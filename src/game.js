@@ -1,7 +1,8 @@
 import { getNeighbors } from './hex.js';
+import config from './gameconfig.js';
 
-export const COLS = 32;
-export const ROWS = 32;
+export const COLS = config.boardCols;
+export const ROWS = config.boardRows;
 
 export const PLAYER = 1;
 export const AI = 2;
@@ -17,17 +18,26 @@ function makeUnit(owner, col, row) {
   return { id: unitIdCounter++, owner, col, row, movedThisTurn: false };
 }
 
+// Spread n columns evenly across the board width
+function spreadCols(n, cols) {
+  if (n === 1) return [Math.floor(cols / 2)];
+  return Array.from({ length: n }, (_, i) =>
+    Math.round((cols - 1) * i / (n - 1))
+  );
+}
+
 export function createInitialState() {
   unitIdCounter = 0;
   const units = [];
 
-  // Human player (south = row ROWS-1), 3 starting units spread across middle cols
-  const humanCols = [12, 16, 20];
-  for (const c of humanCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
+  // Spread starting units evenly across the middle of the board
+  const startingCols = spreadCols(config.startingUnits, COLS);
+
+  // Human player (south = row ROWS-1)
+  for (const c of startingCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
 
   // AI player (north = row 0)
-  const aiCols = [12, 16, 20];
-  for (const c of aiCols) units.push(makeUnit(AI, c, 0));
+  for (const c of startingCols) units.push(makeUnit(AI, c, 0));
 
   return {
     units,

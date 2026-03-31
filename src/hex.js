@@ -1,7 +1,9 @@
 // Hex grid math using offset coordinates (odd-r offset, pointy-top)
 // col = q offset, row = r
 
-export const HEX_SIZE = 22; // radius in px
+import config from './gameconfig.js';
+
+export const HEX_SIZE = config.hexSize;
 
 // Pixel position for a hex at (col, row) — pointy-top, odd-r offset
 export function hexToPixel(col, row) {
@@ -32,11 +34,11 @@ export function getNeighbors(col, row, cols, rows) {
 }
 
 // Hex path for SVG polygon points
-export function hexPoints(cx, cy) {
+export function hexPoints(cx, cy, size = HEX_SIZE) {
   const pts = [];
   for (let i = 0; i < 6; i++) {
     const angle = (Math.PI / 180) * (60 * i - 30); // pointy-top
-    pts.push(`${cx + HEX_SIZE * Math.cos(angle)},${cy + HEX_SIZE * Math.sin(angle)}`);
+    pts.push(`${cx + size * Math.cos(angle)},${cy + size * Math.sin(angle)}`);
   }
   return pts.join(' ');
 }
