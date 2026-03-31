@@ -12,17 +12,19 @@ export function hexToPixel(col, row) {
   return { x, y };
 }
 
-// The 6 neighbor directions for odd and even rows (pointy-top, offset coords)
+// The 6 neighbor directions for odd and even rows (pointy-top, odd-r offset).
+// Odd rows are shifted right by +0.5, so their diagonal neighbors are at col and col+1.
+// Even rows' diagonal neighbors are at col-1 and col.
 const NEIGHBOR_DIRS = {
   even: [
-    [1, 0], [-1, 0],
-    [0, -1], [1, -1],
-    [0, 1], [1, 1],
+    [ 1,  0], [-1,  0],   // right, left
+    [ 0, -1], [-1, -1],   // lower-right, lower-left (row above)
+    [ 0,  1], [-1,  1],   // upper-right, upper-left (row below)
   ],
   odd: [
-    [1, 0], [-1, 0],
-    [-1, -1], [0, -1],
-    [-1, 1], [0, 1],
+    [ 1,  0], [-1,  0],   // right, left
+    [ 1, -1], [ 0, -1],   // lower-right, lower-left (row above)
+    [ 1,  1], [ 0,  1],   // upper-right, upper-left (row below)
   ],
 };
 
