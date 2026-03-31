@@ -71,7 +71,7 @@ export function initRenderer(svgEl) {
       dot.setAttribute('cx', x);
       dot.setAttribute('cy', y);
       dot.setAttribute('r', 2);
-      dot.setAttribute('fill', '#555555');
+      dot.setAttribute('fill', '#A1A1A1');
       dot.setAttribute('pointer-events', 'none');
       dot.setAttribute('id', `dot-${c}-${r}`);
       hexLayer.appendChild(dot);
