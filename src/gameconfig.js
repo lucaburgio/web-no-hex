@@ -3,8 +3,8 @@
 
 const config = {
   // Board dimensions (number of hexes)
-  boardCols: 16,
-  boardRows: 16,
+  boardCols: 8,
+  boardRows: 8,
 
   // Number of units each side starts with
   startingUnits: 3,
