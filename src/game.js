@@ -72,7 +72,7 @@ function updateHexStability(state) {
   for (const [key, hex] of Object.entries(state.hexStates)) {
     if (hex.owner === null) continue;
     const [col, row] = key.split(',').map(Number);
-    const nearby = getHexesWithinDistance(col, row, 2, COLS, ROWS);
+    const nearby = getHexesWithinDistance(col, row, config.productionSafeDistance, COLS, ROWS);
 
     const isStable = nearby.every(([nc, nr]) => {
       const nhex = state.hexStates[`${nc},${nr}`];
@@ -81,7 +81,7 @@ function updateHexStability(state) {
 
     if (isStable) {
       hex.stableFor++;
-      if (hex.stableFor >= 2) hex.isProduction = true;
+      if (hex.stableFor >= config.productionTurns) hex.isProduction = true;
     } else {
       hex.stableFor = 0;
       hex.isProduction = false;
