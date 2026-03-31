@@ -162,6 +162,7 @@ export function renderState(svgEl, state) {
     circle.setAttribute('fill', unit.owner === PLAYER ? COLORS.playerUnit : COLORS.aiUnit);
     circle.setAttribute('stroke', isSelected ? '#aaffaa' : unit.owner === PLAYER ? '#5aaa5a' : '#aa5a5a');
     circle.setAttribute('stroke-width', isSelected ? 2.5 : 1.5);
+    circle.setAttribute('opacity', unit.movedThisTurn ? '0.6' : '1');
     circle.setAttribute('data-col', unit.col);
     circle.setAttribute('data-row', unit.row);
     circle.style.cursor = 'pointer';
@@ -175,6 +176,7 @@ export function renderState(svgEl, state) {
     text.setAttribute('font-family', 'monospace');
     text.setAttribute('fill', '#e0e0e0');
     text.setAttribute('pointer-events', 'none');
+    text.setAttribute('opacity', unit.movedThisTurn ? '0.6' : '1');
     text.textContent = unit.owner === PLAYER ? `P${unit.id}` : `A${unit.id}`;
     unitLayer.appendChild(text);
   }
