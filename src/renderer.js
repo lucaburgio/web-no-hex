@@ -1,20 +1,15 @@
 import { hexToPixel, hexPoints, HEX_SIZE } from './hex.js';
 import { COLS, ROWS, PLAYER, getUnit, getUnitById, isValidProductionPlacement, getValidMoves, isInEnemyZoC } from './game.js';
+import config from './gameconfig.js';
 
-const COLORS = {
-  empty:            '#2C2C2C',
-  emptyStroke:      '#424242',
-  playerOwned:      '#1a3d1a',
-  aiOwned:          '#3d1a1a',
-  playerProduction: '#1a5225',
-  aiProduction:     '#521a1a',
-  selectedUnit:     '#4a8a4a',
-  validMove:        '#2a5a2a',
-  canPlace:         '#0d3d20',
-  zoc:              '#3a1a1a',   // enemy ZoC hex tint
-  playerUnit:       '#3a7a3a',
-  aiUnit:           '#7a3a3a',
-};
+// Corner-bracket dash params — one full cycle = one hex edge (HEX_SIZE)
+// Each bracket leg = BRACKET * HEX_SIZE on each side of a vertex
+const BRACKET     = 0.22;
+const DASH        = HEX_SIZE * BRACKET * 2;        // total dash length
+const GAP         = HEX_SIZE * (1 - BRACKET * 2);  // gap in the middle of each edge
+const DASH_OFFSET = HEX_SIZE * BRACKET;             // centers dash on each vertex
+
+const BG = '#0a0a0a';
 
 // Lerp between two hex colours by t (0→1)
 function lerpColor(hex1, hex2, t) {
@@ -40,7 +35,7 @@ export function initRenderer(svgEl) {
   const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
   bg.setAttribute('width', W);
   bg.setAttribute('height', H);
-  bg.setAttribute('fill', '#111811');
+  bg.setAttribute('fill', BG);
   svgEl.appendChild(bg);
 
   const hexLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -56,16 +51,30 @@ export function initRenderer(svgEl) {
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const { x, y } = hexToPixel(c, r);
+
+      // Hex polygon — bracket dash is baked in; stroke color is toggled in renderState
       const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
       poly.setAttribute('points', hexPoints(x, y));
       poly.setAttribute('id', `hex-${c}-${r}`);
       poly.setAttribute('data-col', c);
       poly.setAttribute('data-row', r);
-      poly.setAttribute('fill', COLORS.empty);
-      poly.setAttribute('stroke', COLORS.emptyStroke);
-      poly.setAttribute('stroke-width', '0.8');
+      poly.setAttribute('fill', BG);
+      poly.setAttribute('stroke', 'transparent');
+      poly.setAttribute('stroke-width', '2.5');
+      poly.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);
+      poly.setAttribute('stroke-dashoffset', DASH_OFFSET);
       poly.style.cursor = 'pointer';
       hexLayer.appendChild(poly);
+
+      // Center dot — shown only on neutral hexes
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', x);
+      dot.setAttribute('cy', y);
+      dot.setAttribute('r', 2);
+      dot.setAttribute('fill', '#555555');
+      dot.setAttribute('pointer-events', 'none');
+      dot.setAttribute('id', `dot-${c}-${r}`);
+      hexLayer.appendChild(dot);
     }
   }
 }
@@ -76,7 +85,6 @@ export function renderState(svgEl, state) {
 
   const selectedUnit = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
 
-  // Valid move targets for selected unit
   const validMoveHexes = new Set();
   if (selectedUnit) {
     for (const [c, r] of getValidMoves(state, selectedUnit)) {
@@ -84,19 +92,17 @@ export function renderState(svgEl, state) {
     }
   }
 
-  // Enemy ZoC hexes (shown during movement phase when nothing is selected)
   const zocHexes = new Set();
   if (state.phase === 'movement' && state.activePlayer === PLAYER) {
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        if (!getUnit(state, c, r) && isInEnemyZoC(state, c, r, state.activePlayer === PLAYER ? 2 : 1)) {
+        if (!getUnit(state, c, r) && isInEnemyZoC(state, c, r, 2)) {
           zocHexes.add(`${c},${r}`);
         }
       }
     }
   }
 
-  // Valid placement hexes during production phase
   const canPlaceHexes = new Set();
   if (state.phase === 'production' && state.activePlayer === PLAYER) {
     for (let r = 0; r < ROWS; r++) {
@@ -106,46 +112,58 @@ export function renderState(svgEl, state) {
     }
   }
 
-  // Update hex fills
+  // Update each hex
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const poly = svgEl.querySelector(`#hex-${c}-${r}`);
+      const dot  = svgEl.querySelector(`#dot-${c}-${r}`);
       if (!poly) continue;
 
-      const key = `${c},${r}`;
+      const key           = `${c},${r}`;
+      const hexState      = state.hexStates[key];
       const isSelectedHex = selectedUnit && c === selectedUnit.col && r === selectedUnit.row;
       const isValidMove   = validMoveHexes.has(key);
       const isZoc         = zocHexes.has(key);
       const canPlace      = canPlaceHexes.has(key);
-      const hexState      = state.hexStates[key];
+      const isConquered   = !!hexState;
+
+      // Dot: hide when hex is conquered or highlighted
+      if (dot) dot.setAttribute('opacity', isConquered || isSelectedHex || isValidMove || canPlace ? '0' : '0.5');
+
+      // Determine fill + bracket stroke color
+      let fill   = BG;
+      let stroke = 'transparent';
 
       if (isSelectedHex) {
-        poly.setAttribute('fill', COLORS.selectedUnit);
+        fill   = '#1e2e1e';
+        stroke = config.playerColor;
       } else if (isValidMove) {
-        poly.setAttribute('fill', COLORS.validMove);
-      } else if (isZoc) {
-        poly.setAttribute('fill', COLORS.zoc);
-      } else if (hexState) {
-        if (hexState.isProduction) {
-          poly.setAttribute('fill', hexState.owner === PLAYER ? COLORS.playerProduction : COLORS.aiProduction);
-        } else {
-          poly.setAttribute('fill', hexState.owner === PLAYER ? COLORS.playerOwned : COLORS.aiOwned);
-        }
+        fill   = '#0d200d';
+        stroke = config.playerColor;
+      } else if (isConquered) {
+        const ownerColor = hexState.owner === PLAYER ? config.playerColor : config.aiColor;
+        fill   = hexState.owner === PLAYER ? '#141414' : '#180606';
+        stroke = isZoc ? ownerColor : ownerColor;  // always show bracket on conquered
       } else if (canPlace) {
-        poly.setAttribute('fill', COLORS.canPlace);
-      } else {
-        poly.setAttribute('fill', COLORS.empty);
+        fill   = '#0a1a10';
+        stroke = config.playerColor;
+      } else if (isZoc) {
+        fill   = '#160404';
+        stroke = 'transparent';
       }
 
-      // Remove old production marker and redraw if needed
+      poly.setAttribute('fill', fill);
+      poly.setAttribute('stroke', stroke);
+
+      // Production marker
       svgEl.querySelector(`#marker-${c}-${r}`)?.remove();
       if (hexState && hexState.isProduction && !isSelectedHex && !isValidMove) {
         const { x, y } = hexToPixel(c, r);
-        const s = HEX_SIZE * 0.22;
+        const s = HEX_SIZE * 0.18;
         const diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         diamond.setAttribute('points', `${x},${y - s} ${x + s},${y} ${x},${y + s} ${x - s},${y}`);
-        diamond.setAttribute('fill', hexState.owner === PLAYER ? '#3aff6a' : '#ff3a3a');
-        diamond.setAttribute('opacity', '0.35');
+        diamond.setAttribute('fill', hexState.owner === PLAYER ? config.playerColor : config.aiColor);
+        diamond.setAttribute('opacity', '0.4');
         diamond.setAttribute('pointer-events', 'none');
         diamond.setAttribute('id', `marker-${c}-${r}`);
         svgEl.querySelector('#hex-layer').appendChild(diamond);
@@ -153,67 +171,50 @@ export function renderState(svgEl, state) {
     }
   }
 
-  // Apply canPlace tint only where territory doesn't already colour it
-  for (const key of canPlaceHexes) {
-    const [c, r] = key.split(',').map(Number);
-    const poly = svgEl.querySelector(`#hex-${c}-${r}`);
-    if (!poly) continue;
-    const hexState = state.hexStates[key];
-    if (!hexState || hexState.owner !== PLAYER) poly.setAttribute('fill', COLORS.canPlace);
-  }
-
   // Draw units
   for (const unit of state.units) {
     const { x, y } = hexToPixel(unit.col, unit.row);
-    const isSelected  = state.selectedUnit === unit.id;
-    const hpRatio     = unit.hp / unit.maxHp;
+    const isSelected = state.selectedUnit === unit.id;
+    const hpRatio    = unit.hp / unit.maxHp;
 
-    // Wounded tint: lerp unit color toward grey as HP drops
-    const baseColor = unit.owner === PLAYER ? COLORS.playerUnit : COLORS.aiUnit;
-    const fill = lerpColor(baseColor, '#555555', 1 - hpRatio);
+    const baseColor = unit.owner === PLAYER ? config.playerColor : config.aiColor;
+    const fill      = lerpColor(baseColor, '#333333', 1 - hpRatio);
+    const opacity   = unit.movedThisTurn ? '0.25' : '1';
 
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     circle.setAttribute('cx', x);
     circle.setAttribute('cy', y);
-    circle.setAttribute('r', HEX_SIZE * 0.65);
+    circle.setAttribute('r', HEX_SIZE * 0.55);
     circle.setAttribute('fill', fill);
-    circle.setAttribute('stroke', isSelected ? '#aaffaa' : unit.owner === PLAYER ? '#5aaa5a' : '#aa5a5a');
-    circle.setAttribute('stroke-width', isSelected ? 2.5 : 1.5);
-    circle.setAttribute('opacity', unit.movedThisTurn ? '0.2' : '1');
+    circle.setAttribute('stroke', isSelected ? baseColor : lerpColor(baseColor, '#000000', 0.3));
+    circle.setAttribute('stroke-width', isSelected ? 2.5 : 1.2);
+    circle.setAttribute('opacity', opacity);
     circle.setAttribute('data-col', unit.col);
     circle.setAttribute('data-row', unit.row);
     circle.style.cursor = 'pointer';
     unitLayer.appendChild(circle);
 
     // HP bar
-    const barW = HEX_SIZE * 1.1;
-    const barH = HEX_SIZE * 0.18;
+    const barW = HEX_SIZE * 1.0;
+    const barH = HEX_SIZE * 0.14;
     const barX = x - barW / 2;
-    const barY = y + HEX_SIZE * 0.72;
+    const barY = y + HEX_SIZE * 0.64;
 
-    // Background
     const barBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    barBg.setAttribute('x', barX);
-    barBg.setAttribute('y', barY);
-    barBg.setAttribute('width', barW);
-    barBg.setAttribute('height', barH);
-    barBg.setAttribute('fill', '#222');
-    barBg.setAttribute('rx', 2);
+    barBg.setAttribute('x', barX); barBg.setAttribute('y', barY);
+    barBg.setAttribute('width', barW); barBg.setAttribute('height', barH);
+    barBg.setAttribute('fill', '#222'); barBg.setAttribute('rx', 1);
     barBg.setAttribute('pointer-events', 'none');
-    barBg.setAttribute('opacity', unit.movedThisTurn ? '0.2' : '1');
+    barBg.setAttribute('opacity', opacity);
     unitLayer.appendChild(barBg);
 
-    // Fill
-    const barColor = hpRatio > 0.6 ? '#4aaa4a' : hpRatio > 0.3 ? '#aaaa22' : '#aa3a3a';
+    const barColor = hpRatio > 0.6 ? '#aaaaaa' : hpRatio > 0.3 ? '#888822' : '#882222';
     const barFill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    barFill.setAttribute('x', barX);
-    barFill.setAttribute('y', barY);
-    barFill.setAttribute('width', barW * hpRatio);
-    barFill.setAttribute('height', barH);
-    barFill.setAttribute('fill', barColor);
-    barFill.setAttribute('rx', 2);
+    barFill.setAttribute('x', barX); barFill.setAttribute('y', barY);
+    barFill.setAttribute('width', barW * hpRatio); barFill.setAttribute('height', barH);
+    barFill.setAttribute('fill', barColor); barFill.setAttribute('rx', 1);
     barFill.setAttribute('pointer-events', 'none');
-    barFill.setAttribute('opacity', unit.movedThisTurn ? '0.2' : '1');
+    barFill.setAttribute('opacity', opacity);
     unitLayer.appendChild(barFill);
 
     // Label
@@ -223,9 +224,9 @@ export function renderState(svgEl, state) {
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('font-size', '9');
     text.setAttribute('font-family', 'monospace');
-    text.setAttribute('fill', '#e0e0e0');
+    text.setAttribute('fill', unit.owner === PLAYER ? '#0a0a0a' : '#ffffff');
     text.setAttribute('pointer-events', 'none');
-    text.setAttribute('opacity', unit.movedThisTurn ? '0.2' : '1');
+    text.setAttribute('opacity', opacity);
     text.textContent = unit.owner === PLAYER ? `P${unit.id}` : `A${unit.id}`;
     unitLayer.appendChild(text);
   }

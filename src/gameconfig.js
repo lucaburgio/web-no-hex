@@ -49,6 +49,10 @@ const config = {
 
   // Whether Zone of Control is active (blocks free movement past enemies)
   zoneOfControl: true,
+
+  // ── Player colors ────────────────────────────────────────────────────────────
+  playerColor: '#ffffff',
+  aiColor:     '#ee3333',
 };
 
 export default config;
