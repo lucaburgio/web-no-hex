@@ -25,7 +25,7 @@ updateUI();
 
 svg.addEventListener('click', e => {
   if (state.winner) return;
-  const hex = getHexFromEvent(svg, e);
+  const hex = getHexFromEvent(e);
   if (!hex) return;
   const { col, row } = hex;
 

@@ -1,9 +1,9 @@
 import { hexToPixel, hexPoints, getNeighbors, HEX_SIZE } from './hex.js';
-import { COLS, ROWS, PLAYER, AI, getUnit, getUnitById, isValidProductionPlacement } from './game.js';
+import { COLS, ROWS, PLAYER, getUnit, getUnitById, isValidProductionPlacement } from './game.js';
 
 const COLORS = {
-  empty:            '#1a2a1a',
-  emptyStroke:      '#2d4a2d',
+  empty:            '#c8c8c8',
+  emptyStroke:      '#f3f3f3',
   // Territory — conquered but not yet production
   playerOwned:      '#1a3d1a',
   aiOwned:          '#3d1a1a',
@@ -122,9 +122,6 @@ export function renderState(svgEl, state) {
       if (existingMarker) existingMarker.remove();
       if (hexState && hexState.isProduction && !isSelectedHex && !isValidMove) {
         const { x, y } = hexToPixel(c, r);
-        const margin = HEX_SIZE * 2;
-        const mx = x + margin; // account for group transform
-        const my = y + margin;
         // small diamond
         const diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         const s = HEX_SIZE * 0.22;
@@ -182,7 +179,7 @@ export function renderState(svgEl, state) {
   }
 }
 
-export function getHexFromEvent(svgEl, e) {
+export function getHexFromEvent(e) {
   const target = e.target.closest('[data-col]');
   if (!target) return null;
   return { col: parseInt(target.dataset.col), row: parseInt(target.dataset.row) };
