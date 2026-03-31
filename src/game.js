@@ -7,15 +7,19 @@ export const ROWS = config.boardRows;
 export const PLAYER = 1;
 export const AI = 2;
 
-// Unit stats
-const ATK = 1;
-const DEF = 2;
-
-export const PHASES = ['production', 'movement', 'end'];
-
 let unitIdCounter = 0;
 function makeUnit(owner, col, row) {
-  return { id: unitIdCounter++, owner, col, row, movedThisTurn: false };
+  return {
+    id: unitIdCounter++,
+    owner,
+    col,
+    row,
+    movedThisTurn: false,
+    attackedThisTurn: false,
+    hp: config.unitMaxHp,
+    maxHp: config.unitMaxHp,
+    strength: config.unitBaseStrength,
+  };
 }
 
 // Spread n columns evenly across the board width
@@ -42,7 +46,6 @@ function conquerHex(state, col, row, owner) {
   }
 }
 
-// Returns all hexes at distance 1..dist from (col, row)
 function getHexesWithinDistance(col, row, dist, cols, rows) {
   const visited = new Set([`${col},${row}`]);
   let frontier = [[col, row]];
@@ -64,10 +67,6 @@ function getHexesWithinDistance(col, row, dist, cols, rows) {
   return result;
 }
 
-// Called at end of each full turn. A hex is stable when every hex within
-// distance 2 is owned by the same player (no neutral, no enemy).
-// After 2 consecutive stable turns it becomes a production hex.
-// Losing the stability condition immediately removes production status.
 function updateHexStability(state) {
   for (const [key, hex] of Object.entries(state.hexStates)) {
     if (hex.owner === null) continue;
@@ -99,12 +98,36 @@ export function getUnitById(state, id) {
   return state.units.find(u => u.id === id) ?? null;
 }
 
-// Returns true if (col, row) is a valid production placement for the player
 export function isValidProductionPlacement(state, col, row) {
   if (getUnit(state, col, row)) return false;
   if (row === ROWS - 1) return true;
   const hex = state.hexStates[`${col},${row}`];
   return !!(hex && hex.isProduction && hex.owner === PLAYER);
+}
+
+// Returns true if (col,row) is under ZoC from any unit belonging to `enemyOwner`
+export function isInEnemyZoC(state, col, row, enemyOwner) {
+  if (!config.zoneOfControl) return false;
+  const neighbors = getNeighbors(col, row, COLS, ROWS);
+  return neighbors.some(([nc, nr]) => {
+    const u = getUnit(state, nc, nr);
+    return u && u.owner === enemyOwner;
+  });
+}
+
+// Valid destination hexes for a unit (respects ZoC)
+export function getValidMoves(state, unit) {
+  const enemy = unit.owner === PLAYER ? AI : PLAYER;
+  return getNeighbors(unit.col, unit.row, COLS, ROWS).filter(([c, r]) => {
+    const occupant = getUnit(state, c, r);
+    // Can't move onto own unit
+    if (occupant && occupant.owner === unit.owner) return false;
+    // Can always attack an adjacent enemy
+    if (occupant && occupant.owner === enemy) return true;
+    // ZoC: can't move to an empty hex that is adjacent to an enemy
+    if (isInEnemyZoC(state, c, r, enemy)) return false;
+    return true;
+  });
 }
 
 function removeUnit(state, id) {
@@ -113,6 +136,101 @@ function removeUnit(state, id) {
 
 function log(state, msg) {
   state.log = [msg, ...state.log.slice(0, 49)];
+}
+
+// ── Combat ────────────────────────────────────────────────────────────────────
+
+// Count friendly units (same side as attacker) adjacent to the defender,
+// excluding the attacker itself — these provide flanking bonus.
+function getFlankingCount(state, attacker, defender) {
+  const neighbors = getNeighbors(defender.col, defender.row, COLS, ROWS);
+  let count = 0;
+  for (const [nc, nr] of neighbors) {
+    if (nc === attacker.col && nr === attacker.row) continue; // attacker itself doesn't count
+    const u = getUnit(state, nc, nr);
+    if (u && u.owner === attacker.owner) count++;
+  }
+  return Math.min(count, config.maxFlankingUnits);
+}
+
+function effectiveCS(unit, flankingCount = 0) {
+  const hpRatio = unit.hp / unit.maxHp;
+  const woundedMult = 0.5 + 0.5 * hpRatio;
+  const flankMult = 1 + flankingCount * config.flankingBonus;
+  return unit.strength * woundedMult * flankMult;
+}
+
+function resolveCombat(state, attacker, defender) {
+  const flanking = getFlankingCount(state, attacker, defender);
+  const csA = effectiveCS(attacker, flanking);
+  const csD = effectiveCS(defender, 0);
+  const delta = csA - csD;
+  const scale = config.combatStrengthScale;
+  const base  = config.combatDamageBase;
+
+  const dmgToDefender = Math.max(1, Math.floor(base * Math.exp( delta / scale)));
+  const dmgToAttacker = Math.max(1, Math.floor(base * Math.exp(-delta / scale)));
+
+  const flankStr = flanking > 0 ? ` (${flanking} flanker${flanking > 1 ? 's' : ''})` : '';
+  log(state, `Combat: #${attacker.id} [${Math.round(csA)}CS] vs #${defender.id} [${Math.round(csD)}CS]${flankStr} → dealt ${dmgToDefender}/${dmgToAttacker} dmg`);
+
+  // Apply damage simultaneously
+  attacker.hp -= dmgToAttacker;
+  defender.hp -= dmgToDefender;
+  attacker.attackedThisTurn = true;
+  defender.attackedThisTurn = true;
+
+  const attackerDied = attacker.hp <= 0;
+  const defenderDied = defender.hp <= 0;
+
+  if (defenderDied) {
+    log(state, `Unit #${defender.id} was destroyed.`);
+    removeUnit(state, defender.id);
+    if (!attackerDied) {
+      attacker.col = defender.col;
+      attacker.row = defender.row;
+      conquerHex(state, attacker.col, attacker.row, attacker.owner);
+    }
+  }
+  if (attackerDied) {
+    log(state, `Unit #${attacker.id} was destroyed.`);
+    removeUnit(state, attacker.id);
+  }
+  if (!attackerDied && !defenderDied) {
+    log(state, `Both units survived (${attacker.hp}/${defender.hp} HP remaining).`);
+  }
+}
+
+// ── Victory check ─────────────────────────────────────────────────────────────
+
+function checkVictory(state) {
+  const humanAtNorth = state.units.some(u => u.owner === PLAYER && u.row === 0);
+  const aiAtSouth    = state.units.some(u => u.owner === AI && u.row === ROWS - 1);
+  const noHuman      = !state.units.some(u => u.owner === PLAYER);
+  const noAI         = !state.units.some(u => u.owner === AI);
+
+  if (humanAtNorth || noAI) state.winner = PLAYER;
+  else if (aiAtSouth || noHuman) state.winner = AI;
+}
+
+// ── Healing ───────────────────────────────────────────────────────────────────
+
+function healUnits(state) {
+  for (const unit of state.units) {
+    if (unit.attackedThisTurn) {
+      unit.attackedThisTurn = false;
+      continue;
+    }
+    const hexState = state.hexStates[`${unit.col},${unit.row}`];
+    const owner = hexState ? hexState.owner : null;
+    const heal = owner === unit.owner
+      ? config.healOwnTerritory
+      : owner === null
+        ? config.healNeutral
+        : config.healEnemyTerritory;
+    unit.hp = Math.min(unit.maxHp, unit.hp + heal);
+    unit.attackedThisTurn = false;
+  }
 }
 
 // ── Initial state ─────────────────────────────────────────────────────────────
@@ -125,7 +243,6 @@ export function createInitialState() {
   for (const c of startingCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
   for (const c of startingCols) units.push(makeUnit(AI, c, 0));
 
-  // Conquer starting positions
   const hexStates = {};
   for (const u of units) {
     hexStates[`${u.col},${u.row}`] = { owner: u.owner, stableFor: 0, isProduction: false };
@@ -141,35 +258,6 @@ export function createInitialState() {
     log: ['Game started. Your turn — Production phase.'],
     winner: null,
   };
-}
-
-// ── Combat ────────────────────────────────────────────────────────────────────
-
-function resolveCombat(state, attacker, defender) {
-  const result = ATK - DEF;
-  if (result > 0) {
-    log(state, `Combat: unit #${attacker.id} defeated unit #${defender.id}!`);
-    removeUnit(state, defender.id);
-    attacker.col = defender.col;
-    attacker.row = defender.row;
-    conquerHex(state, attacker.col, attacker.row, attacker.owner);
-  } else {
-    log(state, `Combat: unit #${attacker.id} was repelled by unit #${defender.id}.`);
-    removeUnit(state, attacker.id);
-  }
-  return state;
-}
-
-// ── Victory check ─────────────────────────────────────────────────────────────
-
-function checkVictory(state) {
-  const humanAtNorth = state.units.some(u => u.owner === PLAYER && u.row === 0);
-  const aiAtSouth    = state.units.some(u => u.owner === AI && u.row === ROWS - 1);
-  const noHuman      = !state.units.some(u => u.owner === PLAYER);
-  const noAI         = !state.units.some(u => u.owner === AI);
-
-  if (humanAtNorth || noAI) state.winner = PLAYER;
-  else if (aiAtSouth || noHuman) state.winner = AI;
 }
 
 // ── Production ────────────────────────────────────────────────────────────────
@@ -191,12 +279,9 @@ export function playerPlaceUnit(state, col, row) {
 export function aiProduction(state) {
   const candidates = [];
 
-  // Home border
   for (let c = 0; c < COLS; c++) {
     if (!getUnit(state, c, 0)) candidates.push([c, 0]);
   }
-
-  // AI production hexes away from home border
   for (const [key, hex] of Object.entries(state.hexStates)) {
     if (hex.owner === AI && hex.isProduction) {
       const [c, r] = key.split(',').map(Number);
@@ -241,9 +326,14 @@ export function playerMoveUnit(state, col, row) {
   const unit = getUnitById(state, state.selectedUnit);
   if (!unit) { state.selectedUnit = null; return state; }
 
-  const neighbors = getNeighbors(unit.col, unit.row, COLS, ROWS);
-  if (!neighbors.some(([c, r]) => c === col && r === row)) {
-    log(state, 'Invalid move: not adjacent.');
+  const validMoves = getValidMoves(state, unit);
+  if (!validMoves.some(([c, r]) => c === col && r === row)) {
+    const occupant = getUnit(state, col, row);
+    if (occupant && occupant.owner !== PLAYER) {
+      log(state, 'Cannot attack: enemy is outside movement range or blocked by ZoC.');
+    } else {
+      log(state, 'Invalid move: blocked by Zone of Control or not adjacent.');
+    }
     return state;
   }
 
@@ -281,17 +371,18 @@ export function aiMovement(state) {
     const humanUnits = state.units.filter(u => u.owner === PLAYER);
     if (humanUnits.length === 0) break;
 
-    let bestNeighbor = null;
+    const validMoves = getValidMoves(state, unit);
+    let bestTarget = null;
     let bestDist = Infinity;
-    const neighbors = getNeighbors(unit.col, unit.row, COLS, ROWS);
 
-    for (const [nc, nr] of neighbors) {
+    for (const [nc, nr] of validMoves) {
       const occupant = getUnit(state, nc, nr);
-      if (occupant && occupant.owner === AI) continue;
 
+      // Attack immediately if reachable
       if (occupant && occupant.owner === PLAYER) {
         resolveCombat(state, unit, occupant);
         checkVictory(state);
+        bestTarget = null; // already moved via combat
         break;
       }
 
@@ -300,18 +391,15 @@ export function aiMovement(state) {
       ));
       if (minDist < bestDist) {
         bestDist = minDist;
-        bestNeighbor = [nc, nr];
+        bestTarget = [nc, nr];
       }
     }
 
-    if (bestNeighbor && !unit.movedThisTurn) {
-      const existing = getUnit(state, bestNeighbor[0], bestNeighbor[1]);
-      if (!existing) {
-        unit.movedThisTurn = true;
-        unit.col = bestNeighbor[0];
-        unit.row = bestNeighbor[1];
-        conquerHex(state, unit.col, unit.row, AI);
-      }
+    if (bestTarget && !unit.movedThisTurn) {
+      unit.movedThisTurn = true;
+      unit.col = bestTarget[0];
+      unit.row = bestTarget[1];
+      conquerHex(state, unit.col, unit.row, AI);
     }
   }
   log(state, 'AI completed movement.');
@@ -336,6 +424,7 @@ export function advancePhase(state) {
       state.units.forEach(u => { if (u.owner === AI) u.movedThisTurn = false; });
       state = aiMovement(state);
       if (state.winner) return state;
+      healUnits(state);
       updateHexStability(state);
       state.turn += 1;
       state.phase = 'production';

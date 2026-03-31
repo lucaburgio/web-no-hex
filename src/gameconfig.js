@@ -17,6 +17,38 @@ const config = {
 
   // Minimum distance to any neutral or enemy hex required for stability
   productionSafeDistance: 2,
+
+  // ── Combat ──────────────────────────────────────────────────────────────────
+
+  // Max hit points for a unit
+  unitMaxHp: 10,
+
+  // Base combat strength for all units
+  unitBaseStrength: 10,
+
+  // Damage dealt when both sides have exactly equal effective strength
+  combatDamageBase: 3,
+
+  // Divisor in the exponential formula — higher = flatter damage curve
+  combatStrengthScale: 10,
+
+  // CS bonus per flanking unit adjacent to the defender
+  flankingBonus: 0.15,
+
+  // Maximum number of flanking units that contribute a bonus
+  maxFlankingUnits: 2,
+
+  // HP recovered per turn when unit is on owned territory
+  healOwnTerritory: 2,
+
+  // HP recovered per turn when unit is on neutral territory
+  healNeutral: 1,
+
+  // HP recovered per turn when unit is on enemy territory (0 = no healing)
+  healEnemyTerritory: 0,
+
+  // Whether Zone of Control is active (blocks free movement past enemies)
+  zoneOfControl: true,
 };
 
 export default config;
