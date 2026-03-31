@@ -35,6 +35,16 @@ web-strategic/
 - Defense strength: **2**
 - Combat resolution: `(attacker ATK) - (defender DEF)` → negative/zero = attacker loses; positive = defender loses
 
+### Territory (hexStates)
+- Each hex starts neutral. A unit moving onto a hex conquers it (owner = that player).
+- An enemy unit moving onto a conquered hex converts it.
+- **Stability counter:** each turn end, a conquered hex checks all hexes within distance 2.
+  If every one is owned by the same player (no neutral, no enemy), `stableFor` increments.
+  After 2 consecutive stable turns → `isProduction = true`.
+  If the condition breaks, `stableFor` resets to 0 and production status is lost immediately.
+- **Production hexes:** player (or AI) can spawn a new unit there on the production phase,
+  in addition to the home border row.
+
 ### Victory
 - Reach the opponent's home row, or eliminate all enemy units.
 

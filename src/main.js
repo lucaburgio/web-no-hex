@@ -5,7 +5,7 @@ import {
   playerMoveUnit,
   playerEndMovement,
   getUnit,
-  PLAYER, ROWS,
+  PLAYER,
 } from './game.js';
 import { initRenderer, renderState, getHexFromEvent } from './renderer.js';
 
@@ -30,11 +30,7 @@ svg.addEventListener('click', e => {
   const { col, row } = hex;
 
   if (state.phase === 'production' && state.activePlayer === PLAYER) {
-    if (row === ROWS - 1) {
-      state = playerPlaceUnit(state, col);
-    } else {
-      flashLog('Place your unit on the bottom border row.');
-    }
+    state = playerPlaceUnit(state, col, row);
   } else if (state.phase === 'movement' && state.activePlayer === PLAYER) {
     if (state.selectedUnit === null) {
       state = playerSelectUnit(state, col, row);

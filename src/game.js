@@ -26,32 +26,70 @@ function spreadCols(n, cols) {
   );
 }
 
-export function createInitialState() {
-  unitIdCounter = 0;
-  const units = [];
+// ── Hex territory ─────────────────────────────────────────────────────────────
 
-  // Spread starting units evenly across the middle of the board
-  const startingCols = spreadCols(config.startingUnits, COLS);
-
-  // Human player (south = row ROWS-1)
-  for (const c of startingCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
-
-  // AI player (north = row 0)
-  for (const c of startingCols) units.push(makeUnit(AI, c, 0));
-
-  return {
-    units,
-    turn: 1,
-    phase: 'production',        // current phase
-    activePlayer: PLAYER,       // whose sub-turn within phase
-    phaseStep: 0,               // 0 = player, 1 = AI
-    selectedUnit: null,         // id of selected unit (movement phase)
-    log: ['Game started. Your turn — Production phase.'],
-    winner: null,
-  };
+function conquerHex(state, col, row, owner) {
+  const key = `${col},${row}`;
+  const existing = state.hexStates[key];
+  if (existing) {
+    if (existing.owner !== owner) {
+      existing.owner = owner;
+      existing.stableFor = 0;
+      existing.isProduction = false;
+    }
+  } else {
+    state.hexStates[key] = { owner, stableFor: 0, isProduction: false };
+  }
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// Returns all hexes at distance 1..dist from (col, row)
+function getHexesWithinDistance(col, row, dist, cols, rows) {
+  const visited = new Set([`${col},${row}`]);
+  let frontier = [[col, row]];
+  const result = [];
+  for (let d = 0; d < dist; d++) {
+    const next = [];
+    for (const [c, r] of frontier) {
+      for (const [nc, nr] of getNeighbors(c, r, cols, rows)) {
+        const key = `${nc},${nr}`;
+        if (!visited.has(key)) {
+          visited.add(key);
+          result.push([nc, nr]);
+          next.push([nc, nr]);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return result;
+}
+
+// Called at end of each full turn. A hex is stable when every hex within
+// distance 2 is owned by the same player (no neutral, no enemy).
+// After 2 consecutive stable turns it becomes a production hex.
+// Losing the stability condition immediately removes production status.
+function updateHexStability(state) {
+  for (const [key, hex] of Object.entries(state.hexStates)) {
+    if (hex.owner === null) continue;
+    const [col, row] = key.split(',').map(Number);
+    const nearby = getHexesWithinDistance(col, row, 2, COLS, ROWS);
+
+    const isStable = nearby.every(([nc, nr]) => {
+      const nhex = state.hexStates[`${nc},${nr}`];
+      return nhex && nhex.owner === hex.owner;
+    });
+
+    if (isStable) {
+      hex.stableFor++;
+      if (hex.stableFor >= 2) hex.isProduction = true;
+    } else {
+      hex.stableFor = 0;
+      hex.isProduction = false;
+    }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 export function getUnit(state, col, row) {
   return state.units.find(u => u.col === col && u.row === row) ?? null;
@@ -59,6 +97,14 @@ export function getUnit(state, col, row) {
 
 export function getUnitById(state, id) {
   return state.units.find(u => u.id === id) ?? null;
+}
+
+// Returns true if (col, row) is a valid production placement for the player
+export function isValidProductionPlacement(state, col, row) {
+  if (getUnit(state, col, row)) return false;
+  if (row === ROWS - 1) return true;
+  const hex = state.hexStates[`${col},${row}`];
+  return !!(hex && hex.isProduction && hex.owner === PLAYER);
 }
 
 function removeUnit(state, id) {
@@ -69,67 +115,108 @@ function log(state, msg) {
   state.log = [msg, ...state.log.slice(0, 49)];
 }
 
-// ── Combat ───────────────────────────────────────────────────────────────────
-// Returns updated state; attacker moves onto defender's hex if wins
+// ── Initial state ─────────────────────────────────────────────────────────────
+
+export function createInitialState() {
+  unitIdCounter = 0;
+  const units = [];
+  const startingCols = spreadCols(config.startingUnits, COLS);
+
+  for (const c of startingCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
+  for (const c of startingCols) units.push(makeUnit(AI, c, 0));
+
+  // Conquer starting positions
+  const hexStates = {};
+  for (const u of units) {
+    hexStates[`${u.col},${u.row}`] = { owner: u.owner, stableFor: 0, isProduction: false };
+  }
+
+  return {
+    units,
+    hexStates,
+    turn: 1,
+    phase: 'production',
+    activePlayer: PLAYER,
+    selectedUnit: null,
+    log: ['Game started. Your turn — Production phase.'],
+    winner: null,
+  };
+}
+
+// ── Combat ────────────────────────────────────────────────────────────────────
+
 function resolveCombat(state, attacker, defender) {
-  const result = ATK - DEF; // 1 - 2 = -1 → attacker loses; to win ATK must > DEF
+  const result = ATK - DEF;
   if (result > 0) {
-    // attacker wins
     log(state, `Combat: unit #${attacker.id} defeated unit #${defender.id}!`);
     removeUnit(state, defender.id);
     attacker.col = defender.col;
     attacker.row = defender.row;
+    conquerHex(state, attacker.col, attacker.row, attacker.owner);
   } else {
-    // defender wins (or tie → attacker loses)
     log(state, `Combat: unit #${attacker.id} was repelled by unit #${defender.id}.`);
     removeUnit(state, attacker.id);
   }
   return state;
 }
 
-// ── Victory check ────────────────────────────────────────────────────────────
+// ── Victory check ─────────────────────────────────────────────────────────────
+
 function checkVictory(state) {
-  // Reach opponent's home row
   const humanAtNorth = state.units.some(u => u.owner === PLAYER && u.row === 0);
-  const aiAtSouth = state.units.some(u => u.owner === AI && u.row === ROWS - 1);
-  const noHuman = !state.units.some(u => u.owner === PLAYER);
-  const noAI = !state.units.some(u => u.owner === AI);
+  const aiAtSouth    = state.units.some(u => u.owner === AI && u.row === ROWS - 1);
+  const noHuman      = !state.units.some(u => u.owner === PLAYER);
+  const noAI         = !state.units.some(u => u.owner === AI);
 
   if (humanAtNorth || noAI) state.winner = PLAYER;
   else if (aiAtSouth || noHuman) state.winner = AI;
 }
 
-// ── Production ───────────────────────────────────────────────────────────────
+// ── Production ────────────────────────────────────────────────────────────────
 
-export function playerPlaceUnit(state, col) {
+export function playerPlaceUnit(state, col, row) {
   if (state.phase !== 'production' || state.activePlayer !== PLAYER) return state;
-  const row = ROWS - 1;
-  if (getUnit(state, col, row)) {
-    log(state, 'That hex is occupied. Choose another column.');
+
+  if (!isValidProductionPlacement(state, col, row)) {
+    log(state, 'Place on your border row or a production hex (empty).');
     return state;
   }
+
   state.units.push(makeUnit(PLAYER, col, row));
+  conquerHex(state, col, row, PLAYER);
   log(state, `You placed a unit at (${col}, ${row}).`);
   return advancePhase(state);
 }
 
 export function aiProduction(state) {
-  const row = 0;
-  const available = [];
+  const candidates = [];
+
+  // Home border
   for (let c = 0; c < COLS; c++) {
-    if (!getUnit(state, c, row)) available.push(c);
+    if (!getUnit(state, c, 0)) candidates.push([c, 0]);
   }
-  if (available.length === 0) {
-    log(state, 'AI: no space on border to place unit.');
+
+  // AI production hexes away from home border
+  for (const [key, hex] of Object.entries(state.hexStates)) {
+    if (hex.owner === AI && hex.isProduction) {
+      const [c, r] = key.split(',').map(Number);
+      if (r !== 0 && !getUnit(state, c, r)) candidates.push([c, r]);
+    }
+  }
+
+  if (candidates.length === 0) {
+    log(state, 'AI: no space to place a unit.');
     return state;
   }
-  const col = available[Math.floor(Math.random() * available.length)];
+
+  const [col, row] = candidates[Math.floor(Math.random() * candidates.length)];
   state.units.push(makeUnit(AI, col, row));
-  log(state, `AI placed a unit at (${col}, 0).`);
+  conquerHex(state, col, row, AI);
+  log(state, `AI placed a unit at (${col}, ${row}).`);
   return state;
 }
 
-// ── Movement ─────────────────────────────────────────────────────────────────
+// ── Movement ──────────────────────────────────────────────────────────────────
 
 export function playerSelectUnit(state, col, row) {
   if (state.phase !== 'movement' || state.activePlayer !== PLAYER) return state;
@@ -155,8 +242,7 @@ export function playerMoveUnit(state, col, row) {
   if (!unit) { state.selectedUnit = null; return state; }
 
   const neighbors = getNeighbors(unit.col, unit.row, COLS, ROWS);
-  const isNeighbor = neighbors.some(([c, r]) => c === col && r === row);
-  if (!isNeighbor) {
+  if (!neighbors.some(([c, r]) => c === col && r === row)) {
     log(state, 'Invalid move: not adjacent.');
     return state;
   }
@@ -175,6 +261,7 @@ export function playerMoveUnit(state, col, row) {
   } else {
     unit.col = col;
     unit.row = row;
+    conquerHex(state, col, row, PLAYER);
     log(state, `Moved unit #${unit.id} to (${col}, ${row}).`);
   }
 
@@ -194,7 +281,6 @@ export function aiMovement(state) {
     const humanUnits = state.units.filter(u => u.owner === PLAYER);
     if (humanUnits.length === 0) break;
 
-    // Find closest human unit
     let bestNeighbor = null;
     let bestDist = Infinity;
     const neighbors = getNeighbors(unit.col, unit.row, COLS, ROWS);
@@ -203,19 +289,15 @@ export function aiMovement(state) {
       const occupant = getUnit(state, nc, nr);
       if (occupant && occupant.owner === AI) continue;
 
-      // If enemy, attack
       if (occupant && occupant.owner === PLAYER) {
         resolveCombat(state, unit, occupant);
         checkVictory(state);
         break;
       }
 
-      // Pick neighbor closer to nearest human unit
-      const minDist = Math.min(...humanUnits.map(h => {
-        const dr = Math.abs(h.row - nr);
-        const dc = Math.abs(h.col - nc);
-        return dr + dc;
-      }));
+      const minDist = Math.min(...humanUnits.map(h =>
+        Math.abs(h.row - nr) + Math.abs(h.col - nc)
+      ));
       if (minDist < bestDist) {
         bestDist = minDist;
         bestNeighbor = [nc, nr];
@@ -228,6 +310,7 @@ export function aiMovement(state) {
         unit.movedThisTurn = true;
         unit.col = bestNeighbor[0];
         unit.row = bestNeighbor[1];
+        conquerHex(state, unit.col, unit.row, AI);
       }
     }
   }
@@ -235,28 +318,25 @@ export function aiMovement(state) {
   return state;
 }
 
-// ── Phase advancement ────────────────────────────────────────────────────────
+// ── Phase advancement ─────────────────────────────────────────────────────────
 
 export function advancePhase(state) {
   if (state.winner) return state;
 
   if (state.phase === 'production') {
     if (state.activePlayer === PLAYER) {
-      // AI does production immediately
       state = aiProduction(state);
       state.phase = 'movement';
       state.activePlayer = PLAYER;
-      // Reset moved flags for player units
       state.units.forEach(u => { if (u.owner === PLAYER) u.movedThisTurn = false; });
       log(state, `Turn ${state.turn} — Movement phase. Click a unit then a hex.`);
     }
   } else if (state.phase === 'movement') {
     if (state.activePlayer === PLAYER) {
-      // AI takes its movement turn
       state.units.forEach(u => { if (u.owner === AI) u.movedThisTurn = false; });
       state = aiMovement(state);
       if (state.winner) return state;
-      // Advance to next turn
+      updateHexStability(state);
       state.turn += 1;
       state.phase = 'production';
       state.activePlayer = PLAYER;
