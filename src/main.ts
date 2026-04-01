@@ -26,7 +26,8 @@ const logEl      = document.getElementById('log') as HTMLUListElement;
 const phaseEl    = document.getElementById('phase') as HTMLElement;
 const turnEl     = document.getElementById('turn') as HTMLElement;
 const ppDisplay  = document.getElementById('pp-display') as HTMLElement;
-const endMoveBtn = document.getElementById('end-move-btn') as HTMLButtonElement;
+const endMoveBtn  = document.getElementById('end-move-btn') as HTMLButtonElement;
+const phaseLabelEl = document.getElementById('phase-label') as HTMLElement;
 const overlayEl  = document.getElementById('overlay') as HTMLDivElement;
 const overlayMsg = document.getElementById('overlay-msg') as HTMLDivElement;
 const restartBtn = document.getElementById('restart-btn') as HTMLButtonElement;
@@ -311,8 +312,10 @@ function updateUI(): void {
   const isPlayerTurn = state.activePlayer === PLAYER;
   if ((state.phase === 'production' || state.phase === 'movement') && isPlayerTurn) {
     endMoveBtn.style.display = 'flex';
+    phaseLabelEl.textContent = state.phase.toUpperCase();
   } else {
     endMoveBtn.style.display = 'none';
+    phaseLabelEl.textContent = '';
   }
 
   logEl.innerHTML = '';
