@@ -4,13 +4,13 @@
 const config = {
   // Board dimensions (number of hexes)
   boardCols: 6,
-  boardRows: 6,
+  boardRows: 4,
 
   // Number of units each side starts with
   startingUnits: 3,
 
   // Hexagon size (radius in pixels)
-  hexSize: 32,
+  hexSize: 64,
 
   // Turns a hex must remain stable before becoming a production hex
   productionTurns: 2,
@@ -69,10 +69,10 @@ const config = {
   // ── Automation ───────────────────────────────────────────────────────────────
 
   // Automatically end the production phase when the player can no longer afford any unit
-  autoEndProduction: false,
+  autoEndProduction: true,
 
   // Automatically end the movement phase when no player unit has a valid move
-  autoEndMovement: false,
+  autoEndMovement: true,
 
 };
 
