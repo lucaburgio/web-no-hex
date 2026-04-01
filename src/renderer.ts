@@ -369,16 +369,9 @@ export function animateMoves(
   }
   animLayer.innerHTML = '';
 
-  let index = 0;
+  let completed = 0;
 
-  function animateNext(): void {
-    if (index >= animations.length) {
-      animLayer!.innerHTML = '';
-      onDone();
-      return;
-    }
-
-    const anim = animations[index++];
+  for (const anim of animations) {
     const from = hexToPixel(anim.fromCol, anim.fromRow);
     const to   = hexToPixel(anim.toCol,   anim.toRow);
     const baseColor = anim.unit.owner === PLAYER ? c.player : c.ai;
@@ -418,7 +411,7 @@ export function animateMoves(
 
     const startTime = performance.now();
 
-    function step(now: number): void {
+    (function step(now: number): void {
       const t    = Math.min((now - startTime) / durationMs, 1);
       const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease-in-out
       const x    = from.x + (to.x - from.x) * ease;
@@ -437,14 +430,14 @@ export function animateMoves(
         requestAnimationFrame(step);
       } else {
         circle.remove(); barBg.remove(); barFill.remove(); label.remove();
-        animateNext();
+        completed++;
+        if (completed >= animations.length) {
+          animLayer!.innerHTML = '';
+          onDone();
+        }
       }
-    }
-
-    requestAnimationFrame(step);
+    })(performance.now());
   }
-
-  animateNext();
 }
 
 export function getHexFromEvent(e: MouseEvent): { col: number; row: number } | null {
