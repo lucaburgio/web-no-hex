@@ -27,13 +27,20 @@ const unitPickerHex  = document.getElementById('unit-picker-hex');
 const unitPickerList = document.getElementById('unit-picker-list');
 
 let state = createInitialState();
+let pendingProductionHex = null; // hex currently selected in the unit picker
+
+function render() {
+  renderState(svg, state, pendingProductionHex);
+}
+
 initRenderer(svg);
-renderState(svg, state);
+render();
 updateUI();
 
 // ── Unit picker ───────────────────────────────────────────────────────────────
 
 function showUnitPicker(col, row) {
+  pendingProductionHex = { col, row };
   unitPickerHex.textContent = `Hex (${col}, ${row})`;
   unitPickerList.innerHTML = '';
 
@@ -46,7 +53,7 @@ function showUnitPicker(col, row) {
       state = playerPlaceUnit(state, col, row, unitType.id);
       // Refresh picker affordances after purchase (points may have changed)
       showUnitPicker(col, row);
-      renderState(svg, state);
+      render();
       updateUI();
       checkWinner();
     });
@@ -57,6 +64,7 @@ function showUnitPicker(col, row) {
 }
 
 function hideUnitPicker() {
+  pendingProductionHex = null;
   unitPickerEl.style.display = 'none';
 }
 
@@ -74,6 +82,7 @@ svg.addEventListener('click', e => {
     } else {
       hideUnitPicker();
     }
+    render();
   } else if (state.phase === 'movement' && state.activePlayer === PLAYER) {
     if (state.selectedUnit === null) {
       state = playerSelectUnit(state, col, row);
@@ -85,7 +94,7 @@ svg.addEventListener('click', e => {
         state = playerMoveUnit(state, col, row);
       }
     }
-    renderState(svg, state);
+    render();
     updateUI();
     checkWinner();
   }
@@ -97,12 +106,12 @@ endMoveBtn.addEventListener('click', () => {
   if (state.phase === 'production' && state.activePlayer === PLAYER) {
     state = playerEndProduction(state);
     hideUnitPicker();
-    renderState(svg, state);
+    render();
     updateUI();
     checkWinner();
   } else if (state.phase === 'movement' && state.activePlayer === PLAYER) {
     state = playerEndMovement(state);
-    renderState(svg, state);
+    render();
     updateUI();
     checkWinner();
   }
@@ -112,7 +121,7 @@ restartBtn.addEventListener('click', () => {
   state = createInitialState();
   initRenderer(svg);
   hideUnitPicker();
-  renderState(svg, state);
+  render();
   overlayEl.classList.add('hidden');
   updateUI();
 });

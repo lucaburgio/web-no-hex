@@ -16,8 +16,9 @@
   --color-hex-valid-move: #0d1120;
   --color-hex-player:     #1e2c57;
   --color-hex-ai:         #240909;
-  --color-hex-can-place:  #405696;
-  --color-hex-zoc:        #160404;
+  --color-hex-can-place:      #405696;
+  --color-hex-prod-selected: #2a2200;
+  --color-hex-zoc:            #160404;
 
   /* ── Movement area perimeter outline ────────────────────────────────────── */
   --color-move-border: rgba(255, 255, 255, 0.75);

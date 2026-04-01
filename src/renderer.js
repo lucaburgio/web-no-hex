@@ -22,8 +22,9 @@ function colors() {
     hexMove:      v('--color-hex-valid-move'),
     hexPlayer:    v('--color-hex-player'),
     hexAi:        v('--color-hex-ai'),
-    hexCanPlace:  v('--color-hex-can-place'),
-    hexZoc:       v('--color-hex-zoc'),
+    hexCanPlace:     v('--color-hex-can-place'),
+    hexProdSelected: v('--color-hex-prod-selected'),
+    hexZoc:          v('--color-hex-zoc'),
     moveBorder:   v('--color-move-border'),
     hpHigh:       v('--color-hp-high'),
     hpMid:        v('--color-hp-mid'),
@@ -141,7 +142,7 @@ export function initRenderer(svgEl) {
   hexLayer.appendChild(boundary);
 }
 
-export function renderState(svgEl, state) {
+export function renderState(svgEl, state, productionHex = null) {
   const c = colors();
   const unitLayer = svgEl.querySelector('#unit-layer');
   unitLayer.innerHTML = '';
@@ -198,15 +199,16 @@ export function renderState(svgEl, state) {
       const dot  = svgEl.querySelector(`#dot-${col}-${r}`);
       if (!poly) continue;
 
-      const key           = `${col},${r}`;
-      const hexState      = state.hexStates[key];
-      const isSelectedHex = selectedUnit && col === selectedUnit.col && r === selectedUnit.row;
-      const isValidMove   = validMoveHexes.has(key);
-      const isZoc         = zocHexes.has(key);
-      const canPlace      = canPlaceHexes.has(key);
-      const isConquered   = !!hexState;
+      const key                = `${col},${r}`;
+      const hexState           = state.hexStates[key];
+      const isSelectedHex      = selectedUnit && col === selectedUnit.col && r === selectedUnit.row;
+      const isValidMove        = validMoveHexes.has(key);
+      const isZoc              = zocHexes.has(key);
+      const canPlace           = canPlaceHexes.has(key);
+      const isProdSelected     = productionHex && col === productionHex.col && r === productionHex.row;
+      const isConquered        = !!hexState;
 
-      if (dot) dot.setAttribute('opacity', isConquered || isSelectedHex || isValidMove || canPlace ? '0' : '0.5');
+      if (dot) dot.setAttribute('opacity', isConquered || isSelectedHex || isValidMove || canPlace || isProdSelected ? '0' : '0.5');
 
       let fill   = c.bg;
       let stroke = 'transparent';
@@ -220,6 +222,9 @@ export function renderState(svgEl, state) {
       } else if (isValidMove) {
         fill = c.hexMove;
         // no per-hex bracket — perimeter outline covers the whole move area
+      } else if (isProdSelected) {
+        fill   = c.hexProdSelected;
+        stroke = c.unitSelected; // yellow bracket to match the selected-unit color
       } else if (canPlace) {
         fill   = c.hexCanPlace;
         stroke = c.player;
