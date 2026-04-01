@@ -1,28 +1,83 @@
 import { hexToPixel, hexPoints, HEX_SIZE } from './hex.js';
 import { COLS, ROWS, PLAYER, getUnit, getUnitById, isValidProductionPlacement, getValidMoves, isInEnemyZoC } from './game.js';
-import config from './gameconfig.js';
 
 // Corner-bracket dash params — one full cycle = one hex edge (HEX_SIZE)
-// Each bracket leg = BRACKET * HEX_SIZE on each side of a vertex
 const BRACKET     = 0.22;
-const DASH        = HEX_SIZE * BRACKET * 2;        // total dash length
-const GAP         = HEX_SIZE * (1 - BRACKET * 2);  // gap in the middle of each edge
-const DASH_OFFSET = HEX_SIZE * BRACKET;             // centers dash on each vertex
+const DASH        = HEX_SIZE * BRACKET * 2;
+const GAP         = HEX_SIZE * (1 - BRACKET * 2);
+const DASH_OFFSET = HEX_SIZE * BRACKET;
 
-const BG = '#0a0a0a';
+// CSS color variables — read once after DOM is ready, then cached
+let C = null;
+function colors() {
+  if (C) return C;
+  const s = getComputedStyle(document.documentElement);
+  const v = n => s.getPropertyValue(n).trim();
+  C = {
+    bg:           v('--color-bg'),
+    player:       v('--color-player'),
+    ai:           v('--color-ai'),
+    unitSelected: v('--color-unit-selected'),
+    hexSelected:  v('--color-hex-selected'),
+    hexMove:      v('--color-hex-valid-move'),
+    hexPlayer:    v('--color-hex-player'),
+    hexAi:        v('--color-hex-ai'),
+    hexCanPlace:  v('--color-hex-can-place'),
+    hexZoc:       v('--color-hex-zoc'),
+    moveBorder:   v('--color-move-border'),
+    hpHigh:       v('--color-hp-high'),
+    hpMid:        v('--color-hp-mid'),
+    hpLow:        v('--color-hp-low'),
+  };
+  return C;
+}
 
-// Lerp between two hex colours by t (0→1)
+// Lerp between two #rrggbb hex colours by t (0→1)
 function lerpColor(hex1, hex2, t) {
-  const r1 = parseInt(hex1.slice(1, 3), 16), g1 = parseInt(hex1.slice(3, 5), 16), b1 = parseInt(hex1.slice(5, 7), 16);
-  const r2 = parseInt(hex2.slice(1, 3), 16), g2 = parseInt(hex2.slice(3, 5), 16), b2 = parseInt(hex2.slice(5, 7), 16);
-  const r = Math.round(r1 + (r2 - r1) * t).toString(16).padStart(2, '0');
-  const g = Math.round(g1 + (g2 - g1) * t).toString(16).padStart(2, '0');
-  const b = Math.round(b1 + (b2 - b1) * t).toString(16).padStart(2, '0');
+  const r1 = parseInt(hex1.slice(1,3),16), g1 = parseInt(hex1.slice(3,5),16), b1 = parseInt(hex1.slice(5,7),16);
+  const r2 = parseInt(hex2.slice(1,3),16), g2 = parseInt(hex2.slice(3,5),16), b2 = parseInt(hex2.slice(5,7),16);
+  const r = Math.round(r1+(r2-r1)*t).toString(16).padStart(2,'0');
+  const g = Math.round(g1+(g2-g1)*t).toString(16).padStart(2,'0');
+  const b = Math.round(b1+(b2-b1)*t).toString(16).padStart(2,'0');
   return `#${r}${g}${b}`;
+}
+
+// Neighbor direction → edge index mapping (edge i spans vertex i to vertex (i+1)%6).
+// Vertex i sits at angle (60*i − 30)° in pointy-top orientation (y-axis down).
+//   Edge 0 (v0–v1): right (E)        Edge 3 (v3–v4): left (W)
+//   Edge 1 (v1–v2): lower-right (SE) Edge 4 (v4–v5): upper-left (NW)
+//   Edge 2 (v2–v3): lower-left (SW)  Edge 5 (v5–v0): upper-right (NE)
+const DIRS_EVEN = [[1,0],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1]]; // even rows
+const DIRS_ODD  = [[1,0],[1,1],[0,1],[-1,0],[0,-1],[1,-1]];   // odd rows
+
+// Build an SVG path `d` tracing only the outer boundary of a set of hexes.
+// Each boundary edge (where a neighbor is outside the set) is emitted as M…L.
+function buildBoundaryPath(hexSet) {
+  if (hexSet.size === 0) return '';
+  let d = '';
+  for (const key of hexSet) {
+    const [c, r] = key.split(',').map(Number);
+    const { x, y } = hexToPixel(c, r);
+    const dirs = r % 2 === 0 ? DIRS_EVEN : DIRS_ODD;
+    for (let i = 0; i < 6; i++) {
+      const [dc, dr] = dirs[i];
+      if (!hexSet.has(`${c + dc},${r + dr}`)) {
+        const a1 = (Math.PI / 180) * (60 * i - 30);
+        const a2 = (Math.PI / 180) * (60 * (i + 1) - 30);
+        const x1 = (x + HEX_SIZE * Math.cos(a1)).toFixed(2);
+        const y1 = (y + HEX_SIZE * Math.sin(a1)).toFixed(2);
+        const x2 = (x + HEX_SIZE * Math.cos(a2)).toFixed(2);
+        const y2 = (y + HEX_SIZE * Math.sin(a2)).toFixed(2);
+        d += `M${x1},${y1}L${x2},${y2}`;
+      }
+    }
+  }
+  return d;
 }
 
 export function initRenderer(svgEl) {
   svgEl.innerHTML = '';
+  const c = colors();
 
   const margin = HEX_SIZE * 2;
   const W = COLS * HEX_SIZE * Math.sqrt(3) + margin * 2;
@@ -35,7 +90,7 @@ export function initRenderer(svgEl) {
   const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
   bg.setAttribute('width', W);
   bg.setAttribute('height', H);
-  bg.setAttribute('fill', BG);
+  bg.setAttribute('fill', c.bg);
   svgEl.appendChild(bg);
 
   const hexLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -49,16 +104,15 @@ export function initRenderer(svgEl) {
   svgEl.appendChild(unitLayer);
 
   for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const { x, y } = hexToPixel(c, r);
+    for (let col = 0; col < COLS; col++) {
+      const { x, y } = hexToPixel(col, r);
 
-      // Hex polygon — bracket dash is baked in; stroke color is toggled in renderState
       const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
       poly.setAttribute('points', hexPoints(x, y));
-      poly.setAttribute('id', `hex-${c}-${r}`);
-      poly.setAttribute('data-col', c);
+      poly.setAttribute('id', `hex-${col}-${r}`);
+      poly.setAttribute('data-col', col);
       poly.setAttribute('data-row', r);
-      poly.setAttribute('fill', BG);
+      poly.setAttribute('fill', c.bg);
       poly.setAttribute('stroke', 'transparent');
       poly.setAttribute('stroke-width', '2.5');
       poly.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);
@@ -66,20 +120,29 @@ export function initRenderer(svgEl) {
       poly.style.cursor = 'pointer';
       hexLayer.appendChild(poly);
 
-      // Center dot — shown only on neutral hexes
       const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       dot.setAttribute('cx', x);
       dot.setAttribute('cy', y);
       dot.setAttribute('r', 2);
       dot.setAttribute('fill', '#A1A1A1');
       dot.setAttribute('pointer-events', 'none');
-      dot.setAttribute('id', `dot-${c}-${r}`);
+      dot.setAttribute('id', `dot-${col}-${r}`);
       hexLayer.appendChild(dot);
     }
   }
+
+  // Movement area boundary overlay (drawn above hexes, below units)
+  const boundary = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  boundary.setAttribute('id', 'move-boundary');
+  boundary.setAttribute('fill', 'none');
+  boundary.setAttribute('stroke-linecap', 'round');
+  boundary.setAttribute('stroke-linejoin', 'round');
+  boundary.setAttribute('pointer-events', 'none');
+  hexLayer.appendChild(boundary);
 }
 
 export function renderState(svgEl, state) {
+  const c = colors();
   const unitLayer = svgEl.querySelector('#unit-layer');
   unitLayer.innerHTML = '';
 
@@ -87,17 +150,21 @@ export function renderState(svgEl, state) {
 
   const validMoveHexes = new Set();
   if (selectedUnit) {
-    for (const [c, r] of getValidMoves(state, selectedUnit)) {
-      validMoveHexes.add(`${c},${r}`);
+    for (const [col, row] of getValidMoves(state, selectedUnit)) {
+      validMoveHexes.add(`${col},${row}`);
     }
   }
+
+  // Full move area = selected hex + valid destinations (used for perimeter outline)
+  const moveAreaHexes = new Set(validMoveHexes);
+  if (selectedUnit) moveAreaHexes.add(`${selectedUnit.col},${selectedUnit.row}`);
 
   const zocHexes = new Set();
   if (state.phase === 'movement' && state.activePlayer === PLAYER) {
     for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (!getUnit(state, c, r) && isInEnemyZoC(state, c, r, 2)) {
-          zocHexes.add(`${c},${r}`);
+      for (let col = 0; col < COLS; col++) {
+        if (!getUnit(state, col, r) && isInEnemyZoC(state, col, r, 2)) {
+          zocHexes.add(`${col},${r}`);
         }
       }
     }
@@ -106,66 +173,80 @@ export function renderState(svgEl, state) {
   const canPlaceHexes = new Set();
   if (state.phase === 'production' && state.activePlayer === PLAYER) {
     for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (isValidProductionPlacement(state, c, r)) canPlaceHexes.add(`${c},${r}`);
+      for (let col = 0; col < COLS; col++) {
+        if (isValidProductionPlacement(state, col, r)) canPlaceHexes.add(`${col},${r}`);
       }
     }
   }
 
-  // Update each hex
+  // Update move area perimeter outline
+  const boundary = svgEl.querySelector('#move-boundary');
+  if (boundary) {
+    if (moveAreaHexes.size > 0) {
+      boundary.setAttribute('d', buildBoundaryPath(moveAreaHexes));
+      boundary.setAttribute('stroke', c.moveBorder);
+      boundary.setAttribute('stroke-width', '2');
+      boundary.setAttribute('stroke-dasharray', '5 4');
+    } else {
+      boundary.setAttribute('d', '');
+    }
+  }
+
+  // Update each hex polygon
   for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const poly = svgEl.querySelector(`#hex-${c}-${r}`);
-      const dot  = svgEl.querySelector(`#dot-${c}-${r}`);
+    for (let col = 0; col < COLS; col++) {
+      const poly = svgEl.querySelector(`#hex-${col}-${r}`);
+      const dot  = svgEl.querySelector(`#dot-${col}-${r}`);
       if (!poly) continue;
 
-      const key           = `${c},${r}`;
+      const key           = `${col},${r}`;
       const hexState      = state.hexStates[key];
-      const isSelectedHex = selectedUnit && c === selectedUnit.col && r === selectedUnit.row;
+      const isSelectedHex = selectedUnit && col === selectedUnit.col && r === selectedUnit.row;
       const isValidMove   = validMoveHexes.has(key);
       const isZoc         = zocHexes.has(key);
       const canPlace      = canPlaceHexes.has(key);
       const isConquered   = !!hexState;
 
-      // Dot: hide when hex is conquered or highlighted
       if (dot) dot.setAttribute('opacity', isConquered || isSelectedHex || isValidMove || canPlace ? '0' : '0.5');
 
-      // Determine fill + bracket stroke color
-      let fill   = BG;
+      let fill   = c.bg;
       let stroke = 'transparent';
 
       if (isSelectedHex) {
-        fill   = '#1e2e1e';
-        stroke = config.playerColor;
+        fill = c.hexSelected;
+        // no per-hex bracket — perimeter outline covers the whole move area
       } else if (isValidMove) {
-        fill   = '#0d200d';
-        stroke = config.playerColor;
+        fill = c.hexMove;
+        // no per-hex bracket — perimeter outline covers the whole move area
       } else if (isConquered) {
-        const ownerColor = hexState.owner === PLAYER ? config.playerColor : config.aiColor;
-        fill   = hexState.owner === PLAYER ? '#141414' : '#180606';
-        stroke = isZoc ? ownerColor : ownerColor;  // always show bracket on conquered
+        if (hexState.owner === PLAYER) {
+          fill   = c.hexPlayer;
+          stroke = c.player;   // bracket on player territory
+        } else {
+          fill   = c.hexAi;
+          stroke = 'transparent'; // no bracket on AI territory
+        }
       } else if (canPlace) {
-        fill   = '#0a1a10';
-        stroke = config.playerColor;
+        fill   = c.hexCanPlace;
+        stroke = c.player;
       } else if (isZoc) {
-        fill   = '#160404';
-        stroke = 'transparent';
+        fill = c.hexZoc;
       }
 
       poly.setAttribute('fill', fill);
       poly.setAttribute('stroke', stroke);
 
       // Production marker
-      svgEl.querySelector(`#marker-${c}-${r}`)?.remove();
+      svgEl.querySelector(`#marker-${col}-${r}`)?.remove();
       if (hexState && hexState.isProduction && !isSelectedHex && !isValidMove) {
-        const { x, y } = hexToPixel(c, r);
+        const { x, y } = hexToPixel(col, r);
         const s = HEX_SIZE * 0.18;
         const diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         diamond.setAttribute('points', `${x},${y - s} ${x + s},${y} ${x},${y + s} ${x - s},${y}`);
-        diamond.setAttribute('fill', hexState.owner === PLAYER ? config.playerColor : config.aiColor);
+        diamond.setAttribute('fill', hexState.owner === PLAYER ? c.player : c.ai);
         diamond.setAttribute('opacity', '0.4');
         diamond.setAttribute('pointer-events', 'none');
-        diamond.setAttribute('id', `marker-${c}-${r}`);
+        diamond.setAttribute('id', `marker-${col}-${r}`);
         svgEl.querySelector('#hex-layer').appendChild(diamond);
       }
     }
@@ -177,8 +258,8 @@ export function renderState(svgEl, state) {
     const isSelected = state.selectedUnit === unit.id;
     const hpRatio    = unit.hp / unit.maxHp;
 
-    const baseColor = unit.owner === PLAYER ? config.playerColor : config.aiColor;
-    const fill      = lerpColor(baseColor, '#333333', 1 - hpRatio);
+    const baseColor = unit.owner === PLAYER ? c.player : c.ai;
+    const fill      = isSelected ? c.unitSelected : lerpColor(baseColor, '#333333', 1 - hpRatio);
     const opacity   = unit.movedThisTurn ? '0.25' : '1';
 
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -208,7 +289,7 @@ export function renderState(svgEl, state) {
     barBg.setAttribute('opacity', opacity);
     unitLayer.appendChild(barBg);
 
-    const barColor = hpRatio > 0.6 ? '#aaaaaa' : hpRatio > 0.3 ? '#888822' : '#882222';
+    const barColor = hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
     const barFill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     barFill.setAttribute('x', barX); barFill.setAttribute('y', barY);
     barFill.setAttribute('width', barW * hpRatio); barFill.setAttribute('height', barH);

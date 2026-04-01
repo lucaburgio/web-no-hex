@@ -1,0 +1,170 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ── Background ─────────────────────────────────────────────────────────── */
+  --color-bg: #0a0a0a;
+
+  /* ── Player / AI identity colors ────────────────────────────────────────── */
+  --color-player: #ffffff;
+  --color-ai:     #ee3333;
+
+  /* ── Unit states ────────────────────────────────────────────────────────── */
+  --color-unit-selected: #ffdd00;
+
+  /* ── Hex fill states ─────────────────────────────────────────────────────── */
+  --color-hex-selected:   #1e2e1e;
+  --color-hex-valid-move: #0d200d;
+  --color-hex-player:     #141414;
+  --color-hex-ai:         #180606;
+  --color-hex-can-place:  #0a1a10;
+  --color-hex-zoc:        #160404;
+
+  /* ── Movement area perimeter outline ────────────────────────────────────── */
+  --color-move-border: rgba(255, 255, 255, 0.75);
+
+  /* ── HP bar thresholds ───────────────────────────────────────────────────── */
+  --color-hp-high: #aaaaaa;
+  --color-hp-mid:  #888822;
+  --color-hp-low:  #882222;
+}
+
+body {
+  background: var(--color-bg);
+  color: #cccccc;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 16px;
+  gap: 12px;
+}
+
+h1 {
+  font-size: 1.1rem;
+  letter-spacing: 0.2em;
+  color: #6aaa6a;
+  text-transform: uppercase;
+}
+
+#hud {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 0.85rem;
+}
+
+#hud span {
+  color: #88bb88;
+}
+
+#hud strong {
+  color: #aaddaa;
+}
+
+#end-move-btn {
+  padding: 4px 12px;
+  background: #2a4a2a;
+  color: #aaddaa;
+  border: 1px solid #4a7a4a;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.8rem;
+  display: none;
+}
+#end-move-btn:hover { background: #3a6a3a; }
+
+#game-area {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 1400px;
+}
+
+#board-wrap {
+  overflow: auto;
+  border: 1px solid #2a4a2a;
+  flex-shrink: 0;
+  position: relative;
+}
+
+#board {
+  display: block;
+}
+
+#sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel {
+  background: #111811;
+  border: 1px solid #2a3a2a;
+  padding: 10px;
+}
+
+.panel h2 {
+  font-size: 0.75rem;
+  color: #5a8a5a;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+}
+
+#log {
+  list-style: none;
+  font-size: 0.72rem;
+  color: #88aa88;
+  max-height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+#log li:first-child { color: #aaccaa; }
+
+.legend {
+  font-size: 0.72rem;
+  line-height: 1.7;
+  color: #6a8a6a;
+}
+
+.legend span.p { color: #5aaa5a; }
+.legend span.a { color: #aa5a5a; }
+
+/* ── Winner overlay ────────────────────────────────────────────────────────── */
+#overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 10;
+}
+
+#overlay.hidden { display: none; }
+
+#overlay-msg {
+  font-size: 2rem;
+  color: #aaddaa;
+  letter-spacing: 0.15em;
+}
+
+#restart-btn {
+  padding: 8px 24px;
+  background: #2a4a2a;
+  color: #aaddaa;
+  border: 1px solid #5a8a5a;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+#restart-btn:hover { background: #3a6a3a; }
