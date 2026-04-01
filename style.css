@@ -425,3 +425,115 @@ body {
   font-size: 0.72rem;
 }
 #rules-close:hover { background: #1a2a1a; color: #8aba8a; }
+
+/* ── Lobby overlay ─────────────────────────────────────────────────────────── */
+#lobby-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+#lobby-overlay.hidden { display: none; }
+
+#lobby-modal {
+  background: #0e160e;
+  border: 1px solid #2a4a2a;
+  padding: 40px 48px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+#lobby-title {
+  font-size: 0.88rem;
+  font-weight: bold;
+  color: #6aaa6a;
+  text-transform: uppercase;
+  letter-spacing: 0.35em;
+}
+
+#lobby-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.lobby-btn {
+  width: 100%;
+  padding: 10px 16px;
+  background: #1a2a1a;
+  color: #aaddaa;
+  border: 1px solid #3a5a3a;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  text-align: center;
+}
+.lobby-btn:hover { background: #2a4a2a; }
+.lobby-btn.secondary {
+  color: #5a7a5a;
+  border-color: #2a3a2a;
+  font-size: 0.68rem;
+}
+.lobby-btn.secondary:hover { background: #111811; color: #7a9a7a; }
+
+#lobby-host-wait,
+#lobby-join-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.lobby-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #5a8a5a;
+}
+
+#lobby-code {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #aaddaa;
+  letter-spacing: 0.5em;
+  padding-left: 0.5em; /* compensate letter-spacing on last char */
+}
+
+.lobby-hint {
+  font-size: 0.62rem;
+  color: #4a6a4a;
+  text-align: center;
+}
+
+#lobby-code-input {
+  width: 100%;
+  padding: 10px;
+  background: #0a120a;
+  border: 1px solid #3a5a3a;
+  color: #aaddaa;
+  font-family: inherit;
+  font-size: 1.1rem;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.35em;
+  outline: none;
+}
+#lobby-code-input:focus { border-color: #5a9a5a; }
+#lobby-code-input::placeholder { color: #2a4a2a; letter-spacing: 0.2em; }
+
+#lobby-error {
+  font-size: 0.68rem;
+  color: #cc7744;
+  text-align: center;
+}
+#lobby-error.hidden { display: none; }

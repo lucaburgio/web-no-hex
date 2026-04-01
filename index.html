@@ -55,6 +55,35 @@
     </div>
   </footer>
 
+  <div id="lobby-overlay">
+    <div id="lobby-modal">
+      <div id="lobby-title">WEB STRATEGIC</div>
+
+      <div id="lobby-menu">
+        <button id="vsai-btn" class="lobby-btn">vs AI</button>
+        <button id="host-btn" class="lobby-btn">Host Game</button>
+        <button id="join-btn" class="lobby-btn">Join Game</button>
+      </div>
+
+      <div id="lobby-host-wait" class="hidden">
+        <div class="lobby-label">Room code</div>
+        <div id="lobby-code">···</div>
+        <div class="lobby-hint">Share this code with your opponent</div>
+        <div class="lobby-hint" id="lobby-waiting-text">Waiting for opponent...</div>
+        <button id="lobby-cancel-btn" class="lobby-btn secondary">Cancel</button>
+      </div>
+
+      <div id="lobby-join-form" class="hidden">
+        <div class="lobby-label">Enter room code</div>
+        <input id="lobby-code-input" placeholder="XXXXXX" maxlength="6" autocomplete="off" />
+        <button id="lobby-join-confirm" class="lobby-btn">Join</button>
+        <button id="lobby-cancel-join-btn" class="lobby-btn secondary">Cancel</button>
+      </div>
+
+      <div id="lobby-error" class="hidden"></div>
+    </div>
+  </div>
+
   <div id="overlay" class="hidden">
     <div id="overlay-msg"></div>
     <button id="restart-btn">Restart</button>

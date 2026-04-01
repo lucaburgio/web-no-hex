@@ -101,11 +101,12 @@ export function getUnitById(state: GameState, id: number): Unit | null {
   return state.units.find(u => u.id === id) ?? null;
 }
 
-export function isValidProductionPlacement(state: GameState, col: number, row: number): boolean {
+export function isValidProductionPlacement(state: GameState, col: number, row: number, localPlayer: Owner = PLAYER): boolean {
   if (getUnit(state, col, row)) return false;
-  if (row === ROWS - 1) return true;
+  const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
+  if (row === homeRow) return true;
   const hex = state.hexStates[`${col},${row}`];
-  return !!(hex && hex.isProduction && hex.owner === PLAYER);
+  return !!(hex && hex.isProduction && hex.owner === localPlayer);
 }
 
 // Returns true if (col,row) is under ZoC from any unit belonging to `enemyOwner`
@@ -304,10 +305,10 @@ export function createInitialState(): GameState {
 
 // ── Production ────────────────────────────────────────────────────────────────
 
-export function playerPlaceUnit(state: GameState, col: number, row: number, unitTypeId: string): GameState {
-  if (state.phase !== 'production' || state.activePlayer !== PLAYER) return state;
+export function playerPlaceUnit(state: GameState, col: number, row: number, unitTypeId: string, localPlayer: Owner = PLAYER): GameState {
+  if (state.phase !== 'production' || state.activePlayer !== localPlayer) return state;
 
-  if (!isValidProductionPlacement(state, col, row)) {
+  if (!isValidProductionPlacement(state, col, row, localPlayer)) {
     log(state, 'Invalid placement hex.');
     return state;
   }
@@ -315,15 +316,15 @@ export function playerPlaceUnit(state: GameState, col: number, row: number, unit
   const unitType = config.unitTypes.find(u => u.id === unitTypeId);
   if (!unitType) return state;
 
-  if (state.productionPoints[PLAYER] < unitType.cost) {
-    log(state, `Not enough production points (need ${unitType.cost}, have ${state.productionPoints[PLAYER]}).`);
+  if (state.productionPoints[localPlayer] < unitType.cost) {
+    log(state, `Not enough production points (need ${unitType.cost}, have ${state.productionPoints[localPlayer]}).`);
     return state;
   }
 
-  state.productionPoints[PLAYER] -= unitType.cost;
-  state.units.push(makeUnit(PLAYER, col, row, unitType.id));
-  conquerHex(state, col, row, PLAYER);
-  log(state, `Placed ${unitType.name} at (${col}, ${row}). PP: ${state.productionPoints[PLAYER]}.`);
+  state.productionPoints[localPlayer] -= unitType.cost;
+  state.units.push(makeUnit(localPlayer, col, row, unitType.id));
+  conquerHex(state, col, row, localPlayer);
+  log(state, `Placed ${unitType.name} at (${col}, ${row}). PP: ${state.productionPoints[localPlayer]}.`);
   return state;
 }
 
@@ -367,10 +368,10 @@ export function aiProduction(state: GameState): GameState {
 
 // ── Movement ──────────────────────────────────────────────────────────────────
 
-export function playerSelectUnit(state: GameState, col: number, row: number): GameState {
-  if (state.phase !== 'movement' || state.activePlayer !== PLAYER) return state;
+export function playerSelectUnit(state: GameState, col: number, row: number, localPlayer: Owner = PLAYER): GameState {
+  if (state.phase !== 'movement' || state.activePlayer !== localPlayer) return state;
   const unit = getUnit(state, col, row);
-  if (!unit || unit.owner !== PLAYER) {
+  if (!unit || unit.owner !== localPlayer) {
     state.selectedUnit = null;
     return state;
   }
@@ -383,8 +384,9 @@ export function playerSelectUnit(state: GameState, col: number, row: number): Ga
   return state;
 }
 
-export function playerMoveUnit(state: GameState, col: number, row: number): GameState {
-  if (state.phase !== 'movement' || state.activePlayer !== PLAYER) return state;
+export function playerMoveUnit(state: GameState, col: number, row: number, localPlayer: Owner = PLAYER): GameState {
+  const enemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
+  if (state.phase !== 'movement' || state.activePlayer !== localPlayer) return state;
   if (state.selectedUnit === null) return state;
 
   const unit = getUnitById(state, state.selectedUnit);
@@ -393,7 +395,7 @@ export function playerMoveUnit(state: GameState, col: number, row: number): Game
   const validMoves = getValidMoves(state, unit);
   if (!validMoves.some(([c, r]) => c === col && r === row)) {
     const occupant = getUnit(state, col, row);
-    if (occupant && occupant.owner !== PLAYER) {
+    if (occupant && occupant.owner !== localPlayer) {
       log(state, 'Cannot attack: enemy is outside movement range or blocked by ZoC.');
     } else {
       log(state, 'Invalid move: blocked by Zone of Control or not adjacent.');
@@ -402,7 +404,7 @@ export function playerMoveUnit(state: GameState, col: number, row: number): Game
   }
 
   const target = getUnit(state, col, row);
-  if (target && target.owner === PLAYER) {
+  if (target && target.owner === localPlayer) {
     log(state, 'Cannot move onto your own unit.');
     return state;
   }
@@ -410,12 +412,12 @@ export function playerMoveUnit(state: GameState, col: number, row: number): Game
   unit.movedThisTurn = true;
   state.selectedUnit = null;
 
-  if (target && target.owner === AI) {
+  if (target && target.owner === enemy) {
     resolveCombat(state, unit, target);
   } else {
     unit.col = col;
     unit.row = row;
-    conquerHex(state, col, row, PLAYER);
+    conquerHex(state, col, row, localPlayer);
     log(state, `Moved unit #${unit.id} to (${col}, ${row}).`);
   }
 
@@ -427,6 +429,35 @@ export function playerEndMovement(state: GameState): GameState {
   if (state.phase !== 'movement' || state.activePlayer !== PLAYER) return state;
   log(state, 'You ended your movement.');
   return advancePhase(state);
+}
+
+// ── vsHuman phase transitions ─────────────────────────────────────────────────
+
+// Advance from production to movement without running AI production.
+export function vsHumanEndProduction(state: GameState, localPlayer: Owner): GameState {
+  if (state.phase !== 'production' || state.activePlayer !== localPlayer) return state;
+  log(state, 'You ended production.');
+  state.phase = 'movement';
+  state.units.forEach(u => { if (u.owner === localPlayer) u.movedThisTurn = false; });
+  log(state, `Turn ${state.turn} — Movement phase. Click a unit then a hex.`);
+  return state;
+}
+
+// End movement and pass the turn to the opponent.
+export function vsHumanEndMovement(state: GameState, localPlayer: Owner): GameState {
+  if (state.phase !== 'movement' || state.activePlayer !== localPlayer) return state;
+  const other: Owner = localPlayer === PLAYER ? AI : PLAYER;
+  log(state, 'You ended your movement.');
+  state.phase = 'production';
+  state.activePlayer = other;
+  state.selectedUnit = null;
+  return state;
+}
+
+// Update the unit ID counter after receiving a state from the opponent.
+export function syncUnitIdCounter(state: GameState): void {
+  const maxId = state.units.reduce((m, u) => Math.max(m, u.id), -1);
+  if (maxId >= unitIdCounter) unitIdCounter = maxId + 1;
 }
 
 export function aiMovement(state: GameState): GameState {  // exported for animation split

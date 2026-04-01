@@ -1,5 +1,6 @@
 import { hexToPixel, hexPoints, HEX_SIZE } from './hex';
 import { COLS, ROWS, PLAYER, AI, getUnit, getUnitById, isValidProductionPlacement, getValidMoves, isInEnemyZoC } from './game';
+import type { Owner } from './types';
 import type { GameState, Unit } from './types';
 import config from './gameconfig';
 
@@ -220,7 +221,7 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   hexLayer.appendChild(boundary);
 }
 
-export function renderState(svgElement: SVGSVGElement, state: GameState, productionHex: { col: number; row: number } | null = null, hiddenUnitIds: Set<number> = new Set()): void {
+export function renderState(svgElement: SVGSVGElement, state: GameState, productionHex: { col: number; row: number } | null = null, hiddenUnitIds: Set<number> = new Set(), localPlayer: Owner = PLAYER): void {
   const c = colors();
   const unitLayer = svgElement.querySelector('#unit-layer') as SVGGElement;
   unitLayer.innerHTML = '';
@@ -238,11 +239,12 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
   const moveAreaHexes = new Set<string>(validMoveHexes);
   if (selectedUnit) moveAreaHexes.add(`${selectedUnit.col},${selectedUnit.row}`);
 
+  const zocEnemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
   const zocHexes = new Set<string>();
   if (selectedUnit) {
     for (const key of validMoveHexes) {
       const [kc, kr] = key.split(',').map(Number);
-      if (!getUnit(state, kc, kr) && isInEnemyZoC(state, kc, kr, AI)) {
+      if (!getUnit(state, kc, kr) && isInEnemyZoC(state, kc, kr, zocEnemy)) {
         zocHexes.add(key);
       }
     }
@@ -251,15 +253,16 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
   const canPlaceHexes = new Set<string>();
   // Focus set: home row + owned production hexes (regardless of occupation) — used for dimming
   const productionFocusHexes = new Set<string>();
-  if (state.phase === 'production' && state.activePlayer === PLAYER) {
+  const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
+  if (state.phase === 'production' && state.activePlayer === localPlayer) {
     for (let r = 0; r < ROWS; r++) {
       for (let col = 0; col < COLS; col++) {
-        if (isValidProductionPlacement(state, col, r)) canPlaceHexes.add(`${col},${r}`);
-        if (r === ROWS - 1) productionFocusHexes.add(`${col},${r}`);
+        if (isValidProductionPlacement(state, col, r, localPlayer)) canPlaceHexes.add(`${col},${r}`);
+        if (r === homeRow) productionFocusHexes.add(`${col},${r}`);
       }
     }
     for (const [key, hex] of Object.entries(state.hexStates)) {
-      if (hex.owner === PLAYER && hex.isProduction) productionFocusHexes.add(key);
+      if (hex.owner === localPlayer && hex.isProduction) productionFocusHexes.add(key);
     }
   }
 
