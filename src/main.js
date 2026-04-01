@@ -6,9 +6,12 @@ import {
   playerMoveUnit,
   playerEndMovement,
   getUnit,
+  getUnitById,
   getValidMoves,
   isValidProductionPlacement,
+  forecastCombat,
   PLAYER,
+  AI,
 } from './game.js';
 import { initRenderer, renderState, getHexFromEvent } from './renderer.js';
 import config from './gameconfig.js';
@@ -196,3 +199,119 @@ function checkWinner() {
     overlayEl.classList.remove('hidden');
   }
 }
+
+// ── Combat forecast tooltip ───────────────────────────────────────────────────
+
+const tooltipEl = document.getElementById('combat-tooltip');
+
+function hpBarColor(ratio) {
+  if (ratio > 0.6) return 'var(--color-hp-high)';
+  if (ratio > 0.3) return 'var(--color-hp-mid)';
+  return 'var(--color-hp-low)';
+}
+
+function buildSideHTML(unit, dmg, hpAfter, label, labelClass, factors) {
+  const curRatio = unit.hp / unit.maxHp;
+  const aftRatio = hpAfter / unit.maxHp;
+  const curColor = hpBarColor(curRatio);
+  const aftColor = hpBarColor(aftRatio);
+  return `
+    <div class="tt-side">
+      <div class="tt-side-label ${labelClass}">${label}</div>
+      <div class="tt-hp-block">
+        <div class="tt-bar-wrap">
+          <div class="tt-bar current" style="width:${curRatio*100}%;background:${curColor}"></div>
+        </div>
+        <div class="tt-bar-wrap">
+          <div class="tt-bar after" style="width:${aftRatio*100}%;background:${aftColor}"></div>
+        </div>
+        <div class="tt-hp-nums">${unit.hp} → ${hpAfter} HP</div>
+      </div>
+      <div class="tt-dmg">−${dmg} damage</div>
+      <div class="tt-cs">CS: ${factors.cs}</div>
+      <div class="tt-factors">
+        <div>· Strength: ${unit.strength}</div>
+        <div>· Condition: ${factors.conditionPct}%</div>
+        ${factors.flankBonusPct > 0 ? `<div>· Flanking ×${factors.flankCount}: +${factors.flankBonusPct}%</div>` : ''}
+      </div>
+    </div>`;
+}
+
+function showCombatTooltip(attacker, defender, pageX, pageY) {
+  const fc = forecastCombat(state, attacker, defender);
+
+  const attackerFactors = {
+    cs: fc.attackerCS,
+    conditionPct: fc.attackerConditionPct,
+    flankCount: fc.flankingCount,
+    flankBonusPct: fc.flankBonusPct,
+  };
+  const defenderFactors = {
+    cs: fc.defenderCS,
+    conditionPct: fc.defenderConditionPct,
+    flankCount: 0,
+    flankBonusPct: 0,
+  };
+
+  let outcomeText, outcomeClass;
+  if (fc.attackerDies && fc.defenderDies) {
+    outcomeText = 'Both units destroyed'; outcomeClass = 'both';
+  } else if (fc.defenderDies) {
+    outcomeText = 'Enemy destroyed';      outcomeClass = 'win';
+  } else if (fc.attackerDies) {
+    outcomeText = 'Your unit destroyed';  outcomeClass = 'lose';
+  } else {
+    outcomeText = 'Both units survive';   outcomeClass = 'none';
+  }
+
+  const attackerLabel = `You (P${attacker.id})`;
+  const defenderLabel = `AI (A${defender.id})`;
+
+  tooltipEl.innerHTML = `
+    <div class="tt-title">Combat Forecast</div>
+    <div class="tt-columns">
+      ${buildSideHTML(attacker, fc.dmgToAttacker, fc.attackerHpAfter, attackerLabel, 'attacker', attackerFactors)}
+      ${buildSideHTML(defender, fc.dmgToDefender, fc.defenderHpAfter, defenderLabel, 'defender', defenderFactors)}
+    </div>
+    <hr class="tt-divider">
+    <div class="tt-outcome ${outcomeClass}">→ ${outcomeText}</div>`;
+
+  tooltipEl.classList.remove('hidden');
+  positionTooltip(pageX, pageY);
+}
+
+function positionTooltip(pageX, pageY) {
+  const offset = 14;
+  let left = pageX + offset;
+  let top  = pageY + offset;
+  const rect = tooltipEl.getBoundingClientRect();
+  if (left + rect.width  > window.innerWidth)  left = pageX - rect.width  - offset;
+  if (top  + rect.height > window.innerHeight) top  = pageY - rect.height - offset;
+  tooltipEl.style.left = `${left}px`;
+  tooltipEl.style.top  = `${top}px`;
+}
+
+svg.addEventListener('mousemove', e => {
+  if (state.phase !== 'movement' || state.activePlayer !== PLAYER || state.selectedUnit === null) {
+    tooltipEl.classList.add('hidden');
+    return;
+  }
+  const hex = getHexFromEvent(e);
+  if (!hex) { tooltipEl.classList.add('hidden'); return; }
+
+  const attacker = getUnitById(state, state.selectedUnit);
+  if (!attacker) { tooltipEl.classList.add('hidden'); return; }
+
+  const target = getUnit(state, hex.col, hex.row);
+  if (!target || target.owner !== AI) { tooltipEl.classList.add('hidden'); return; }
+
+  const validMoves = getValidMoves(state, attacker);
+  const canAttack = validMoves.some(([c, r]) => c === hex.col && r === hex.row);
+  if (!canAttack) { tooltipEl.classList.add('hidden'); return; }
+
+  showCombatTooltip(attacker, target, e.pageX, e.pageY);
+});
+
+svg.addEventListener('mouseleave', () => {
+  tooltipEl.classList.add('hidden');
+});

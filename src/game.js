@@ -207,6 +207,35 @@ function resolveCombat(state, attacker, defender) {
   }
 }
 
+// ── Combat forecast (pure — no state mutation) ────────────────────────────────
+
+export function forecastCombat(state, attacker, defender) {
+  const flanking = getFlankingCount(state, attacker, defender);
+  const csA = effectiveCS(attacker, flanking);
+  const csD = effectiveCS(defender, 0);
+  const delta = csA - csD;
+  const scale = config.combatStrengthScale;
+  const base  = config.combatDamageBase;
+
+  const dmgToDefender = Math.max(1, Math.floor(base * Math.exp( delta / scale)));
+  const dmgToAttacker = Math.max(1, Math.floor(base * Math.exp(-delta / scale)));
+
+  return {
+    attackerCS:          Math.round(csA),
+    defenderCS:          Math.round(csD),
+    dmgToAttacker,
+    dmgToDefender,
+    attackerHpAfter:     Math.max(0, attacker.hp - dmgToAttacker),
+    defenderHpAfter:     Math.max(0, defender.hp - dmgToDefender),
+    attackerDies:        attacker.hp - dmgToAttacker <= 0,
+    defenderDies:        defender.hp - dmgToDefender <= 0,
+    flankingCount:       flanking,
+    flankBonusPct:       Math.round(flanking * config.flankingBonus * 100),
+    attackerConditionPct: Math.round((0.5 + 0.5 * (attacker.hp / attacker.maxHp)) * 100),
+    defenderConditionPct: Math.round((0.5 + 0.5 * (defender.hp / defender.maxHp)) * 100),
+  };
+}
+
 // ── Victory check ─────────────────────────────────────────────────────────────
 
 function checkVictory(state) {

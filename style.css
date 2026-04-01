@@ -173,6 +173,110 @@ h1 {
 .unit-btn:hover:not(:disabled) { background: #2a4a2a; }
 .unit-btn:disabled { color: #556655; border-color: #2a3a2a; cursor: not-allowed; }
 
+/* ── Combat forecast tooltip ─────────────────────────────────────────────────── */
+#combat-tooltip {
+  position: fixed;
+  z-index: 100;
+  background: #0b160b;
+  border: 1px solid #3a6a3a;
+  padding: 10px 12px;
+  font-size: 0.7rem;
+  color: #aaccaa;
+  pointer-events: none;
+  min-width: 230px;
+  line-height: 1.5;
+}
+#combat-tooltip.hidden { display: none; }
+
+.tt-title {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #5a9a5a;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #2a4a2a;
+  padding-bottom: 4px;
+}
+
+.tt-columns {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.tt-side {
+  flex: 1;
+}
+
+.tt-side-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 5px;
+}
+.tt-side-label.attacker { color: #aaddaa; }
+.tt-side-label.defender { color: #dd7777; }
+
+.tt-hp-block {
+  margin-bottom: 4px;
+}
+
+.tt-bar-wrap {
+  height: 6px;
+  background: #222;
+  border-radius: 2px;
+  margin-bottom: 1px;
+  overflow: hidden;
+}
+
+.tt-bar {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.tt-bar.current { opacity: 0.45; }
+.tt-bar.after   { opacity: 1; }
+
+.tt-hp-nums {
+  font-size: 0.65rem;
+  color: #88aa88;
+}
+
+.tt-dmg {
+  font-size: 0.68rem;
+  color: #cc7744;
+  margin: 3px 0;
+}
+
+.tt-cs {
+  font-size: 0.65rem;
+  color: #88aa88;
+  margin-top: 4px;
+  border-top: 1px solid #1e2e1e;
+  padding-top: 3px;
+}
+
+.tt-factors {
+  font-size: 0.63rem;
+  color: #6a8a6a;
+  margin-top: 3px;
+}
+
+.tt-divider {
+  border: none;
+  border-top: 1px solid #1e2e1e;
+  margin: 6px 0;
+}
+
+.tt-outcome {
+  font-size: 0.68rem;
+  color: #ccddcc;
+}
+.tt-outcome.win  { color: #6ada8a; }
+.tt-outcome.lose { color: #da6a6a; }
+.tt-outcome.both { color: #da9a4a; }
+.tt-outcome.none { color: #88aa88; }
+
 /* ── Winner overlay ────────────────────────────────────────────────────────── */
 #overlay {
   position: fixed;
