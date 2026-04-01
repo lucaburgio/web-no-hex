@@ -160,12 +160,11 @@ export function renderState(svgEl, state) {
   if (selectedUnit) moveAreaHexes.add(`${selectedUnit.col},${selectedUnit.row}`);
 
   const zocHexes = new Set();
-  if (state.phase === 'movement' && state.activePlayer === PLAYER) {
-    for (let r = 0; r < ROWS; r++) {
-      for (let col = 0; col < COLS; col++) {
-        if (!getUnit(state, col, r) && isInEnemyZoC(state, col, r, 2)) {
-          zocHexes.add(`${col},${r}`);
-        }
+  if (selectedUnit) {
+    for (const key of validMoveHexes) {
+      const [kc, kr] = key.split(',').map(Number);
+      if (!getUnit(state, kc, kr) && isInEnemyZoC(state, kc, kr, 2)) {
+        zocHexes.add(key);
       }
     }
   }
@@ -215,6 +214,9 @@ export function renderState(svgEl, state) {
       if (isSelectedHex) {
         fill = c.hexSelected;
         // no per-hex bracket — perimeter outline covers the whole move area
+      } else if (isZoc) {
+        fill = c.hexZoc;
+        // ZoC warning takes priority over valid-move color
       } else if (isValidMove) {
         fill = c.hexMove;
         // no per-hex bracket — perimeter outline covers the whole move area
