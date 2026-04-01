@@ -10,10 +10,11 @@ export const ROWS = config.boardRows;
 
 let unitIdCounter = 0;
 
-function makeUnit(owner: Owner, col: number, row: number): Unit {
+function makeUnit(owner: Owner, col: number, row: number, unitTypeId = 'infantry'): Unit {
   return {
     id: unitIdCounter++,
     owner,
+    unitTypeId,
     col,
     row,
     movedThisTurn: false,
@@ -320,7 +321,7 @@ export function playerPlaceUnit(state: GameState, col: number, row: number, unit
   }
 
   state.productionPoints[PLAYER] -= unitType.cost;
-  state.units.push(makeUnit(PLAYER, col, row));
+  state.units.push(makeUnit(PLAYER, col, row, unitType.id));
   conquerHex(state, col, row, PLAYER);
   log(state, `Placed ${unitType.name} at (${col}, ${row}). PP: ${state.productionPoints[PLAYER]}.`);
   return state;
@@ -358,7 +359,7 @@ export function aiProduction(state: GameState): GameState {
 
   const [col, row] = candidates[Math.floor(Math.random() * candidates.length)];
   state.productionPoints[AI] -= unitType.cost;
-  state.units.push(makeUnit(AI, col, row));
+  state.units.push(makeUnit(AI, col, row, unitType.id));
   conquerHex(state, col, row, AI);
   log(state, `AI placed a unit at (${col}, ${row}).`);
   return state;

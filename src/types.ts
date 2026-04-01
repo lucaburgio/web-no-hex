@@ -6,6 +6,7 @@ export type Phase = 'production' | 'movement';
 export interface Unit {
   id: number;
   owner: Owner;
+  unitTypeId: string;
   col: number;
   row: number;
   movedThisTurn: boolean;
@@ -52,6 +53,7 @@ export interface UnitType {
   id: string;
   name: string;
   cost: number;
+  icon?: string;
 }
 
 export interface GameConfig {

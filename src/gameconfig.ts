@@ -30,7 +30,7 @@ const config: GameConfig = {
 
   // Available unit types (id must be unique; cost is in production points)
   unitTypes: [
-    { id: 'infantry', name: 'Infantry', cost: 20 },
+    { id: 'infantry', name: 'Infantry', cost: 20, icon: 'icons/sword.svg' },
   ],
 
   // ── Combat ──────────────────────────────────────────────────────────────────

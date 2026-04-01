@@ -1,6 +1,7 @@
 import { hexToPixel, hexPoints, HEX_SIZE } from './hex';
 import { COLS, ROWS, PLAYER, AI, getUnit, getUnitById, isValidProductionPlacement, getValidMoves, isInEnemyZoC } from './game';
 import type { GameState, Unit } from './types';
+import config from './gameconfig';
 
 export interface MoveAnimation {
   unit: Unit;      // snapshot of the unit before moving (owner/hp for colour)
@@ -8,6 +9,10 @@ export interface MoveAnimation {
   fromRow: number;
   toCol: number;
   toRow: number;
+}
+
+function unitIcon(unitTypeId: string): string | undefined {
+  return config.unitTypes.find(t => t.id === unitTypeId)?.icon;
 }
 
 // Corner-bracket dash params — one full cycle = one hex edge (HEX_SIZE)
@@ -331,18 +336,20 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     barFill.setAttribute('opacity', opacity);
     unitLayer.appendChild(barFill);
 
-    // Label
-    const text = svgEl('text');
-    text.setAttribute('x', String(x));
-    text.setAttribute('y', String(y + 4));
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('font-size', '9');
-    text.setAttribute('font-family', 'monospace');
-    text.setAttribute('fill', unit.owner === PLAYER ? '#0a0a0a' : '#ffffff');
-    text.setAttribute('pointer-events', 'none');
-    text.setAttribute('opacity', opacity);
-    text.textContent = unit.owner === PLAYER ? `P${unit.id}` : `A${unit.id}`;
-    unitLayer.appendChild(text);
+    // Icon
+    const icon = unitIcon(unit.unitTypeId);
+    if (icon) {
+      const iconSize = HEX_SIZE * 0.6;
+      const img = svgEl('image') as unknown as SVGImageElement;
+      img.setAttribute('href', `/${icon}`);
+      img.setAttribute('x', String(x - iconSize / 2));
+      img.setAttribute('y', String(y - iconSize / 2));
+      img.setAttribute('width', String(iconSize));
+      img.setAttribute('height', String(iconSize));
+      img.setAttribute('pointer-events', 'none');
+      img.setAttribute('opacity', opacity);
+      unitLayer.appendChild(img);
+    }
   }
 }
 
@@ -400,14 +407,16 @@ export function animateMoves(
     barFill.setAttribute('pointer-events', 'none');
     animLayer!.appendChild(barFill);
 
-    const label = svgEl('text');
-    label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('font-size', '9');
-    label.setAttribute('font-family', 'monospace');
-    label.setAttribute('fill', anim.unit.owner === PLAYER ? '#0a0a0a' : '#ffffff');
-    label.setAttribute('pointer-events', 'none');
-    label.textContent = anim.unit.owner === PLAYER ? `P${anim.unit.id}` : `A${anim.unit.id}`;
-    animLayer!.appendChild(label);
+    const iconSrc = unitIcon(anim.unit.unitTypeId);
+    const iconSize = HEX_SIZE * 0.6;
+    const iconImg = iconSrc ? svgEl('image') as unknown as SVGImageElement : null;
+    if (iconImg) {
+      iconImg.setAttribute('href', `/${iconSrc}`);
+      iconImg.setAttribute('width', String(iconSize));
+      iconImg.setAttribute('height', String(iconSize));
+      iconImg.setAttribute('pointer-events', 'none');
+      animLayer!.appendChild(iconImg);
+    }
 
     const startTime = performance.now();
 
@@ -423,13 +432,15 @@ export function animateMoves(
       barBg.setAttribute('y',   String(y + HEX_SIZE * 0.64));
       barFill.setAttribute('x', String(x - barW / 2));
       barFill.setAttribute('y', String(y + HEX_SIZE * 0.64));
-      label.setAttribute('x',   String(x));
-      label.setAttribute('y',   String(y + 4));
+      if (iconImg) {
+        iconImg.setAttribute('x', String(x - iconSize / 2));
+        iconImg.setAttribute('y', String(y - iconSize / 2));
+      }
 
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
-        circle.remove(); barBg.remove(); barFill.remove(); label.remove();
+        circle.remove(); barBg.remove(); barFill.remove(); iconImg?.remove();
         completed++;
         if (completed >= animations.length) {
           animLayer!.innerHTML = '';
