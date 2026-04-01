@@ -19,7 +19,7 @@ web-strategic/
 
 ## Game Rules
 
-> **IMPORTANT — keep in sync:** Whenever production, movement, or combat logic changes in `game.js` or `gameconfig.js`, you **must** also update the in-game rules overlay in `index.html` (`#rules-modal`) to reflect the new logic. The overlay is the canonical player-facing description of the rules and must always match the actual code.
+> **IMPORTANT — keep in sync:** Whenever production, movement, victory conditions, or combat logic changes in `game.js` or `gameconfig.js`, you **must** also update the in-game rules overlay in `index.html` (`#rules-modal`) to reflect the new logic. The overlay is the canonical player-facing description of the rules and must always match the actual code.
 
 ### Board
 - 6×4 hexagonal grid (configurable in `gameconfig.js`), pointy-top orientation
