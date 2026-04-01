@@ -127,7 +127,7 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   const bg = svgEl('rect');
   bg.setAttribute('width', String(W));
   bg.setAttribute('height', String(H));
-  bg.setAttribute('fill', c.bg);
+  bg.setAttribute('fill', 'transparent');
   svgElement.appendChild(bg);
 
   const hexLayer = svgEl('g');
