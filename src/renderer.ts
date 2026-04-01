@@ -116,7 +116,7 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   svgElement.innerHTML = '';
   const c = colors();
 
-  const margin = HEX_SIZE * 2;
+  const margin = 100;
   const W = COLS * HEX_SIZE * Math.sqrt(3) + margin * 2;
   const H = ROWS * HEX_SIZE * 1.5 + HEX_SIZE + margin * 2;
 
@@ -365,7 +365,7 @@ export function animateMoves(
   if (animations.length === 0 || durationMs <= 0) { onDone(); return; }
 
   const c = colors();
-  const margin = HEX_SIZE * 2;
+  const margin = 100;
 
   let animLayer = svgElement.querySelector('#anim-layer') as SVGGElement | null;
   if (!animLayer) {
