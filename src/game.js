@@ -462,8 +462,8 @@ export function advancePhase(state) {
       state.phase = 'production';
       state.activePlayer = PLAYER;
       state.selectedUnit = null;
-      const playerHexes = state.hexStates.flat().filter(h => h.owner === PLAYER).length;
-      const aiHexes     = state.hexStates.flat().filter(h => h.owner === AI).length;
+      const playerHexes = Object.values(state.hexStates).filter(h => h.owner === PLAYER).length;
+      const aiHexes     = Object.values(state.hexStates).filter(h => h.owner === AI).length;
       const playerBonus = Math.floor(playerHexes / config.territoryQuota) * config.pointsPerQuota;
       const aiBonus     = Math.floor(aiHexes     / config.territoryQuota) * config.pointsPerQuota;
       state.productionPoints[PLAYER] += config.productionPointsPerTurn + playerBonus;
