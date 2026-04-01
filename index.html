@@ -12,6 +12,7 @@
   <div id="hud">
     <span><strong id="turn">Turn 1</strong></span>
     <span>Phase: <strong id="phase">Production</strong></span>
+    <span>PP: <strong id="pp-display">0</strong></span>
     <button id="end-move-btn">End Movement</button>
   </div>
 
@@ -21,6 +22,12 @@
     </div>
 
     <div id="sidebar">
+      <div class="panel" id="unit-picker">
+        <h2>Build Unit</h2>
+        <div id="unit-picker-hex"></div>
+        <div id="unit-picker-list"></div>
+      </div>
+
       <div class="panel">
         <h2>Instructions</h2>
         <div class="legend">

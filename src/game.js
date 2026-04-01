@@ -261,6 +261,10 @@ export function createInitialState() {
     phase: 'production',
     activePlayer: PLAYER,
     selectedUnit: null,
+    productionPoints: {
+      [PLAYER]: config.productionPointsPerTurn,
+      [AI]:     config.productionPointsPerTurn,
+    },
     log: ['Game started. Your turn — Production phase.'],
     winner: null,
   };
@@ -268,23 +272,44 @@ export function createInitialState() {
 
 // ── Production ────────────────────────────────────────────────────────────────
 
-export function playerPlaceUnit(state, col, row) {
+export function playerPlaceUnit(state, col, row, unitTypeId) {
   if (state.phase !== 'production' || state.activePlayer !== PLAYER) return state;
 
   if (!isValidProductionPlacement(state, col, row)) {
-    log(state, 'Place on your border row or a production hex (empty).');
+    log(state, 'Invalid placement hex.');
     return state;
   }
 
+  const unitType = config.unitTypes.find(u => u.id === unitTypeId);
+  if (!unitType) return state;
+
+  if (state.productionPoints[PLAYER] < unitType.cost) {
+    log(state, `Not enough production points (need ${unitType.cost}, have ${state.productionPoints[PLAYER]}).`);
+    return state;
+  }
+
+  state.productionPoints[PLAYER] -= unitType.cost;
   state.units.push(makeUnit(PLAYER, col, row));
   conquerHex(state, col, row, PLAYER);
-  log(state, `You placed a unit at (${col}, ${row}).`);
+  log(state, `Placed ${unitType.name} at (${col}, ${row}). PP: ${state.productionPoints[PLAYER]}.`);
+  return state;
+}
+
+export function playerEndProduction(state) {
+  if (state.phase !== 'production' || state.activePlayer !== PLAYER) return state;
+  log(state, 'You ended production.');
   return advancePhase(state);
 }
 
 export function aiProduction(state) {
-  const candidates = [];
+  const unitType = config.unitTypes[0]; // AI always builds the first unit type
 
+  if (state.productionPoints[AI] < unitType.cost) {
+    log(state, 'AI: not enough production points.');
+    return state;
+  }
+
+  const candidates = [];
   for (let c = 0; c < COLS; c++) {
     if (!getUnit(state, c, 0)) candidates.push([c, 0]);
   }
@@ -301,6 +326,7 @@ export function aiProduction(state) {
   }
 
   const [col, row] = candidates[Math.floor(Math.random() * candidates.length)];
+  state.productionPoints[AI] -= unitType.cost;
   state.units.push(makeUnit(AI, col, row));
   conquerHex(state, col, row, AI);
   log(state, `AI placed a unit at (${col}, ${row}).`);
@@ -436,7 +462,9 @@ export function advancePhase(state) {
       state.phase = 'production';
       state.activePlayer = PLAYER;
       state.selectedUnit = null;
-      log(state, `Turn ${state.turn} — Production phase. Click a border hex to place a unit.`);
+      state.productionPoints[PLAYER] += config.productionPointsPerTurn;
+      state.productionPoints[AI]     += config.productionPointsPerTurn;
+      log(state, `Turn ${state.turn} — Production phase. PP: ${state.productionPoints[PLAYER]}.`);
     }
   }
 

@@ -137,6 +137,31 @@ h1 {
 .legend span.p { color: #5aaa5a; }
 .legend span.a { color: #aa5a5a; }
 
+/* ── Unit picker ─────────────────────────────────────────────────────────────── */
+#unit-picker { display: none; }
+
+#unit-picker-hex {
+  font-size: 0.7rem;
+  color: #88aa88;
+  margin-bottom: 8px;
+}
+
+.unit-btn {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  background: #1a2a1a;
+  color: #aaddaa;
+  border: 1px solid #3a5a3a;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  margin-bottom: 4px;
+}
+.unit-btn:hover:not(:disabled) { background: #2a4a2a; }
+.unit-btn:disabled { color: #556655; border-color: #2a3a2a; cursor: not-allowed; }
+
 /* ── Winner overlay ────────────────────────────────────────────────────────── */
 #overlay {
   position: fixed;

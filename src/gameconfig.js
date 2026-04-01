@@ -18,6 +18,16 @@ const config = {
   // Minimum distance to any neutral or enemy hex required for stability
   productionSafeDistance: 2,
 
+  // ── Production economy ───────────────────────────────────────────────────────
+
+  // Production points earned by each player at the start of every turn
+  productionPointsPerTurn: 20,
+
+  // Available unit types (id must be unique; cost is in production points)
+  unitTypes: [
+    { id: 'infantry', name: 'Infantry', cost: 20 },
+  ],
+
   // ── Combat ──────────────────────────────────────────────────────────────────
 
   // Max hit points for a unit
