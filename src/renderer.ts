@@ -2,6 +2,14 @@ import { hexToPixel, hexPoints, HEX_SIZE } from './hex';
 import { COLS, ROWS, PLAYER, AI, getUnit, getUnitById, isValidProductionPlacement, getValidMoves, isInEnemyZoC } from './game';
 import type { GameState, Unit } from './types';
 
+export interface MoveAnimation {
+  unit: Unit;      // snapshot of the unit before moving (owner/hp for colour)
+  fromCol: number;
+  fromRow: number;
+  toCol: number;
+  toRow: number;
+}
+
 // Corner-bracket dash params — one full cycle = one hex edge (HEX_SIZE)
 const BRACKET     = 0.22;
 const DASH        = HEX_SIZE * BRACKET * 2;
@@ -165,7 +173,7 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   hexLayer.appendChild(boundary);
 }
 
-export function renderState(svgElement: SVGSVGElement, state: GameState, productionHex: { col: number; row: number } | null = null): void {
+export function renderState(svgElement: SVGSVGElement, state: GameState, productionHex: { col: number; row: number } | null = null, hiddenUnitIds: Set<number> = new Set()): void {
   const c = colors();
   const unitLayer = svgElement.querySelector('#unit-layer') as SVGGElement;
   unitLayer.innerHTML = '';
@@ -278,6 +286,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
 
   // Draw units
   for (const unit of state.units) {
+    if (hiddenUnitIds.has(unit.id)) continue;
     const { x, y } = hexToPixel(unit.col, unit.row);
     const isSelected = state.selectedUnit === unit.id;
     const hpRatio    = unit.hp / unit.maxHp;
@@ -335,6 +344,107 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     text.textContent = unit.owner === PLAYER ? `P${unit.id}` : `A${unit.id}`;
     unitLayer.appendChild(text);
   }
+}
+
+// Animate a list of unit moves sequentially, then call onDone.
+// During animation the caller should hide the moving units from the static render
+// (pass their ids to renderState's hiddenUnitIds) so they don't ghost at the destination.
+export function animateMoves(
+  svgElement: SVGSVGElement,
+  animations: MoveAnimation[],
+  durationMs: number,
+  onDone: () => void,
+): void {
+  if (animations.length === 0 || durationMs <= 0) { onDone(); return; }
+
+  const c = colors();
+  const margin = HEX_SIZE * 2;
+
+  let animLayer = svgElement.querySelector('#anim-layer') as SVGGElement | null;
+  if (!animLayer) {
+    animLayer = svgEl('g');
+    animLayer.id = 'anim-layer';
+    animLayer.setAttribute('transform', `translate(${margin},${margin})`);
+    svgElement.appendChild(animLayer);
+  }
+  animLayer.innerHTML = '';
+
+  let index = 0;
+
+  function animateNext(): void {
+    if (index >= animations.length) {
+      animLayer!.innerHTML = '';
+      onDone();
+      return;
+    }
+
+    const anim = animations[index++];
+    const from = hexToPixel(anim.fromCol, anim.fromRow);
+    const to   = hexToPixel(anim.toCol,   anim.toRow);
+    const baseColor = anim.unit.owner === PLAYER ? c.player : c.ai;
+    const hpRatio   = anim.unit.hp / anim.unit.maxHp;
+
+    const circle = svgEl('circle');
+    circle.setAttribute('r', String(HEX_SIZE * 0.55));
+    circle.setAttribute('fill', lerpColor(baseColor, '#333333', 1 - hpRatio));
+    circle.setAttribute('stroke', lerpColor(baseColor, '#000000', 0.3));
+    circle.setAttribute('stroke-width', '1.2');
+    circle.setAttribute('pointer-events', 'none');
+    animLayer!.appendChild(circle);
+
+    const barW = HEX_SIZE * 1.0;
+    const barH = HEX_SIZE * 0.14;
+    const barBg = svgEl('rect');
+    barBg.setAttribute('width', String(barW)); barBg.setAttribute('height', String(barH));
+    barBg.setAttribute('fill', '#222'); barBg.setAttribute('rx', '1');
+    barBg.setAttribute('pointer-events', 'none');
+    animLayer!.appendChild(barBg);
+
+    const barColor = hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
+    const barFill = svgEl('rect');
+    barFill.setAttribute('width', String(barW * hpRatio)); barFill.setAttribute('height', String(barH));
+    barFill.setAttribute('fill', barColor); barFill.setAttribute('rx', '1');
+    barFill.setAttribute('pointer-events', 'none');
+    animLayer!.appendChild(barFill);
+
+    const label = svgEl('text');
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('font-size', '9');
+    label.setAttribute('font-family', 'monospace');
+    label.setAttribute('fill', anim.unit.owner === PLAYER ? '#0a0a0a' : '#ffffff');
+    label.setAttribute('pointer-events', 'none');
+    label.textContent = anim.unit.owner === PLAYER ? `P${anim.unit.id}` : `A${anim.unit.id}`;
+    animLayer!.appendChild(label);
+
+    const startTime = performance.now();
+
+    function step(now: number): void {
+      const t    = Math.min((now - startTime) / durationMs, 1);
+      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease-in-out
+      const x    = from.x + (to.x - from.x) * ease;
+      const y    = from.y + (to.y - from.y) * ease;
+
+      circle.setAttribute('cx', String(x));
+      circle.setAttribute('cy', String(y));
+      barBg.setAttribute('x',   String(x - barW / 2));
+      barBg.setAttribute('y',   String(y + HEX_SIZE * 0.64));
+      barFill.setAttribute('x', String(x - barW / 2));
+      barFill.setAttribute('y', String(y + HEX_SIZE * 0.64));
+      label.setAttribute('x',   String(x));
+      label.setAttribute('y',   String(y + 4));
+
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else {
+        circle.remove(); barBg.remove(); barFill.remove(); label.remove();
+        animateNext();
+      }
+    }
+
+    requestAnimationFrame(step);
+  }
+
+  animateNext();
 }
 
 export function getHexFromEvent(e: MouseEvent): { col: number; row: number } | null {

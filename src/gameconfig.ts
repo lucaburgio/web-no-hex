@@ -72,6 +72,9 @@ const config: GameConfig = {
 
   // Automatically end the movement phase when no player unit has a valid move
   autoEndMovement: true,
+
+  // Duration in ms for the unit move animation (0 = instant)
+  unitMoveSpeed: 280,
 };
 
 export default config;

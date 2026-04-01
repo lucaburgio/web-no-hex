@@ -5,6 +5,9 @@ import {
   playerSelectUnit,
   playerMoveUnit,
   playerEndMovement,
+  prepareAiTurn,
+  aiMovement,
+  endTurnAfterAi,
   getUnit,
   getUnitById,
   getValidMoves,
@@ -13,7 +16,8 @@ import {
   PLAYER,
   AI,
 } from './game';
-import { initRenderer, renderState, getHexFromEvent } from './renderer';
+import { initRenderer, renderState, animateMoves, getHexFromEvent } from './renderer';
+import type { MoveAnimation } from './renderer';
 import config from './gameconfig';
 import type { GameState, Unit, CombatForecast } from './types';
 
@@ -108,6 +112,7 @@ function buildRulesContent(): string {
 
 let state: GameState = createInitialState();
 let pendingProductionHex: { col: number; row: number } | null = null;
+let isAnimating = false;
 
 function render(): void {
   renderState(svg, state, pendingProductionHex);
@@ -152,7 +157,7 @@ function hideUnitPicker(): void {
 // ── Board click ───────────────────────────────────────────────────────────────
 
 svg.addEventListener('click', (e: MouseEvent) => {
-  if (state.winner) return;
+  if (state.winner || isAnimating) return;
   const hex = getHexFromEvent(e);
   if (!hex) return;
   const { col, row } = hex;
@@ -167,37 +172,96 @@ svg.addEventListener('click', (e: MouseEvent) => {
   } else if (state.phase === 'movement' && state.activePlayer === PLAYER) {
     if (state.selectedUnit === null) {
       state = playerSelectUnit(state, col, row);
+      render(); updateUI();
     } else {
       const target = getUnit(state, col, row);
       if (target && target.owner === PLAYER) {
         state = playerSelectUnit(state, col, row);
+        render(); updateUI();
       } else {
+        // Snapshot the moving unit before state changes
+        const movingUnitId = state.selectedUnit;
+        const movingUnit = getUnitById(state, movingUnitId)!;
+        const fromCol = movingUnit.col, fromRow = movingUnit.row;
+
         state = playerMoveUnit(state, col, row);
+
+        const unitAfter = getUnitById(state, movingUnitId);
+        const toCol = unitAfter?.col ?? col;
+        const toRow = unitAfter?.row ?? row;
+
+        if (fromCol !== toCol || fromRow !== toRow) {
+          isAnimating = true;
+          renderState(svg, state, pendingProductionHex, new Set([movingUnitId]));
+          updateUI();
+          animateMoves(svg, [{ unit: movingUnit, fromCol, fromRow, toCol, toRow }], config.unitMoveSpeed, () => {
+            isAnimating = false;
+            render(); checkWinner(); maybeAutoEnd();
+          });
+        } else {
+          render(); updateUI(); checkWinner(); maybeAutoEnd();
+        }
       }
     }
-    render();
-    updateUI();
-    checkWinner();
-    maybeAutoEnd();
   }
 });
 
 // ── End phase button ──────────────────────────────────────────────────────────
 
 endMoveBtn.addEventListener('click', () => {
+  if (isAnimating) return;
+
   if (state.phase === 'production' && state.activePlayer === PLAYER) {
     state = playerEndProduction(state);
     hideUnitPicker();
-    render();
-    updateUI();
-    checkWinner();
+    render(); updateUI(); checkWinner();
   } else if (state.phase === 'movement' && state.activePlayer === PLAYER) {
-    state = playerEndMovement(state);
-    render();
-    updateUI();
-    checkWinner();
+    runAiTurnWithAnimation();
   }
 });
+
+function runAiTurnWithAnimation(): void {
+  // 1. Log end-of-movement and reset AI moved flags
+  state = prepareAiTurn(state);
+
+  // 2. Snapshot AI unit positions before AI moves
+  const preAiPositions = new Map(
+    state.units.filter(u => u.owner === AI).map(u => [u.id, { col: u.col, row: u.row, unit: { ...u } as typeof u }])
+  );
+
+  // 3. Run AI movement (state is now fully updated)
+  state = aiMovement(state);
+
+  if (state.winner) {
+    render(); updateUI(); checkWinner();
+    return;
+  }
+
+  // 4. Build animation list: AI units that changed position
+  const moves: MoveAnimation[] = [];
+  for (const unit of state.units.filter(u => u.owner === AI)) {
+    const pre = preAiPositions.get(unit.id);
+    if (pre && (pre.col !== unit.col || pre.row !== unit.row)) {
+      moves.push({ unit: pre.unit, fromCol: pre.col, fromRow: pre.row, toCol: unit.col, toRow: unit.row });
+    }
+  }
+
+  if (moves.length === 0) {
+    state = endTurnAfterAi(state);
+    render(); updateUI(); checkWinner(); maybeAutoEnd();
+    return;
+  }
+
+  // 5. Render final state with moving units hidden, then animate them in
+  isAnimating = true;
+  renderState(svg, state, null, new Set(moves.map(m => m.unit.id)));
+  updateUI();
+  animateMoves(svg, moves, config.unitMoveSpeed, () => {
+    isAnimating = false;
+    state = endTurnAfterAi(state);
+    render(); updateUI(); checkWinner(); maybeAutoEnd();
+  });
+}
 
 restartBtn.addEventListener('click', () => {
   state = createInitialState();
@@ -222,7 +286,7 @@ function hasAnyValidMove(): boolean {
 }
 
 function maybeAutoEnd(): void {
-  if (state.winner || state.activePlayer !== PLAYER) return;
+  if (isAnimating || state.winner || state.activePlayer !== PLAYER) return;
   if (state.phase === 'production' && autoEndProductionEl.checked && !canAffordAnyUnit()) {
     state = playerEndProduction(state);
     hideUnitPicker();

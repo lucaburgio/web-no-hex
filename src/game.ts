@@ -428,7 +428,7 @@ export function playerEndMovement(state: GameState): GameState {
   return advancePhase(state);
 }
 
-export function aiMovement(state: GameState): GameState {
+export function aiMovement(state: GameState): GameState {  // exported for animation split
   const aiUnits = state.units.filter(u => u.owner === AI);
   for (const unit of aiUnits) {
     const humanUnits = state.units.filter(u => u.owner === PLAYER);
@@ -471,6 +471,34 @@ export function aiMovement(state: GameState): GameState {
 
 // ── Phase advancement ─────────────────────────────────────────────────────────
 
+// Prepares the AI turn: logs end-of-movement and resets AI moved flags.
+// Call this before running aiMovement separately (used by the animation path).
+export function prepareAiTurn(state: GameState): GameState {
+  if (state.phase !== 'movement' || state.activePlayer !== PLAYER) return state;
+  log(state, 'You ended your movement.');
+  state.units.forEach(u => { if (u.owner === AI) u.movedThisTurn = false; });
+  return state;
+}
+
+// Runs end-of-turn housekeeping after AI movement: heal, stability, turn counter, PP.
+// Call this after aiMovement has already been applied (used by the animation path).
+export function endTurnAfterAi(state: GameState): GameState {
+  healUnits(state);
+  updateHexStability(state);
+  state.turn += 1;
+  state.phase = 'production';
+  state.activePlayer = PLAYER;
+  state.selectedUnit = null;
+  const playerHexes = Object.values(state.hexStates).filter(h => h.owner === PLAYER).length;
+  const aiHexes     = Object.values(state.hexStates).filter(h => h.owner === AI).length;
+  const playerBonus = Math.floor(playerHexes / config.territoryQuota) * config.pointsPerQuota;
+  const aiBonus     = Math.floor(aiHexes     / config.territoryQuota) * config.pointsPerQuota;
+  state.productionPoints[PLAYER] += config.productionPointsPerTurn + playerBonus;
+  state.productionPoints[AI]     += config.productionPointsPerTurn + aiBonus;
+  log(state, `Turn ${state.turn} — Production phase. PP: ${state.productionPoints[PLAYER]} (+${playerBonus} from territory).`);
+  return state;
+}
+
 export function advancePhase(state: GameState): GameState {
   if (state.winner) return state;
 
@@ -484,22 +512,10 @@ export function advancePhase(state: GameState): GameState {
     }
   } else if (state.phase === 'movement') {
     if (state.activePlayer === PLAYER) {
-      state.units.forEach(u => { if (u.owner === AI) u.movedThisTurn = false; });
+      state = prepareAiTurn(state);
       state = aiMovement(state);
       if (state.winner) return state;
-      healUnits(state);
-      updateHexStability(state);
-      state.turn += 1;
-      state.phase = 'production';
-      state.activePlayer = PLAYER;
-      state.selectedUnit = null;
-      const playerHexes = Object.values(state.hexStates).filter(h => h.owner === PLAYER).length;
-      const aiHexes     = Object.values(state.hexStates).filter(h => h.owner === AI).length;
-      const playerBonus = Math.floor(playerHexes / config.territoryQuota) * config.pointsPerQuota;
-      const aiBonus     = Math.floor(aiHexes     / config.territoryQuota) * config.pointsPerQuota;
-      state.productionPoints[PLAYER] += config.productionPointsPerTurn + playerBonus;
-      state.productionPoints[AI]     += config.productionPointsPerTurn + aiBonus;
-      log(state, `Turn ${state.turn} — Production phase. PP: ${state.productionPoints[PLAYER]} (+${playerBonus} from territory).`);
+      state = endTurnAfterAi(state);
     }
   }
 

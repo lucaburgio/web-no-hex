@@ -77,4 +77,6 @@ export interface GameConfig {
   zoneOfControl: boolean;
   autoEndProduction: boolean;
   autoEndMovement: boolean;
+  // Duration in ms for the unit move animation (0 = instant)
+  unitMoveSpeed: number;
 }
