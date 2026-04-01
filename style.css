@@ -33,12 +33,10 @@ body {
   background: var(--color-bg);
   color: #cccccc;
   font-family: 'Courier New', monospace;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   min-height: 100vh;
-  padding: 16px;
-  gap: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 h1 {
@@ -50,8 +48,8 @@ h1 {
 
 #hud {
   display: flex;
-  align-items: center;
-  gap: 20px;
+  flex-direction: column;
+  gap: 6px;
   font-size: 0.85rem;
 }
 
@@ -78,7 +76,9 @@ h1 {
 #game-area {
   display: flex;
   justify-content: center;
-  width: 100%;
+  width: 100vw;
+  min-height: 100vh;
+  align-items: center;
 }
 
 #board-wrap {
