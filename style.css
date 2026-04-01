@@ -12,18 +12,18 @@
   --color-unit-selected: #ffdd00;
 
   /* ── Hex fill states ─────────────────────────────────────────────────────── */
-  --color-hex-selected:   #1e2e1e;
-  --color-hex-valid-move: #0d200d;
-  --color-hex-player:     #141414;
-  --color-hex-ai:         #180606;
-  --color-hex-can-place:  #0a1a10;
+  --color-hex-selected:   #433b0b;
+  --color-hex-valid-move: #0d1120;
+  --color-hex-player:     #1e2c57;
+  --color-hex-ai:         #240909;
+  --color-hex-can-place:  #405696;
   --color-hex-zoc:        #160404;
 
   /* ── Movement area perimeter outline ────────────────────────────────────── */
   --color-move-border: rgba(255, 255, 255, 0.75);
 
   /* ── HP bar thresholds ───────────────────────────────────────────────────── */
-  --color-hp-high: #aaaaaa;
+  --color-hp-high: #43d6aa;
   --color-hp-mid:  #888822;
   --color-hp-low:  #882222;
 }
