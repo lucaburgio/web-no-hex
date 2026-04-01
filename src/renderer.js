@@ -220,8 +220,7 @@ export function renderState(svgEl, state) {
         // no per-hex bracket — perimeter outline covers the whole move area
       } else if (isConquered) {
         if (hexState.owner === PLAYER) {
-          fill   = c.hexPlayer;
-          stroke = c.player;   // bracket on player territory
+          fill = c.hexPlayer;
         } else {
           fill   = c.hexAi;
           stroke = 'transparent'; // no bracket on AI territory
