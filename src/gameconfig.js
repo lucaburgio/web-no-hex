@@ -23,6 +23,12 @@ const config = {
   // Production points earned by each player at the start of every turn
   productionPointsPerTurn: 20,
 
+  // Number of owned hexes required to form one quota
+  territoryQuota: 10,
+
+  // Bonus production points earned per quota owned each turn
+  pointsPerQuota: 2,
+
   // Available unit types (id must be unique; cost is in production points)
   unitTypes: [
     { id: 'infantry', name: 'Infantry', cost: 20 },
