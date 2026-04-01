@@ -1,0 +1,33 @@
+:root {
+  /* ── Background ─────────────────────────────────────────────────────────── */
+  --color-bg: #F3F0E9;
+
+  /* ── Player / AI identity colors ────────────────────────────────────────── */
+  --color-player: #1b2c46;
+  --color-ai:     #4a1a1a;
+
+  /* ── Unit states ────────────────────────────────────────────────────────── */
+  --color-unit-selected: #C77E00;
+
+  /* ── Hex fill states ─────────────────────────────────────────────────────── */
+  --color-hex-selected:      #FFBE00;
+  --color-hex-valid-move:    #ECDBAA;
+  --color-hex-player:        #5D9EFF;
+  --color-hex-ai:            #FF5D5D;
+  --color-hex-can-place:     #bebcb2;
+  --color-hex-prod-selected: #e1c47c;
+  --color-hex-prod-stroke:   #e18a17;
+  --color-hex-zoc:           #d58f8f;
+  --color-hex-neutral:       #EAE8DE;
+  --color-hex-stroke:        #000;
+
+  /* ── Movement area perimeter outline ────────────────────────────────────── */
+  --color-move-border: rgba(199, 126, 0, 1);
+
+  /* ── Unit icon & HP bar thresholds ──────────────────────────────────────── */
+  --color-unit-icon: #FFF;
+
+  --color-hp-high: #3aca7b;
+  --color-hp-mid:  #edc526;
+  --color-hp-low:  #b72929;
+}

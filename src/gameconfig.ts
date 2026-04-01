@@ -30,7 +30,7 @@ const config: GameConfig = {
 
   // Available unit types (id must be unique; cost is in production points)
   unitTypes: [
-    { id: 'infantry', name: 'Infantry', cost: 20, icon: 'icons/sword.svg' },
+    { id: 'infantry', name: 'Infantry', cost: 20, icon: 'icons/grade.svg' },
   ],
 
   // ── Combat ──────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ const config: GameConfig = {
   autoEndMovement: true,
 
   // Duration in ms for the unit move animation (0 = instant)
-  unitMoveSpeed: 280,
+  unitMoveSpeed: 480,
 };
 
 export default config;
