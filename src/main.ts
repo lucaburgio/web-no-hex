@@ -309,12 +309,8 @@ function updateUI(): void {
   ppDisplay.textContent = String(state.productionPoints[PLAYER]);
 
   const isPlayerTurn = state.activePlayer === PLAYER;
-  if (state.phase === 'production' && isPlayerTurn) {
-    endMoveBtn.style.display = 'inline-block';
-    endMoveBtn.textContent   = 'End Production';
-  } else if (state.phase === 'movement' && isPlayerTurn) {
-    endMoveBtn.style.display = 'inline-block';
-    endMoveBtn.textContent   = 'End Movement';
+  if ((state.phase === 'production' || state.phase === 'movement') && isPlayerTurn) {
+    endMoveBtn.style.display = 'flex';
   } else {
     endMoveBtn.style.display = 'none';
   }

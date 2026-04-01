@@ -22,52 +22,35 @@
     <div id="board-wrap">
       <svg id="board"></svg>
     </div>
-
-    <div id="sidebar">
-      <h1>Web Strategic</h1>
-
-      <div id="hud">
-        <span><strong id="turn">Turn 1</strong></span>
-        <span>Phase: <strong id="phase">Production</strong></span>
-        <span>PP: <strong id="pp-display">0</strong></span>
-        <button id="end-move-btn">End Movement</button>
-      </div>
-      <div class="panel" id="unit-picker">
-        <h2>Build Unit</h2>
-        <div id="unit-picker-hex"></div>
-        <div id="unit-picker-list"></div>
-      </div>
-
-      <div class="panel">
-        <h2>Instructions</h2>
-        <div class="legend">
-          <span class="p">You (P)</span> = south border<br>
-          <span class="a">AI (A)</span> = north border<br><br>
-          <strong>Production:</strong> spend PP to place units on your home row or production hexes.<br><br>
-          <strong>Movement:</strong> click a unit then an adjacent hex. Combat triggers automatically.<br><br>
-          <strong>Goal:</strong> reach the north row or eliminate all enemies.
-        </div>
-        <button id="rules-btn">Full Rules</button>
-      </div>
-
-      <div class="panel">
-        <h2>Settings</h2>
-        <label class="setting-row">
-          <input type="checkbox" id="auto-end-production" />
-          Auto-end production
-        </label>
-        <label class="setting-row">
-          <input type="checkbox" id="auto-end-movement" />
-          Auto-end movement
-        </label>
-      </div>
-
-      <div class="panel">
-        <h2>Log</h2>
-        <ul id="log"></ul>
-      </div>
-    </div>
   </div>
+
+  <!-- Hidden state elements required by JS -->
+  <div id="hud-hidden">
+    <strong id="turn"></strong>
+    <strong id="phase"></strong>
+    <ul id="log"></ul>
+    <input type="checkbox" id="auto-end-production" />
+    <input type="checkbox" id="auto-end-movement" />
+  </div>
+
+  <!-- Unit picker: floating panel shown during production -->
+  <div class="panel" id="unit-picker">
+    <h2>Build Unit</h2>
+    <div id="unit-picker-hex"></div>
+    <div id="unit-picker-list"></div>
+  </div>
+
+  <!-- Sticky footer -->
+  <footer id="game-footer">
+    <div id="footer-left">
+      <div id="pp-info">
+        <strong id="pp-display">0</strong>
+        <span id="pp-label">PRODUCTION<br>POINTS</span>
+      </div>
+      <button id="rules-btn">FULL RULES</button>
+    </div>
+    <button id="end-move-btn">&rsaquo;&rsaquo;&rsaquo;</button>
+  </footer>
 
   <div id="overlay" class="hidden">
     <div id="overlay-msg"></div>
