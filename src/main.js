@@ -6,6 +6,7 @@ import {
   playerMoveUnit,
   playerEndMovement,
   getUnit,
+  getValidMoves,
   isValidProductionPlacement,
   PLAYER,
 } from './game.js';
@@ -26,6 +27,11 @@ const unitPickerEl   = document.getElementById('unit-picker');
 const unitPickerHex  = document.getElementById('unit-picker-hex');
 const unitPickerList = document.getElementById('unit-picker-list');
 
+const autoEndProductionEl = document.getElementById('auto-end-production');
+const autoEndMovementEl   = document.getElementById('auto-end-movement');
+autoEndProductionEl.checked = config.autoEndProduction;
+autoEndMovementEl.checked   = config.autoEndMovement;
+
 let state = createInitialState();
 let pendingProductionHex = null; // hex currently selected in the unit picker
 
@@ -36,6 +42,7 @@ function render() {
 initRenderer(svg);
 render();
 updateUI();
+maybeAutoEnd();
 
 // ── Unit picker ───────────────────────────────────────────────────────────────
 
@@ -56,6 +63,7 @@ function showUnitPicker(col, row) {
       render();
       updateUI();
       checkWinner();
+      maybeAutoEnd();
     });
     unitPickerList.appendChild(btn);
   }
@@ -97,6 +105,7 @@ svg.addEventListener('click', e => {
     render();
     updateUI();
     checkWinner();
+    maybeAutoEnd();
   }
 });
 
@@ -124,7 +133,36 @@ restartBtn.addEventListener('click', () => {
   render();
   overlayEl.classList.add('hidden');
   updateUI();
+  maybeAutoEnd();
 });
+
+// ── Auto-end helpers ──────────────────────────────────────────────────────────
+
+function canAffordAnyUnit() {
+  return config.unitTypes.some(u => state.productionPoints[PLAYER] >= u.cost);
+}
+
+function hasAnyValidMove() {
+  return state.units
+    .filter(u => u.owner === PLAYER && !u.movedThisTurn)
+    .some(u => getValidMoves(state, u).length > 0);
+}
+
+function maybeAutoEnd() {
+  if (state.winner || state.activePlayer !== PLAYER) return;
+  if (state.phase === 'production' && autoEndProductionEl.checked && !canAffordAnyUnit()) {
+    state = playerEndProduction(state);
+    hideUnitPicker();
+    render();
+    updateUI();
+    checkWinner();
+  } else if (state.phase === 'movement' && autoEndMovementEl.checked && !hasAnyValidMove()) {
+    state = playerEndMovement(state);
+    render();
+    updateUI();
+    checkWinner();
+  }
+}
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
 

@@ -3,8 +3,8 @@
 
 const config = {
   // Board dimensions (number of hexes)
-  boardCols: 8,
-  boardRows: 8,
+  boardCols: 6,
+  boardRows: 6,
 
   // Number of units each side starts with
   startingUnits: 3,
@@ -65,6 +65,14 @@ const config = {
 
   // Whether Zone of Control is active (blocks free movement past enemies)
   zoneOfControl: true,
+
+  // ── Automation ───────────────────────────────────────────────────────────────
+
+  // Automatically end the production phase when the player can no longer afford any unit
+  autoEndProduction: false,
+
+  // Automatically end the movement phase when no player unit has a valid move
+  autoEndMovement: false,
 
 };
 

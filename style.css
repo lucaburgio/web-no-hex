@@ -116,6 +116,16 @@ h1 {
   margin-bottom: 6px;
 }
 
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #88aa88;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
 #log {
   list-style: none;
   font-size: 0.72rem;
