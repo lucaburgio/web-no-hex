@@ -316,7 +316,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
       }
 
       const hexOccupied = !!getUnit(state, col, r);
-      const hexDimmed = productionFocusHexes.size > 0 && (!productionFocusHexes.has(key) || hexOccupied) && !isProdSelected;
+      const hexDimmed = productionFocusHexes.size > 0 && isConquered && (!productionFocusHexes.has(key) || hexOccupied) && !isProdSelected;
       poly.setAttribute('fill', fill);
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('opacity', hexDimmed ? '0.2' : '1');
