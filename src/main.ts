@@ -168,6 +168,12 @@ function hideLobby(): void {
   lobbyOverlayEl.classList.add('hidden');
 }
 
+function sendStateUpdate(): void {
+  if (gameMode === 'vsHuman' && ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'state-update', state }));
+  }
+}
+
 function closeLobbyWs(): void {
   if (ws) {
     ws.onclose = null;
@@ -252,6 +258,14 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     updateUI();
     checkWinner();
     maybeAutoEnd();
+  } else if (msg.type === 'state-update') {
+    // Opponent's in-turn update — apply only while it's their turn
+    if (state.activePlayer !== localPlayer) {
+      state = msg.state as GameState;
+      syncUnitIdCounter(state);
+      render();
+      updateUI();
+    }
   } else if (msg.type === 'error') {
     showLobbyMenu();
     showLobbyError((msg.message as string) ?? 'Error.');
@@ -360,6 +374,7 @@ function showUnitPicker(col: number, row: number): void {
       render();
       updateUI();
       checkWinner();
+      sendStateUpdate();
       maybeAutoEnd();
     });
     unitPickerList.appendChild(btn);
@@ -416,10 +431,10 @@ svg.addEventListener('click', (e: MouseEvent) => {
           updateUI();
           animateMoves(svg, [{ unit: movingUnit, fromCol, fromRow, toCol, toRow }], config.unitMoveSpeed, () => {
             isAnimating = false;
-            render(); checkWinner(); maybeAutoEnd();
+            render(); checkWinner(); sendStateUpdate(); maybeAutoEnd();
           });
         } else {
-          render(); updateUI(); checkWinner(); maybeAutoEnd();
+          render(); updateUI(); checkWinner(); sendStateUpdate(); maybeAutoEnd();
         }
       }
     }
@@ -440,7 +455,9 @@ endMoveBtn.addEventListener('click', () => {
     hideUnitPicker();
     render(); updateUI(); checkWinner();
     if (gameMode === 'vsAI') {
-      // vsAI: no auto-end needed here; movement phase starts
+      maybeAutoEnd();
+    } else {
+      sendStateUpdate();
       maybeAutoEnd();
     }
   } else if (state.phase === 'movement' && state.activePlayer === localPlayer) {
