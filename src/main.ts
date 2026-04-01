@@ -455,3 +455,9 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
 svg.addEventListener('mouseleave', () => {
   tooltipEl.classList.add('hidden');
 });
+
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (e.key === 'Enter' && !endMoveBtn.hidden && endMoveBtn.style.display !== 'none') {
+    endMoveBtn.click();
+  }
+});

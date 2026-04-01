@@ -486,6 +486,7 @@ export function prepareAiTurn(state: GameState): GameState {
 export function endTurnAfterAi(state: GameState): GameState {
   healUnits(state);
   updateHexStability(state);
+  state.units.forEach(u => { u.movedThisTurn = false; });
   state.turn += 1;
   state.phase = 'production';
   state.activePlayer = PLAYER;
