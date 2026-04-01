@@ -308,3 +308,91 @@ h1 {
   font-size: 0.9rem;
 }
 #restart-btn:hover { background: #3a6a3a; }
+
+/* ── Rules button ──────────────────────────────────────────────────────────── */
+#rules-btn {
+  margin-top: 8px;
+  padding: 3px 10px;
+  background: transparent;
+  color: #5a8a5a;
+  border: 1px solid #3a5a3a;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+#rules-btn:hover { background: #1a2a1a; color: #8aba8a; }
+
+/* ── Rules overlay ─────────────────────────────────────────────────────────── */
+#rules-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.82);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 20;
+  overflow-y: auto;
+  padding: 40px 16px;
+}
+#rules-overlay.hidden { display: none; }
+
+#rules-modal {
+  background: #0e160e;
+  border: 1px solid #2a4a2a;
+  padding: 28px 32px;
+  max-width: 620px;
+  width: 100%;
+  color: #aaccaa;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  position: relative;
+}
+
+#rules-modal h2 {
+  font-size: 1rem;
+  color: #6aaa6a;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  margin-bottom: 20px;
+}
+
+#rules-modal h3 {
+  font-size: 0.78rem;
+  color: #5a9a5a;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin: 18px 0 6px;
+  border-bottom: 1px solid #1e2e1e;
+  padding-bottom: 3px;
+}
+
+#rules-modal p,
+#rules-modal li { color: #8aaa8a; margin-bottom: 3px; }
+
+#rules-modal ol,
+#rules-modal ul { padding-left: 18px; margin-bottom: 4px; }
+
+#rules-modal code {
+  background: #1a281a;
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.78rem;
+  color: #aaddaa;
+}
+
+#rules-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 3px 10px;
+  background: transparent;
+  color: #5a8a5a;
+  border: 1px solid #3a5a3a;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.72rem;
+}
+#rules-close:hover { background: #1a2a1a; color: #8aba8a; }

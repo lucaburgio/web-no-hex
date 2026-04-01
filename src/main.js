@@ -30,6 +30,11 @@ const unitPickerEl   = document.getElementById('unit-picker');
 const unitPickerHex  = document.getElementById('unit-picker-hex');
 const unitPickerList = document.getElementById('unit-picker-list');
 
+const rulesOverlayEl = document.getElementById('rules-overlay');
+document.getElementById('rules-btn').addEventListener('click', () => rulesOverlayEl.classList.remove('hidden'));
+document.getElementById('rules-close').addEventListener('click', () => rulesOverlayEl.classList.add('hidden'));
+rulesOverlayEl.addEventListener('click', e => { if (e.target === rulesOverlayEl) rulesOverlayEl.classList.add('hidden'); });
+
 const autoEndProductionEl = document.getElementById('auto-end-production');
 const autoEndMovementEl   = document.getElementById('auto-end-movement');
 autoEndProductionEl.checked = config.autoEndProduction;

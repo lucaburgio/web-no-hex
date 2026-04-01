@@ -19,34 +19,47 @@ web-strategic/
 
 ## Game Rules
 
+> **IMPORTANT — keep in sync:** Whenever production, movement, or combat logic changes in `game.js` or `gameconfig.js`, you **must** also update the in-game rules overlay in `index.html` (`#rules-modal`) to reflect the new logic. The overlay is the canonical player-facing description of the rules and must always match the actual code.
+
 ### Board
-- 32×32 hexagonal grid, pointy-top orientation
-- Player 1 (human) starts from the **south** (row 31)
-- Player 2 (AI) starts from the **north** (row 0)
+- 6×4 hexagonal grid (configurable in `gameconfig.js`), pointy-top orientation
+- Player (human) starts from the **south** (bottom row)
+- AI starts from the **north** (top row, row 0)
 
 ### Turn Phases (in order)
-1. **Production** — each player places one new unit on their home border (row 0 for AI, row 31 for human). Must be an empty hex.
-2. **Movement** — each unit may move at most 1 hex. Moving onto an enemy hex triggers combat immediately.
-3. **End** — turn counter advances, AI takes its turn automatically.
+1. **Production** — each player spends PP to place units on valid hexes.
+2. **Movement** — each unit may move at most 1 hex. Moving onto an enemy triggers combat.
+3. **End** — AI takes its turn, units heal, hex stability updates, turn counter advances.
+
+### Production Economy
+- Each turn both players earn **20 PP** (production points).
+- **Territory bonus:** +2 PP per 10 owned hexes per turn.
+- Spend **20 PP** to place an Infantry unit on a valid hex.
+- Valid placement: **home row** (bottom row for player) or any **owned production hex**.
+- **Production hex:** an owned hex becomes a production hex after being stable for **2 consecutive turns**. Stability requires all hexes within distance 2 to be owned by the same player. Breaks immediately if any nearby hex becomes neutral or enemy.
+- Multiple units can be placed per turn if you have enough PP.
 
 ### Units
-- Represented by a tag/label (e.g. `P1`, `P2`)
-- Attack strength: **1**
-- Defense strength: **2**
-- Combat resolution: `(attacker ATK) - (defender DEF)` → negative/zero = attacker loses; positive = defender loses
+- Base strength: **10**
+- Max HP: **10**
+- Combat Strength (CS) = `strength × condition × flanking`
+  - **Condition:** scales from 50% (1 HP) to 100% (full HP)
+  - **Flanking:** +15% CS per friendly unit adjacent to the defender (max 2 flankers, capped at +30%)
 
-### Territory (hexStates)
-- Each hex starts neutral. A unit moving onto a hex conquers it (owner = that player).
-- An enemy unit moving onto a conquered hex converts it.
-- **Stability counter:** each turn end, a conquered hex checks all hexes within distance 2.
-  If every one is owned by the same player (no neutral, no enemy), `stableFor` increments.
-  After 2 consecutive stable turns → `isProduction = true`.
-  If the condition breaks, `stableFor` resets to 0 and production status is lost immediately.
-- **Production hexes:** player (or AI) can spawn a new unit there on the production phase,
-  in addition to the home border row.
+### Movement & Zone of Control
+- Each unit moves **1 hex** per turn.
+- Moving onto an empty hex conquers it.
+- **Zone of Control (ZoC):** a unit adjacent to an enemy is "locked" — it may only attack an adjacent enemy or retreat to a hex that is itself not adjacent to any enemy.
+
+### Combat
+- Damage is resolved **simultaneously**.
+- Damage formula: `floor(3 × exp(±ΔCS / 10))`, minimum 1.
+- If defender dies: attacker advances and conquers the hex.
+- If both die: both removed.
+- **Healing** (units that did not fight): +2 HP on own territory, +1 HP on neutral, +0 HP on enemy territory.
 
 ### Victory
-- Reach the opponent's home row, or eliminate all enemy units.
+- Move a unit onto the **opponent's home row**, or **eliminate all enemy units**.
 
 ## Coordinate System
 Axial hex coordinates (q, r). Offset display via `axialToPixel()`.

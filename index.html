@@ -33,10 +33,11 @@
         <div class="legend">
           <span class="p">You (P)</span> = south border<br>
           <span class="a">AI (A)</span> = north border<br><br>
-          <strong>Production:</strong> click any hex on the bottom row to place a unit.<br><br>
-          <strong>Movement:</strong> click one of your units to select it (highlighted), then click an adjacent hex to move. Click "End Movement" when done.<br><br>
-          <strong>Combat:</strong> move onto an enemy unit to attack. ATK 1 vs DEF 2 — attacker loses on tie.
+          <strong>Production:</strong> spend PP to place units on your home row or production hexes.<br><br>
+          <strong>Movement:</strong> click a unit then an adjacent hex. Combat triggers automatically.<br><br>
+          <strong>Goal:</strong> reach the north row or eliminate all enemies.
         </div>
+        <button id="rules-btn">Full Rules</button>
       </div>
 
       <div class="panel">
@@ -61,6 +62,68 @@
   <div id="overlay" class="hidden">
     <div id="overlay-msg"></div>
     <button id="restart-btn">Restart</button>
+  </div>
+
+  <div id="rules-overlay" class="hidden">
+    <div id="rules-modal">
+      <button id="rules-close">✕ Close</button>
+      <h2>Game Rules</h2>
+
+      <h3>Overview</h3>
+      <p>Turn-based hex strategy on a 6×4 grid. You play from the south (bottom row); the AI plays from the north (top row).</p>
+
+      <h3>Turn Phases</h3>
+      <ol>
+        <li><strong>Production</strong> — spend PP to place units.</li>
+        <li><strong>Movement</strong> — move each of your units up to 1 hex.</li>
+        <li><strong>End</strong> — AI takes its turn, then the turn counter advances.</li>
+      </ol>
+
+      <h3>Production</h3>
+      <ul>
+        <li>Each turn you earn <strong>20 PP</strong> (production points).</li>
+        <li><strong>Territory bonus:</strong> +2 PP for every 10 hexes you own.</li>
+        <li>Spend 20 PP to place an <strong>Infantry</strong> unit.</li>
+        <li>Valid placement hexes: your <strong>home row</strong> (bottom), or any <strong>production hex</strong> you own.</li>
+        <li><strong>Production hex:</strong> an owned hex that has been stable for 2 consecutive turns.
+          Stability requires all hexes within distance 2 to be owned by you (no neutral, no enemy).
+          Stability resets immediately if that condition breaks.</li>
+        <li>You can place multiple units per turn as long as you have PP.</li>
+      </ul>
+
+      <h3>Movement</h3>
+      <ul>
+        <li>Each unit may move <strong>1 hex</strong> per turn.</li>
+        <li>Moving onto an empty hex <strong>conquers</strong> it (converts it to your territory).</li>
+        <li>Moving onto an enemy unit triggers <strong>combat</strong>.</li>
+        <li><strong>Zone of Control (ZoC):</strong> if your unit is adjacent to an enemy, it is "locked."
+          It may only attack an adjacent enemy or retreat to a hex that is not itself adjacent to any enemy.
+          It cannot freely move away to a safe hex.</li>
+      </ul>
+
+      <h3>Combat</h3>
+      <ul>
+        <li>Both sides deal damage <strong>simultaneously</strong>.</li>
+        <li><strong>Combat Strength (CS)</strong> = base strength (10) × condition × flanking bonus.</li>
+        <li><strong>Condition:</strong> scales from 50% (1 HP) to 100% (full HP).</li>
+        <li><strong>Flanking:</strong> each additional friendly unit adjacent to the defender grants +15% CS to the attacker (max 2 flankers = +30%).</li>
+        <li><strong>Damage formula:</strong> <code>floor(3 × exp(±ΔCS / 10))</code>, minimum 1 damage per side.</li>
+        <li>If the defender dies: attacker advances onto that hex and conquers it.</li>
+        <li>If both die: both units are removed.</li>
+        <li>Hover over an enemy unit during movement to see a combat forecast.</li>
+      </ul>
+
+      <h3>Healing</h3>
+      <ul>
+        <li>Units that did <strong>not</strong> fight this turn heal at end of turn.</li>
+        <li>+2 HP on <strong>own territory</strong>, +1 HP on <strong>neutral</strong>, +0 HP on <strong>enemy territory</strong>.</li>
+      </ul>
+
+      <h3>Victory</h3>
+      <ul>
+        <li>Move a unit onto the <strong>opponent's home row</strong>, or <strong>eliminate all enemy units</strong>.</li>
+      </ul>
+    </div>
   </div>
 
   <div id="combat-tooltip" class="hidden"></div>
