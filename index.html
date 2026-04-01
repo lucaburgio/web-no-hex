@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Web Strategic</title>
   <link rel="stylesheet" href="style.css" />
+  <script>
+    (function () {
+      const theme = new URLSearchParams(location.search).get('theme');
+      if (theme) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = `public/themes/theme-${theme}.css`;
+        document.currentScript.parentNode.appendChild(link);
+      }
+    })();
+  </script>
 </head>
 <body>
   <div id="game-area">
