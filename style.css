@@ -14,11 +14,12 @@
   /* ── Hex fill states ─────────────────────────────────────────────────────── */
   --color-hex-selected:   #433b0b;
   --color-hex-valid-move: #0d1120;
-  --color-hex-player:     #1e2c57;
-  --color-hex-ai:         #240909;
+  --color-hex-player:     #23251E;
+  --color-hex-ai:         #A5A8A2;
   --color-hex-can-place:      #405696;
   --color-hex-prod-selected: #2a2200;
   --color-hex-zoc:            #160404;
+  --color-hex-neutral:        #E8E4DB;
 
   /* ── Movement area perimeter outline ────────────────────────────────────── */
   --color-move-border: rgba(255, 255, 255, 0.75);
@@ -77,7 +78,6 @@ h1 {
   min-width: max-content;
   min-height: 100vh;
   align-items: center;
-  padding-right: 272px; /* sidebar clearance: 240px width + 16px right + 16px gap */
 }
 
 #board-wrap {

@@ -34,6 +34,7 @@ interface Colors {
   hexCanPlace: string;
   hexProdSelected: string;
   hexZoc: string;
+  hexNeutral: string;
   moveBorder: string;
   hpHigh: string;
   hpMid: string;
@@ -57,6 +58,7 @@ function colors(): Colors {
     hexCanPlace:     v('--color-hex-can-place'),
     hexProdSelected: v('--color-hex-prod-selected'),
     hexZoc:          v('--color-hex-zoc'),
+    hexNeutral:      v('--color-hex-neutral'),
     moveBorder:      v('--color-move-border'),
     hpHigh:          v('--color-hp-high'),
     hpMid:           v('--color-hp-mid'),
@@ -157,14 +159,6 @@ export function initRenderer(svgElement: SVGSVGElement): void {
       poly.style.cursor = 'pointer';
       hexLayer.appendChild(poly);
 
-      const dot = svgEl('circle');
-      dot.setAttribute('cx', String(x));
-      dot.setAttribute('cy', String(y));
-      dot.setAttribute('r', '2');
-      dot.setAttribute('fill', '#A1A1A1');
-      dot.setAttribute('pointer-events', 'none');
-      dot.setAttribute('id', `dot-${col}-${r}`);
-      hexLayer.appendChild(dot);
     }
   }
 
@@ -232,7 +226,6 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
   for (let r = 0; r < ROWS; r++) {
     for (let col = 0; col < COLS; col++) {
       const poly = svgElement.querySelector(`#hex-${col}-${r}`) as SVGPolygonElement | null;
-      const dot  = svgElement.querySelector(`#dot-${col}-${r}`) as SVGCircleElement | null;
       if (!poly) continue;
 
       const key                = `${col},${r}`;
@@ -244,9 +237,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
       const isProdSelected     = productionHex && col === productionHex.col && r === productionHex.row;
       const isConquered        = !!hexState;
 
-      if (dot) dot.setAttribute('opacity', isConquered || isSelectedHex || isValidMove || canPlace || isProdSelected ? '0' : '0.5');
-
-      let fill   = c.bg;
+      let fill   = c.hexNeutral;
       let stroke = 'transparent';
 
       if (isSelectedHex) {
