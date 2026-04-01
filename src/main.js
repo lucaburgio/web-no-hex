@@ -51,8 +51,8 @@ function showUnitPicker(col, row) {
     btn.disabled = state.productionPoints[PLAYER] < unitType.cost;
     btn.addEventListener('click', () => {
       state = playerPlaceUnit(state, col, row, unitType.id);
-      // Refresh picker affordances after purchase (points may have changed)
-      showUnitPicker(col, row);
+      // Hex is now occupied — close picker; player picks a new hex if needed
+      hideUnitPicker();
       render();
       updateUI();
       checkWinner();
