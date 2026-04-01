@@ -122,16 +122,16 @@ export function getValidMoves(state, unit) {
   // If this unit is already adjacent to an enemy it is "locked":
   // it may only attack, not move to empty hexes (Civ 5 rule).
   // Approaching an enemy is always allowed.
-  const lockedByZoC = isInEnemyZoC(state, unit.col, unit.row, enemy);
+  const inZoC = isInEnemyZoC(state, unit.col, unit.row, enemy);
 
   return getNeighbors(unit.col, unit.row, COLS, ROWS).filter(([c, r]) => {
     const occupant = getUnit(state, c, r);
     // Can't move onto own unit
     if (occupant && occupant.owner === unit.owner) return false;
-    // Can always attack an adjacent enemy (even when locked)
+    // Can always attack an adjacent enemy
     if (occupant && occupant.owner === enemy) return true;
-    // If locked by ZoC, no free movement — must attack or pass
-    if (lockedByZoC) return false;
+    // If in ZoC, can only move to hexes that are NOT themselves in ZoC (retreat)
+    if (inZoC && isInEnemyZoC(state, c, r, enemy)) return false;
     return true;
   });
 }
