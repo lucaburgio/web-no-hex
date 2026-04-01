@@ -41,6 +41,71 @@ document.getElementById('rules-btn')!.addEventListener('click', () => rulesOverl
 document.getElementById('rules-close')!.addEventListener('click', () => rulesOverlayEl.classList.add('hidden'));
 rulesOverlayEl.addEventListener('click', e => { if (e.target === rulesOverlayEl) rulesOverlayEl.classList.add('hidden'); });
 
+function buildRulesContent(): string {
+  const unitList = config.unitTypes.map(u => `<strong>${u.name}</strong> (${u.cost} PP)`).join(', ');
+  const maxFlankBonus = Math.round(config.maxFlankingUnits * config.flankingBonus * 100);
+  return `
+    <h2>Game Rules</h2>
+
+    <h3>Overview</h3>
+    <p>Turn-based hex strategy on a ${config.boardCols}×${config.boardRows} grid.
+       You play from the south (bottom row); the AI plays from the north (top row).</p>
+
+    <h3>Turn Phases</h3>
+    <ol>
+      <li><strong>Production</strong> — spend PP to place units.</li>
+      <li><strong>Movement</strong> — move each of your units up to 1 hex.</li>
+      <li><strong>End</strong> — AI takes its turn, then the turn counter advances.</li>
+    </ol>
+
+    <h3>Production</h3>
+    <ul>
+      <li>Each turn you earn <strong>${config.productionPointsPerTurn} PP</strong> (production points).</li>
+      <li><strong>Territory bonus:</strong> +${config.pointsPerQuota} PP for every ${config.territoryQuota} hexes you own.</li>
+      <li>Available units: ${unitList}.</li>
+      <li>Valid placement: your <strong>home row</strong> (bottom), or any owned <strong>production hex</strong>.</li>
+      <li><strong>Production hex:</strong> an owned hex stable for <strong>${config.productionTurns} consecutive turns</strong>.
+        Stability requires all hexes within distance ${config.productionSafeDistance} to be owned by you.
+        Resets immediately if that condition breaks.</li>
+      <li>You can place multiple units per turn as long as you have PP.</li>
+    </ul>
+
+    <h3>Movement</h3>
+    <ul>
+      <li>Each unit may move <strong>1 hex</strong> per turn. Moving onto an empty hex <strong>conquers</strong> it.</li>
+      <li>Moving onto an enemy unit triggers <strong>combat</strong>.</li>
+      <li><strong>Zone of Control (ZoC):</strong> a unit adjacent to an enemy is locked — it may only attack
+        or retreat to a hex not itself adjacent to any enemy.</li>
+    </ul>
+
+    <h3>Combat</h3>
+    <ul>
+      <li>Both sides deal damage <strong>simultaneously</strong>.</li>
+      <li><strong>CS</strong> = base strength (${config.unitBaseStrength}) × condition (50–100% of HP) × flanking bonus.</li>
+      <li><strong>Flanking:</strong> +${Math.round(config.flankingBonus * 100)}% CS per adjacent friendly
+        (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%).</li>
+      <li><strong>Damage:</strong> <code>floor(${config.combatDamageBase} × exp(±ΔCS / ${config.combatStrengthScale}))</code>, min 1 per side.</li>
+      <li>If defender dies: attacker advances and conquers the hex. If both die: both removed.</li>
+      <li>Hover over an enemy unit during movement to see a combat forecast.</li>
+    </ul>
+
+    <h3>Healing</h3>
+    <ul>
+      <li>Units that did <strong>not</strong> fight this turn heal at end of turn.</li>
+      <li>+${config.healOwnTerritory} HP on <strong>own territory</strong> ·
+          +${config.healNeutral} HP on <strong>neutral</strong> ·
+          +${config.healEnemyTerritory} HP on <strong>enemy territory</strong>.</li>
+    </ul>
+
+    <h3>Victory</h3>
+    <ul>
+      <li>Move a unit onto the <strong>opponent's home row</strong>, or <strong>eliminate all enemy units</strong>.</li>
+    </ul>
+  `;
+}
+
+(document.getElementById('rules-content') as HTMLDivElement).innerHTML = buildRulesContent();
+
 let state: GameState = createInitialState();
 let pendingProductionHex: { col: number; row: number } | null = null;
 
