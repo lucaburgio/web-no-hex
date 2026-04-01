@@ -15,6 +15,48 @@ function unitIcon(unitTypeId: string): string | undefined {
   return config.unitTypes.find(t => t.id === unitTypeId)?.icon;
 }
 
+interface IconDef { viewBox: number; mode: 'stroke' | 'fill'; paths: string[]; }
+
+const SVG_ICON_DEFS: Record<string, IconDef> = {
+  'icons/sword.svg': {
+    viewBox: 24,
+    mode: 'stroke',
+    paths: ['m11 19-6-6', 'm5 21-2-2', 'm8 16-4 4', 'M9.5 17.5 21 6V3h-3L6.5 14.5'],
+  },
+  'icons/grade.svg': {
+    viewBox: 18,
+    mode: 'fill',
+    paths: ['M11.6748 6.64258C11.6754 6.64381 11.6784 6.64827 11.6826 6.65625C11.6931 6.67582 11.7135 6.71514 11.7451 6.77051C11.8086 6.88164 11.9134 7.05668 12.0586 7.27441C12.3523 7.71495 12.7927 8.30151 13.3711 8.87988C14.5441 10.0529 16.0763 11.001 18 11.001V17.001C13.9237 17.001 10.9559 14.9491 9.12891 13.1221C9.085 13.0782 9.04283 13.0331 9 12.9893C8.95717 13.0331 8.915 13.0782 8.87109 13.1221C7.0441 14.9491 4.07627 17.001 0 17.001V11.001C1.92373 11.001 3.4559 10.0529 4.62891 8.87988C5.20727 8.30151 5.64772 7.71495 5.94141 7.27441C6.08656 7.05668 6.19138 6.88164 6.25488 6.77051C6.28652 6.71514 6.30695 6.67582 6.31738 6.65625L6.32324 6.64648L9 1.29297L11.6748 6.64258ZM6.31836 6.65527L6.31738 6.65723L6.32031 6.65234C6.31983 6.65331 6.31891 6.65417 6.31836 6.65527ZM11.6826 6.65723L11.6816 6.65527C11.6811 6.65417 11.6802 6.65331 11.6797 6.65234L11.6826 6.65723Z'],
+  },
+};
+
+function inlineIcon(iconSrc: string | undefined, x: number, y: number, size: number, color: string, opacity: string): SVGGElement | null {
+  if (!iconSrc) return null;
+  const def = SVG_ICON_DEFS[iconSrc];
+  if (!def) return null;
+  const scale = size / def.viewBox;
+  const g = svgEl('g');
+  g.setAttribute('transform', `translate(${x - size / 2},${y - size / 2}) scale(${scale})`);
+  if (def.mode === 'fill') {
+    g.setAttribute('fill', color);
+    g.setAttribute('stroke', 'none');
+  } else {
+    g.setAttribute('fill', 'none');
+    g.setAttribute('stroke', color);
+    g.setAttribute('stroke-width', String(2 / scale));
+    g.setAttribute('stroke-linecap', 'round');
+    g.setAttribute('stroke-linejoin', 'round');
+  }
+  g.setAttribute('opacity', opacity);
+  g.setAttribute('pointer-events', 'none');
+  for (const d of def.paths) {
+    const p = svgEl('path');
+    p.setAttribute('d', d);
+    g.appendChild(p);
+  }
+  return g;
+}
+
 // Corner-bracket dash params — one full cycle = one hex edge (HEX_SIZE)
 const BRACKET     = 0.22;
 const DASH        = HEX_SIZE * BRACKET * 2;
@@ -36,6 +78,8 @@ interface Colors {
   hexZoc: string;
   hexNeutral: string;
   hexStroke: string;
+  hexProdStroke: string;
+  unitIconColor: string;
   moveBorder: string;
   hpHigh: string;
   hpMid: string;
@@ -61,6 +105,8 @@ function colors(): Colors {
     hexZoc:          v('--color-hex-zoc'),
     hexNeutral:      v('--color-hex-neutral'),
     hexStroke:       v('--color-hex-stroke'),
+    hexProdStroke:   v('--color-hex-prod-stroke'),
+    unitIconColor:   v('--color-unit-icon'),
     moveBorder:      v('--color-move-border'),
     hpHigh:          v('--color-hp-high'),
     hpMid:           v('--color-hp-mid'),
@@ -203,11 +249,17 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
   }
 
   const canPlaceHexes = new Set<string>();
+  // Focus set: home row + owned production hexes (regardless of occupation) — used for dimming
+  const productionFocusHexes = new Set<string>();
   if (state.phase === 'production' && state.activePlayer === PLAYER) {
     for (let r = 0; r < ROWS; r++) {
       for (let col = 0; col < COLS; col++) {
         if (isValidProductionPlacement(state, col, r)) canPlaceHexes.add(`${col},${r}`);
+        if (r === ROWS - 1) productionFocusHexes.add(`${col},${r}`);
       }
+    }
+    for (const [key, hex] of Object.entries(state.hexStates)) {
+      if (hex.owner === PLAYER && hex.isProduction) productionFocusHexes.add(key);
     }
   }
 
@@ -250,7 +302,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
         fill = c.hexMove;
       } else if (isProdSelected) {
         fill   = c.hexProdSelected;
-        stroke = c.unitSelected;
+        stroke = c.hexProdStroke;
       } else if (canPlace) {
         fill   = c.hexCanPlace;
         stroke = c.hexStroke;
@@ -263,8 +315,10 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
         }
       }
 
+      const hexDimmed = productionFocusHexes.size > 0 && !productionFocusHexes.has(key) && !isProdSelected;
       poly.setAttribute('fill', fill);
       poly.setAttribute('stroke', stroke);
+      poly.setAttribute('opacity', hexDimmed ? '0.2' : '1');
 
       // Production marker
       svgElement.querySelector(`#marker-${col}-${r}`)?.remove();
@@ -274,7 +328,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
         const diamond = svgEl('polygon');
         diamond.setAttribute('points', `${x},${y - s} ${x + s},${y} ${x},${y + s} ${x - s},${y}`);
         diamond.setAttribute('fill', hexState.owner === PLAYER ? c.player : c.ai);
-        diamond.setAttribute('opacity', '0.4');
+        diamond.setAttribute('opacity', hexDimmed ? '0.08' : '0.4');
         diamond.setAttribute('pointer-events', 'none');
         diamond.setAttribute('id', `marker-${col}-${r}`);
         (svgElement.querySelector('#hex-layer') as SVGGElement).appendChild(diamond);
@@ -291,15 +345,15 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
 
     const baseColor = unit.owner === PLAYER ? c.player : c.ai;
     const fill      = isSelected ? c.unitSelected : lerpColor(baseColor, '#333333', 1 - hpRatio);
-    const opacity   = unit.movedThisTurn ? '0.25' : '1';
+    const unitDimmed = productionFocusHexes.size > 0 && !productionFocusHexes.has(`${unit.col},${unit.row}`);
+    const opacity   = (unit.movedThisTurn || unitDimmed) ? '0.2' : '1';
 
     const circle = svgEl('circle');
     circle.setAttribute('cx', String(x));
     circle.setAttribute('cy', String(y));
     circle.setAttribute('r', String(HEX_SIZE * 0.55));
     circle.setAttribute('fill', fill);
-    circle.setAttribute('stroke', isSelected ? baseColor : lerpColor(baseColor, '#000000', 0.3));
-    circle.setAttribute('stroke-width', isSelected ? '2.5' : '1.2');
+    circle.setAttribute('stroke', 'none');
     circle.setAttribute('opacity', opacity);
     circle.setAttribute('data-col', String(unit.col));
     circle.setAttribute('data-row', String(unit.row));
@@ -331,18 +385,8 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
 
     // Icon
     const icon = unitIcon(unit.unitTypeId);
-    if (icon) {
-      const iconSize = HEX_SIZE * 0.6;
-      const img = svgEl('image') as unknown as SVGImageElement;
-      img.setAttribute('href', `/${icon}`);
-      img.setAttribute('x', String(x - iconSize / 2));
-      img.setAttribute('y', String(y - iconSize / 2));
-      img.setAttribute('width', String(iconSize));
-      img.setAttribute('height', String(iconSize));
-      img.setAttribute('pointer-events', 'none');
-      img.setAttribute('opacity', opacity);
-      unitLayer.appendChild(img);
-    }
+    const iconEl = inlineIcon(icon, x, y, HEX_SIZE * 0.4, c.unitIconColor, opacity);
+    if (iconEl) unitLayer.appendChild(iconEl);
   }
 }
 
@@ -380,8 +424,7 @@ export function animateMoves(
     const circle = svgEl('circle');
     circle.setAttribute('r', String(HEX_SIZE * 0.55));
     circle.setAttribute('fill', lerpColor(baseColor, '#333333', 1 - hpRatio));
-    circle.setAttribute('stroke', lerpColor(baseColor, '#000000', 0.3));
-    circle.setAttribute('stroke-width', '1.2');
+    circle.setAttribute('stroke', 'none');
     circle.setAttribute('pointer-events', 'none');
     animLayer!.appendChild(circle);
 
@@ -402,14 +445,8 @@ export function animateMoves(
 
     const iconSrc = unitIcon(anim.unit.unitTypeId);
     const iconSize = HEX_SIZE * 0.6;
-    const iconImg = iconSrc ? svgEl('image') as unknown as SVGImageElement : null;
-    if (iconImg) {
-      iconImg.setAttribute('href', `/${iconSrc}`);
-      iconImg.setAttribute('width', String(iconSize));
-      iconImg.setAttribute('height', String(iconSize));
-      iconImg.setAttribute('pointer-events', 'none');
-      animLayer!.appendChild(iconImg);
-    }
+    const iconEl = inlineIcon(iconSrc, from.x, from.y, iconSize, c.unitIconColor, '1');
+    if (iconEl) animLayer!.appendChild(iconEl);
 
     const startTime = performance.now();
 
@@ -425,15 +462,15 @@ export function animateMoves(
       barBg.setAttribute('y',   String(y + HEX_SIZE * 0.64));
       barFill.setAttribute('x', String(x - barW / 2));
       barFill.setAttribute('y', String(y + HEX_SIZE * 0.64));
-      if (iconImg) {
-        iconImg.setAttribute('x', String(x - iconSize / 2));
-        iconImg.setAttribute('y', String(y - iconSize / 2));
+      if (iconEl) {
+        const scale = iconSize / 24;
+        iconEl.setAttribute('transform', `translate(${x - iconSize / 2},${y - iconSize / 2}) scale(${scale})`);
       }
 
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
-        circle.remove(); barBg.remove(); barFill.remove(); iconImg?.remove();
+        circle.remove(); barBg.remove(); barFill.remove(); iconEl?.remove();
         completed++;
         if (completed >= animations.length) {
           animLayer!.innerHTML = '';
