@@ -35,6 +35,7 @@ interface Colors {
   hexProdSelected: string;
   hexZoc: string;
   hexNeutral: string;
+  hexStroke: string;
   moveBorder: string;
   hpHigh: string;
   hpMid: string;
@@ -59,6 +60,7 @@ function colors(): Colors {
     hexProdSelected: v('--color-hex-prod-selected'),
     hexZoc:          v('--color-hex-zoc'),
     hexNeutral:      v('--color-hex-neutral'),
+    hexStroke:       v('--color-hex-stroke'),
     moveBorder:      v('--color-move-border'),
     hpHigh:          v('--color-hp-high'),
     hpMid:           v('--color-hp-mid'),
@@ -251,7 +253,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
         stroke = c.unitSelected;
       } else if (canPlace) {
         fill   = c.hexCanPlace;
-        stroke = c.player;
+        stroke = c.hexStroke;
       } else if (isConquered) {
         if (hexState.owner === PLAYER) {
           fill = c.hexPlayer;

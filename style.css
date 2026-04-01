@@ -12,14 +12,15 @@
   --color-unit-selected: #ffdd00;
 
   /* ── Hex fill states ─────────────────────────────────────────────────────── */
-  --color-hex-selected:   #433b0b;
-  --color-hex-valid-move: #0d1120;
+  --color-hex-selected:   #FFBE00;
+  --color-hex-valid-move: #ECDBAA;
   --color-hex-player:     #23251E;
   --color-hex-ai:         #A5A8A2;
-  --color-hex-can-place:      #405696;
+  --color-hex-can-place:      #42463A;
   --color-hex-prod-selected: #2a2200;
   --color-hex-zoc:            #160404;
-  --color-hex-neutral:        #E8E4DB;
+  --color-hex-neutral:        #EAE8DE;
+  --color-hex-stroke:         #ffffff;
 
   /* ── Movement area perimeter outline ────────────────────────────────────── */
   --color-move-border: rgba(255, 255, 255, 0.75);
