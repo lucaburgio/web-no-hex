@@ -53,7 +53,7 @@ function showUnitPicker(col, row) {
     unitPickerList.appendChild(btn);
   }
 
-  unitPickerEl.style.display = '';
+  unitPickerEl.style.display = 'block';
 }
 
 function hideUnitPicker() {
