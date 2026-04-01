@@ -2,14 +2,14 @@ import type { GameConfig } from './types';
 
 const config: GameConfig = {
   // Board dimensions (number of hexes)
-  boardCols: 6,
-  boardRows: 4,
+  boardCols: 8,
+  boardRows: 8,
 
   // Number of units each side starts with
   startingUnits: 3,
 
   // Hexagon size (radius in pixels)
-  hexSize: 64,
+  hexSize: 48,
 
   // Turns a hex must remain stable before becoming a production hex
   productionTurns: 2,

@@ -23,7 +23,7 @@
   --color-hex-stroke:         #ffffff;
 
   /* ── Movement area perimeter outline ────────────────────────────────────── */
-  --color-move-border: rgba(255, 255, 255, 0.75);
+  --color-move-border: rgba(199, 126, 0, 1);
 
   /* ── HP bar thresholds ───────────────────────────────────────────────────── */
   --color-hp-high: #43d6aa;
