@@ -345,7 +345,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
 
     const baseColor = unit.owner === PLAYER ? c.player : c.ai;
     const fill      = isSelected ? c.unitSelected : lerpColor(baseColor, '#333333', 1 - hpRatio);
-    const unitDimmed = productionFocusHexes.size > 0 && !productionFocusHexes.has(`${unit.col},${unit.row}`);
+    const unitDimmed = productionFocusHexes.size > 0 && !(unit.owner === PLAYER && unit.row === ROWS - 1);
     const opacity   = (unit.movedThisTurn || unitDimmed) ? '0.2' : '1';
 
     const circle = svgEl('circle');
