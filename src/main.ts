@@ -24,7 +24,8 @@ import type { MoveAnimation } from './renderer';
 import config from './gameconfig';
 import type { GameState, Unit, CombatForecast, Owner } from './types';
 
-const WS_URL = 'ws://localhost:3001'; // Update for production deployment
+const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_URL = `${wsProtocol}//${location.hostname}:3001`;
 
 const svg        = document.getElementById('board') as unknown as SVGSVGElement;
 const logEl      = document.getElementById('log') as HTMLUListElement;
