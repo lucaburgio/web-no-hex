@@ -218,6 +218,9 @@ export function renderState(svgEl, state) {
       } else if (isValidMove) {
         fill = c.hexMove;
         // no per-hex bracket — perimeter outline covers the whole move area
+      } else if (canPlace) {
+        fill   = c.hexCanPlace;
+        stroke = c.player;
       } else if (isConquered) {
         if (hexState.owner === PLAYER) {
           fill = c.hexPlayer;
@@ -225,9 +228,6 @@ export function renderState(svgEl, state) {
           fill   = c.hexAi;
           stroke = 'transparent'; // no bracket on AI territory
         }
-      } else if (canPlace) {
-        fill   = c.hexCanPlace;
-        stroke = c.player;
       } else if (isZoc) {
         fill = c.hexZoc;
       }
