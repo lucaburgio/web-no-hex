@@ -352,41 +352,24 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     const unitDimmed = productionFocusHexes.size > 0;
     const opacity   = (unit.movedThisTurn || unitDimmed) ? '0.2' : '1';
 
-    const PLAYER_PATH_D = 'M0 36.3968V16C0 7.16344 7.16344 0 16 0H25H34C42.8366 0 50 7.16345 50 16V36.3968C50 41.273 47.7764 45.883 43.9602 48.9185L34.9602 56.0774C29.1298 60.715 20.8702 60.715 15.0398 56.0774L6.03982 48.9185C2.22364 45.883 0 41.273 0 36.3968Z';
-    let unitEl: SVGElement;
-    if (unit.owner === PLAYER) {
-      const sc = (HEX_SIZE * 1.1) / 50;
-      const path = svgEl('path');
-      path.setAttribute('d', PLAYER_PATH_D);
-      path.setAttribute('fill', fill);
-      path.setAttribute('stroke', 'none');
-      path.setAttribute('opacity', opacity);
-      path.setAttribute('data-col', String(unit.col));
-      path.setAttribute('data-row', String(unit.row));
-      path.setAttribute('transform', `translate(${x - 25 * sc},${y - 30 * sc}) scale(${sc})`);
-      path.style.cursor = 'pointer';
-      unitEl = path;
-    } else {
-      const circle = svgEl('circle');
-      circle.setAttribute('cx', String(x));
-      circle.setAttribute('cy', String(y));
-      circle.setAttribute('r', String(HEX_SIZE * 0.55));
-      circle.setAttribute('fill', fill);
-      circle.setAttribute('stroke', 'none');
-      circle.setAttribute('opacity', opacity);
-      circle.setAttribute('data-col', String(unit.col));
-      circle.setAttribute('data-row', String(unit.row));
-      circle.style.cursor = 'pointer';
-      unitEl = circle;
-    }
+    const UNIT_PATH_D = 'M0 36.3968V16C0 7.16344 7.16344 0 16 0H25H34C42.8366 0 50 7.16345 50 16V36.3968C50 41.273 47.7764 45.883 43.9602 48.9185L34.9602 56.0774C29.1298 60.715 20.8702 60.715 15.0398 56.0774L6.03982 48.9185C2.22364 45.883 0 41.273 0 36.3968Z';
+    const sc = (HEX_SIZE * 1.1) / 50;
+    const unitEl = svgEl('path');
+    unitEl.setAttribute('d', UNIT_PATH_D);
+    unitEl.setAttribute('fill', fill);
+    unitEl.setAttribute('stroke', 'none');
+    unitEl.setAttribute('opacity', opacity);
+    unitEl.setAttribute('data-col', String(unit.col));
+    unitEl.setAttribute('data-row', String(unit.row));
+    unitEl.setAttribute('transform', `translate(${x - 25 * sc},${y - 30 * sc}) scale(${sc})`);
+    unitEl.style.cursor = 'pointer';
     unitLayer.appendChild(unitEl);
 
-    // HP bar
-    const isPlayer = unit.owner === PLAYER;
-    const barW = isPlayer ? HEX_SIZE * 0.78 : HEX_SIZE * 1.0;
-    const barH = HEX_SIZE * 0.14;
+    // HP bar (inside shape)
+    const barW = HEX_SIZE * 0.58;
+    const barH = HEX_SIZE * 0.1;
     const barX = x - barW / 2;
-    const barY = isPlayer ? y + HEX_SIZE * 0.27 : y + HEX_SIZE * 0.64;
+    const barY = y + HEX_SIZE * 0.27;
 
     const barBg = svgEl('rect');
     barBg.setAttribute('x', String(barX)); barBg.setAttribute('y', String(barY));
@@ -405,10 +388,9 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     barFill.setAttribute('opacity', opacity);
     unitLayer.appendChild(barFill);
 
-    // Icon
+    // Icon (shifted up inside shape)
     const icon = unitIcon(unit.unitTypeId);
-    const iconY = isPlayer ? y - HEX_SIZE * 0.13 : y;
-    const iconEl = inlineIcon(icon, x, iconY, HEX_SIZE * 0.4, c.unitIconColor, opacity);
+    const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.13, HEX_SIZE * 0.4, c.unitIconColor, opacity);
     if (iconEl) unitLayer.appendChild(iconEl);
   }
 }
@@ -444,28 +426,18 @@ export function animateMoves(
     const baseColor = anim.unit.owner === PLAYER ? c.player : c.ai;
     const hpRatio   = anim.unit.hp / anim.unit.maxHp;
 
-    const PLAYER_PATH_D = 'M0 36.3968V16C0 7.16344 7.16344 0 16 0H25H34C42.8366 0 50 7.16345 50 16V36.3968C50 41.273 47.7764 45.883 43.9602 48.9185L34.9602 56.0774C29.1298 60.715 20.8702 60.715 15.0398 56.0774L6.03982 48.9185C2.22364 45.883 0 41.273 0 36.3968Z';
+    const UNIT_PATH_D = 'M0 36.3968V16C0 7.16344 7.16344 0 16 0H25H34C42.8366 0 50 7.16345 50 16V36.3968C50 41.273 47.7764 45.883 43.9602 48.9185L34.9602 56.0774C29.1298 60.715 20.8702 60.715 15.0398 56.0774L6.03982 48.9185C2.22364 45.883 0 41.273 0 36.3968Z';
     const animFill = lerpColor(baseColor, '#333333', 1 - hpRatio);
-    const isPlayerUnit = anim.unit.owner === PLAYER;
     const unitSc = (HEX_SIZE * 1.1) / 50;
-    let circle: SVGElement;
-    if (isPlayerUnit) {
-      circle = svgEl('path');
-      circle.setAttribute('d', PLAYER_PATH_D);
-      circle.setAttribute('fill', animFill);
-      circle.setAttribute('stroke', 'none');
-      circle.setAttribute('pointer-events', 'none');
-    } else {
-      circle = svgEl('circle');
-      (circle as SVGCircleElement).setAttribute('r', String(HEX_SIZE * 0.55));
-      circle.setAttribute('fill', animFill);
-      circle.setAttribute('stroke', 'none');
-      circle.setAttribute('pointer-events', 'none');
-    }
+    const circle = svgEl('path');
+    circle.setAttribute('d', UNIT_PATH_D);
+    circle.setAttribute('fill', animFill);
+    circle.setAttribute('stroke', 'none');
+    circle.setAttribute('pointer-events', 'none');
     animLayer!.appendChild(circle);
 
-    const animBarW = isPlayerUnit ? HEX_SIZE * 0.78 : HEX_SIZE * 1.0;
-    const barH = HEX_SIZE * 0.14;
+    const animBarW = HEX_SIZE * 0.58;
+    const barH = HEX_SIZE * 0.1;
     const barBg = svgEl('rect');
     barBg.setAttribute('width', String(animBarW)); barBg.setAttribute('height', String(barH));
     barBg.setAttribute('fill', '#222'); barBg.setAttribute('rx', '1');
@@ -481,7 +453,7 @@ export function animateMoves(
 
     const iconSrc = unitIcon(anim.unit.unitTypeId);
     const iconSize = HEX_SIZE * 0.4;
-    const iconEl = inlineIcon(iconSrc, from.x, isPlayerUnit ? from.y - HEX_SIZE * 0.13 : from.y, iconSize, c.unitIconColor, '1');
+    const iconEl = inlineIcon(iconSrc, from.x, from.y - HEX_SIZE * 0.13, iconSize, c.unitIconColor, '1');
     if (iconEl) animLayer!.appendChild(iconEl);
 
     const startTime = performance.now();
@@ -492,21 +464,14 @@ export function animateMoves(
       const x    = from.x + (to.x - from.x) * ease;
       const y    = from.y + (to.y - from.y) * ease;
 
-      if (isPlayerUnit) {
-        circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 30 * unitSc}) scale(${unitSc})`);
-      } else {
-        circle.setAttribute('cx', String(x));
-        circle.setAttribute('cy', String(y));
-      }
-      const barYAnim = isPlayerUnit ? y + HEX_SIZE * 0.27 : y + HEX_SIZE * 0.64;
+      circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 30 * unitSc}) scale(${unitSc})`);
       barBg.setAttribute('x',   String(x - animBarW / 2));
-      barBg.setAttribute('y',   String(barYAnim));
+      barBg.setAttribute('y',   String(y + HEX_SIZE * 0.27));
       barFill.setAttribute('x', String(x - animBarW / 2));
-      barFill.setAttribute('y', String(barYAnim));
+      barFill.setAttribute('y', String(y + HEX_SIZE * 0.27));
       if (iconEl) {
         const scale = iconSize / 24;
-        const iconYAnim = isPlayerUnit ? y - HEX_SIZE * 0.13 : y;
-        iconEl.setAttribute('transform', `translate(${x - iconSize / 2},${iconYAnim - iconSize / 2}) scale(${scale})`);
+        iconEl.setAttribute('transform', `translate(${x - iconSize / 2},${y - HEX_SIZE * 0.13 - iconSize / 2}) scale(${scale})`);
       }
 
       if (t < 1) {
