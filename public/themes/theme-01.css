@@ -3,8 +3,8 @@
   --color-bg: #F3F0E9;
 
   /* ── Player / AI identity colors ────────────────────────────────────────── */
-  --color-player: #43483E;
-  --color-ai:     #000;
+  --color-player: #1b2c46;
+  --color-ai:     #4a1a1a;
 
   /* ── Unit states ────────────────────────────────────────────────────────── */
   --color-unit-selected: #C77E00;
@@ -12,14 +12,14 @@
   /* ── Hex fill states ─────────────────────────────────────────────────────── */
   --color-hex-selected:      #FFBE00;
   --color-hex-valid-move:    #ECDBAA;
-  --color-hex-player:        #23251E;
-  --color-hex-ai:            #A5A8A2;
-  --color-hex-can-place:     #73776a;
-  --color-hex-prod-selected: #d5cc91;
-  --color-hex-prod-stroke:   #ab6913;
+  --color-hex-player:        #5D9EFF;
+  --color-hex-ai:            #FF5D5D;
+  --color-hex-can-place:     #bebcb2;
+  --color-hex-prod-selected: #e1c47c;
+  --color-hex-prod-stroke:   #e18a17;
   --color-hex-zoc:           #d58f8f;
   --color-hex-neutral:       #EAE8DE;
-  --color-hex-stroke:        #23251E;
+  --color-hex-stroke:        #000;
 
   /* ── Movement area perimeter outline ────────────────────────────────────── */
   --color-move-border: rgba(199, 126, 0, 1);

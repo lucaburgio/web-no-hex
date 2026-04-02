@@ -2,8 +2,8 @@ import type { GameConfig } from './types';
 
 const config: GameConfig = {
   // Board dimensions (number of hexes)
-  boardCols: 8,
-  boardRows: 8,
+  boardCols: 4,
+  boardRows: 4,
 
   // Number of units each side starts with
   startingUnits: 3,
