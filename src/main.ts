@@ -168,9 +168,11 @@ function hideLobby(): void {
   lobbyOverlayEl.classList.add('hidden');
 }
 
-function sendStateUpdate(): void {
+function sendStateUpdate(anim?: MoveAnimation): void {
   if (gameMode === 'vsHuman' && ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'state-update', state }));
+    const payload: Record<string, unknown> = { type: 'state-update', state };
+    if (anim) payload.animation = anim;
+    ws.send(JSON.stringify(payload));
   }
 }
 
@@ -263,8 +265,20 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     if (state.activePlayer !== localPlayer) {
       state = msg.state as GameState;
       syncUnitIdCounter(state);
-      render();
-      updateUI();
+      const anim = msg.animation as MoveAnimation | undefined;
+      if (anim && !isAnimating) {
+        isAnimating = true;
+        renderState(svg, state, null, new Set([anim.unit.id]), localPlayer);
+        updateUI();
+        animateMoves(svg, [anim], config.unitMoveSpeed, () => {
+          isAnimating = false;
+          render();
+          updateUI();
+        });
+      } else {
+        render();
+        updateUI();
+      }
     }
   } else if (msg.type === 'error') {
     showLobbyMenu();
@@ -408,11 +422,13 @@ svg.addEventListener('click', (e: MouseEvent) => {
     if (state.selectedUnit === null) {
       state = playerSelectUnit(state, col, row, localPlayer);
       render(); updateUI();
+      sendStateUpdate();
     } else {
       const target = getUnit(state, col, row);
       if (target && target.owner === localPlayer) {
         state = playerSelectUnit(state, col, row, localPlayer);
         render(); updateUI();
+        sendStateUpdate();
       } else {
         // Snapshot the moving unit before state changes
         const movingUnitId = state.selectedUnit;
@@ -426,12 +442,14 @@ svg.addEventListener('click', (e: MouseEvent) => {
         const toRow = unitAfter?.row ?? row;
 
         if (fromCol !== toCol || fromRow !== toRow) {
+          const animUnit = { ...movingUnit };
           isAnimating = true;
           renderState(svg, state, pendingProductionHex, new Set([movingUnitId]), localPlayer);
           updateUI();
+          sendStateUpdate({ unit: animUnit, fromCol, fromRow, toCol, toRow });
           animateMoves(svg, [{ unit: movingUnit, fromCol, fromRow, toCol, toRow }], config.unitMoveSpeed, () => {
             isAnimating = false;
-            render(); checkWinner(); sendStateUpdate(); maybeAutoEnd();
+            render(); checkWinner(); maybeAutoEnd();
           });
         } else {
           render(); updateUI(); checkWinner(); sendStateUpdate(); maybeAutoEnd();
