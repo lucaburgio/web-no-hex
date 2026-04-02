@@ -434,15 +434,10 @@ function showUnitPicker(col: number, row: number): void {
     const price = document.createElement('div');
     price.className = 'unit-card-price';
 
-    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    icon.setAttribute('viewBox', '0 0 14 18');
-    icon.setAttribute('width', '14');
-    icon.setAttribute('height', '18');
-    icon.setAttribute('fill', '#1a1a0e');
-    icon.setAttribute('class', 'unit-card-price-icon');
-    const bolt = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-    bolt.setAttribute('points', '8,0 2,10 7,10 6,18 12,8 7,8');
-    icon.appendChild(bolt);
+    const icon = document.createElement('img');
+    icon.src = 'icons/points.svg';
+    icon.alt = 'PP';
+    icon.className = 'unit-card-price-icon';
 
     const cost = document.createElement('span');
     cost.textContent = String(unitType.cost);
