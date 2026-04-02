@@ -352,17 +352,34 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     const unitDimmed = productionFocusHexes.size > 0;
     const opacity   = (unit.movedThisTurn || unitDimmed) ? '0.2' : '1';
 
-    const circle = svgEl('circle');
-    circle.setAttribute('cx', String(x));
-    circle.setAttribute('cy', String(y));
-    circle.setAttribute('r', String(HEX_SIZE * 0.55));
-    circle.setAttribute('fill', fill);
-    circle.setAttribute('stroke', 'none');
-    circle.setAttribute('opacity', opacity);
-    circle.setAttribute('data-col', String(unit.col));
-    circle.setAttribute('data-row', String(unit.row));
-    circle.style.cursor = 'pointer';
-    unitLayer.appendChild(circle);
+    const PLAYER_PATH_D = 'M0 36.3968V16C0 7.16344 7.16344 0 16 0H25H34C42.8366 0 50 7.16345 50 16V36.3968C50 41.273 47.7764 45.883 43.9602 48.9185L34.9602 56.0774C29.1298 60.715 20.8702 60.715 15.0398 56.0774L6.03982 48.9185C2.22364 45.883 0 41.273 0 36.3968Z';
+    let unitEl: SVGElement;
+    if (unit.owner === PLAYER) {
+      const sc = (HEX_SIZE * 1.1) / 50;
+      const path = svgEl('path');
+      path.setAttribute('d', PLAYER_PATH_D);
+      path.setAttribute('fill', fill);
+      path.setAttribute('stroke', 'none');
+      path.setAttribute('opacity', opacity);
+      path.setAttribute('data-col', String(unit.col));
+      path.setAttribute('data-row', String(unit.row));
+      path.setAttribute('transform', `translate(${x - 25 * sc},${y - 30 * sc}) scale(${sc})`);
+      path.style.cursor = 'pointer';
+      unitEl = path;
+    } else {
+      const circle = svgEl('circle');
+      circle.setAttribute('cx', String(x));
+      circle.setAttribute('cy', String(y));
+      circle.setAttribute('r', String(HEX_SIZE * 0.55));
+      circle.setAttribute('fill', fill);
+      circle.setAttribute('stroke', 'none');
+      circle.setAttribute('opacity', opacity);
+      circle.setAttribute('data-col', String(unit.col));
+      circle.setAttribute('data-row', String(unit.row));
+      circle.style.cursor = 'pointer';
+      unitEl = circle;
+    }
+    unitLayer.appendChild(unitEl);
 
     // HP bar
     const barW = HEX_SIZE * 1.0;
@@ -425,11 +442,24 @@ export function animateMoves(
     const baseColor = anim.unit.owner === PLAYER ? c.player : c.ai;
     const hpRatio   = anim.unit.hp / anim.unit.maxHp;
 
-    const circle = svgEl('circle');
-    circle.setAttribute('r', String(HEX_SIZE * 0.55));
-    circle.setAttribute('fill', lerpColor(baseColor, '#333333', 1 - hpRatio));
-    circle.setAttribute('stroke', 'none');
-    circle.setAttribute('pointer-events', 'none');
+    const PLAYER_PATH_D = 'M0 36.3968V16C0 7.16344 7.16344 0 16 0H25H34C42.8366 0 50 7.16345 50 16V36.3968C50 41.273 47.7764 45.883 43.9602 48.9185L34.9602 56.0774C29.1298 60.715 20.8702 60.715 15.0398 56.0774L6.03982 48.9185C2.22364 45.883 0 41.273 0 36.3968Z';
+    const animFill = lerpColor(baseColor, '#333333', 1 - hpRatio);
+    const isPlayerUnit = anim.unit.owner === PLAYER;
+    const unitSc = (HEX_SIZE * 1.1) / 50;
+    let circle: SVGElement;
+    if (isPlayerUnit) {
+      circle = svgEl('path');
+      circle.setAttribute('d', PLAYER_PATH_D);
+      circle.setAttribute('fill', animFill);
+      circle.setAttribute('stroke', 'none');
+      circle.setAttribute('pointer-events', 'none');
+    } else {
+      circle = svgEl('circle');
+      (circle as SVGCircleElement).setAttribute('r', String(HEX_SIZE * 0.55));
+      circle.setAttribute('fill', animFill);
+      circle.setAttribute('stroke', 'none');
+      circle.setAttribute('pointer-events', 'none');
+    }
     animLayer!.appendChild(circle);
 
     const barW = HEX_SIZE * 1.0;
@@ -460,8 +490,12 @@ export function animateMoves(
       const x    = from.x + (to.x - from.x) * ease;
       const y    = from.y + (to.y - from.y) * ease;
 
-      circle.setAttribute('cx', String(x));
-      circle.setAttribute('cy', String(y));
+      if (isPlayerUnit) {
+        circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 30 * unitSc}) scale(${unitSc})`);
+      } else {
+        circle.setAttribute('cx', String(x));
+        circle.setAttribute('cy', String(y));
+      }
       barBg.setAttribute('x',   String(x - barW / 2));
       barBg.setAttribute('y',   String(y + HEX_SIZE * 0.64));
       barFill.setAttribute('x', String(x - barW / 2));
