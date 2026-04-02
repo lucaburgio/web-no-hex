@@ -438,7 +438,7 @@ function showUnitPicker(col: number, row: number): void {
     icon.setAttribute('viewBox', '0 0 14 18');
     icon.setAttribute('width', '14');
     icon.setAttribute('height', '18');
-    icon.setAttribute('fill', '#e8e0d0');
+    icon.setAttribute('fill', '#1a1a0e');
     icon.setAttribute('class', 'unit-card-price-icon');
     const bolt = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
     bolt.setAttribute('points', '8,0 2,10 7,10 6,18 12,8 7,8');
