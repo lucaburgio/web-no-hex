@@ -19,13 +19,13 @@
 </head>
 <body>
   <header id="conquer-header">
-    <div class="conquer-side">
-      <span class="conquer-pct" id="player-conquer-pct">0%</span>
-      <span class="conquer-label" id="player-conquer-label">YOU</span>
+    <div id="pp-info">
+      <img src="public/icons/points.svg" id="header-pp-icon" alt="PP" />
+      <strong id="pp-display">0</strong>
     </div>
-    <div class="conquer-divider">TERRITORY</div>
-    <div class="conquer-side right">
-      <span class="conquer-label" id="ai-conquer-label">OPPONENT</span>
+    <div id="header-territory">
+      <span class="conquer-pct" id="player-conquer-pct">0%</span>
+      <div class="conquer-bar-line"></div>
       <span class="conquer-pct" id="ai-conquer-pct">0%</span>
     </div>
   </header>
@@ -43,6 +43,8 @@
     <ul id="log"></ul>
     <input type="checkbox" id="auto-end-production" />
     <input type="checkbox" id="auto-end-movement" />
+    <span id="player-conquer-label"></span>
+    <span id="ai-conquer-label"></span>
   </div>
 
   <!-- Unit picker: floating panel shown during production -->
@@ -55,10 +57,6 @@
   <!-- Sticky footer -->
   <footer id="game-footer">
     <div id="footer-left">
-      <div id="pp-info">
-        <strong id="pp-display">0</strong>
-        <span id="pp-label">PRODUCTION<br>POINTS</span>
-      </div>
       <button id="rules-btn">FULL RULES</button>
     </div>
     <div id="footer-right">
