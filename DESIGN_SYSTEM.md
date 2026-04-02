@@ -2,7 +2,7 @@
 
 ## Visual Language
 
-Retro terminal / 80s strategy game aesthetic. Monospace font, dark green panels, amber/gold accents. No drop shadows — 1px solid borders only.
+Retro terminal / 80s strategy game aesthetic. Monospace font, near-black panels, amber/gold accents on white text. No borders, no drop shadows.
 
 **Font:** `'Disket Mono'`, monospace  
 **Base colors:** see CSS custom properties in `:root` (`style.css` and `public/themes/`)
@@ -13,46 +13,47 @@ Retro terminal / 80s strategy game aesthetic. Monospace font, dark green panels,
 
 ### Tooltip
 
-Dark semi-transparent panel that floats near the trigger element. Used for contextual information that should not block interaction.
+Near-black panel that floats near the trigger element. Title in amber, body in white, stats/values in amber. Everything uppercase.
 
 **Structure:**
 ```html
-<div id="my-tooltip" class="hidden">
+<div id="my-tooltip" class="tooltip hidden">
   <div class="tt-title">SECTION TITLE</div>
   <!-- content rows -->
 </div>
 ```
 
-**CSS (copy verbatim for the container):**
+**CSS (copy verbatim for the container — already defined in `style.css`):**
 ```css
-#my-tooltip {
+.tooltip {
   position: fixed;
   z-index: 100;
-  background: #0b160b;
-  border: 1px solid #3a6a3a;
-  padding: 10px 12px;
+  background: #000100;
+  padding: 24px;
   font-size: 0.7rem;
-  color: #aaccaa;
+  color: #FFF;
   pointer-events: none;
   min-width: 220px;
-  line-height: 1.5;
+  line-height: 1.6;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
-#my-tooltip.hidden { display: none; }
+.tooltip.hidden { display: none; }
 ```
 
 **Content classes (shared, already defined in `style.css`):**
 
 | Class | Purpose | Color |
 |---|---|---|
-| `.tt-title` | Section header, uppercase, letter-spaced | `#5a9a5a` |
-| `.tt-divider` | `<hr>` separator | `#1e2e1e` border |
-| `.tt-outcome` | Result line (default) | `#ccddcc` |
-| `.tt-outcome.win` | Positive result | `#6ada8a` |
+| `.tt-title` | Section header, amber, bold | `#C77E00` |
+| `.tt-divider` | `<hr>` separator | `rgba(255,255,255,0.1)` |
+| `.tt-outcome` | Result line (default) | `#FFF` |
+| `.tt-outcome.win` | Positive result | `#C77E00` |
 | `.tt-outcome.lose` | Negative result | `#da6a6a` |
 | `.tt-outcome.both` | Mixed result | `#da9a4a` |
-| `.tt-dmg` | Damage / warning value | `#cc7744` |
-| `.tt-cs` | Secondary stat line | `#88aa88` |
-| `.tt-factors` | Fine-print detail | `#6a8a6a` |
+| `.tt-dmg` | Damage / warning value | `#C77E00` |
+| `.tt-cs` | Stat value line | `#C77E00` |
+| `.tt-factors` | Fine-print detail | `rgba(255,255,255,0.4)` |
 
 **Key/value row pattern** (used in PP tooltip):
 ```html
@@ -61,14 +62,12 @@ Dark semi-transparent panel that floats near the trigger element. Used for conte
   <span>Value</span>
 </div>
 ```
-```css
-.my-tt-row { display: flex; justify-content: space-between; gap: 16px; }
-.my-tt-row span:first-child { color: #6a9a6a; }
-.my-tt-row span:last-child  { color: #aaccaa; }
-```
+Labels render at `rgba(255,255,255,0.6)`, values at `#C77E00`.
 
-**Positioning:** set via JS on `mousemove` (dynamic) or fixed anchor (static). Clamp to viewport edges.
+**Positioning:**
+- Dynamic (follows cursor): call `positionTooltip(pageX, pageY)` after showing — clamps to viewport.
+- Anchored (near element): show tooltip, then read `getBoundingClientRect()` on both the anchor and tooltip elements and set `left`/`top` via `style`. Clamp to viewport.
 
 **Toggle:** add/remove `.hidden` class — never use `display` inline.
 
-**Existing instances:** `#combat-tooltip` (dynamic, mousemove), `#pp-tooltip` (fixed anchor, mouseenter/mouseleave).
+**Existing instances:** `#combat-tooltip` (dynamic, mousemove), `#pp-tooltip` (anchored to `#pp-info`, mouseenter/mouseleave).

@@ -66,7 +66,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px;
+  padding: 30px;
   z-index: 5;
 }
 
@@ -258,12 +258,14 @@ body {
   position: fixed;
   z-index: 100;
   background: #000100;
-  padding: 16px;
+  padding: 24px;
   font-size: 0.7rem;
   color: #FFF;
   pointer-events: none;
   min-width: 220px;
-  line-height: 1.5;
+  line-height: 1.6;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 .tooltip.hidden { display: none; }
 
@@ -273,18 +275,16 @@ body {
 }
 
 .tt-title {
-  font-size: 0.65rem;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 700;
   letter-spacing: 0.12em;
-  color: #5a9a5a;
-  margin-bottom: 8px;
-  border-bottom: 1px solid #2a4a2a;
-  padding-bottom: 4px;
+  color: #C77E00;
+  margin-bottom: 16px;
 }
 
 .tt-columns {
   display: flex;
-  gap: 10px;
+  gap: 16px;
   margin-bottom: 8px;
 }
 
@@ -293,16 +293,16 @@ body {
 }
 
 .tt-side-label {
-  font-size: 0.65rem;
-  text-transform: uppercase;
+  font-size: 0.7rem;
   letter-spacing: 0.08em;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
+  color: #C77E00;
 }
-.tt-side-label.attacker { color: #aaddaa; }
-.tt-side-label.defender { color: #dd7777; }
+.tt-side-label.attacker { color: #C77E00; }
+.tt-side-label.defender { color: #C77E00; }
 
 .tt-hp-block {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .tt-bar-wrap {
@@ -323,43 +323,41 @@ body {
 
 .tt-hp-nums {
   font-size: 0.65rem;
-  color: #88aa88;
+  color: rgba(255,255,255,0.7);
 }
 
 .tt-dmg {
-  font-size: 0.68rem;
-  color: #cc7744;
-  margin: 3px 0;
+  font-size: 0.7rem;
+  color: #C77E00;
+  margin: 4px 0;
 }
 
 .tt-cs {
-  font-size: 0.65rem;
-  color: #88aa88;
+  font-size: 0.7rem;
+  color: #C77E00;
   margin-top: 4px;
-  border-top: 1px solid #1e2e1e;
-  padding-top: 3px;
 }
 
 .tt-factors {
   font-size: 0.63rem;
-  color: #6a8a6a;
-  margin-top: 3px;
+  color: rgba(255,255,255,0.4);
+  margin-top: 4px;
 }
 
 .tt-divider {
   border: none;
-  border-top: 1px solid #1e2e1e;
-  margin: 6px 0;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  margin: 12px 0;
 }
 
 .tt-outcome {
-  font-size: 0.68rem;
-  color: #ccddcc;
+  font-size: 0.7rem;
+  color: #FFF;
 }
-.tt-outcome.win  { color: #6ada8a; }
+.tt-outcome.win  { color: #C77E00; }
 .tt-outcome.lose { color: #da6a6a; }
 .tt-outcome.both { color: #da9a4a; }
-.tt-outcome.none { color: #88aa88; }
+.tt-outcome.none { color: rgba(255,255,255,0.5); }
 
 /* ── Winner overlay ────────────────────────────────────────────────────────── */
 #overlay {
@@ -677,32 +675,26 @@ body {
 
 /* ── PP tooltip ──────────────────────────────────────────────────────────────── */
 
-#pp-tooltip {
-  bottom: 80px;
-  left: 20px;
-  z-index: 20;
-}
-
 .pp-tt-row {
   display: flex;
   justify-content: space-between;
   gap: 16px;
 }
 
-.pp-tt-row span:first-child { color: #6a9a6a; }
-.pp-tt-row span:last-child  { color: #aaccaa; }
+.pp-tt-row span:first-child { color: rgba(255,255,255,0.6); }
+.pp-tt-row span:last-child  { color: #C77E00; }
 
 .pp-tt-row.total {
-  border-top: 1px solid #2a4a2a;
-  margin-top: 4px;
-  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  margin-top: 8px;
+  padding-top: 8px;
 }
-.pp-tt-row.total span { color: #ccddcc; font-weight: bold; }
+.pp-tt-row.total span { color: #C77E00; font-weight: bold; }
 
 .pp-tt-next {
-  margin-top: 8px;
+  margin-top: 12px;
   font-size: 0.63rem;
-  color: #6a8a6a;
-  border-top: 1px solid #1e2e1e;
-  padding-top: 5px;
+  color: rgba(255,255,255,0.4);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 8px;
 }

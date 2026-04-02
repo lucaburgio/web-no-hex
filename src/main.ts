@@ -82,6 +82,13 @@ ppInfoEl.addEventListener('mouseenter', () => {
     <div class="pp-tt-row total"><span>This turn</span><span>+${total} PP</span></div>
     <div class="pp-tt-next">${nextLine}</div>`;
   ppTooltipEl.classList.remove('hidden');
+  const anchor = ppInfoEl.getBoundingClientRect();
+  const ttRect = ppTooltipEl.getBoundingClientRect();
+  let left = anchor.left;
+  let top  = anchor.bottom + 8;
+  if (left + ttRect.width > window.innerWidth) left = window.innerWidth - ttRect.width - 8;
+  ppTooltipEl.style.left = `${left}px`;
+  ppTooltipEl.style.top  = `${top}px`;
 });
 
 ppInfoEl.addEventListener('mouseleave', () => {
@@ -662,11 +669,11 @@ function updateUI(): void {
   const leftPct = total > 0 ? Math.round(localPct / total * 100) : 50;
   const style = getComputedStyle(document.documentElement);
   const localColor    = localPlayer === PLAYER
-    ? style.getPropertyValue('--color-player').trim()
-    : style.getPropertyValue('--color-ai').trim();
+    ? style.getPropertyValue('--color-hex-player').trim()
+    : style.getPropertyValue('--color-hex-ai').trim();
   const opponentColor = localPlayer === PLAYER
-    ? style.getPropertyValue('--color-ai').trim()
-    : style.getPropertyValue('--color-player').trim();
+    ? style.getPropertyValue('--color-hex-ai').trim()
+    : style.getPropertyValue('--color-hex-player').trim();
   conquerBarEl.style.background =
     `linear-gradient(to right, ${localColor} ${leftPct}%, ${opponentColor} ${leftPct}%)`;
 
