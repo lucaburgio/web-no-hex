@@ -12,6 +12,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
+
+  --color-yellow-500: #FFC13A;
   /* ── Background ─────────────────────────────────────────────────────────── */
   --color-bg: #F3F0E9;
 
@@ -682,14 +684,14 @@ body {
 }
 
 .pp-tt-row span:first-child { color: rgba(255,255,255,0.6); }
-.pp-tt-row span:last-child  { color: #C77E00; }
+.pp-tt-row span:last-child  { color: var(--color-yellow-500); }
 
 .pp-tt-row.total {
   border-top: 1px solid rgba(255,255,255,0.1);
   margin-top: 8px;
   padding-top: 8px;
 }
-.pp-tt-row.total span { color: #C77E00; font-weight: bold; }
+.pp-tt-row.total span { color: var(--color-yellow-500); font-weight: bold; }
 
 .pp-tt-next {
   margin-top: 12px;

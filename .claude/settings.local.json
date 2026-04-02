@@ -11,7 +11,8 @@
       "Bash(npm run:*)",
       "Bash(git rm:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(grep -E \"\\\\.\\(js|ts|html|json\\)$\")"
     ]
   }
 }
