@@ -18,6 +18,18 @@
   </script>
 </head>
 <body>
+  <header id="conquer-header">
+    <div class="conquer-side">
+      <span class="conquer-pct" id="player-conquer-pct">0%</span>
+      <span class="conquer-label" id="player-conquer-label">YOU</span>
+    </div>
+    <div class="conquer-divider">TERRITORY</div>
+    <div class="conquer-side right">
+      <span class="conquer-label" id="ai-conquer-label">OPPONENT</span>
+      <span class="conquer-pct" id="ai-conquer-pct">0%</span>
+    </div>
+  </header>
+
   <div id="game-area">
     <div id="board-wrap">
       <svg id="board"></svg>
@@ -97,6 +109,8 @@
   </div>
 
   <div id="combat-tooltip" class="hidden"></div>
+
+  <div id="pp-tooltip" class="hidden"></div>
 
   <script type="module" src="src/main.ts"></script>
 </body>

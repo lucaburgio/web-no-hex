@@ -18,6 +18,8 @@ import {
   syncUnitIdCounter,
   PLAYER,
   AI,
+  COLS,
+  ROWS,
 } from './game';
 import { initRenderer, renderState, animateMoves, getHexFromEvent } from './renderer';
 import type { MoveAnimation } from './renderer';
@@ -42,6 +44,13 @@ const unitPickerEl   = document.getElementById('unit-picker') as HTMLDivElement;
 const unitPickerHex  = document.getElementById('unit-picker-hex') as HTMLDivElement;
 const unitPickerList = document.getElementById('unit-picker-list') as HTMLDivElement;
 
+const playerConquerPctEl  = document.getElementById('player-conquer-pct') as HTMLElement;
+const aiConquerPctEl      = document.getElementById('ai-conquer-pct') as HTMLElement;
+const playerConquerLabel  = document.getElementById('player-conquer-label') as HTMLElement;
+const aiConquerLabel      = document.getElementById('ai-conquer-label') as HTMLElement;
+const ppTooltipEl         = document.getElementById('pp-tooltip') as HTMLDivElement;
+const ppInfoEl            = document.getElementById('pp-info') as HTMLDivElement;
+
 const autoEndProductionEl = document.getElementById('auto-end-production') as HTMLInputElement;
 const autoEndMovementEl   = document.getElementById('auto-end-movement') as HTMLInputElement;
 autoEndProductionEl.checked = config.autoEndProduction;
@@ -51,6 +60,32 @@ const rulesOverlayEl = document.getElementById('rules-overlay') as HTMLDivElemen
 document.getElementById('rules-btn')!.addEventListener('click', () => rulesOverlayEl.classList.remove('hidden'));
 document.getElementById('rules-close')!.addEventListener('click', () => rulesOverlayEl.classList.add('hidden'));
 rulesOverlayEl.addEventListener('click', e => { if (e.target === rulesOverlayEl) rulesOverlayEl.classList.add('hidden'); });
+
+// ── PP tooltip ────────────────────────────────────────────────────────────────
+
+ppInfoEl.addEventListener('mouseenter', () => {
+  const ownedHexes = Object.values(state.hexStates).filter(h => h.owner === localPlayer).length;
+  const quotas = Math.floor(ownedHexes / config.territoryQuota);
+  const territoryBonus = quotas * config.pointsPerQuota;
+  const total = config.productionPointsPerTurn + territoryBonus;
+  const hexesIntoQuota = ownedHexes % config.territoryQuota;
+  const hexesToNext = config.territoryQuota - hexesIntoQuota;
+
+  const nextLine = hexesIntoQuota === 0 && ownedHexes === 0
+    ? `Own ${config.territoryQuota} hexes to earn +${config.pointsPerQuota} PP`
+    : `Next +${config.pointsPerQuota} PP in ${hexesToNext} more hex${hexesToNext === 1 ? '' : 'es'}`;
+
+  ppTooltipEl.innerHTML = `
+    <div class="pp-tt-row"><span>Base</span><span>+${config.productionPointsPerTurn} PP</span></div>
+    <div class="pp-tt-row"><span>Territory (${ownedHexes} hexes)</span><span>+${territoryBonus} PP</span></div>
+    <div class="pp-tt-row total"><span>This turn</span><span>+${total} PP</span></div>
+    <div class="pp-tt-next">${nextLine}</div>`;
+  ppTooltipEl.classList.remove('hidden');
+});
+
+ppInfoEl.addEventListener('mouseleave', () => {
+  ppTooltipEl.classList.add('hidden');
+});
 
 // ── Lobby DOM refs ────────────────────────────────────────────────────────────
 
@@ -599,6 +634,25 @@ function updateUI(): void {
   turnEl.textContent  = `Turn ${state.turn}`;
   phaseEl.textContent = state.phase.charAt(0).toUpperCase() + state.phase.slice(1);
   ppDisplay.textContent = String(state.productionPoints[localPlayer]);
+
+  // Update conquer header
+  const totalHexes = COLS * ROWS;
+  const playerHexes = Object.values(state.hexStates).filter(h => h.owner === PLAYER).length;
+  const aiHexes     = Object.values(state.hexStates).filter(h => h.owner === AI).length;
+  const playerPct = Math.round(playerHexes / totalHexes * 100);
+  const aiPct     = Math.round(aiHexes / totalHexes * 100);
+  // Show from localPlayer's perspective: "YOU" = localPlayer side
+  if (localPlayer === PLAYER) {
+    playerConquerPctEl.textContent = `${playerPct}%`;
+    aiConquerPctEl.textContent     = `${aiPct}%`;
+    playerConquerLabel.textContent = 'YOU';
+    aiConquerLabel.textContent     = gameMode === 'vsHuman' ? 'OPPONENT' : 'AI';
+  } else {
+    playerConquerPctEl.textContent = `${aiPct}%`;
+    aiConquerPctEl.textContent     = `${playerPct}%`;
+    playerConquerLabel.textContent = 'YOU';
+    aiConquerLabel.textContent     = 'OPPONENT';
+  }
 
   const isMyTurn = state.activePlayer === localPlayer;
   if ((state.phase === 'production' || state.phase === 'movement') && isMyTurn) {

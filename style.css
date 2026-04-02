@@ -51,7 +51,64 @@ body {
   font-family: 'Disket Mono', 'Courier New', monospace;
   min-height: 100vh;
   overflow: auto;
+  padding-top: 56px;
   padding-bottom: 72px;
+}
+
+/* ── Conquer header ──────────────────────────────────────────────────────────── */
+#conquer-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: var(--color-bg);
+  border-bottom: 1px solid #23251E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  z-index: 5;
+}
+
+.conquer-side {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex: 1;
+  justify-content: flex-end;
+  padding-right: 24px;
+}
+
+.conquer-side.right {
+  justify-content: flex-start;
+  padding-right: 0;
+  padding-left: 24px;
+}
+
+.conquer-pct {
+  font-size: 1.7rem;
+  font-weight: bold;
+  color: #23251E;
+  line-height: 1;
+}
+
+.conquer-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #23251E;
+  opacity: 0.55;
+}
+
+.conquer-divider {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #23251E;
+  opacity: 0.35;
+  padding: 0 16px;
+  white-space: nowrap;
 }
 
 #hud-hidden {
@@ -62,7 +119,7 @@ body {
   display: flex;
   justify-content: center;
   min-width: max-content;
-  min-height: calc(100vh - 72px);
+  min-height: calc(100vh - 72px - 56px);
   align-items: center;
 }
 
@@ -537,3 +594,48 @@ body {
   text-align: center;
 }
 #lobby-error.hidden { display: none; }
+
+/* ── PP tooltip ──────────────────────────────────────────────────────────────── */
+#pp-info {
+  cursor: default;
+}
+
+#pp-tooltip {
+  position: fixed;
+  bottom: 80px;
+  left: 20px;
+  z-index: 20;
+  background: #0b160b;
+  border: 1px solid #3a6a3a;
+  padding: 10px 14px;
+  font-size: 0.68rem;
+  color: #aaccaa;
+  min-width: 220px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+#pp-tooltip.hidden { display: none; }
+
+.pp-tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pp-tt-row span:first-child { color: #6a9a6a; }
+.pp-tt-row span:last-child  { color: #aaccaa; }
+
+.pp-tt-row.total {
+  border-top: 1px solid #2a4a2a;
+  margin-top: 4px;
+  padding-top: 4px;
+}
+.pp-tt-row.total span { color: #ccddcc; font-weight: bold; }
+
+.pp-tt-next {
+  margin-top: 8px;
+  font-size: 0.63rem;
+  color: #6a8a6a;
+  border-top: 1px solid #1e2e1e;
+  padding-top: 5px;
+}
