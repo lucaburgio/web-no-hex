@@ -65,6 +65,10 @@ web-strategic/
 Axial hex coordinates (q, r). Offset display via `axialToPixel()`.
 Row = r, Col = q offset per row parity.
 
+## Design System
+
+> **IMPORTANT — check before building UI:** Before creating any new UI component (tooltip, modal, button, overlay, badge, etc.), consult **`DESIGN_SYSTEM.md`** for the canonical style, class names, and HTML structure. Always reuse existing shared classes; do not invent new colors or patterns that deviate from the established aesthetic.
+
 ## Dev Notes
 - No frameworks, no bundler — just `<script type="module">` imports
 - SVG for rendering (scalable, easy hit-testing)
