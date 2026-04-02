@@ -369,7 +369,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     const barW = HEX_SIZE * 0.58;
     const barH = HEX_SIZE * 0.1;
     const barX = x - barW / 2;
-    const barY = y + HEX_SIZE * 0.27;
+    const barY = y + HEX_SIZE * 0.13;
 
     const barBg = svgEl('rect');
     barBg.setAttribute('x', String(barX)); barBg.setAttribute('y', String(barY));
@@ -390,7 +390,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
 
     // Icon (shifted up inside shape)
     const icon = unitIcon(unit.unitTypeId);
-    const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.13, HEX_SIZE * 0.4, c.unitIconColor, opacity);
+    const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.34, HEX_SIZE * 0.4, c.unitIconColor, opacity);
     if (iconEl) unitLayer.appendChild(iconEl);
   }
 }
@@ -470,10 +470,10 @@ export function animateMoves(
 
       circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
       barBg.setAttribute('x',   String(x - animBarW / 2));
-      barBg.setAttribute('y',   String(y + HEX_SIZE * 0.27));
+      barBg.setAttribute('y',   String(y + HEX_SIZE * 0.13));
       barFill.setAttribute('x', String(x - animBarW / 2));
-      barFill.setAttribute('y', String(y + HEX_SIZE * 0.27));
-      iconWrapper.setAttribute('transform', `translate(${x},${y - HEX_SIZE * 0.13})`);
+      barFill.setAttribute('y', String(y + HEX_SIZE * 0.13));
+      iconWrapper.setAttribute('transform', `translate(${x},${y - HEX_SIZE * 0.34})`);
 
       if (t < 1) {
         requestAnimationFrame(step);
