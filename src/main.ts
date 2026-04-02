@@ -835,7 +835,8 @@ const recapBtn        = document.getElementById('recap-btn') as HTMLButtonElemen
 function renderRecapTurn(index: number): void {
   const snap = turnSnapshots[index];
   if (!snap) return;
-  renderState(recapSvg, snap, null, new Set(), localPlayer);
+  // Override phase/selectedUnit so renderState never dims hexes or highlights moves
+  renderState(recapSvg, { ...snap, phase: 'movement', selectedUnit: null }, null, new Set(), localPlayer);
   recapTurnLabel.textContent = index === 0
     ? 'TURN 1 — START'
     : `TURN ${snap.turn - 1} — END`;
