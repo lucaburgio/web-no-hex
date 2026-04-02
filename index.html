@@ -98,7 +98,25 @@
 
   <div id="overlay" class="hidden">
     <div id="overlay-msg"></div>
-    <button id="restart-btn">Restart</button>
+    <div id="overlay-actions">
+      <button id="restart-btn">Restart</button>
+      <button id="recap-btn">View Replay</button>
+    </div>
+  </div>
+
+  <div id="recap-overlay" class="hidden">
+    <div id="recap-header">
+      <button id="recap-close-btn">&#x2715; Back</button>
+      <span id="recap-turn-label">TURN 1</span>
+      <div id="recap-header-right"></div>
+    </div>
+    <div id="recap-board-wrap">
+      <svg id="recap-board"></svg>
+    </div>
+    <div id="recap-footer">
+      <input type="range" id="recap-slider" min="0" value="0" step="1" />
+      <ul id="recap-log"></ul>
+    </div>
   </div>
 
   <div id="rules-overlay" class="hidden">

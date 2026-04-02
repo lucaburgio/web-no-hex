@@ -112,6 +112,7 @@ let ws: WebSocket | null = null;
 let state: GameState = createInitialState();
 let pendingProductionHex: { col: number; row: number } | null = null;
 let isAnimating = false;
+let turnSnapshots: GameState[] = [];
 
 function render(): void {
   renderState(svg, state, pendingProductionHex, new Set(), localPlayer);
@@ -291,6 +292,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     syncUnitIdCounter(state);
     // Host runs end-turn cleanup
     state = endTurnAfterAi(state);
+    turnSnapshots.push(structuredClone(state));
     render();
     updateUI();
     checkWinner();
@@ -398,6 +400,7 @@ function startGame(initialState: GameState): void {
   state = initialState;
   pendingProductionHex = null;
   isAnimating = false;
+  turnSnapshots = [structuredClone(state)];
   initRenderer(svg);
   render();
   updateUI();
@@ -556,6 +559,7 @@ function runAiTurnWithAnimation(): void {
 
   if (moves.length === 0) {
     state = endTurnAfterAi(state);
+    turnSnapshots.push(structuredClone(state));
     render(); updateUI(); checkWinner(); maybeAutoEnd();
     return;
   }
@@ -567,6 +571,7 @@ function runAiTurnWithAnimation(): void {
   animateMoves(svg, moves, config.unitMoveSpeed, () => {
     isAnimating = false;
     state = endTurnAfterAi(state);
+    turnSnapshots.push(structuredClone(state));
     render(); updateUI(); checkWinner(); maybeAutoEnd();
   });
 }
@@ -613,7 +618,9 @@ function maybeAutoEnd(): void {
     checkWinner();
   } else if (state.phase === 'movement' && autoEndMovementEl.checked && !hasAnyValidMove()) {
     if (gameMode === 'vsAI') {
+      const prevTurn = state.turn;
       state = playerEndMovement(state);
+      if (state.turn !== prevTurn) turnSnapshots.push(structuredClone(state));
       render();
       updateUI();
       checkWinner();
@@ -813,4 +820,47 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   if (e.key === 'Enter' && !endMoveBtn.hidden && endMoveBtn.style.display !== 'none') {
     endMoveBtn.click();
   }
+});
+
+// ── Replay ────────────────────────────────────────────────────────────────────
+
+const recapOverlayEl  = document.getElementById('recap-overlay') as HTMLDivElement;
+const recapSliderEl   = document.getElementById('recap-slider') as HTMLInputElement;
+const recapTurnLabel  = document.getElementById('recap-turn-label') as HTMLElement;
+const recapLogEl      = document.getElementById('recap-log') as HTMLUListElement;
+const recapSvg        = document.getElementById('recap-board') as unknown as SVGSVGElement;
+const recapCloseBtn   = document.getElementById('recap-close-btn') as HTMLButtonElement;
+const recapBtn        = document.getElementById('recap-btn') as HTMLButtonElement;
+
+function renderRecapTurn(index: number): void {
+  const snap = turnSnapshots[index];
+  if (!snap) return;
+  renderState(recapSvg, snap, null, new Set(), localPlayer);
+  recapTurnLabel.textContent = index === 0
+    ? 'TURN 1 — START'
+    : `TURN ${snap.turn - 1} — END`;
+  recapLogEl.innerHTML = '';
+  for (const msg of snap.log.slice(0, 10)) {
+    const li = document.createElement('li');
+    li.textContent = msg;
+    recapLogEl.appendChild(li);
+  }
+}
+
+recapBtn.addEventListener('click', () => {
+  initRenderer(recapSvg);
+  recapSliderEl.max = String(turnSnapshots.length - 1);
+  recapSliderEl.value = String(turnSnapshots.length - 1);
+  renderRecapTurn(turnSnapshots.length - 1);
+  overlayEl.classList.add('hidden');
+  recapOverlayEl.classList.remove('hidden');
+});
+
+recapSliderEl.addEventListener('input', () => {
+  renderRecapTurn(parseInt(recapSliderEl.value));
+});
+
+recapCloseBtn.addEventListener('click', () => {
+  recapOverlayEl.classList.add('hidden');
+  overlayEl.classList.remove('hidden');
 });
