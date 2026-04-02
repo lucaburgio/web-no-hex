@@ -352,7 +352,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     const unitDimmed = productionFocusHexes.size > 0;
     const opacity   = (unit.movedThisTurn || unitDimmed) ? '0.2' : '1';
 
-    const UNIT_PATH_D = 'M0 36.3968V16C0 7.16344 7.16344 0 16 0H25H34C42.8366 0 50 7.16345 50 16V36.3968C50 41.273 47.7764 45.883 43.9602 48.9185L34.9602 56.0774C29.1298 60.715 20.8702 60.715 15.0398 56.0774L6.03982 48.9185C2.22364 45.883 0 41.273 0 36.3968Z';
+    const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
     const sc = (HEX_SIZE * 1.1) / 50;
     const unitEl = svgEl('path');
     unitEl.setAttribute('d', UNIT_PATH_D);
@@ -361,7 +361,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     unitEl.setAttribute('opacity', opacity);
     unitEl.setAttribute('data-col', String(unit.col));
     unitEl.setAttribute('data-row', String(unit.row));
-    unitEl.setAttribute('transform', `translate(${x - 25 * sc},${y - 30 * sc}) scale(${sc})`);
+    unitEl.setAttribute('transform', `translate(${x - 25 * sc},${y - 32 * sc}) scale(${sc})`);
     unitEl.style.cursor = 'pointer';
     unitLayer.appendChild(unitEl);
 
@@ -426,7 +426,7 @@ export function animateMoves(
     const baseColor = anim.unit.owner === PLAYER ? c.player : c.ai;
     const hpRatio   = anim.unit.hp / anim.unit.maxHp;
 
-    const UNIT_PATH_D = 'M0 36.3968V16C0 7.16344 7.16344 0 16 0H25H34C42.8366 0 50 7.16345 50 16V36.3968C50 41.273 47.7764 45.883 43.9602 48.9185L34.9602 56.0774C29.1298 60.715 20.8702 60.715 15.0398 56.0774L6.03982 48.9185C2.22364 45.883 0 41.273 0 36.3968Z';
+    const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
     const animFill = lerpColor(baseColor, '#333333', 1 - hpRatio);
     const unitSc = (HEX_SIZE * 1.1) / 50;
     const circle = svgEl('path');
@@ -468,7 +468,7 @@ export function animateMoves(
       const x    = from.x + (to.x - from.x) * ease;
       const y    = from.y + (to.y - from.y) * ease;
 
-      circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 30 * unitSc}) scale(${unitSc})`);
+      circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
       barBg.setAttribute('x',   String(x - animBarW / 2));
       barBg.setAttribute('y',   String(y + HEX_SIZE * 0.27));
       barFill.setAttribute('x', String(x - animBarW / 2));
