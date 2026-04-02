@@ -382,10 +382,11 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     unitLayer.appendChild(unitEl);
 
     // HP bar
-    const barW = HEX_SIZE * 1.0;
+    const isPlayer = unit.owner === PLAYER;
+    const barW = isPlayer ? HEX_SIZE * 0.78 : HEX_SIZE * 1.0;
     const barH = HEX_SIZE * 0.14;
     const barX = x - barW / 2;
-    const barY = y + HEX_SIZE * 0.64;
+    const barY = isPlayer ? y + HEX_SIZE * 0.27 : y + HEX_SIZE * 0.64;
 
     const barBg = svgEl('rect');
     barBg.setAttribute('x', String(barX)); barBg.setAttribute('y', String(barY));
@@ -406,7 +407,8 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
 
     // Icon
     const icon = unitIcon(unit.unitTypeId);
-    const iconEl = inlineIcon(icon, x, y, HEX_SIZE * 0.4, c.unitIconColor, opacity);
+    const iconY = isPlayer ? y - HEX_SIZE * 0.13 : y;
+    const iconEl = inlineIcon(icon, x, iconY, HEX_SIZE * 0.4, c.unitIconColor, opacity);
     if (iconEl) unitLayer.appendChild(iconEl);
   }
 }
@@ -462,24 +464,24 @@ export function animateMoves(
     }
     animLayer!.appendChild(circle);
 
-    const barW = HEX_SIZE * 1.0;
+    const animBarW = isPlayerUnit ? HEX_SIZE * 0.78 : HEX_SIZE * 1.0;
     const barH = HEX_SIZE * 0.14;
     const barBg = svgEl('rect');
-    barBg.setAttribute('width', String(barW)); barBg.setAttribute('height', String(barH));
+    barBg.setAttribute('width', String(animBarW)); barBg.setAttribute('height', String(barH));
     barBg.setAttribute('fill', '#222'); barBg.setAttribute('rx', '1');
     barBg.setAttribute('pointer-events', 'none');
     animLayer!.appendChild(barBg);
 
     const barColor = hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
     const barFill = svgEl('rect');
-    barFill.setAttribute('width', String(barW * hpRatio)); barFill.setAttribute('height', String(barH));
+    barFill.setAttribute('width', String(animBarW * hpRatio)); barFill.setAttribute('height', String(barH));
     barFill.setAttribute('fill', barColor); barFill.setAttribute('rx', '1');
     barFill.setAttribute('pointer-events', 'none');
     animLayer!.appendChild(barFill);
 
     const iconSrc = unitIcon(anim.unit.unitTypeId);
-    const iconSize = HEX_SIZE * 0.6;
-    const iconEl = inlineIcon(iconSrc, from.x, from.y, iconSize, c.unitIconColor, '1');
+    const iconSize = HEX_SIZE * 0.4;
+    const iconEl = inlineIcon(iconSrc, from.x, isPlayerUnit ? from.y - HEX_SIZE * 0.13 : from.y, iconSize, c.unitIconColor, '1');
     if (iconEl) animLayer!.appendChild(iconEl);
 
     const startTime = performance.now();
@@ -496,13 +498,15 @@ export function animateMoves(
         circle.setAttribute('cx', String(x));
         circle.setAttribute('cy', String(y));
       }
-      barBg.setAttribute('x',   String(x - barW / 2));
-      barBg.setAttribute('y',   String(y + HEX_SIZE * 0.64));
-      barFill.setAttribute('x', String(x - barW / 2));
-      barFill.setAttribute('y', String(y + HEX_SIZE * 0.64));
+      const barYAnim = isPlayerUnit ? y + HEX_SIZE * 0.27 : y + HEX_SIZE * 0.64;
+      barBg.setAttribute('x',   String(x - animBarW / 2));
+      barBg.setAttribute('y',   String(barYAnim));
+      barFill.setAttribute('x', String(x - animBarW / 2));
+      barFill.setAttribute('y', String(barYAnim));
       if (iconEl) {
         const scale = iconSize / 24;
-        iconEl.setAttribute('transform', `translate(${x - iconSize / 2},${y - iconSize / 2}) scale(${scale})`);
+        const iconYAnim = isPlayerUnit ? y - HEX_SIZE * 0.13 : y;
+        iconEl.setAttribute('transform', `translate(${x - iconSize / 2},${iconYAnim - iconSize / 2}) scale(${scale})`);
       }
 
       if (t < 1) {
