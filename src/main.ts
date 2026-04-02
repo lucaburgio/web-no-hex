@@ -48,6 +48,7 @@ const playerConquerPctEl  = document.getElementById('player-conquer-pct') as HTM
 const aiConquerPctEl      = document.getElementById('ai-conquer-pct') as HTMLElement;
 const playerConquerLabel  = document.getElementById('player-conquer-label') as HTMLElement;
 const aiConquerLabel      = document.getElementById('ai-conquer-label') as HTMLElement;
+const conquerBarEl        = document.getElementById('conquer-bar-line') as HTMLElement;
 const ppTooltipEl         = document.getElementById('pp-tooltip') as HTMLDivElement;
 const ppInfoEl            = document.getElementById('pp-info') as HTMLDivElement;
 
@@ -649,17 +650,25 @@ function updateUI(): void {
   const playerPct = Math.round(playerHexes / totalHexes * 100);
   const aiPct     = Math.round(aiHexes / totalHexes * 100);
   // Show from localPlayer's perspective: "YOU" = localPlayer side
-  if (localPlayer === PLAYER) {
-    playerConquerPctEl.textContent = `${playerPct}%`;
-    aiConquerPctEl.textContent     = `${aiPct}%`;
-    playerConquerLabel.textContent = 'YOU';
-    aiConquerLabel.textContent     = gameMode === 'vsHuman' ? 'OPPONENT' : 'AI';
-  } else {
-    playerConquerPctEl.textContent = `${aiPct}%`;
-    aiConquerPctEl.textContent     = `${playerPct}%`;
-    playerConquerLabel.textContent = 'YOU';
-    aiConquerLabel.textContent     = 'OPPONENT';
-  }
+  const localPct    = localPlayer === PLAYER ? playerPct : aiPct;
+  const opponentPct = localPlayer === PLAYER ? aiPct : playerPct;
+  playerConquerPctEl.textContent = `${localPct}%`;
+  aiConquerPctEl.textContent     = `${opponentPct}%`;
+  playerConquerLabel.textContent = 'YOU';
+  aiConquerLabel.textContent     = localPlayer === PLAYER && gameMode !== 'vsHuman' ? 'AI' : 'OPPONENT';
+
+  // Two-color conquer bar: left = local player, right = opponent
+  const total = localPct + opponentPct;
+  const leftPct = total > 0 ? Math.round(localPct / total * 100) : 50;
+  const style = getComputedStyle(document.documentElement);
+  const localColor    = localPlayer === PLAYER
+    ? style.getPropertyValue('--color-player').trim()
+    : style.getPropertyValue('--color-ai').trim();
+  const opponentColor = localPlayer === PLAYER
+    ? style.getPropertyValue('--color-ai').trim()
+    : style.getPropertyValue('--color-player').trim();
+  conquerBarEl.style.background =
+    `linear-gradient(to right, ${localColor} ${leftPct}%, ${opponentColor} ${leftPct}%)`;
 
   const isMyTurn = state.activePlayer === localPlayer;
   if ((state.phase === 'production' || state.phase === 'movement') && isMyTurn) {

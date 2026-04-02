@@ -107,10 +107,9 @@ body {
   line-height: 1;
 }
 
-.conquer-bar-line {
+#conquer-bar-line {
   width: 80px;
   height: 2px;
-  background: rgba(35,37,30,0.25);
   border-radius: 1px;
 }
 
