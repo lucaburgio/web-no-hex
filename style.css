@@ -63,7 +63,6 @@ body {
   right: 0;
   height: 40px;
   background: var(--color-bg);
-  border-bottom: 1px solid rgba(35,37,30,0.15);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -109,8 +108,7 @@ body {
 
 #conquer-bar-line {
   width: 80px;
-  height: 2px;
-  border-radius: 1px;
+  height: 6px;
 }
 
 #hud-hidden {
@@ -255,20 +253,24 @@ body {
 .unit-btn:hover:not(:disabled) { background: #2a4a2a; }
 .unit-btn:disabled { color: #556655; border-color: #2a3a2a; cursor: not-allowed; }
 
-/* ── Combat forecast tooltip ─────────────────────────────────────────────────── */
-#combat-tooltip {
+/* ── Tooltip base ────────────────────────────────────────────────────────────── */
+.tooltip {
   position: fixed;
   z-index: 100;
-  background: #0b160b;
-  border: 1px solid #3a6a3a;
-  padding: 10px 12px;
+  background: #000100;
+  padding: 16px;
   font-size: 0.7rem;
-  color: #aaccaa;
+  color: #FFF;
   pointer-events: none;
-  min-width: 230px;
+  min-width: 220px;
   line-height: 1.5;
 }
-#combat-tooltip.hidden { display: none; }
+.tooltip.hidden { display: none; }
+
+/* ── Combat forecast tooltip ─────────────────────────────────────────────────── */
+#combat-tooltip {
+  min-width: 230px;
+}
 
 .tt-title {
   font-size: 0.65rem;
@@ -676,20 +678,10 @@ body {
 /* ── PP tooltip ──────────────────────────────────────────────────────────────── */
 
 #pp-tooltip {
-  position: fixed;
   bottom: 80px;
   left: 20px;
   z-index: 20;
-  background: #0b160b;
-  border: 1px solid #3a6a3a;
-  padding: 10px 14px;
-  font-size: 0.68rem;
-  color: #aaccaa;
-  min-width: 220px;
-  line-height: 1.5;
-  pointer-events: none;
 }
-#pp-tooltip.hidden { display: none; }
 
 .pp-tt-row {
   display: flex;
