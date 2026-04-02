@@ -453,8 +453,12 @@ export function animateMoves(
 
     const iconSrc = unitIcon(anim.unit.unitTypeId);
     const iconSize = HEX_SIZE * 0.4;
-    const iconEl = inlineIcon(iconSrc, from.x, from.y - HEX_SIZE * 0.13, iconSize, c.unitIconColor, '1');
-    if (iconEl) animLayer!.appendChild(iconEl);
+    // Place icon at (0,0) so its internal scale stays fixed; a wrapper <g> handles translation each frame.
+    const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, c.unitIconColor, '1');
+    const iconWrapper = svgEl('g');
+    iconWrapper.setAttribute('pointer-events', 'none');
+    if (iconEl) iconWrapper.appendChild(iconEl);
+    animLayer!.appendChild(iconWrapper);
 
     const startTime = performance.now();
 
@@ -469,15 +473,12 @@ export function animateMoves(
       barBg.setAttribute('y',   String(y + HEX_SIZE * 0.27));
       barFill.setAttribute('x', String(x - animBarW / 2));
       barFill.setAttribute('y', String(y + HEX_SIZE * 0.27));
-      if (iconEl) {
-        const scale = iconSize / 24;
-        iconEl.setAttribute('transform', `translate(${x - iconSize / 2},${y - HEX_SIZE * 0.13 - iconSize / 2}) scale(${scale})`);
-      }
+      iconWrapper.setAttribute('transform', `translate(${x},${y - HEX_SIZE * 0.13})`);
 
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
-        circle.remove(); barBg.remove(); barFill.remove(); iconEl?.remove();
+        circle.remove(); barBg.remove(); barFill.remove(); iconWrapper.remove();
         completed++;
         if (completed >= animations.length) {
           animLayer!.innerHTML = '';
