@@ -41,7 +41,6 @@ const overlayMsg = document.getElementById('overlay-msg') as HTMLDivElement;
 const restartBtn = document.getElementById('restart-btn') as HTMLButtonElement;
 
 const unitPickerEl   = document.getElementById('unit-picker') as HTMLDivElement;
-const unitPickerHex  = document.getElementById('unit-picker-hex') as HTMLDivElement;
 const unitPickerList = document.getElementById('unit-picker-list') as HTMLDivElement;
 
 const playerConquerPctEl  = document.getElementById('player-conquer-pct') as HTMLElement;
@@ -420,24 +419,52 @@ function startGame(initialState: GameState): void {
 
 function showUnitPicker(col: number, row: number): void {
   pendingProductionHex = { col, row };
-  unitPickerHex.textContent = `Hex (${col}, ${row})`;
   unitPickerList.innerHTML = '';
 
   for (const unitType of config.unitTypes) {
-    const btn = document.createElement('button');
-    btn.className = 'unit-btn';
-    btn.textContent = `${unitType.name}  —  ${unitType.cost} PP`;
-    btn.disabled = state.productionPoints[localPlayer] < unitType.cost;
-    btn.addEventListener('click', () => {
-      state = playerPlaceUnit(state, col, row, unitType.id, localPlayer);
-      hideUnitPicker();
-      render();
-      updateUI();
-      checkWinner();
-      sendStateUpdate();
-      maybeAutoEnd();
-    });
-    unitPickerList.appendChild(btn);
+    const canAfford = state.productionPoints[localPlayer] >= unitType.cost;
+
+    const card = document.createElement('div');
+    card.className = 'unit-card' + (canAfford ? '' : ' disabled');
+
+    const img = document.createElement('img');
+    img.src = `public/cards/${unitType.id}.svg`;
+    img.alt = unitType.name;
+
+    const price = document.createElement('div');
+    price.className = 'unit-card-price';
+
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('viewBox', '0 0 14 18');
+    icon.setAttribute('width', '14');
+    icon.setAttribute('height', '18');
+    icon.setAttribute('fill', '#e8e0d0');
+    icon.setAttribute('class', 'unit-card-price-icon');
+    const bolt = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    bolt.setAttribute('points', '8,0 2,10 7,10 6,18 12,8 7,8');
+    icon.appendChild(bolt);
+
+    const cost = document.createElement('span');
+    cost.textContent = String(unitType.cost);
+
+    price.appendChild(icon);
+    price.appendChild(cost);
+    card.appendChild(img);
+    card.appendChild(price);
+
+    if (canAfford) {
+      card.addEventListener('click', () => {
+        state = playerPlaceUnit(state, col, row, unitType.id, localPlayer);
+        hideUnitPicker();
+        render();
+        updateUI();
+        checkWinner();
+        sendStateUpdate();
+        maybeAutoEnd();
+      });
+    }
+
+    unitPickerList.appendChild(card);
   }
 
   unitPickerEl.style.display = 'block';

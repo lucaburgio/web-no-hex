@@ -14,6 +14,7 @@
 :root {
 
   --color-yellow-500: #FFC13A;
+  --color-gray-500: #9E9E9E;
   /* ── Background ─────────────────────────────────────────────────────────── */
   --color-bg: #F3F0E9;
 
@@ -228,32 +229,51 @@ body {
   display: none;
   position: fixed;
   bottom: 80px;
-  right: 20px;
-  width: 200px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 10;
 }
 
-#unit-picker-hex {
-  font-size: 0.7rem;
-  color: #88aa88;
-  margin-bottom: 8px;
+#unit-picker-list {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  align-items: flex-end;
 }
 
-.unit-btn {
-  display: block;
-  width: 100%;
-  padding: 5px 8px;
-  background: #1a2a1a;
-  color: #aaddaa;
-  border: 1px solid #3a5a3a;
+.unit-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
-  font-family: inherit;
-  font-size: 0.78rem;
-  text-align: left;
-  margin-bottom: 4px;
+  user-select: none;
+  transition: transform 0.1s ease;
 }
-.unit-btn:hover:not(:disabled) { background: #2a4a2a; }
-.unit-btn:disabled { color: #556655; border-color: #2a3a2a; cursor: not-allowed; }
+.unit-card:hover:not(.disabled) { transform: translateY(-6px); }
+.unit-card.disabled { opacity: 0.35; cursor: not-allowed; }
+
+.unit-card img {
+  width: 90px;
+  height: auto;
+  display: block;
+}
+
+.unit-card-price {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e8e0d0;
+  letter-spacing: 0.05em;
+}
+
+.unit-card-price-icon {
+  display: inline-block;
+  vertical-align: middle;
+}
 
 /* ── Tooltip base ────────────────────────────────────────────────────────────── */
 .tooltip {
@@ -683,7 +703,7 @@ body {
   gap: 16px;
 }
 
-.pp-tt-row span:first-child { color: rgba(255,255,255,0.6); }
+.pp-tt-row span:first-child { color: white }
 .pp-tt-row span:last-child  { color: var(--color-yellow-500); }
 
 .pp-tt-row.total {
@@ -696,7 +716,7 @@ body {
 .pp-tt-next {
   margin-top: 12px;
   font-size: 0.63rem;
-  color: rgba(255,255,255,0.4);
+  color: var(--color-gray-500);
   border-top: 1px solid rgba(255,255,255,0.08);
   padding-top: 8px;
 }
