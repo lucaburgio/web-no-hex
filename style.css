@@ -62,8 +62,8 @@ body {
   min-height: 100vh;
   font-size: 14px;
   overflow: auto;
-  padding-top: 40px;
-  padding-bottom: 72px;
+  display: flex;
+  flex-direction: column;
   cursor: url('/icons/pointer.svg') 13 14, auto;
 }
 
@@ -129,7 +129,6 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  background: var(--color-bg);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -141,7 +140,6 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  cursor: default;
 }
 
 #header-pp-icon {
@@ -184,8 +182,9 @@ body {
   display: flex;
   justify-content: center;
   min-width: max-content;
-  min-height: calc(100vh - 72px - 40px);
+  flex: 1;
   align-items: center;
+  padding: 40px 0 72px;
 }
 
 #board-wrap {
