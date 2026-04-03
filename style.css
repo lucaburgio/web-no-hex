@@ -55,6 +55,7 @@ body {
   color: #cccccc;
   font-family: 'Disket Mono', 'Courier New', monospace;
   min-height: 100vh;
+  font-size: 14px;
   overflow: auto;
   padding-top: 40px;
   padding-bottom: 72px;
@@ -67,10 +68,8 @@ body {
   border: 2px solid var(--color-dark);
   color: var(--color-light);
   font-family: 'Disket Mono', monospace;
-  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
   padding: 16px 20px;
   cursor: url('/icons/cursor.svg') 0 0, auto;
   transition: all 0.2s ease;
@@ -146,7 +145,6 @@ body {
 }
 
 #pp-display {
-  font-size: 0.9rem;
   font-weight: bold;
   color: #23251E;
   line-height: 1;
@@ -162,7 +160,6 @@ body {
 }
 
 .conquer-pct {
-  font-size: 0.9rem;
   font-weight: bold;
   color: #23251E;
   line-height: 1;
@@ -222,7 +219,6 @@ body {
 }
 
 #phase-label {
-  font-size: 0.7rem;
   text-transform: uppercase;
   font-weight: bold;
   letter-spacing: 0.1em;
@@ -238,7 +234,6 @@ body {
 }
 
 .panel h2 {
-  font-size: 0.75rem;
   color: #5a8a5a;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -256,7 +251,6 @@ body {
   padding: 0;
   color: #23251E;
   font-family: inherit;
-  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   text-decoration: underline;
@@ -305,7 +299,6 @@ body {
   align-items: center;
   gap: 4px;
   font-family: inherit;
-  font-size: 1rem;
   font-weight: 700;
   color: #1a1a0e;
   letter-spacing: 0.05em;
@@ -322,7 +315,6 @@ body {
   z-index: 100;
   background: #000100;
   padding: 24px;
-  font-size: 0.7rem;
   color: #FFF;
   pointer-events: none;
   min-width: 220px;
@@ -338,7 +330,6 @@ body {
 }
 
 .tt-title {
-  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   color: #C77E00;
@@ -356,7 +347,6 @@ body {
 }
 
 .tt-side-label {
-  font-size: 0.7rem;
   letter-spacing: 0.08em;
   margin-bottom: 6px;
   color: #C77E00;
@@ -385,7 +375,6 @@ body {
 .tt-bar.after   { opacity: 1; }
 
 .tt-hp-nums {
-  font-size: 0.65rem;
   color: rgba(255,255,255,0.7);
 }
 
@@ -438,7 +427,6 @@ body {
 #overlay.hidden { display: none; }
 
 #overlay-msg {
-  font-size: 2rem;
   color: #aaddaa;
   letter-spacing: 0.15em;
 }
@@ -455,7 +443,6 @@ body {
   border: 1px solid #5a8a5a;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.9rem;
 }
 #restart-btn:hover { background: #3a6a3a; }
 
@@ -466,7 +453,6 @@ body {
   border: 1px solid #3a5a3a;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.9rem;
 }
 #recap-btn:hover { background: #1a2a1a; }
 
@@ -492,7 +478,6 @@ body {
 }
 
 #recap-turn-label {
-  font-size: 0.72rem;
   color: #23251E;
   text-transform: uppercase;
   letter-spacing: 0.18em;
@@ -505,7 +490,6 @@ body {
   border: 1px solid #23251E;
   color: #23251E;
   font-family: inherit;
-  font-size: 0.72rem;
   padding: 3px 10px;
   cursor: pointer;
   width: 80px;
@@ -546,7 +530,6 @@ body {
 
 #recap-log {
   list-style: none;
-  font-size: 0.64rem;
   color: #23251E;
   opacity: 0.5;
   max-height: 70px;
@@ -576,13 +559,11 @@ body {
   max-width: 620px;
   width: 100%;
   color: #aaccaa;
-  font-size: 0.82rem;
   line-height: 1.7;
   position: relative;
 }
 
 #rules-modal h2 {
-  font-size: 1rem;
   color: #6aaa6a;
   text-transform: uppercase;
   letter-spacing: 0.2em;
@@ -590,7 +571,6 @@ body {
 }
 
 #rules-modal h3 {
-  font-size: 0.78rem;
   color: #5a9a5a;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -610,7 +590,6 @@ body {
   padding: 1px 5px;
   border-radius: 2px;
   font-family: 'Disket Mono', 'Courier New', monospace;
-  font-size: 0.78rem;
   color: #aaddaa;
 }
 
@@ -624,7 +603,6 @@ body {
   border: 1px solid #3a5a3a;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.72rem;
 }
 #rules-close:hover { background: #1a2a1a; color: #8aba8a; }
 
@@ -676,7 +654,6 @@ body {
   border: 0;
   color: var(--color-dark);
   font-family: 'Disket Mono', monospace;
-  font-size: 1rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1079,7 +1056,6 @@ body {
 
 .pp-tt-next {
   margin-top: 12px;
-  font-size: 0.63rem;
   color: var(--color-gray-500);
   border-top: 1px solid rgba(255,255,255,0.08);
   padding-top: 8px;
