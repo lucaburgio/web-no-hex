@@ -5,8 +5,13 @@ import type { Unit, HexState, GameState, CombatForecast, Owner } from './types';
 export const PLAYER = 1 as const;
 export const AI     = 2 as const;
 
-export const COLS = config.boardCols;
-export const ROWS = config.boardRows;
+export let COLS = config.boardCols;
+export let ROWS = config.boardRows;
+
+export function syncDimensions(): void {
+  COLS = config.boardCols;
+  ROWS = config.boardRows;
+}
 
 let unitIdCounter = 0;
 

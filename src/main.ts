@@ -26,6 +26,8 @@ import type { MoveAnimation } from './renderer';
 import config from './gameconfig';
 import type { GameState, Unit, CombatForecast, Owner } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
+import { updateConfig } from './gameconfig';
+import { syncDimensions } from './game';
 
 const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
 const WS_URL = `${wsProtocol}//${location.hostname}:3001`;
@@ -171,9 +173,11 @@ menuNewGameBtn.addEventListener('click', () => {
     newGameConfirmOverlay.classList.remove('hidden');
   } else {
     hideMainMenu();
-    gameMode = 'vsAI';
-    localPlayer = PLAYER;
-    startGame(createInitialState());
+    showSettings(() => {
+      gameMode = 'vsAI';
+      localPlayer = PLAYER;
+      startGame(createInitialState());
+    });
   }
 });
 
@@ -181,9 +185,11 @@ confirmNewGameBtn.addEventListener('click', () => {
   newGameConfirmOverlay.classList.add('hidden');
   clearGameState();
   hideMainMenu();
-  gameMode = 'vsAI';
-  localPlayer = PLAYER;
-  startGame(createInitialState());
+  showSettings(() => {
+    gameMode = 'vsAI';
+    localPlayer = PLAYER;
+    startGame(createInitialState());
+  });
 });
 
 cancelNewGameBtn.addEventListener('click', () => {
@@ -217,6 +223,133 @@ menuJoinBtn.addEventListener('click', () => {
   lobbyCodeInputEl.value = '';
   lobbyErrorEl.classList.add('hidden');
   lobbyCodeInputEl.focus();
+});
+
+// ── Game settings ────────────────────────────────────────────────────────────
+
+const settingsOverlayEl  = document.getElementById('settings-overlay') as HTMLDivElement;
+const settingsStartBtn   = document.getElementById('settings-start-btn') as HTMLButtonElement;
+const settingsBackBtn    = document.getElementById('settings-back-btn') as HTMLButtonElement;
+
+// Numeric fields: [elementId, configKey, scale factor (e.g. 100 for % fields)]
+const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
+  ['cfg-boardCols',               'boardCols',               1],
+  ['cfg-boardRows',               'boardRows',               1],
+  ['cfg-startingUnits',           'startingUnits',           1],
+  ['cfg-productionPointsPerTurn', 'productionPointsPerTurn', 1],
+  ['cfg-infantryCost',            'infantryCost',            1],
+  ['cfg-territoryQuota',          'territoryQuota',          1],
+  ['cfg-pointsPerQuota',          'pointsPerQuota',          1],
+  ['cfg-productionTurns',         'productionTurns',         1],
+  ['cfg-productionSafeDistance',  'productionSafeDistance',  1],
+  ['cfg-unitMaxHp',               'unitMaxHp',               1],
+  ['cfg-unitBaseStrength',        'unitBaseStrength',        1],
+  ['cfg-combatDamageBase',        'combatDamageBase',        1],
+  ['cfg-combatStrengthScale',     'combatStrengthScale',     1],
+  ['cfg-flankingBonus',           'flankingBonus',           100],
+  ['cfg-maxFlankingUnits',        'maxFlankingUnits',        1],
+  ['cfg-healOwnTerritory',        'healOwnTerritory',        1],
+  ['cfg-healNeutral',             'healNeutral',             1],
+  ['cfg-healEnemyTerritory',      'healEnemyTerritory',      1],
+  ['cfg-unitMoveSpeed',           'unitMoveSpeed',           1],
+];
+
+// Proxy type for key checking only — never instantiated
+declare const _cfgNumProxy: {
+  boardCols: number; boardRows: number; startingUnits: number;
+  productionPointsPerTurn: number; infantryCost: number;
+  territoryQuota: number; pointsPerQuota: number;
+  productionTurns: number; productionSafeDistance: number;
+  unitMaxHp: number; unitBaseStrength: number;
+  combatDamageBase: number; combatStrengthScale: number;
+  flankingBonus: number; maxFlankingUnits: number;
+  healOwnTerritory: number; healNeutral: number; healEnemyTerritory: number;
+  unitMoveSpeed: number;
+};
+
+const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'autoEndProduction' | 'autoEndMovement']> = [
+  ['cfg-zoneOfControl',      'zoneOfControl'],
+  ['cfg-autoEndProduction',  'autoEndProduction'],
+  ['cfg-autoEndMovement',    'autoEndMovement'],
+];
+
+function populateSettings(): void {
+  const infantryCost = config.unitTypes.find(u => u.id === 'infantry')?.cost ?? config.unitTypes[0].cost;
+  const vals: Record<string, number> = {
+    boardCols: config.boardCols, boardRows: config.boardRows,
+    startingUnits: config.startingUnits,
+    productionPointsPerTurn: config.productionPointsPerTurn,
+    infantryCost,
+    territoryQuota: config.territoryQuota, pointsPerQuota: config.pointsPerQuota,
+    productionTurns: config.productionTurns, productionSafeDistance: config.productionSafeDistance,
+    unitMaxHp: config.unitMaxHp, unitBaseStrength: config.unitBaseStrength,
+    combatDamageBase: config.combatDamageBase, combatStrengthScale: config.combatStrengthScale,
+    flankingBonus: config.flankingBonus, maxFlankingUnits: config.maxFlankingUnits,
+    healOwnTerritory: config.healOwnTerritory, healNeutral: config.healNeutral,
+    healEnemyTerritory: config.healEnemyTerritory,
+    unitMoveSpeed: config.unitMoveSpeed,
+  };
+  for (const [id, key, scale] of NUM_FIELDS) {
+    const el = document.getElementById(id) as HTMLInputElement;
+    el.value = String(Math.round(vals[key] * scale));
+  }
+  for (const [id, key] of TOGGLE_FIELDS) {
+    const el = document.getElementById(id) as HTMLButtonElement;
+    const val = config[key] as boolean;
+    el.dataset.value = String(val);
+    el.textContent = val ? 'ON' : 'OFF';
+  }
+}
+
+function collectSettings(): Parameters<typeof updateConfig>[0] {
+  const out: Record<string, number | boolean> = {};
+  for (const [id, key, scale] of NUM_FIELDS) {
+    const el = document.getElementById(id) as HTMLInputElement;
+    out[key] = parseFloat(el.value) / scale;
+  }
+  for (const [id, key] of TOGGLE_FIELDS) {
+    const el = document.getElementById(id) as HTMLButtonElement;
+    out[key] = el.dataset.value === 'true';
+  }
+  return out as Parameters<typeof updateConfig>[0];
+}
+
+// Wire toggle buttons
+for (const [id] of TOGGLE_FIELDS) {
+  const el = document.getElementById(id) as HTMLButtonElement;
+  el.addEventListener('click', () => {
+    const next = el.dataset.value !== 'true';
+    el.dataset.value = String(next);
+    el.textContent = next ? 'ON' : 'OFF';
+  });
+}
+
+let settingsOnStart: (() => void) | null = null;
+
+function showSettings(onStart: () => void): void {
+  populateSettings();
+  settingsOnStart = onStart;
+  settingsOverlayEl.classList.remove('hidden');
+}
+
+function hideSettings(): void {
+  settingsOverlayEl.classList.add('hidden');
+  settingsOnStart = null;
+}
+
+settingsStartBtn.addEventListener('click', () => {
+  const settings = collectSettings();
+  updateConfig(settings);
+  syncDimensions();
+  const cb = settingsOnStart;
+  hideSettings();
+  cb?.();
+});
+
+settingsBackBtn.addEventListener('click', () => {
+  closeLobbyWs();
+  hideSettings();
+  showMainMenu();
 });
 
 // ── Intro story ───────────────────────────────────────────────────────────────
@@ -412,12 +545,13 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     lobbyCodeEl.textContent = msg.code as string;
     // already showing host-wait
   } else if (msg.type === 'guest-joined') {
-    // Host: guest arrived — send game-start with initial state
-    if (ws) {
-      ws.send(JSON.stringify({ type: 'game-start', state }));
-    }
+    // Host: guest arrived — show settings, then start
     hideLobby();
-    startGame(state);
+    showSettings(() => {
+      state = createInitialState();
+      if (ws) ws.send(JSON.stringify({ type: 'game-start', state }));
+      startGame(state);
+    });
   } else if (msg.type === 'joined') {
     // Guest: successfully joined, wait for game-start
     lobbyMenuEl.classList.add('hidden');

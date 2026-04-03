@@ -88,6 +88,128 @@
     </div>
   </div>
 
+  <!-- Game settings overlay -->
+  <div id="settings-overlay" class="hidden">
+    <div id="settings-left">
+      <div id="settings-title">GAME<br>SETTINGS</div>
+      <div id="settings-actions">
+        <button id="settings-start-btn" class="menu-btn">START GAME</button>
+        <button id="settings-back-btn" class="menu-btn secondary">BACK</button>
+      </div>
+    </div>
+    <div id="settings-right">
+
+      <div class="settings-group">
+        <div class="settings-group-title">BOARD</div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-boardCols">Columns</label>
+          <input class="settings-input" type="number" id="cfg-boardCols" min="2" max="24" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-boardRows">Rows</label>
+          <input class="settings-input" type="number" id="cfg-boardRows" min="2" max="24" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-startingUnits">Starting units per side</label>
+          <input class="settings-input" type="number" id="cfg-startingUnits" min="1" max="12" step="1" />
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">ECONOMY</div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-productionPointsPerTurn">PP per turn</label>
+          <input class="settings-input" type="number" id="cfg-productionPointsPerTurn" min="1" max="200" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-infantryCost">Infantry cost (PP)</label>
+          <input class="settings-input" type="number" id="cfg-infantryCost" min="1" max="200" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-territoryQuota">Territory quota (hexes)</label>
+          <input class="settings-input" type="number" id="cfg-territoryQuota" min="1" max="50" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-pointsPerQuota">Bonus PP per quota</label>
+          <input class="settings-input" type="number" id="cfg-pointsPerQuota" min="0" max="50" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-productionTurns">Turns to become production hex</label>
+          <input class="settings-input" type="number" id="cfg-productionTurns" min="1" max="10" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-productionSafeDistance">Production safe distance</label>
+          <input class="settings-input" type="number" id="cfg-productionSafeDistance" min="1" max="6" step="1" />
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">COMBAT</div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-unitMaxHp">Unit max HP</label>
+          <input class="settings-input" type="number" id="cfg-unitMaxHp" min="1" max="50" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-unitBaseStrength">Unit base strength</label>
+          <input class="settings-input" type="number" id="cfg-unitBaseStrength" min="1" max="50" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-combatDamageBase">Damage base</label>
+          <input class="settings-input" type="number" id="cfg-combatDamageBase" min="1" max="20" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-combatStrengthScale">Strength scale</label>
+          <input class="settings-input" type="number" id="cfg-combatStrengthScale" min="1" max="50" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-flankingBonus">Flanking bonus (%)</label>
+          <input class="settings-input" type="number" id="cfg-flankingBonus" min="0" max="100" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-maxFlankingUnits">Max flanking units</label>
+          <input class="settings-input" type="number" id="cfg-maxFlankingUnits" min="0" max="6" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label">Zone of Control</label>
+          <button class="settings-toggle" id="cfg-zoneOfControl" data-value="true">ON</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">HEALING</div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-healOwnTerritory">HP/turn on own territory</label>
+          <input class="settings-input" type="number" id="cfg-healOwnTerritory" min="0" max="10" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-healNeutral">HP/turn on neutral</label>
+          <input class="settings-input" type="number" id="cfg-healNeutral" min="0" max="10" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-healEnemyTerritory">HP/turn on enemy territory</label>
+          <input class="settings-input" type="number" id="cfg-healEnemyTerritory" min="0" max="10" step="1" />
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">AUTOMATION</div>
+        <div class="settings-row">
+          <label class="settings-label">Auto-end production</label>
+          <button class="settings-toggle" id="cfg-autoEndProduction" data-value="true">ON</button>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label">Auto-end movement</label>
+          <button class="settings-toggle" id="cfg-autoEndMovement" data-value="true">ON</button>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-unitMoveSpeed">Unit move animation (ms)</label>
+          <input class="settings-input" type="number" id="cfg-unitMoveSpeed" min="0" max="2000" step="40" />
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Intro story overlay — shown before the first new game -->
   <div id="intro-overlay" class="hidden">
     <div id="intro-page">

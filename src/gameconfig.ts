@@ -1,5 +1,15 @@
 import type { GameConfig } from './types';
 
+export function updateConfig(overrides: Partial<Omit<GameConfig, 'unitTypes'>> & { infantryCost?: number }): void {
+  const { infantryCost, ...rest } = overrides;
+  Object.assign(config, rest);
+  if (infantryCost !== undefined) {
+    config.unitTypes = config.unitTypes.map(u =>
+      u.id === 'infantry' ? { ...u, cost: infantryCost } : u
+    );
+  }
+}
+
 const config: GameConfig = {
   // Board dimensions (number of hexes)
   boardCols: 4,
