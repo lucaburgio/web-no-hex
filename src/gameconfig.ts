@@ -41,7 +41,7 @@ const config: GameConfig = {
   // Available unit types (id must be unique; cost is in production points)
   unitTypes: [
     { id: 'infantry', name: 'Infantry', cost: 20, movement: 1, icon: 'icons/grade.svg' },
-    { id: 'tank',     name: 'Tank',     cost: 20, movement: 2, icon: 'icons/tank.svg'  },
+    { id: 'tank',     name: 'Tank',     cost: 40, movement: 2, icon: 'icons/tank.svg'  },
   ],
 
   // ── Combat ──────────────────────────────────────────────────────────────────
@@ -86,6 +86,9 @@ const config: GameConfig = {
 
   // Duration in ms for the unit move animation (0 = instant)
   unitMoveSpeed: 480,
+
+  // Fraction of board hexes to randomly set as impassable mountains at game start (0–1)
+  mountainPct: 0.12,
 };
 
 export default config;

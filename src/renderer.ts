@@ -83,6 +83,7 @@ interface Colors {
   hexProdSelected: string;
   hexZoc: string;
   hexNeutral: string;
+  hexMountain: string;
   hexStroke: string;
   hexProdStroke: string;
   unitIconColor: string;
@@ -110,6 +111,7 @@ function colors(): Colors {
     hexProdSelected: v('--color-hex-prod-selected'),
     hexZoc:          v('--color-hex-zoc'),
     hexNeutral:      v('--color-hex-neutral'),
+    hexMountain:     v('--color-hex-mountain'),
     hexStroke:       v('--color-hex-stroke'),
     hexProdStroke:   v('--color-hex-prod-stroke'),
     unitIconColor:   v('--color-unit-icon'),
@@ -216,6 +218,12 @@ export function initRenderer(svgElement: SVGSVGElement): void {
     }
   }
 
+  // Mountain icon layer (above hex fills, below units)
+  const mountainLayer = svgEl('g');
+  mountainLayer.id = 'mountain-layer';
+  mountainLayer.setAttribute('pointer-events', 'none');
+  hexLayer.appendChild(mountainLayer);
+
   // Movement area boundary overlay (drawn above hexes, below units)
   const boundary = svgEl('path');
   boundary.setAttribute('id', 'move-boundary');
@@ -230,6 +238,8 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
   const c = colors();
   const unitLayer = svgElement.querySelector('#unit-layer') as SVGGElement;
   unitLayer.innerHTML = '';
+
+  const mountainSet = new Set(state.mountainHexes ?? []);
 
   const selectedUnit = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
 
@@ -291,6 +301,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
       if (!poly) continue;
 
       const key                = `${col},${r}`;
+      const isMountain         = mountainSet.has(key);
       const hexState           = state.hexStates[key];
       const isSelectedHex      = selectedUnit && col === selectedUnit.col && r === selectedUnit.row;
       const isValidMove        = validMoveHexes.has(key);
@@ -302,7 +313,9 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
       let fill   = c.hexNeutral;
       let stroke = 'transparent';
 
-      if (isSelectedHex) {
+      if (isMountain) {
+        fill = c.hexMountain;
+      } else if (isSelectedHex) {
         fill = c.hexSelected;
       } else if (isZoc) {
         fill = c.hexZoc;
@@ -328,6 +341,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
       poly.setAttribute('fill', fill);
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('opacity', hexDimmed ? '0.2' : '1');
+      poly.style.cursor = isMountain ? 'default' : 'pointer';
 
       // Production marker
       svgElement.querySelector(`#marker-${col}-${r}`)?.remove();
@@ -342,6 +356,26 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
         diamond.setAttribute('id', `marker-${col}-${r}`);
         (svgElement.querySelector('#hex-layer') as SVGGElement).appendChild(diamond);
       }
+    }
+  }
+
+  // Draw mountain icons
+  const mountainLayer = svgElement.querySelector('#mountain-layer') as SVGGElement | null;
+  if (mountainLayer) {
+    mountainLayer.innerHTML = '';
+    const iw = HEX_SIZE * Math.sqrt(3);
+    const ih = HEX_SIZE * 2;
+    for (const key of mountainSet) {
+      const [mc, mr] = key.split(',').map(Number);
+      const { x, y } = hexToPixel(mc, mr);
+      const img = svgEl('image');
+      img.setAttribute('href', '/icons/mountains.svg');
+      img.setAttribute('x', String(x - iw / 2));
+      img.setAttribute('y', String(y - ih / 2));
+      img.setAttribute('width', String(iw));
+      img.setAttribute('height', String(ih));
+      img.setAttribute('pointer-events', 'none');
+      mountainLayer.appendChild(img);
     }
   }
 

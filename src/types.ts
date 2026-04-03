@@ -26,6 +26,7 @@ export interface HexState {
 export interface GameState {
   units: Unit[];
   hexStates: Record<string, HexState>;
+  mountainHexes: string[];
   turn: number;
   phase: Phase;
   activePlayer: Owner;
@@ -83,4 +84,6 @@ export interface GameConfig {
   autoEndMovement: boolean;
   // Duration in ms for the unit move animation (0 = instant)
   unitMoveSpeed: number;
+  // Fraction of board hexes to randomly set as impassable mountains (0–1)
+  mountainPct: number;
 }

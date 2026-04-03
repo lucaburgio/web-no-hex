@@ -252,6 +252,7 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
   ['cfg-healNeutral',             'healNeutral',             1],
   ['cfg-healEnemyTerritory',      'healEnemyTerritory',      1],
   ['cfg-unitMoveSpeed',           'unitMoveSpeed',           1],
+  ['cfg-mountainPct',             'mountainPct',             100],
 ];
 
 // Proxy type for key checking only — never instantiated
@@ -265,6 +266,7 @@ declare const _cfgNumProxy: {
   flankingBonus: number; maxFlankingUnits: number;
   healOwnTerritory: number; healNeutral: number; healEnemyTerritory: number;
   unitMoveSpeed: number;
+  mountainPct: number;
 };
 
 const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'autoEndProduction' | 'autoEndMovement']> = [
@@ -288,6 +290,7 @@ function populateSettings(): void {
     healOwnTerritory: config.healOwnTerritory, healNeutral: config.healNeutral,
     healEnemyTerritory: config.healEnemyTerritory,
     unitMoveSpeed: config.unitMoveSpeed,
+    mountainPct: config.mountainPct,
   };
   for (const [id, key, scale] of NUM_FIELDS) {
     const el = document.getElementById(id) as HTMLInputElement;

@@ -44,6 +44,7 @@ function spreadCols(n: number, cols: number): number[] {
 
 function conquerHex(state: GameState, col: number, row: number, owner: Owner): void {
   const key = `${col},${row}`;
+  if ((state.mountainHexes ?? []).includes(key)) return;
   const existing = state.hexStates[key];
   if (existing) {
     if (existing.owner !== owner) {
@@ -109,6 +110,7 @@ export function getUnitById(state: GameState, id: number): Unit | null {
 }
 
 export function isValidProductionPlacement(state: GameState, col: number, row: number, localPlayer: Owner = PLAYER): boolean {
+  if ((state.mountainHexes ?? []).includes(`${col},${row}`)) return false;
   if (getUnit(state, col, row)) return false;
   const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
   if (row === homeRow) return true;
@@ -129,6 +131,7 @@ export function isInEnemyZoC(state: GameState, col: number, row: number, enemyOw
 // Valid destination hexes for a unit (respects ZoC, supports multi-hex movement)
 export function getValidMoves(state: GameState, unit: Unit): [number, number][] {
   const enemy: Owner = unit.owner === PLAYER ? AI : PLAYER;
+  const mountains = new Set(state.mountainHexes ?? []);
   // ZoC is checked on the SOURCE hex, not the destination.
   // If this unit is already adjacent to an enemy it is "locked":
   // it may only attack an adjacent enemy or retreat to a non-ZoC hex.
@@ -136,6 +139,7 @@ export function getValidMoves(state: GameState, unit: Unit): [number, number][] 
 
   if (inZoC) {
     return getNeighbors(unit.col, unit.row, COLS, ROWS).filter(([c, r]) => {
+      if (mountains.has(`${c},${r}`)) return false;
       const occupant = getUnit(state, c, r);
       if (occupant && occupant.owner === unit.owner) return false;
       if (occupant && occupant.owner === enemy) return true;
@@ -155,6 +159,7 @@ export function getValidMoves(state: GameState, unit: Unit): [number, number][] 
       for (const [nc, nr] of getNeighbors(c, r, COLS, ROWS)) {
         const key = `${nc},${nr}`;
         if (visited.has(key)) continue;
+        if (mountains.has(key)) continue; // impassable
         visited.add(key);
         const occupant = getUnit(state, nc, nr);
         if (occupant && occupant.owner === unit.owner) continue; // blocked by own unit
@@ -319,9 +324,26 @@ export function createInitialState(): GameState {
     hexStates[`${u.col},${u.row}`] = { owner: u.owner, stableFor: 0, isProduction: false };
   }
 
+  // Generate random mountain hexes, excluding home rows and starting unit positions
+  const reservedKeys = new Set(units.map(u => `${u.col},${u.row}`));
+  const candidates: string[] = [];
+  for (let r = 1; r < ROWS - 1; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const key = `${c},${r}`;
+      if (!reservedKeys.has(key)) candidates.push(key);
+    }
+  }
+  const mountainCount = Math.round(COLS * ROWS * config.mountainPct);
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  const mountainHexes = candidates.slice(0, Math.min(mountainCount, candidates.length));
+
   return {
     units,
     hexStates,
+    mountainHexes,
     turn: 1,
     phase: 'production',
     activePlayer: PLAYER,
