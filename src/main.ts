@@ -1144,17 +1144,21 @@ function positionTooltip(pageX: number, pageY: number): void {
   tooltipEl.style.top  = `${top}px`;
 }
 
+const CURSOR_DEFAULT = "url('/icons/pointer.svg') 13 14, auto";
+const CURSOR_FIGHT   = "url('/icons/pointer-fight.svg') 11 10, crosshair";
+
 svg.addEventListener('mousemove', (e: MouseEvent) => {
   const enemyOwner: Owner = localPlayer === PLAYER ? AI : PLAYER;
   if (state.phase !== 'movement' || state.activePlayer !== localPlayer || state.selectedUnit === null) {
     tooltipEl.classList.add('hidden');
+    svg.style.cursor = CURSOR_DEFAULT;
     return;
   }
   const hex = getHexFromEvent(e);
-  if (!hex) { tooltipEl.classList.add('hidden'); return; }
+  if (!hex) { tooltipEl.classList.add('hidden'); svg.style.cursor = CURSOR_DEFAULT; return; }
 
   const attacker = getUnitById(state, state.selectedUnit);
-  if (!attacker) { tooltipEl.classList.add('hidden'); return; }
+  if (!attacker) { tooltipEl.classList.add('hidden'); svg.style.cursor = CURSOR_DEFAULT; return; }
 
   const target = getUnit(state, hex.col, hex.row);
 
@@ -1166,22 +1170,25 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
       tooltipEl.innerHTML = `<div class="tt-title tt-zoc">Zone of Control</div>
         <div class="tt-zoc-msg">Cannot move here — retreating next to an enemy while already engaged is not allowed.</div>`;
       tooltipEl.classList.remove('hidden');
+      svg.style.cursor = CURSOR_DEFAULT;
       positionTooltip(e.pageX, e.pageY);
       return;
     }
   }
 
-  if (!target || target.owner !== enemyOwner) { tooltipEl.classList.add('hidden'); return; }
+  if (!target || target.owner !== enemyOwner) { tooltipEl.classList.add('hidden'); svg.style.cursor = CURSOR_DEFAULT; return; }
 
   const validMoves = getValidMoves(state, attacker);
   const canAttack = validMoves.some(([c, r]) => c === hex.col && r === hex.row);
-  if (!canAttack) { tooltipEl.classList.add('hidden'); return; }
+  if (!canAttack) { tooltipEl.classList.add('hidden'); svg.style.cursor = CURSOR_DEFAULT; return; }
 
+  svg.style.cursor = CURSOR_FIGHT;
   showCombatTooltip(attacker, target, e.pageX, e.pageY);
 });
 
 svg.addEventListener('mouseleave', () => {
   tooltipEl.classList.add('hidden');
+  svg.style.cursor = CURSOR_DEFAULT;
 });
 
 const pauseOverlayEl   = document.getElementById('pause-overlay') as HTMLDivElement;

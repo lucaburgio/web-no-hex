@@ -235,7 +235,7 @@ export function initRenderer(svgElement: SVGSVGElement): void {
       poly.setAttribute('stroke-width', '2.5');
       poly.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);
       poly.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
-      poly.style.cursor = 'pointer';
+      poly.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
       hexLayer.appendChild(poly);
 
     }
@@ -365,7 +365,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
       poly.setAttribute('fill', fill);
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('opacity', hexDimmed ? '0.2' : '1');
-      poly.style.cursor = isMountain ? 'default' : 'pointer';
+      poly.style.cursor = isMountain ? 'default' : "url('/icons/pointer.svg') 13 14, pointer";
 
       // Production marker
       svgElement.querySelector(`#marker-${col}-${r}`)?.remove();
@@ -425,7 +425,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     unitEl.setAttribute('data-col', String(unit.col));
     unitEl.setAttribute('data-row', String(unit.row));
     unitEl.setAttribute('transform', `translate(${x - 25 * sc},${y - 32 * sc}) scale(${sc})`);
-    unitEl.style.cursor = 'pointer';
+    unitEl.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
     unitLayer.appendChild(unitEl);
 
     // HP bar (inside shape)

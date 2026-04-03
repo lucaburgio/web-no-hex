@@ -64,6 +64,7 @@ body {
   overflow: auto;
   padding-top: 40px;
   padding-bottom: 72px;
+  cursor: url('/icons/pointer.svg') 13 14, auto;
 }
 
 /* Buttons — pair base + variant: primary = dark CTA, secondary = gray (mission panel, modals, etc.) */
@@ -76,7 +77,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   padding: 16px 20px;
-  cursor: url('/icons/cursor.svg') 0 0, auto;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
   transition: all 0.2s ease;
 }
 
@@ -104,7 +105,7 @@ body {
 }
 
 .button-active {
-  cursor: url('/icons/cursor.svg') 0 0, auto;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 
 .button.secondary,
@@ -259,7 +260,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   text-decoration: underline;
-  cursor: pointer;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
   font-weight: bold;
 }
 #rules-btn:hover { opacity: 0.65; }
@@ -286,7 +287,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
   user-select: none;
   transition: transform 0.2s ease, scale 0.2s ease;
 }
@@ -448,7 +449,7 @@ body {
   background: #2a4a2a;
   color: #aaddaa;
   border: 1px solid #5a8a5a;
-  cursor: pointer;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
   font-family: inherit;
 }
 #restart-btn:hover { background: #3a6a3a; }
@@ -458,7 +459,7 @@ body {
   background: transparent;
   color: #aaddaa;
   border: 1px solid #3a5a3a;
-  cursor: pointer;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
   font-family: inherit;
 }
 #recap-btn:hover { background: #1a2a1a; }
@@ -498,7 +499,7 @@ body {
   color: #23251E;
   font-family: inherit;
   padding: 3px 10px;
-  cursor: pointer;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
   width: 80px;
 }
 #recap-close-btn:hover { opacity: 0.6; }
@@ -532,7 +533,7 @@ body {
   width: 100%;
   margin-bottom: 10px;
   accent-color: #23251E;
-  cursor: pointer;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 
 #recap-log {
@@ -608,7 +609,7 @@ body {
   background: transparent;
   color: #5a8a5a;
   border: 1px solid #3a5a3a;
-  cursor: pointer;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
   font-family: inherit;
 }
 #rules-close:hover { background: #1a2a1a; color: #8aba8a; }
@@ -665,7 +666,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 1rem 2rem;
-  cursor: pointer;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
   transition: all 0.2s ease;
   width: 100%;
   max-width: 280px;
@@ -808,7 +809,7 @@ body {
   border: 1px solid var(--color-dark);
   background: var(--color-dark);
   color: var(--color-bg);
-  cursor: pointer;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
   transition: all 0.15s ease;
   width: 64px;
   text-align: center;
@@ -975,7 +976,7 @@ body {
   background: #1a2a1a;
   color: #aaddaa;
   border: 1px solid #3a5a3a;
-  cursor: pointer;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
   font-family: inherit;
   font-size: 0.78rem;
   text-transform: uppercase;
