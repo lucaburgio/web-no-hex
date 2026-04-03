@@ -197,6 +197,11 @@ body {
   display: block;
 }
 
+#board.cursor-fight,
+#board.cursor-fight * {
+  cursor: url('/icons/pointer-fight.svg') 11 10, crosshair !important;
+}
+
 /* ── Sticky footer ───────────────────────────────────────────────────────────── */
 #game-footer {
   position: fixed;
