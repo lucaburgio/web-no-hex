@@ -16,6 +16,7 @@ export function syncDimensions(): void {
 let unitIdCounter = 0;
 
 function makeUnit(owner: Owner, col: number, row: number, unitTypeId = 'infantry'): Unit {
+  const unitType = config.unitTypes.find(u => u.id === unitTypeId) ?? config.unitTypes[0];
   return {
     id: unitIdCounter++,
     owner,
@@ -27,6 +28,7 @@ function makeUnit(owner: Owner, col: number, row: number, unitTypeId = 'infantry
     hp: config.unitMaxHp,
     maxHp: config.unitMaxHp,
     strength: config.unitBaseStrength,
+    movement: unitType.movement,
   };
 }
 
@@ -124,24 +126,49 @@ export function isInEnemyZoC(state: GameState, col: number, row: number, enemyOw
   });
 }
 
-// Valid destination hexes for a unit (respects ZoC)
+// Valid destination hexes for a unit (respects ZoC, supports multi-hex movement)
 export function getValidMoves(state: GameState, unit: Unit): [number, number][] {
   const enemy: Owner = unit.owner === PLAYER ? AI : PLAYER;
   // ZoC is checked on the SOURCE hex, not the destination.
   // If this unit is already adjacent to an enemy it is "locked":
-  // it may only attack, not move to empty hexes (Civ 5 rule).
-  // Approaching an enemy is always allowed.
+  // it may only attack an adjacent enemy or retreat to a non-ZoC hex.
   const inZoC = isInEnemyZoC(state, unit.col, unit.row, enemy);
 
-  return getNeighbors(unit.col, unit.row, COLS, ROWS).filter(([c, r]) => {
-    const occupant = getUnit(state, c, r);
-    // Can't move onto own unit
-    if (occupant && occupant.owner === unit.owner) return false;
-    // Can always attack an adjacent enemy
-    if (occupant && occupant.owner === enemy) return true;
-    // If in ZoC, can only move to hexes that are NOT themselves in ZoC (retreat)
-    if (inZoC && isInEnemyZoC(state, c, r, enemy)) return false;
-    return true;
+  if (inZoC) {
+    return getNeighbors(unit.col, unit.row, COLS, ROWS).filter(([c, r]) => {
+      const occupant = getUnit(state, c, r);
+      if (occupant && occupant.owner === unit.owner) return false;
+      if (occupant && occupant.owner === enemy) return true;
+      if (isInEnemyZoC(state, c, r, enemy)) return false;
+      return true;
+    });
+  }
+
+  // BFS up to unit.movement steps; enemy hexes are valid destinations but block further passage
+  const visited = new Set<string>([`${unit.col},${unit.row}`]);
+  const reachable = new Set<string>();
+  let frontier: [number, number][] = [[unit.col, unit.row]];
+
+  for (let step = 0; step < unit.movement; step++) {
+    const nextFrontier: [number, number][] = [];
+    for (const [c, r] of frontier) {
+      for (const [nc, nr] of getNeighbors(c, r, COLS, ROWS)) {
+        const key = `${nc},${nr}`;
+        if (visited.has(key)) continue;
+        visited.add(key);
+        const occupant = getUnit(state, nc, nr);
+        if (occupant && occupant.owner === unit.owner) continue; // blocked by own unit
+        reachable.add(key);
+        if (!occupant) nextFrontier.push([nc, nr]); // empty: can continue through
+        // enemy: valid destination (attack) but can't pass through
+      }
+    }
+    frontier = nextFrontier;
+  }
+
+  return [...reachable].map(key => {
+    const [c, r] = key.split(',').map(Number);
+    return [c, r] as [number, number];
   });
 }
 

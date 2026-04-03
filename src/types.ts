@@ -14,6 +14,7 @@ export interface Unit {
   hp: number;
   maxHp: number;
   strength: number;
+  movement: number;
 }
 
 export interface HexState {
@@ -53,6 +54,7 @@ export interface UnitType {
   id: string;
   name: string;
   cost: number;
+  movement: number;
   icon?: string;
 }
 
