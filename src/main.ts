@@ -789,6 +789,15 @@ svg.addEventListener('click', (e: MouseEvent) => {
         render(); updateUI();
         sendStateUpdate();
       } else {
+        // Deselect if clicked hex is not a valid move destination
+        const selUnit = getUnitById(state, state.selectedUnit)!;
+        const validMoves = getValidMoves(state, selUnit);
+        if (!validMoves.some(([c, r]) => c === col && r === row)) {
+          state.selectedUnit = null;
+          render(); updateUI();
+          return;
+        }
+
         // Snapshot the moving unit before state changes
         const movingUnitId = state.selectedUnit;
         const movingUnit = getUnitById(state, movingUnitId)!;
