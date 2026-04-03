@@ -63,7 +63,44 @@
     </div>
   </footer>
 
-  <div id="lobby-overlay">
+  <!-- Main menu overlay — shown on page load -->
+  <div id="main-menu-overlay">
+    <div id="main-menu-left">
+      <div id="main-menu-title">WEB<br>STRATEGIC</div>
+    </div>
+    <div id="main-menu-right">
+      <button id="menu-continue-btn" class="menu-btn hidden">CONTINUE</button>
+      <button id="menu-new-game-btn" class="menu-btn">NEW GAME</button>
+      <button id="menu-host-btn" class="menu-btn">HOST GAME</button>
+      <button id="menu-join-btn" class="menu-btn">JOIN GAME</button>
+      <p class="menu-version-text">v0.1 — BETA</p>
+    </div>
+  </div>
+
+  <!-- Confirm new game (when a save exists) -->
+  <div id="new-game-confirm-overlay" class="hidden">
+    <div id="new-game-confirm-modal">
+      <p class="confirm-text">Start a new game?<br>Your current progress will be lost.</p>
+      <div class="confirm-actions">
+        <button id="confirm-new-game-btn" class="menu-btn">YES, NEW GAME</button>
+        <button id="cancel-new-game-btn" class="menu-btn secondary">CANCEL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Intro story overlay — shown before the first new game -->
+  <div id="intro-overlay" class="hidden">
+    <div id="intro-page">
+      <div id="intro-text-block">
+        <p id="intro-text"></p><span id="intro-cursor">|</span>
+      </div>
+      <div id="intro-nav">
+        <button id="intro-continue-btn" class="menu-btn hidden">CONTINUE</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="lobby-overlay" class="hidden">
     <div id="lobby-modal">
       <div id="lobby-title">WEB STRATEGIC</div>
 

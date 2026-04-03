@@ -25,6 +25,7 @@ import { initRenderer, renderState, animateMoves, getHexFromEvent } from './rend
 import type { MoveAnimation } from './renderer';
 import config from './gameconfig';
 import type { GameState, Unit, CombatForecast, Owner } from './types';
+import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
 
 const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
 const WS_URL = `${wsProtocol}//${location.hostname}:3001`;
@@ -94,6 +95,21 @@ ppInfoEl.addEventListener('mouseleave', () => {
   ppTooltipEl.classList.add('hidden');
 });
 
+// ── Main menu DOM refs ────────────────────────────────────────────────────────
+
+const mainMenuOverlayEl    = document.getElementById('main-menu-overlay') as HTMLDivElement;
+const menuContinueBtn      = document.getElementById('menu-continue-btn') as HTMLButtonElement;
+const menuNewGameBtn       = document.getElementById('menu-new-game-btn') as HTMLButtonElement;
+const menuHostBtn          = document.getElementById('menu-host-btn') as HTMLButtonElement;
+const menuJoinBtn          = document.getElementById('menu-join-btn') as HTMLButtonElement;
+const newGameConfirmOverlay = document.getElementById('new-game-confirm-overlay') as HTMLDivElement;
+const confirmNewGameBtn    = document.getElementById('confirm-new-game-btn') as HTMLButtonElement;
+const cancelNewGameBtn     = document.getElementById('cancel-new-game-btn') as HTMLButtonElement;
+const introOverlayEl       = document.getElementById('intro-overlay') as HTMLDivElement;
+const introTextEl          = document.getElementById('intro-text') as HTMLParagraphElement;
+const introCursorEl        = document.getElementById('intro-cursor') as HTMLSpanElement;
+const introContinueBtn     = document.getElementById('intro-continue-btn') as HTMLButtonElement;
+
 // ── Lobby DOM refs ────────────────────────────────────────────────────────────
 
 const lobbyOverlayEl    = document.getElementById('lobby-overlay') as HTMLDivElement;
@@ -124,6 +140,133 @@ let turnSnapshots: GameState[] = [];
 function render(): void {
   renderState(svg, state, pendingProductionHex, new Set(), localPlayer);
 }
+
+// ── Main menu ─────────────────────────────────────────────────────────────────
+
+function showMainMenu(): void {
+  mainMenuOverlayEl.classList.remove('hidden');
+  if (hasSaveGame()) {
+    menuContinueBtn.classList.remove('hidden');
+  } else {
+    menuContinueBtn.classList.add('hidden');
+  }
+}
+
+function hideMainMenu(): void {
+  mainMenuOverlayEl.classList.add('hidden');
+}
+
+menuContinueBtn.addEventListener('click', () => {
+  const saved = loadGameState();
+  if (!saved) { showMainMenu(); return; }
+  hideMainMenu();
+  gameMode = 'vsAI';
+  localPlayer = PLAYER;
+  startGame(saved);
+});
+
+menuNewGameBtn.addEventListener('click', () => {
+  if (hasSaveGame()) {
+    newGameConfirmOverlay.classList.remove('hidden');
+  } else {
+    hideMainMenu();
+    startIntro();
+  }
+});
+
+confirmNewGameBtn.addEventListener('click', () => {
+  newGameConfirmOverlay.classList.add('hidden');
+  clearGameState();
+  hideMainMenu();
+  startIntro();
+});
+
+cancelNewGameBtn.addEventListener('click', () => {
+  newGameConfirmOverlay.classList.add('hidden');
+});
+
+menuHostBtn.addEventListener('click', () => {
+  gameMode = 'vsHuman';
+  localPlayer = PLAYER;
+  state = createInitialState();
+  hideMainMenu();
+  lobbyOverlayEl.classList.remove('hidden');
+  lobbyMenuEl.classList.add('hidden');
+  lobbyJoinFormEl.classList.add('hidden');
+  lobbyHostWaitEl.classList.remove('hidden');
+  lobbyCodeEl.textContent = '···';
+  lobbyErrorEl.classList.add('hidden');
+  connectWs((socket) => {
+    socket.send(JSON.stringify({ type: 'host' }));
+  });
+});
+
+menuJoinBtn.addEventListener('click', () => {
+  gameMode = 'vsHuman';
+  localPlayer = AI;
+  hideMainMenu();
+  lobbyOverlayEl.classList.remove('hidden');
+  lobbyMenuEl.classList.add('hidden');
+  lobbyHostWaitEl.classList.add('hidden');
+  lobbyJoinFormEl.classList.remove('hidden');
+  lobbyCodeInputEl.value = '';
+  lobbyErrorEl.classList.add('hidden');
+  lobbyCodeInputEl.focus();
+});
+
+// ── Intro story ───────────────────────────────────────────────────────────────
+
+const INTRO_PAGES = [
+  'The northern and southern territories have been locked in dispute for decades. As commander of the southern forces, your mission is to break through the enemy lines.',
+  'Establish production lines deep in enemy territory, outmaneuver your opponent, and push your units to their home row. One decisive breakthrough wins the war.',
+];
+
+let introPageIndex = 0;
+let introTypingInterval: ReturnType<typeof setInterval> | null = null;
+
+function startIntro(): void {
+  introPageIndex = 0;
+  introOverlayEl.classList.remove('hidden');
+  showIntroPage(0);
+}
+
+function showIntroPage(page: number): void {
+  const text = INTRO_PAGES[page];
+  introTextEl.textContent = '';
+  introCursorEl.style.display = 'inline-block';
+  introContinueBtn.classList.add('hidden');
+
+  let i = 0;
+  if (introTypingInterval) clearInterval(introTypingInterval);
+  introTypingInterval = setInterval(() => {
+    if (i < text.length) {
+      introTextEl.textContent = text.slice(0, i + 1);
+      i++;
+    } else {
+      if (introTypingInterval) clearInterval(introTypingInterval);
+      introTypingInterval = null;
+      introCursorEl.style.display = 'none';
+      setTimeout(() => {
+        introContinueBtn.textContent = page < INTRO_PAGES.length - 1
+          ? `CONTINUE (${page + 1}/${INTRO_PAGES.length})`
+          : 'START GAME';
+        introContinueBtn.classList.remove('hidden');
+      }, 300);
+    }
+  }, 28);
+}
+
+introContinueBtn.addEventListener('click', () => {
+  if (introPageIndex < INTRO_PAGES.length - 1) {
+    introPageIndex++;
+    showIntroPage(introPageIndex);
+  } else {
+    introOverlayEl.classList.add('hidden');
+    gameMode = 'vsAI';
+    localPlayer = PLAYER;
+    startGame(createInitialState());
+  }
+});
 
 // ── Rules content ─────────────────────────────────────────────────────────────
 
@@ -377,12 +520,14 @@ joinBtn.addEventListener('click', () => {
 
 lobbyCancelBtn.addEventListener('click', () => {
   closeLobbyWs();
-  showLobbyMenu();
+  lobbyOverlayEl.classList.add('hidden');
+  showMainMenu();
 });
 
 lobbyCancelJoinBtn.addEventListener('click', () => {
   closeLobbyWs();
-  showLobbyMenu();
+  lobbyOverlayEl.classList.add('hidden');
+  showMainMenu();
 });
 
 lobbyJoinConfirm.addEventListener('click', () => {
@@ -590,6 +735,7 @@ function runAiTurnWithAnimation(): void {
   if (moves.length === 0) {
     state = endTurnAfterAi(state);
     turnSnapshots.push(structuredClone(state));
+    saveGameState(state);
     render(); updateUI(); checkWinner(); maybeAutoEnd();
     return;
   }
@@ -602,18 +748,16 @@ function runAiTurnWithAnimation(): void {
     isAnimating = false;
     state = endTurnAfterAi(state);
     turnSnapshots.push(structuredClone(state));
+    saveGameState(state);
     render(); updateUI(); checkWinner(); maybeAutoEnd();
   });
 }
 
 restartBtn.addEventListener('click', () => {
   closeLobbyWs();
-  gameMode = 'vsAI';
-  localPlayer = PLAYER;
   overlayEl.classList.add('hidden');
   hideUnitPicker();
-  showLobbyMenu();
-  lobbyOverlayEl.classList.remove('hidden');
+  showMainMenu();
 });
 
 // ── Auto-end helpers ──────────────────────────────────────────────────────────
@@ -650,7 +794,10 @@ function maybeAutoEnd(): void {
     if (gameMode === 'vsAI') {
       const prevTurn = state.turn;
       state = playerEndMovement(state);
-      if (state.turn !== prevTurn) turnSnapshots.push(structuredClone(state));
+      if (state.turn !== prevTurn) {
+        turnSnapshots.push(structuredClone(state));
+        saveGameState(state);
+      }
       render();
       updateUI();
       checkWinner();
@@ -903,3 +1050,7 @@ recapCloseBtn.addEventListener('click', () => {
   recapOverlayEl.classList.add('hidden');
   overlayEl.classList.remove('hidden');
 });
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+showMainMenu();

@@ -627,6 +627,177 @@ body {
 }
 #rules-close:hover { background: #1a2a1a; color: #8aba8a; }
 
+/* ── Main menu overlay ────────────────────────────────────────────────────── */
+#main-menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 20%;
+  z-index: 40;
+  padding: 60px;
+  box-sizing: border-box;
+}
+#main-menu-overlay.hidden { display: none; }
+
+#main-menu-left {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 60px;
+}
+
+#main-menu-title {
+  font-family: 'Disket Mono', monospace;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--color-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  line-height: 1.2;
+}
+
+#main-menu-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.5rem;
+  padding-left: 60px;
+}
+
+.menu-btn {
+  background-color: transparent;
+  border: 0;
+  color: var(--color-dark);
+  font-family: 'Disket Mono', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1rem 2rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  max-width: 280px;
+  text-align: left;
+}
+.menu-btn:hover {
+  background-color: var(--color-dark);
+  color: var(--color-bg);
+}
+.menu-btn.secondary {
+  color: var(--color-gray-500);
+}
+.menu-btn.secondary:hover {
+  background-color: var(--color-gray-500);
+  color: var(--color-bg);
+}
+.menu-btn.hidden { display: none; }
+
+.menu-version-text {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--color-gray-500);
+  margin: 2rem 0 0 2rem;
+  text-transform: lowercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── New game confirm modal ────────────────────────────────────────────────── */
+#new-game-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+#new-game-confirm-overlay.hidden { display: none; }
+
+#new-game-confirm-modal {
+  background: var(--color-bg);
+  padding: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 380px;
+  width: 90%;
+}
+
+.confirm-text {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--color-dark);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.9;
+}
+
+.confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ── Intro story overlay ───────────────────────────────────────────────────── */
+#intro-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 45;
+  padding: 60px;
+  box-sizing: border-box;
+}
+#intro-overlay.hidden { display: none; }
+
+#intro-page {
+  max-width: 560px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  animation: introFadeIn 0.4s ease forwards;
+}
+
+@keyframes introFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+#intro-text-block {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-dark);
+  line-height: 2;
+  letter-spacing: 0.04em;
+  min-height: 6rem;
+}
+
+#intro-cursor {
+  display: inline-block;
+  animation: introCursorBlink 1s infinite;
+  margin-left: 2px;
+}
+
+@keyframes introCursorBlink {
+  0%, 50%  { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+#intro-nav {
+  min-height: 60px;
+}
+
 /* ── Lobby overlay ─────────────────────────────────────────────────────────── */
 #lobby-overlay {
   position: fixed;
