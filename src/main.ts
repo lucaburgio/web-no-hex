@@ -22,6 +22,8 @@ import {
   ROWS,
 } from './game';
 import { initRenderer, renderState, animateMoves, getHexFromEvent } from './renderer';
+import { getNeighbors } from './hex';
+import { isInEnemyZoC } from './game';
 import type { MoveAnimation } from './renderer';
 import config from './gameconfig';
 import type { GameState, Unit, CombatForecast, Owner } from './types';
@@ -1135,6 +1137,20 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
   if (!attacker) { tooltipEl.classList.add('hidden'); return; }
 
   const target = getUnit(state, hex.col, hex.row);
+
+  // ZoC-blocked hex: unit is locked and this empty neighbor is also in enemy ZoC
+  if (!target && isInEnemyZoC(state, attacker.col, attacker.row, enemyOwner)) {
+    const isNeighbor = getNeighbors(attacker.col, attacker.row, COLS, ROWS)
+      .some(([nc, nr]) => nc === hex.col && nr === hex.row);
+    if (isNeighbor && isInEnemyZoC(state, hex.col, hex.row, enemyOwner)) {
+      tooltipEl.innerHTML = `<div class="tt-title tt-zoc">Zone of Control</div>
+        <div class="tt-zoc-msg">Cannot move here — retreating next to an enemy while already engaged is not allowed.</div>`;
+      tooltipEl.classList.remove('hidden');
+      positionTooltip(e.pageX, e.pageY);
+      return;
+    }
+  }
+
   if (!target || target.owner !== enemyOwner) { tooltipEl.classList.add('hidden'); return; }
 
   const validMoves = getValidMoves(state, attacker);

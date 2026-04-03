@@ -335,6 +335,8 @@ body {
   color: #C77E00;
   margin-bottom: 16px;
 }
+.tt-title.tt-zoc { color: #d58f8f; margin-bottom: 8px; }
+.tt-zoc-msg { font-size: 0.82em; color: rgba(255,255,255,0.75); max-width: 200px; line-height: 1.4; }
 
 .tt-columns {
   display: flex;
