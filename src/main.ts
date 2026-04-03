@@ -767,13 +767,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
   if (state.winner || isAnimating) return;
   if (state.activePlayer !== localPlayer) return;
   const hex = getHexFromEvent(e);
-  if (!hex) {
-    if (state.phase === 'movement' && state.selectedUnit !== null) {
-      state.selectedUnit = null;
-      render(); updateUI();
-    }
-    return;
-  }
+  if (!hex) return;
   const { col, row } = hex;
 
   if (state.phase === 'production' && state.activePlayer === localPlayer) {
@@ -833,6 +827,17 @@ svg.addEventListener('click', (e: MouseEvent) => {
       }
     }
   }
+});
+
+// Deselect when tapping outside the hex board (decorative overflow area or true background)
+const boardWrap = document.getElementById('board-wrap') as HTMLDivElement;
+boardWrap.addEventListener('click', (e: MouseEvent) => {
+  if (state.winner || isAnimating) return;
+  if (state.activePlayer !== localPlayer) return;
+  if (state.phase !== 'movement' || state.selectedUnit === null) return;
+  if ((e.target as Element).closest('[data-col]')) return; // hex click already handled
+  state.selectedUnit = null;
+  render(); updateUI();
 });
 
 // ── End phase button ──────────────────────────────────────────────────────────
