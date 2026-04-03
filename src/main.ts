@@ -11,6 +11,7 @@ import {
   getUnit,
   getUnitById,
   getValidMoves,
+  getMovePath,
   isValidProductionPlacement,
   forecastCombat,
   vsHumanEndProduction,
@@ -21,7 +22,7 @@ import {
   COLS,
   ROWS,
 } from './game';
-import { initRenderer, renderState, animateMoves, getHexFromEvent } from './renderer';
+import { initRenderer, renderState, animateMoves, getHexFromEvent, renderMovePath } from './renderer';
 import { getNeighbors } from './hex';
 import { isInEnemyZoC } from './game';
 import type { MoveAnimation } from './renderer';
@@ -1146,6 +1147,10 @@ function positionTooltip(pageX: number, pageY: number): void {
 
 svg.addEventListener('mousemove', (e: MouseEvent) => {
   const enemyOwner: Owner = localPlayer === PLAYER ? AI : PLAYER;
+
+  // Clear path preview by default; will be re-drawn below if hovering a valid move hex
+  renderMovePath(svg, []);
+
   if (state.phase !== 'movement' || state.activePlayer !== localPlayer || state.selectedUnit === null) {
     tooltipEl.classList.add('hidden');
     svg.classList.remove('cursor-fight');
@@ -1156,6 +1161,14 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
 
   const attacker = getUnitById(state, state.selectedUnit);
   if (!attacker) { tooltipEl.classList.add('hidden'); svg.classList.remove('cursor-fight'); return; }
+
+  const validMoves = getValidMoves(state, attacker);
+  const isValidMove = validMoves.some(([c, r]) => c === hex.col && r === hex.row);
+
+  // Show path preview for any valid move destination
+  if (isValidMove) {
+    renderMovePath(svg, getMovePath(state, attacker, hex.col, hex.row));
+  }
 
   const target = getUnit(state, hex.col, hex.row);
 
@@ -1175,7 +1188,6 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
 
   if (!target || target.owner !== enemyOwner) { tooltipEl.classList.add('hidden'); svg.classList.remove('cursor-fight'); return; }
 
-  const validMoves = getValidMoves(state, attacker);
   const canAttack = validMoves.some(([c, r]) => c === hex.col && r === hex.row);
   if (!canAttack) { tooltipEl.classList.add('hidden'); svg.classList.remove('cursor-fight'); return; }
 
@@ -1186,6 +1198,7 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
 svg.addEventListener('mouseleave', () => {
   tooltipEl.classList.add('hidden');
   svg.classList.remove('cursor-fight');
+  renderMovePath(svg, []);
 });
 
 const pauseOverlayEl   = document.getElementById('pause-overlay') as HTMLDivElement;

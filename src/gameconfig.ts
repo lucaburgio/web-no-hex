@@ -19,7 +19,7 @@ const config: GameConfig = {
   startingUnits: 3,
 
   // Hexagon size (radius in pixels)
-  hexSize: 48,
+  hexSize: 40,
 
   // Turns a hex must remain stable before becoming a production hex
   productionTurns: 2,
@@ -89,6 +89,12 @@ const config: GameConfig = {
 
   // Fraction of board hexes to randomly set as impassable mountains at game start (0–1)
   mountainPct: 0.12,
+
+  // Color of the movement path preview line shown when hovering a valid move hex
+  movePathColor: '#ffffff',
+
+  // Stroke width of the movement path preview line (in pixels)
+  movePathStrokeWidth: 2.5,
 };
 
 export default config;

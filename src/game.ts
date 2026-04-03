@@ -178,6 +178,52 @@ export function getValidMoves(state: GameState, unit: Unit): [number, number][] 
   });
 }
 
+// BFS path from unit's position to (toCol,toRow), respecting movement rules (no mountains,
+// no friendly units, enemy units are valid destinations but block further passage).
+// Returns the full path including the start hex, or [] if unreachable.
+export function getMovePath(state: GameState, unit: Unit, toCol: number, toRow: number): [number, number][] {
+  if (unit.col === toCol && unit.row === toRow) return [[toCol, toRow]];
+  const mountains = new Set(state.mountainHexes ?? []);
+  const enemy: Owner = unit.owner === PLAYER ? AI : PLAYER;
+
+  const predecessors = new Map<string, string | null>();
+  const start = `${unit.col},${unit.row}`;
+  const targetKey = `${toCol},${toRow}`;
+  predecessors.set(start, null);
+  let frontier: [number, number][] = [[unit.col, unit.row]];
+  let found = false;
+
+  outer: while (frontier.length > 0) {
+    const next: [number, number][] = [];
+    for (const [c, r] of frontier) {
+      for (const [nc, nr] of getNeighbors(c, r, COLS, ROWS)) {
+        const key = `${nc},${nr}`;
+        if (predecessors.has(key)) continue;
+        if (mountains.has(key)) continue;
+        const occupant = getUnit(state, nc, nr);
+        if (occupant && occupant.owner === unit.owner) continue; // blocked by own unit
+        predecessors.set(key, `${c},${r}`);
+        if (key === targetKey) { found = true; break outer; }
+        if (!occupant) next.push([nc, nr]); // only traverse through empty hexes
+        // enemy occupant: valid destination but can't pass through — already recorded above
+      }
+    }
+    frontier = next;
+  }
+
+  if (!found) return [];
+
+  // Reconstruct path from target back to start
+  const path: [number, number][] = [];
+  let cur: string | null = targetKey;
+  while (cur !== null) {
+    const [c, r] = cur.split(',').map(Number);
+    path.unshift([c, r]);
+    cur = predecessors.get(cur) ?? null;
+  }
+  return path; // first element is the unit's start hex, last is the target
+}
+
 // BFS distance from (fromCol,fromRow) to (toCol,toRow), ignoring units/ZoC.
 // Used to count how many movement points a move actually costs.
 function bfsDistance(state: GameState, fromCol: number, fromRow: number, toCol: number, toRow: number): number {
@@ -497,9 +543,13 @@ export function playerMoveUnit(state: GameState, col: number, row: number, local
     unit.movesUsed = unit.movement;
     resolveCombat(state, unit, target);
   } else {
+    // Conquer every neutral/enemy hex along the path (intermediate steps)
+    const path = getMovePath(state, unit, col, row);
+    for (const [pc, pr] of path.slice(1)) {
+      conquerHex(state, pc, pr, localPlayer);
+    }
     unit.col = col;
     unit.row = row;
-    conquerHex(state, col, row, localPlayer);
     log(state, `Moved unit #${unit.id} to (${col}, ${row}).`);
     // Keep the unit selected if it still has movement left
     if (unit.movesUsed < unit.movement) {
@@ -578,9 +628,12 @@ export function aiMovement(state: GameState): GameState {  // exported for anima
 
     if (bestTarget && unit.movesUsed < unit.movement) {
       unit.movesUsed = unit.movement; // AI uses all remaining movement at once
+      const path = getMovePath(state, unit, bestTarget[0], bestTarget[1]);
       unit.col = bestTarget[0];
       unit.row = bestTarget[1];
-      conquerHex(state, unit.col, unit.row, AI);
+      for (const [pc, pr] of path.slice(1)) {
+        conquerHex(state, pc, pr, AI);
+      }
     }
   }
   log(state, 'AI completed movement.');

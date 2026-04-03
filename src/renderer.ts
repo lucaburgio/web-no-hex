@@ -255,6 +255,26 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   boundary.setAttribute('stroke-linejoin', 'round');
   boundary.setAttribute('pointer-events', 'none');
   hexLayer.appendChild(boundary);
+
+  // Movement path preview line (above hex layer, below units)
+  const movePathLayer = svgEl('g');
+  movePathLayer.id = 'move-path-layer';
+  movePathLayer.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
+  movePathLayer.setAttribute('pointer-events', 'none');
+  svgElement.insertBefore(movePathLayer, unitLayer);
+
+  const pathLine = svgEl('polyline');
+  pathLine.id = 'move-path-line';
+  pathLine.setAttribute('fill', 'none');
+  pathLine.setAttribute('stroke-linecap', 'round');
+  pathLine.setAttribute('stroke-linejoin', 'round');
+  pathLine.setAttribute('pointer-events', 'none');
+  movePathLayer.appendChild(pathLine);
+
+  // Dot markers group for intermediate path hexes
+  const pathDots = svgEl('g');
+  pathDots.id = 'move-path-dots';
+  movePathLayer.appendChild(pathDots);
 }
 
 export function renderState(svgElement: SVGSVGElement, state: GameState, productionHex: { col: number; row: number } | null = null, hiddenUnitIds: Set<number> = new Set(), localPlayer: Owner = PLAYER): void {
@@ -556,4 +576,41 @@ export function getHexFromEvent(e: MouseEvent): { col: number; row: number } | n
   const target = (e.target as Element).closest('[data-col]') as HTMLElement | null;
   if (!target) return null;
   return { col: parseInt(target.dataset['col']!), row: parseInt(target.dataset['row']!) };
+}
+
+// Draw (or clear) the movement path preview from the unit to a hovered valid-move hex.
+// `path` is an array of [col, row] pairs including the unit's start hex; pass [] to clear.
+export function renderMovePath(svgElement: SVGSVGElement, path: [number, number][]): void {
+  const pathLine = svgElement.querySelector('#move-path-line') as SVGPolylineElement | null;
+  const pathDots = svgElement.querySelector('#move-path-dots') as SVGGElement | null;
+  if (!pathLine || !pathDots) return;
+
+  pathDots.innerHTML = '';
+
+  if (path.length < 2) {
+    pathLine.setAttribute('points', '');
+    return;
+  }
+
+  const points = path.map(([c, r]) => {
+    const { x, y } = hexToPixel(c, r);
+    return `${x},${y}`;
+  }).join(' ');
+
+  pathLine.setAttribute('points', points);
+  pathLine.setAttribute('stroke', config.movePathColor);
+  pathLine.setAttribute('stroke-width', String(config.movePathStrokeWidth));
+  pathLine.setAttribute('opacity', '0.8');
+
+  // Small dot at each intermediate hex (skip start and end)
+  for (const [c, r] of path.slice(1, -1)) {
+    const { x, y } = hexToPixel(c, r);
+    const dot = svgEl('circle');
+    dot.setAttribute('cx', String(x));
+    dot.setAttribute('cy', String(y));
+    dot.setAttribute('r', String(config.movePathStrokeWidth * 1.8));
+    dot.setAttribute('fill', config.movePathColor);
+    dot.setAttribute('opacity', '0.8');
+    pathDots.appendChild(dot);
+  }
 }

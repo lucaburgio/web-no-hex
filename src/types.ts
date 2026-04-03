@@ -86,4 +86,8 @@ export interface GameConfig {
   unitMoveSpeed: number;
   // Fraction of board hexes to randomly set as impassable mountains (0–1)
   mountainPct: number;
+  // Color of the movement path preview line
+  movePathColor: string;
+  // Stroke width of the movement path preview line (in pixels)
+  movePathStrokeWidth: number;
 }
