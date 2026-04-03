@@ -47,10 +47,22 @@
   --color-hp-high: #3aca7b;
   --color-hp-mid:  #edc526;
   --color-hp-low:  #b72929;
+
+  /* ── Hex background dot pattern ─────────────────────────────────────────── */
+  --hex-size: 48px;
 }
 
 body {
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(circle, rgba(0,0,0,0.10) 1.5px, transparent 1.5px),
+    radial-gradient(circle, rgba(0,0,0,0.10) 1.5px, transparent 1.5px);
+  background-size:
+    calc(var(--hex-size) * 1.732) calc(var(--hex-size) * 3),
+    calc(var(--hex-size) * 1.732) calc(var(--hex-size) * 3);
+  background-position:
+    0 0,
+    calc(var(--hex-size) * 0.866) calc(var(--hex-size) * 1.5);
   color: #cccccc;
   font-family: 'Disket Mono', 'Courier New', monospace;
   min-height: 100vh;
