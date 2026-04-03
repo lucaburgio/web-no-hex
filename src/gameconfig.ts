@@ -12,8 +12,8 @@ export function updateConfig(overrides: Partial<Omit<GameConfig, 'unitTypes'>> &
 
 const config: GameConfig = {
   // Board dimensions (number of hexes)
-  boardCols: 4,
-  boardRows: 4,
+  boardCols: 8,
+  boardRows: 8,
 
   // Number of units each side starts with
   startingUnits: 3,

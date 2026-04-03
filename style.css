@@ -13,9 +13,13 @@
 
 :root {
 
+  --color-white: #FFF;
   --color-yellow-500: #FFC13A;
   --color-gray-500: #9E9E9E;
   --color-dark: #000100;
+  --color-red-500: #ff6b6b;
+  --color-green-500: #81e2a0;
+
   /* ── Background ─────────────────────────────────────────────────────────── */
   --color-bg: #F3F0E9;
 
@@ -52,6 +56,7 @@
 
 body {
   background: var(--color-bg);
+  text-rendering:geometricPrecision;
   color: #cccccc;
   font-family: 'Disket Mono', 'Courier New', monospace;
   min-height: 100vh;
@@ -313,6 +318,7 @@ body {
 .tooltip {
   position: fixed;
   z-index: 100;
+  font-size: 11px;
   background: #000100;
   padding: 24px;
   color: #FFF;
@@ -320,7 +326,7 @@ body {
   min-width: 220px;
   line-height: 1.6;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-weight: 700;
 }
 .tooltip.hidden { display: none; }
 
@@ -332,11 +338,11 @@ body {
 .tt-title {
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: #C77E00;
+  color: var(--color-yellow-500);
   margin-bottom: 16px;
 }
-.tt-title.tt-zoc { color: #d58f8f; margin-bottom: 8px; }
-.tt-zoc-msg { font-size: 0.82em; color: rgba(255,255,255,0.75); max-width: 200px; line-height: 1.4; }
+.tt-title.tt-zoc { color: var(--color-red-500); margin-bottom: 8px; }
+.tt-zoc-msg { max-width: 200px; line-height: 1.4; }
 
 .tt-columns {
   display: flex;
@@ -351,10 +357,9 @@ body {
 .tt-side-label {
   letter-spacing: 0.08em;
   margin-bottom: 6px;
-  color: #C77E00;
+  color: var(--color-yellow-500);
 }
-.tt-side-label.attacker { color: #C77E00; }
-.tt-side-label.defender { color: #C77E00; }
+.tt-side-label.attacker,.tt-side-label.defender { color: var(--color-white); }
 
 .tt-hp-block {
   margin-bottom: 6px;
@@ -373,7 +378,7 @@ body {
   border-radius: 2px;
 }
 
-.tt-bar.current { opacity: 0.45; }
+.tt-bar.current { opacity: 0.2; }
 .tt-bar.after   { opacity: 1; }
 
 .tt-hp-nums {
@@ -382,13 +387,13 @@ body {
 
 .tt-dmg {
   font-size: 0.7rem;
-  color: #C77E00;
+  color: var(--color-yellow-500);
   margin: 4px 0;
 }
 
 .tt-cs {
   font-size: 0.7rem;
-  color: #C77E00;
+  color: var(--color-yellow-500);
   margin-top: 4px;
 }
 
@@ -408,10 +413,10 @@ body {
   font-size: 0.7rem;
   color: #FFF;
 }
-.tt-outcome.win  { color: #C77E00; }
-.tt-outcome.lose { color: #da6a6a; }
-.tt-outcome.both { color: #da9a4a; }
-.tt-outcome.none { color: rgba(255,255,255,0.5); }
+.tt-outcome.win  { color: var(--color-green-500); }
+.tt-outcome.lose { color: var(--color-red-500); }
+.tt-outcome.both { color: var(--color-red-500); }
+.tt-outcome.none { color: var(--color-gray-500) }
 
 /* ── Winner overlay ────────────────────────────────────────────────────────── */
 #overlay {
