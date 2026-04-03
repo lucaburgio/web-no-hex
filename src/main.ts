@@ -767,7 +767,13 @@ svg.addEventListener('click', (e: MouseEvent) => {
   if (state.winner || isAnimating) return;
   if (state.activePlayer !== localPlayer) return;
   const hex = getHexFromEvent(e);
-  if (!hex) return;
+  if (!hex) {
+    if (state.phase === 'movement' && state.selectedUnit !== null) {
+      state.selectedUnit = null;
+      render(); updateUI();
+    }
+    return;
+  }
   const { col, row } = hex;
 
   if (state.phase === 'production' && state.activePlayer === localPlayer) {
