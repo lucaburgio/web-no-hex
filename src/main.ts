@@ -937,7 +937,7 @@ function canAffordAnyUnit(): boolean {
 
 function hasAnyValidMove(): boolean {
   return state.units
-    .filter(u => u.owner === localPlayer && !u.movedThisTurn)
+    .filter(u => u.owner === localPlayer && u.movesUsed < u.movement)
     .some(u => getValidMoves(state, u).length > 0);
 }
 

@@ -9,7 +9,7 @@ export interface Unit {
   unitTypeId: string;
   col: number;
   row: number;
-  movedThisTurn: boolean;
+  movesUsed: number;
   attackedThisTurn: boolean;
   hp: number;
   maxHp: number;

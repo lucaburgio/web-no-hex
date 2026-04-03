@@ -23,7 +23,7 @@ function makeUnit(owner: Owner, col: number, row: number, unitTypeId = 'infantry
     unitTypeId,
     col,
     row,
-    movedThisTurn: false,
+    movesUsed: 0,
     attackedThisTurn: false,
     hp: config.unitMaxHp,
     maxHp: config.unitMaxHp,
@@ -148,12 +148,13 @@ export function getValidMoves(state: GameState, unit: Unit): [number, number][] 
     });
   }
 
-  // BFS up to unit.movement steps; enemy hexes are valid destinations but block further passage
+  // BFS up to remaining movement steps; enemy hexes are valid destinations but block further passage
+  const remainingMoves = unit.movement - unit.movesUsed;
   const visited = new Set<string>([`${unit.col},${unit.row}`]);
   const reachable = new Set<string>();
   let frontier: [number, number][] = [[unit.col, unit.row]];
 
-  for (let step = 0; step < unit.movement; step++) {
+  for (let step = 0; step < remainingMoves; step++) {
     const nextFrontier: [number, number][] = [];
     for (const [c, r] of frontier) {
       for (const [nc, nr] of getNeighbors(c, r, COLS, ROWS)) {
@@ -175,6 +176,30 @@ export function getValidMoves(state: GameState, unit: Unit): [number, number][] 
     const [c, r] = key.split(',').map(Number);
     return [c, r] as [number, number];
   });
+}
+
+// BFS distance from (fromCol,fromRow) to (toCol,toRow), ignoring units/ZoC.
+// Used to count how many movement points a move actually costs.
+function bfsDistance(state: GameState, fromCol: number, fromRow: number, toCol: number, toRow: number): number {
+  const mountains = new Set(state.mountainHexes ?? []);
+  const visited = new Set<string>([`${fromCol},${fromRow}`]);
+  let frontier: [number, number][] = [[fromCol, fromRow]];
+  let dist = 0;
+  while (frontier.length > 0) {
+    const next: [number, number][] = [];
+    for (const [c, r] of frontier) {
+      if (c === toCol && r === toRow) return dist;
+      for (const [nc, nr] of getNeighbors(c, r, COLS, ROWS)) {
+        const key = `${nc},${nr}`;
+        if (visited.has(key) || mountains.has(key)) continue;
+        visited.add(key);
+        next.push([nc, nr]);
+      }
+    }
+    dist++;
+    frontier = next;
+  }
+  return dist;
 }
 
 function removeUnit(state: GameState, id: number): void {
@@ -429,8 +454,8 @@ export function playerSelectUnit(state: GameState, col: number, row: number, loc
     state.selectedUnit = null;
     return state;
   }
-  if (unit.movedThisTurn) {
-    log(state, `Unit #${unit.id} already moved this turn.`);
+  if (unit.movesUsed >= unit.movement) {
+    log(state, `Unit #${unit.id} has no movement left this turn.`);
     return state;
   }
   state.selectedUnit = unit.id;
@@ -463,16 +488,23 @@ export function playerMoveUnit(state: GameState, col: number, row: number, local
     return state;
   }
 
-  unit.movedThisTurn = true;
+  const stepsCost = bfsDistance(state, unit.col, unit.row, col, row);
+  unit.movesUsed += stepsCost;
   state.selectedUnit = null;
 
   if (target && target.owner === enemy) {
+    // Combat exhausts remaining movement
+    unit.movesUsed = unit.movement;
     resolveCombat(state, unit, target);
   } else {
     unit.col = col;
     unit.row = row;
     conquerHex(state, col, row, localPlayer);
     log(state, `Moved unit #${unit.id} to (${col}, ${row}).`);
+    // Keep the unit selected if it still has movement left
+    if (unit.movesUsed < unit.movement) {
+      state.selectedUnit = unit.id;
+    }
   }
 
   checkVictory(state);
@@ -492,7 +524,7 @@ export function vsHumanEndProduction(state: GameState, localPlayer: Owner): Game
   if (state.phase !== 'production' || state.activePlayer !== localPlayer) return state;
   log(state, 'You ended production.');
   state.phase = 'movement';
-  state.units.forEach(u => { if (u.owner === localPlayer) u.movedThisTurn = false; });
+  state.units.forEach(u => { if (u.owner === localPlayer) u.movesUsed = 0; });
   log(state, `Turn ${state.turn} — Movement phase. Click a unit then a hex.`);
   return state;
 }
@@ -544,8 +576,8 @@ export function aiMovement(state: GameState): GameState {  // exported for anima
       }
     }
 
-    if (bestTarget && !unit.movedThisTurn) {
-      unit.movedThisTurn = true;
+    if (bestTarget && unit.movesUsed < unit.movement) {
+      unit.movesUsed = unit.movement; // AI uses all remaining movement at once
       unit.col = bestTarget[0];
       unit.row = bestTarget[1];
       conquerHex(state, unit.col, unit.row, AI);
@@ -562,7 +594,7 @@ export function aiMovement(state: GameState): GameState {  // exported for anima
 export function prepareAiTurn(state: GameState): GameState {
   if (state.phase !== 'movement' || state.activePlayer !== PLAYER) return state;
   log(state, 'You ended your movement.');
-  state.units.forEach(u => { if (u.owner === AI) u.movedThisTurn = false; });
+  state.units.forEach(u => { if (u.owner === AI) u.movesUsed = 0; });
   return state;
 }
 
@@ -571,7 +603,7 @@ export function prepareAiTurn(state: GameState): GameState {
 export function endTurnAfterAi(state: GameState): GameState {
   healUnits(state);
   updateHexStability(state);
-  state.units.forEach(u => { u.movedThisTurn = false; });
+  state.units.forEach(u => { u.movesUsed = 0; });
   state.turn += 1;
   state.phase = 'production';
   state.activePlayer = PLAYER;
@@ -594,7 +626,7 @@ export function advancePhase(state: GameState): GameState {
       state = aiProduction(state);
       state.phase = 'movement';
       state.activePlayer = PLAYER;
-      state.units.forEach(u => { if (u.owner === PLAYER) u.movedThisTurn = false; });
+      state.units.forEach(u => { if (u.owner === PLAYER) u.movesUsed = 0; });
       log(state, `Turn ${state.turn} — Movement phase. Click a unit then a hex.`);
     }
   } else if (state.phase === 'movement') {

@@ -413,7 +413,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     const baseColor = unit.owner === PLAYER ? c.player : c.ai;
     const fill      = isSelected ? c.unitSelected : lerpColor(baseColor, '#333333', 1 - hpRatio);
     const unitDimmed = productionFocusHexes.size > 0;
-    const opacity   = (unit.movedThisTurn || unitDimmed) ? '0.2' : '1';
+    const opacity   = (unit.movesUsed >= unit.movement || unitDimmed) ? '0.2' : '1';
 
     const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
     const sc = (HEX_SIZE * 1.1) / 50;
