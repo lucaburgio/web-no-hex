@@ -15,6 +15,7 @@
 
   --color-yellow-500: #FFC13A;
   --color-gray-500: #9E9E9E;
+  --color-dark: #000100;
   /* ── Background ─────────────────────────────────────────────────────────── */
   --color-bg: #F3F0E9;
 
@@ -58,13 +59,70 @@ body {
   padding-bottom: 72px;
 }
 
+/* Buttons — pair base + variant: primary = dark CTA, secondary = gray (mission panel, modals, etc.) */
+.button,
+.button-primary,#end-move-btn {
+  background-color: var(--color-dark);
+  border: 2px solid var(--color-dark);
+  color: var(--color-light);
+  font-family: 'Disket Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 16px 20px;
+  cursor: url('/icons/cursor.svg') 0 0, auto;
+  transition: all 0.2s ease;
+}
+
+.button:hover,
+.button-primary:hover,#end-move-btn:hover {
+  background-color: var(--color-gray-200);
+  color: var(--color-dark);
+}
+
+.button:disabled,
+.button-primary:disabled,
+.button-disabled,#end-move-btn:disabled {
+  background-color: #ccc;
+  color: #666;
+  border-color: #ccc;
+  opacity: 0.6;
+}
+
+.button:disabled:hover,
+.button-primary:disabled:hover,
+.button-disabled:hover,#end-move-btn:disabled:hover {
+  background-color: #ccc;
+  color: #666;
+  opacity: 0.6;
+}
+
+.button-active {
+  cursor: url('/icons/cursor.svg') 0 0, auto;
+}
+
+.button.secondary,
+.button.button-secondary {
+  background-color: var(--color-gray-400);
+  border: 2px solid var(--color-gray-400);
+  color: var(--color-dark);
+}
+
+.button.secondary:hover,
+.button.button-secondary:hover {
+  background-color: var(--color-gray-200);
+  border: 2px solid var(--color-dark);
+  color: var(--color-dark);
+}
+
+
 /* ── Conquer header ──────────────────────────────────────────────────────────── */
 #conquer-header {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: 40px;
   background: var(--color-bg);
   display: flex;
   align-items: center;
@@ -142,8 +200,6 @@ body {
   left: 0;
   right: 0;
   height: 72px;
-  background: var(--color-bg);
-  border-top: 1px solid #23251E;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -167,27 +223,11 @@ body {
 #phase-label {
   font-size: 0.7rem;
   text-transform: uppercase;
+  font-weight: bold;
   letter-spacing: 0.1em;
   color: #23251E;
   text-align: right;
 }
-
-#end-move-btn {
-  width: 56px;
-  height: 56px;
-  background: #23251E;
-  color: #F3F0E9;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 1rem;
-  letter-spacing: 0.05em;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-#end-move-btn:hover { background: #3a3d35; }
 
 /* ── Unit picker: floating panel ─────────────────────────────────────────────── */
 .panel {
@@ -228,7 +268,7 @@ body {
 #unit-picker {
   display: none;
   position: fixed;
-  bottom: 80px;
+  bottom: 40px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
@@ -271,8 +311,8 @@ body {
 }
 
 .unit-card-price-icon {
-  width: 18px;
-  height: 18px;
+  width: 18px!important;
+  height: 18px!important;
 }
 
 /* ── Tooltip base ────────────────────────────────────────────────────────────── */
@@ -490,6 +530,10 @@ body {
   flex-shrink: 0;
   padding: 12px 20px 16px;
   border-top: 1px solid #23251E;
+  position: fixed;
+    bottom: 0;
+    width: 100%;
+    height: 140px;
 }
 
 #recap-slider {
