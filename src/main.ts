@@ -692,6 +692,7 @@ lobbyCodeInputEl.addEventListener('keydown', (e: KeyboardEvent) => {
 
 function startGame(initialState: GameState): void {
   state = initialState;
+  syncUnitIdCounter(state);
   pendingProductionHex = null;
   isAnimating = false;
   turnSnapshots = [structuredClone(state)];
