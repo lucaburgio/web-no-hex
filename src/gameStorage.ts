@@ -1,3 +1,4 @@
+import config from './gameconfig';
 import type { GameState } from './types';
 
 const STORAGE_KEY = 'web-strategic-save';
@@ -19,7 +20,20 @@ export function loadGameState(): GameState | null {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return null;
     const state = JSON.parse(saved) as GameState;
+
+    // Backward-compat: mountainHexes added later
     if (!state.mountainHexes) state.mountainHexes = [];
+
+    // Migrate units — fill in fields that may be absent from older saves
+    for (const unit of state.units) {
+      if (unit.unitTypeId == null) unit.unitTypeId = 'infantry';
+      if (unit.attackedThisTurn == null) unit.attackedThisTurn = false;
+      if (unit.movement == null) {
+        const ut = config.unitTypes.find(u => u.id === unit.unitTypeId) ?? config.unitTypes[0];
+        unit.movement = ut.movement;
+      }
+    }
+
     return state;
   } catch (error) {
     console.error('Failed to load game state:', error);

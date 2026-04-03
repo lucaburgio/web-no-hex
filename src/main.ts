@@ -737,6 +737,7 @@ function showUnitPicker(col: number, row: number): void {
     if (canAfford) {
       card.addEventListener('click', () => {
         state = playerPlaceUnit(state, col, row, unitType.id, localPlayer);
+        if (gameMode === 'vsAI') saveGameState(state);
         hideUnitPicker();
         render();
         updateUI();
@@ -804,9 +805,11 @@ svg.addEventListener('click', (e: MouseEvent) => {
           sendStateUpdate({ unit: animUnit, fromCol, fromRow, toCol, toRow });
           animateMoves(svg, [{ unit: movingUnit, fromCol, fromRow, toCol, toRow }], config.unitMoveSpeed, () => {
             isAnimating = false;
+            if (gameMode === 'vsAI') saveGameState(state);
             render(); checkWinner(); maybeAutoEnd();
           });
         } else {
+          if (gameMode === 'vsAI') saveGameState(state);
           render(); updateUI(); checkWinner(); sendStateUpdate(); maybeAutoEnd();
         }
       }
@@ -822,6 +825,7 @@ endMoveBtn.addEventListener('click', () => {
   if (state.phase === 'production' && state.activePlayer === localPlayer) {
     if (gameMode === 'vsAI') {
       state = playerEndProduction(state);
+      saveGameState(state);
     } else {
       state = vsHumanEndProduction(state, localPlayer);
     }
