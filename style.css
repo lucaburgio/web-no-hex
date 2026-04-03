@@ -288,9 +288,9 @@ body {
   gap: 8px;
   cursor: pointer;
   user-select: none;
-  transition: transform 0.1s ease;
+  transition: transform 0.2s ease, scale 0.2s ease;
 }
-.unit-card:hover:not(.disabled) { transform: translateY(-6px); }
+.unit-card:hover:not(.disabled) { transform: translateY(-6px);scale: 1.05; }
 .unit-card.disabled { opacity: 0.35; cursor: not-allowed; }
 
 .unit-card img {
