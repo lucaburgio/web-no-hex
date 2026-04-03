@@ -178,7 +178,7 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   const decorMargin = Math.ceil(DECOR_RINGS * HEX_SIZE * Math.sqrt(3)) + HEX_SIZE;
   // Width/height cover only the board — decor overflows visually without affecting scroll
   const W = COLS * HEX_SIZE * Math.sqrt(3) + boardMargin * 2;
-  const H = ROWS * HEX_SIZE * 1.5 + HEX_SIZE + boardMargin * 2;
+  const H = 1.5 * HEX_SIZE * (ROWS - 1) + boardMargin * 2;
 
   svgElement.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svgElement.setAttribute('width', String(W));
