@@ -174,13 +174,16 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   svgElement.innerHTML = '';
   const c = colors();
 
-  const margin = Math.ceil(DECOR_RINGS * HEX_SIZE * Math.sqrt(3)) + HEX_SIZE;
-  const W = COLS * HEX_SIZE * Math.sqrt(3) + margin * 2;
-  const H = ROWS * HEX_SIZE * 1.5 + HEX_SIZE + margin * 2;
+  const boardMargin = 100;
+  const decorMargin = Math.ceil(DECOR_RINGS * HEX_SIZE * Math.sqrt(3)) + HEX_SIZE;
+  // Width/height cover only the board — decor overflows visually without affecting scroll
+  const W = COLS * HEX_SIZE * Math.sqrt(3) + boardMargin * 2;
+  const H = ROWS * HEX_SIZE * 1.5 + HEX_SIZE + boardMargin * 2;
 
   svgElement.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svgElement.setAttribute('width', String(W));
   svgElement.setAttribute('height', String(H));
+  svgElement.style.overflow = 'visible';
 
   const bg = svgEl('rect');
   bg.setAttribute('width', String(W));
@@ -188,9 +191,10 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   bg.setAttribute('fill', 'transparent');
   svgElement.appendChild(bg);
 
-  // Decorative hex layer — ghost hexes ringing the board, rendered first (below everything)
+  // Decorative hex layer — ghost hexes ringing the board, rendered first (below everything).
+  // Uses decorMargin so hexes align with the board, but the layer overflows the SVG layout box.
   const decorLayer = svgEl('g');
-  decorLayer.setAttribute('transform', `translate(${margin},${margin})`);
+  decorLayer.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
   decorLayer.setAttribute('pointer-events', 'none');
   svgElement.appendChild(decorLayer);
 
@@ -198,12 +202,6 @@ export function initRenderer(svgElement: SVGSVGElement): void {
     for (let col = -DECOR_RINGS; col < COLS + DECOR_RINGS; col++) {
       if (col >= 0 && col < COLS && r >= 0 && r < ROWS) continue; // skip board hexes
       const { x, y } = hexToPixel(col, r);
-      const poly = svgEl('polygon');
-      poly.setAttribute('points', hexPoints(x, y));
-      poly.setAttribute('fill', 'transparent');
-      poly.setAttribute('stroke', 'rgba(0,0,0,0.07)');
-      poly.setAttribute('stroke-width', '1');
-      decorLayer.appendChild(poly);
       const dot = svgEl('circle');
       dot.setAttribute('cx', String(x));
       dot.setAttribute('cy', String(y));
@@ -215,12 +213,12 @@ export function initRenderer(svgElement: SVGSVGElement): void {
 
   const hexLayer = svgEl('g');
   hexLayer.id = 'hex-layer';
-  hexLayer.setAttribute('transform', `translate(${margin},${margin})`);
+  hexLayer.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
   svgElement.appendChild(hexLayer);
 
   const unitLayer = svgEl('g');
   unitLayer.id = 'unit-layer';
-  unitLayer.setAttribute('transform', `translate(${margin},${margin})`);
+  unitLayer.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
   svgElement.appendChild(unitLayer);
 
   for (let r = 0; r < ROWS; r++) {
@@ -471,7 +469,7 @@ export function animateMoves(
   if (animations.length === 0 || durationMs <= 0) { onDone(); return; }
 
   const c = colors();
-  const margin = Math.ceil(DECOR_RINGS * HEX_SIZE * Math.sqrt(3)) + HEX_SIZE;
+  const margin = 100;
 
   let animLayer = svgElement.querySelector('#anim-layer') as SVGGElement | null;
   if (!animLayer) {
