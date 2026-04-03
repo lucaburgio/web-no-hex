@@ -1,4 +1,4 @@
-import { hexToPixel, hexPoints, HEX_SIZE } from './hex';
+import { hexToPixel, hexPoints, HEX_SIZE, getNeighbors } from './hex';
 import { COLS, ROWS, PLAYER, AI, getUnit, getUnitById, isValidProductionPlacement, getValidMoves, isInEnemyZoC } from './game';
 import type { Owner } from './types';
 import type { GameState, Unit } from './types';
@@ -279,10 +279,11 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
 
   const zocEnemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
   const zocHexes = new Set<string>();
-  if (selectedUnit) {
-    for (const key of validMoveHexes) {
-      const [kc, kr] = key.split(',').map(Number);
-      if (!getUnit(state, kc, kr) && isInEnemyZoC(state, kc, kr, zocEnemy)) {
+  if (selectedUnit && isInEnemyZoC(state, selectedUnit.col, selectedUnit.row, zocEnemy)) {
+    // Unit is locked in ZoC: highlight empty neighbors it cannot retreat to (also in ZoC)
+    for (const [nc, nr] of getNeighbors(selectedUnit.col, selectedUnit.row, COLS, ROWS)) {
+      const key = `${nc},${nr}`;
+      if (!getUnit(state, nc, nr) && isInEnemyZoC(state, nc, nr, zocEnemy)) {
         zocHexes.add(key);
       }
     }
