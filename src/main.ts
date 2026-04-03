@@ -40,6 +40,7 @@ const phaseLabelEl = document.getElementById('phase-label') as HTMLElement;
 const overlayEl  = document.getElementById('overlay') as HTMLDivElement;
 const overlayMsg = document.getElementById('overlay-msg') as HTMLDivElement;
 const restartBtn = document.getElementById('restart-btn') as HTMLButtonElement;
+const recapOverlayEl = document.getElementById('recap-overlay') as HTMLDivElement;
 
 const unitPickerEl   = document.getElementById('unit-picker') as HTMLDivElement;
 const unitPickerList = document.getElementById('unit-picker-list') as HTMLDivElement;
@@ -170,7 +171,9 @@ menuNewGameBtn.addEventListener('click', () => {
     newGameConfirmOverlay.classList.remove('hidden');
   } else {
     hideMainMenu();
-    startIntro();
+    gameMode = 'vsAI';
+    localPlayer = PLAYER;
+    startGame(createInitialState());
   }
 });
 
@@ -178,7 +181,9 @@ confirmNewGameBtn.addEventListener('click', () => {
   newGameConfirmOverlay.classList.add('hidden');
   clearGameState();
   hideMainMenu();
-  startIntro();
+  gameMode = 'vsAI';
+  localPlayer = PLAYER;
+  startGame(createInitialState());
 });
 
 cancelNewGameBtn.addEventListener('click', () => {
@@ -1001,7 +1006,35 @@ svg.addEventListener('mouseleave', () => {
   tooltipEl.classList.add('hidden');
 });
 
+const pauseOverlayEl   = document.getElementById('pause-overlay') as HTMLDivElement;
+const pauseReturnBtn   = document.getElementById('pause-return-btn') as HTMLButtonElement;
+const pauseContinueBtn = document.getElementById('pause-continue-btn') as HTMLButtonElement;
+
+pauseReturnBtn.addEventListener('click', () => {
+  pauseOverlayEl.classList.add('hidden');
+  closeLobbyWs();
+  overlayEl.classList.add('hidden');
+  hideUnitPicker();
+  showMainMenu();
+});
+
+pauseContinueBtn.addEventListener('click', () => {
+  pauseOverlayEl.classList.add('hidden');
+});
+
 document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    const inGame = mainMenuOverlayEl.classList.contains('hidden')
+      && introOverlayEl.classList.contains('hidden')
+      && recapOverlayEl.classList.contains('hidden');
+    if (!inGame) return;
+    if (pauseOverlayEl.classList.contains('hidden')) {
+      pauseOverlayEl.classList.remove('hidden');
+    } else {
+      pauseOverlayEl.classList.add('hidden');
+    }
+    return;
+  }
   if (e.key === 'Enter' && !endMoveBtn.hidden && endMoveBtn.style.display !== 'none') {
     endMoveBtn.click();
   }
@@ -1009,7 +1042,6 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
 
 // ── Replay ────────────────────────────────────────────────────────────────────
 
-const recapOverlayEl  = document.getElementById('recap-overlay') as HTMLDivElement;
 const recapSliderEl   = document.getElementById('recap-slider') as HTMLInputElement;
 const recapTurnLabel  = document.getElementById('recap-turn-label') as HTMLElement;
 const recapLogEl      = document.getElementById('recap-log') as HTMLUListElement;
