@@ -168,11 +168,13 @@ function svgEl<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameM
   return document.createElementNS('http://www.w3.org/2000/svg', tag);
 }
 
+const DECOR_RINGS = 4;
+
 export function initRenderer(svgElement: SVGSVGElement): void {
   svgElement.innerHTML = '';
   const c = colors();
 
-  const margin = 100;
+  const margin = Math.ceil(DECOR_RINGS * HEX_SIZE * Math.sqrt(3)) + HEX_SIZE;
   const W = COLS * HEX_SIZE * Math.sqrt(3) + margin * 2;
   const H = ROWS * HEX_SIZE * 1.5 + HEX_SIZE + margin * 2;
 
@@ -185,6 +187,31 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   bg.setAttribute('height', String(H));
   bg.setAttribute('fill', 'transparent');
   svgElement.appendChild(bg);
+
+  // Decorative hex layer — ghost hexes ringing the board, rendered first (below everything)
+  const decorLayer = svgEl('g');
+  decorLayer.setAttribute('transform', `translate(${margin},${margin})`);
+  decorLayer.setAttribute('pointer-events', 'none');
+  svgElement.appendChild(decorLayer);
+
+  for (let r = -DECOR_RINGS; r < ROWS + DECOR_RINGS; r++) {
+    for (let col = -DECOR_RINGS; col < COLS + DECOR_RINGS; col++) {
+      if (col >= 0 && col < COLS && r >= 0 && r < ROWS) continue; // skip board hexes
+      const { x, y } = hexToPixel(col, r);
+      const poly = svgEl('polygon');
+      poly.setAttribute('points', hexPoints(x, y));
+      poly.setAttribute('fill', 'transparent');
+      poly.setAttribute('stroke', 'rgba(0,0,0,0.07)');
+      poly.setAttribute('stroke-width', '1');
+      decorLayer.appendChild(poly);
+      const dot = svgEl('circle');
+      dot.setAttribute('cx', String(x));
+      dot.setAttribute('cy', String(y));
+      dot.setAttribute('r', String(HEX_SIZE * 0.05));
+      dot.setAttribute('fill', 'rgba(0,0,0,0.18)');
+      decorLayer.appendChild(dot);
+    }
+  }
 
   const hexLayer = svgEl('g');
   hexLayer.id = 'hex-layer';
@@ -444,7 +471,7 @@ export function animateMoves(
   if (animations.length === 0 || durationMs <= 0) { onDone(); return; }
 
   const c = colors();
-  const margin = 100;
+  const margin = Math.ceil(DECOR_RINGS * HEX_SIZE * Math.sqrt(3)) + HEX_SIZE;
 
   let animLayer = svgElement.querySelector('#anim-layer') as SVGGElement | null;
   if (!animLayer) {
