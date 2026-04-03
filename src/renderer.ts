@@ -83,7 +83,6 @@ interface Colors {
   hexProdSelected: string;
   hexZoc: string;
   hexNeutral: string;
-  hexMountain: string;
   hexStroke: string;
   hexProdStroke: string;
   unitIconColor: string;
@@ -111,7 +110,6 @@ function colors(): Colors {
     hexProdSelected: v('--color-hex-prod-selected'),
     hexZoc:          v('--color-hex-zoc'),
     hexNeutral:      v('--color-hex-neutral'),
-    hexMountain:     v('--color-hex-mountain'),
     hexStroke:       v('--color-hex-stroke'),
     hexProdStroke:   v('--color-hex-prod-stroke'),
     unitIconColor:   v('--color-unit-icon'),
@@ -314,7 +312,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
       let stroke = 'transparent';
 
       if (isMountain) {
-        fill = c.hexMountain;
+        fill = c.hexNeutral;
       } else if (isSelectedHex) {
         fill = c.hexSelected;
       } else if (isZoc) {
