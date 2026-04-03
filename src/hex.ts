@@ -7,7 +7,7 @@ export const HEX_SIZE: number = config.hexSize;
 
 // Pixel position for a hex at (col, row) — pointy-top, odd-r offset
 export function hexToPixel(col: number, row: number): { x: number; y: number } {
-  const x = HEX_SIZE * Math.sqrt(3) * (col + (row % 2 === 1 ? 0.5 : 0));
+  const x = HEX_SIZE * Math.sqrt(3) * (col + (Math.abs(row) % 2 === 1 ? 0.5 : 0));
   const y = HEX_SIZE * 1.5 * row;
   return { x, y };
 }
