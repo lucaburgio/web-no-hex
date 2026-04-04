@@ -514,16 +514,22 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
   }
 }
 
-// Animate a list of unit moves sequentially, then call onDone.
+// Animate a list of unit moves in parallel, then call onDone once.
 // During animation the caller should hide the moving units from the static render
 // (pass their ids to renderState's hiddenUnitIds) so they don't ghost at the destination.
+// Call cancel() to stop frames, clear the anim layer, and skip onDone (caller handles completion).
 export function animateMoves(
   svgElement: SVGSVGElement,
   animations: MoveAnimation[],
   durationMs: number,
   onDone: () => void,
-): void {
-  if (animations.length === 0 || durationMs <= 0) { onDone(); return; }
+): { cancel: () => void } {
+  const noopCancel = (): void => {};
+
+  if (animations.length === 0 || durationMs <= 0) {
+    onDone();
+    return { cancel: noopCancel };
+  }
 
   const c = colors();
   const margin = 100;
@@ -536,6 +542,21 @@ export function animateMoves(
     svgElement.appendChild(animLayer);
   }
   animLayer.innerHTML = '';
+
+  let cancelled = false;
+  let doneCalled = false;
+
+  function callDoneOnce(): void {
+    if (cancelled || doneCalled) return;
+    doneCalled = true;
+    onDone();
+  }
+
+  const cancel = (): void => {
+    if (cancelled || doneCalled) return;
+    cancelled = true;
+    animLayer!.innerHTML = '';
+  };
 
   let completed = 0;
 
@@ -581,6 +602,8 @@ export function animateMoves(
     const startTime = performance.now();
 
     (function step(now: number): void {
+      if (cancelled) return;
+
       const t    = Math.min((now - startTime) / durationMs, 1);
       const ease = easeInOutQuad(t);
       const { x, y } = positionOnPolyline(pixelPath, ease);
@@ -595,15 +618,18 @@ export function animateMoves(
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
+        if (cancelled) return;
         circle.remove(); barBg.remove(); barFill.remove(); iconWrapper.remove();
         completed++;
         if (completed >= animations.length) {
           animLayer!.innerHTML = '';
-          onDone();
+          callDoneOnce();
         }
       }
     })(performance.now());
   }
+
+  return { cancel };
 }
 
 export function getHexFromEvent(e: MouseEvent): { col: number; row: number } | null {

@@ -149,6 +149,8 @@ let ws: WebSocket | null = null;
 let state: GameState = createInitialState();
 let pendingProductionHex: { col: number; row: number } | null = null;
 let isAnimating = false;
+/** Cancel function for the local player's in-flight move animation (allows selecting another unit mid-animation). */
+let humanMoveAnimCancel: (() => void) | null = null;
 let turnSnapshots: GameState[] = [];
 
 function render(): void {
@@ -714,6 +716,8 @@ function startGame(initialState: GameState): void {
   state = initialState;
   syncUnitIdCounter(state);
   pendingProductionHex = null;
+  humanMoveAnimCancel?.();
+  humanMoveAnimCancel = null;
   isAnimating = false;
   turnSnapshots = [structuredClone(state)];
   initRenderer(svg);
@@ -782,11 +786,23 @@ function hideUnitPicker(): void {
 // ── Board click ───────────────────────────────────────────────────────────────
 
 svg.addEventListener('click', (e: MouseEvent) => {
-  if (state.winner || isAnimating) return;
+  if (state.winner) return;
   if (state.activePlayer !== localPlayer) return;
   const hex = getHexFromEvent(e);
   if (!hex) return;
   const { col, row } = hex;
+
+  let didInterruptHumanMove = false;
+  if (humanMoveAnimCancel) {
+    didInterruptHumanMove = true;
+    humanMoveAnimCancel();
+    humanMoveAnimCancel = null;
+    isAnimating = false;
+    if (gameMode === 'vsAI') saveGameState(state);
+    render();
+    checkWinner();
+  }
+  if (isAnimating) return;
 
   if (state.phase === 'production' && state.activePlayer === localPlayer) {
     if (isValidProductionPlacement(state, col, row, localPlayer)) {
@@ -815,6 +831,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
           clearMovePathPreview();
           state.selectedUnit = null;
           render(); updateUI();
+          if (didInterruptHumanMove) maybeAutoEnd();
           return;
         }
 
@@ -840,11 +857,13 @@ svg.addEventListener('click', (e: MouseEvent) => {
           renderState(svg, state, pendingProductionHex, new Set([movingUnitId]), localPlayer);
           updateUI();
           sendStateUpdate({ unit: animUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim });
-          animateMoves(svg, [{ unit: movingUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim }], config.unitMoveSpeed, () => {
+          const { cancel } = animateMoves(svg, [{ unit: movingUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim }], config.unitMoveSpeed, () => {
+            humanMoveAnimCancel = null;
             isAnimating = false;
             if (gameMode === 'vsAI') saveGameState(state);
             render(); checkWinner(); maybeAutoEnd();
           });
+          humanMoveAnimCancel = cancel;
         } else {
           if (gameMode === 'vsAI') saveGameState(state);
           render(); updateUI(); checkWinner(); sendStateUpdate(); maybeAutoEnd();
@@ -852,18 +871,36 @@ svg.addEventListener('click', (e: MouseEvent) => {
       }
     }
   }
+
+  if (didInterruptHumanMove && state.phase === 'movement' && state.activePlayer === localPlayer) {
+    maybeAutoEnd();
+  }
 });
 
 // Deselect when tapping outside the hex board (decorative overflow area or true background)
 const boardWrap = document.getElementById('board-wrap') as HTMLDivElement;
 boardWrap.addEventListener('click', (e: MouseEvent) => {
-  if (state.winner || isAnimating) return;
+  if (state.winner) return;
   if (state.activePlayer !== localPlayer) return;
   if (state.phase !== 'movement' || state.selectedUnit === null) return;
   if ((e.target as Element).closest('[data-col]')) return; // hex click already handled
+
+  let didInterruptHumanMove = false;
+  if (humanMoveAnimCancel) {
+    didInterruptHumanMove = true;
+    humanMoveAnimCancel();
+    humanMoveAnimCancel = null;
+    isAnimating = false;
+    if (gameMode === 'vsAI') saveGameState(state);
+    render();
+    checkWinner();
+  }
+  if (isAnimating) return;
+
   clearMovePathPreview();
   state.selectedUnit = null;
   render(); updateUI();
+  if (didInterruptHumanMove) maybeAutoEnd();
 });
 
 // ── End phase button ──────────────────────────────────────────────────────────
