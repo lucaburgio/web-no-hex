@@ -56,6 +56,8 @@ export interface UnitType {
   name: string;
   cost: number;
   movement: number;
+  maxHp: number;
+  strength: number;
   icon?: string;
 }
 
@@ -70,8 +72,6 @@ export interface GameConfig {
   territoryQuota: number;
   pointsPerQuota: number;
   unitTypes: UnitType[];
-  unitMaxHp: number;
-  unitBaseStrength: number;
   combatDamageBase: number;
   combatStrengthScale: number;
   flankingBonus: number;

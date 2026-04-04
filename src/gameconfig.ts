@@ -1,11 +1,32 @@
-import type { GameConfig } from './types';
+import type { GameConfig, UnitType } from './types';
 
-export function updateConfig(overrides: Partial<Omit<GameConfig, 'unitTypes'>> & { infantryCost?: number }): void {
-  const { infantryCost, ...rest } = overrides;
+type UnitTypePatches = {
+  infantryCost?: number;
+  infantryMaxHp?: number;
+  infantryStrength?: number;
+  tankMaxHp?: number;
+  tankStrength?: number;
+};
+
+export function updateConfig(overrides: Partial<Omit<GameConfig, 'unitTypes'>> & UnitTypePatches): void {
+  const {
+    infantryCost,
+    infantryMaxHp,
+    infantryStrength,
+    tankMaxHp,
+    tankStrength,
+    ...rest
+  } = overrides;
   Object.assign(config, rest);
-  if (infantryCost !== undefined) {
+  const patchById: Record<string, Partial<UnitType>> = {};
+  if (infantryCost !== undefined) patchById.infantry = { ...patchById.infantry, cost: infantryCost };
+  if (infantryMaxHp !== undefined) patchById.infantry = { ...patchById.infantry, maxHp: infantryMaxHp };
+  if (infantryStrength !== undefined) patchById.infantry = { ...patchById.infantry, strength: infantryStrength };
+  if (tankMaxHp !== undefined) patchById.tank = { ...patchById.tank, maxHp: tankMaxHp };
+  if (tankStrength !== undefined) patchById.tank = { ...patchById.tank, strength: tankStrength };
+  if (Object.keys(patchById).length > 0) {
     config.unitTypes = config.unitTypes.map(u =>
-      u.id === 'infantry' ? { ...u, cost: infantryCost } : u
+      patchById[u.id] ? { ...u, ...patchById[u.id] } : u
     );
   }
 }
@@ -40,17 +61,27 @@ const config: GameConfig = {
 
   // Available unit types (id must be unique; cost is in production points)
   unitTypes: [
-    { id: 'infantry', name: 'Infantry', cost: 20, movement: 1, icon: 'icons/grade.svg' },
-    { id: 'tank',     name: 'Tank',     cost: 40, movement: 2, icon: 'icons/tank.svg'  },
+    {
+      id: 'infantry',
+      name: 'Infantry',
+      cost: 20,
+      movement: 1,
+      maxHp: 10,
+      strength: 10,
+      icon: 'icons/grade.svg',
+    },
+    {
+      id: 'tank',
+      name: 'Tank',
+      cost: 40,
+      movement: 2,
+      maxHp: 16,
+      strength: 14,
+      icon: 'icons/tank.svg',
+    },
   ],
 
   // ── Combat ──────────────────────────────────────────────────────────────────
-
-  // Max hit points for a unit
-  unitMaxHp: 10,
-
-  // Base combat strength for all units
-  unitBaseStrength: 10,
 
   // Damage dealt when both sides have exactly equal effective strength
   combatDamageBase: 3,

@@ -25,9 +25,9 @@ function makeUnit(owner: Owner, col: number, row: number, unitTypeId = 'infantry
     row,
     movesUsed: 0,
     attackedThisTurn: false,
-    hp: config.unitMaxHp,
-    maxHp: config.unitMaxHp,
-    strength: config.unitBaseStrength,
+    hp: unitType.maxHp,
+    maxHp: unitType.maxHp,
+    strength: unitType.strength,
     movement: unitType.movement,
   };
 }

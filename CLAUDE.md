@@ -40,8 +40,7 @@ web-strategic/
 - Multiple units can be placed per turn if you have enough PP.
 
 ### Units
-- Base strength: **10**
-- Max HP: **10**
+- Each **unit type** defines its own **max HP** and **base strength** (see `unitTypes` in `gameconfig.ts`; e.g. infantry vs tank).
 - Combat Strength (CS) = `strength × condition × flanking`
   - **Condition:** scales from 50% (1 HP) to 100% (full HP)
   - **Flanking:** +15% CS per friendly unit adjacent to the defender (max 2 flankers, capped at +30%)

@@ -254,8 +254,10 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
   ['cfg-pointsPerQuota',          'pointsPerQuota',          1],
   ['cfg-productionTurns',         'productionTurns',         1],
   ['cfg-productionSafeDistance',  'productionSafeDistance',  1],
-  ['cfg-unitMaxHp',               'unitMaxHp',               1],
-  ['cfg-unitBaseStrength',        'unitBaseStrength',        1],
+  ['cfg-infantry-maxHp',          'infantryMaxHp',           1],
+  ['cfg-infantry-strength',       'infantryStrength',        1],
+  ['cfg-tank-maxHp',              'tankMaxHp',               1],
+  ['cfg-tank-strength',           'tankStrength',            1],
   ['cfg-combatDamageBase',        'combatDamageBase',        1],
   ['cfg-combatStrengthScale',     'combatStrengthScale',     1],
   ['cfg-flankingBonus',           'flankingBonus',           100],
@@ -273,7 +275,8 @@ declare const _cfgNumProxy: {
   productionPointsPerTurn: number; infantryCost: number;
   territoryQuota: number; pointsPerQuota: number;
   productionTurns: number; productionSafeDistance: number;
-  unitMaxHp: number; unitBaseStrength: number;
+  infantryMaxHp: number; infantryStrength: number;
+  tankMaxHp: number; tankStrength: number;
   combatDamageBase: number; combatStrengthScale: number;
   flankingBonus: number; maxFlankingUnits: number;
   healOwnTerritory: number; healNeutral: number; healEnemyTerritory: number;
@@ -288,7 +291,9 @@ const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'autoEndProduction' | 'aut
 ];
 
 function populateSettings(): void {
-  const infantryCost = config.unitTypes.find(u => u.id === 'infantry')?.cost ?? config.unitTypes[0].cost;
+  const infantry = config.unitTypes.find(u => u.id === 'infantry') ?? config.unitTypes[0];
+  const tank = config.unitTypes.find(u => u.id === 'tank') ?? config.unitTypes[0];
+  const infantryCost = infantry.cost;
   const vals: Record<string, number> = {
     boardCols: config.boardCols, boardRows: config.boardRows,
     startingUnits: config.startingUnits,
@@ -296,7 +301,8 @@ function populateSettings(): void {
     infantryCost,
     territoryQuota: config.territoryQuota, pointsPerQuota: config.pointsPerQuota,
     productionTurns: config.productionTurns, productionSafeDistance: config.productionSafeDistance,
-    unitMaxHp: config.unitMaxHp, unitBaseStrength: config.unitBaseStrength,
+    infantryMaxHp: infantry.maxHp, infantryStrength: infantry.strength,
+    tankMaxHp: tank.maxHp, tankStrength: tank.strength,
     combatDamageBase: config.combatDamageBase, combatStrengthScale: config.combatStrengthScale,
     flankingBonus: config.flankingBonus, maxFlankingUnits: config.maxFlankingUnits,
     healOwnTerritory: config.healOwnTerritory, healNeutral: config.healNeutral,
@@ -424,7 +430,9 @@ introContinueBtn.addEventListener('click', () => {
 // ── Rules content ─────────────────────────────────────────────────────────────
 
 function buildRulesContent(): string {
-  const unitList = config.unitTypes.map(u => `<strong>${u.name}</strong> (${u.cost} PP)`).join(', ');
+  const unitList = config.unitTypes
+    .map(u => `<strong>${u.name}</strong> (${u.cost} PP, ${u.maxHp} HP, base str ${u.strength})`)
+    .join(', ');
   const maxFlankBonus = Math.round(config.maxFlankingUnits * config.flankingBonus * 100);
   return `
     <h2>Game Rules</h2>
@@ -463,7 +471,7 @@ function buildRulesContent(): string {
     <h3>Combat</h3>
     <ul>
       <li>Both sides deal damage <strong>simultaneously</strong>.</li>
-      <li><strong>CS</strong> = base strength (${config.unitBaseStrength}) × condition (50–100% of HP) × flanking bonus.</li>
+      <li><strong>CS</strong> = unit type&rsquo;s base strength × condition (50–100% of current max HP) × flanking bonus.</li>
       <li><strong>Flanking:</strong> +${Math.round(config.flankingBonus * 100)}% CS per adjacent friendly
         (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%).</li>
       <li><strong>Damage:</strong> <code>floor(${config.combatDamageBase} × exp(±ΔCS / ${config.combatStrengthScale}))</code>, min 1 per side.</li>

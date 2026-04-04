@@ -28,10 +28,11 @@ export function loadGameState(): GameState | null {
     for (const unit of state.units) {
       if (unit.unitTypeId == null) unit.unitTypeId = 'infantry';
       if (unit.attackedThisTurn == null) unit.attackedThisTurn = false;
-      if (unit.movement == null) {
-        const ut = config.unitTypes.find(u => u.id === unit.unitTypeId) ?? config.unitTypes[0];
-        unit.movement = ut.movement;
-      }
+      const ut = config.unitTypes.find(u => u.id === unit.unitTypeId) ?? config.unitTypes[0];
+      if (unit.movement == null) unit.movement = ut.movement;
+      if (unit.maxHp == null) unit.maxHp = ut.maxHp;
+      if (unit.strength == null) unit.strength = ut.strength;
+      unit.hp = Math.min(unit.hp ?? unit.maxHp, unit.maxHp);
     }
 
     return state;
