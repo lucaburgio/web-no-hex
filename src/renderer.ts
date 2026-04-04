@@ -168,16 +168,6 @@ function colors(): Colors {
   return C;
 }
 
-// Lerp between two #rrggbb hex colours by t (0→1)
-function lerpColor(hex1: string, hex2: string, t: number): string {
-  const r1 = parseInt(hex1.slice(1,3),16), g1 = parseInt(hex1.slice(3,5),16), b1 = parseInt(hex1.slice(5,7),16);
-  const r2 = parseInt(hex2.slice(1,3),16), g2 = parseInt(hex2.slice(3,5),16), b2 = parseInt(hex2.slice(5,7),16);
-  const r = Math.round(r1+(r2-r1)*t).toString(16).padStart(2,'0');
-  const g = Math.round(g1+(g2-g1)*t).toString(16).padStart(2,'0');
-  const b = Math.round(b1+(b2-b1)*t).toString(16).padStart(2,'0');
-  return `#${r}${g}${b}`;
-}
-
 // Neighbor direction → edge index mapping (edge i spans vertex i to vertex (i+1)%6).
 // Vertex i sits at angle (60*i − 30)° in pointy-top orientation (y-axis down).
 //   Edge 0 (v0–v1): right (E)        Edge 3 (v3–v4): left (W)
@@ -473,7 +463,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     const hpRatio    = unit.hp / unit.maxHp;
 
     const baseColor = unit.owner === PLAYER ? c.player : c.ai;
-    const fill      = isSelected ? c.unitSelected : lerpColor(baseColor, '#333333', 1 - hpRatio);
+    const fill      = isSelected ? c.unitSelected : baseColor;
     const unitDimmed = productionFocusHexes.size > 0;
     const opacity   = (unit.movesUsed >= unit.movement || unitDimmed) ? '0.2' : '1';
 
@@ -551,7 +541,7 @@ export function animateMoves(
     const hpRatio   = anim.unit.hp / anim.unit.maxHp;
 
     const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
-    const animFill = lerpColor(baseColor, '#333333', 1 - hpRatio);
+    const animFill = baseColor;
     const unitSc = (HEX_SIZE * 1.1) / 50;
     const circle = svgEl('path');
     circle.setAttribute('d', UNIT_PATH_D);
