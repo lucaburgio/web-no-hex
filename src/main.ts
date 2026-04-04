@@ -749,8 +749,6 @@ function showUnitPicker(col: number, row: number): void {
   pendingProductionHex = { col, row };
   unitPickerList.innerHTML = '';
 
-  const statBoltSrc = 'public/icons/points.svg';
-
   for (const unitType of config.unitTypes) {
     const canAfford = state.productionPoints[localPlayer] >= unitType.cost;
 
@@ -780,13 +778,10 @@ function showUnitPicker(col: number, row: number): void {
       row.className = `unit-card-stat ${modClass}`;
       const iconWrap = document.createElement('span');
       iconWrap.className = 'unit-card-stat-icon';
-      const bolt = document.createElement('img');
-      bolt.src = statBoltSrc;
-      bolt.alt = '';
+      iconWrap.setAttribute('aria-hidden', 'true');
       const val = document.createElement('span');
       val.className = 'unit-card-stat-value';
       val.textContent = String(value);
-      iconWrap.appendChild(bolt);
       row.appendChild(iconWrap);
       row.appendChild(val);
       stats.appendChild(row);

@@ -304,8 +304,7 @@ body {
   align-items: flex-start;
   padding: 0;
   box-sizing: border-box;
-  width: 198px;
-  height: 113px;
+  width: 200px;
   flex: none;
   flex-grow: 0;
   background: #010101;
@@ -360,8 +359,8 @@ body {
 }
 
 .unit-card-name {
-  width: 100px;
-  max-width: 100px;
+  height: 80px;
+  max-height: 80px;
   font-size: 14px;
   font-weight: 700;
   line-height: 1.2;
@@ -395,30 +394,28 @@ body {
   min-width: 0;
 }
 
+/* Lightning shape only (no tile behind it) — mask from points.svg */
 .unit-card-stat-icon {
   flex-shrink: 0;
-  width: 15px;
-  height: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 1px;
-}
-.unit-card-stat-icon img {
   width: 10px;
   height: 10px;
   display: block;
+  background-color: var(--color-gray-500);
+  mask-image: url('/icons/points.svg');
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-image: url('/icons/points.svg');
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
 }
 
 .unit-card-stat--cost .unit-card-stat-icon {
-  background: var(--color-yellow-500);
+  background-color: var(--color-yellow-500);
 }
 .unit-card-stat--cost .unit-card-stat-value {
   color: var(--color-yellow-500);
-}
-
-.unit-card-stat:not(.unit-card-stat--cost) .unit-card-stat-icon {
-  background: var(--color-gray-500);
 }
 .unit-card-stat:not(.unit-card-stat--cost) .unit-card-stat-value {
   color: var(--color-white);
