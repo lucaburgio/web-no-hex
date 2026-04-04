@@ -202,6 +202,15 @@ body {
   cursor: url('/icons/pointer-fight.svg') 11 10, crosshair !important;
 }
 
+@keyframes ranged-target-aim-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+#board .ranged-target-aim {
+  animation: ranged-target-aim-bounce 1.35s ease-in-out infinite;
+}
+
 /* ── Sticky footer ───────────────────────────────────────────────────────────── */
 #game-footer {
   position: fixed;
