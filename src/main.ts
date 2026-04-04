@@ -473,7 +473,8 @@ function buildRulesContent(): string {
       <li>Both sides deal damage <strong>simultaneously</strong>.</li>
       <li><strong>CS</strong> = unit type&rsquo;s base strength × condition (50–100% of current max HP) × flanking bonus.</li>
       <li><strong>Flanking:</strong> +${Math.round(config.flankingBonus * 100)}% CS per adjacent friendly
-        (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%).</li>
+        (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%), in fixed neighbor order.
+        Some unit types add <strong>extra flanking</strong> when they are among those adjacent flankers.</li>
       <li><strong>Damage:</strong> <code>floor(${config.combatDamageBase} × exp(±ΔCS / ${config.combatStrengthScale}))</code>, min 1 per side.</li>
       <li>If defender dies: attacker advances and conquers the hex. If both die: both removed.</li>
       <li>Hover over an enemy unit during movement to see a combat forecast.</li>
@@ -1097,6 +1098,7 @@ interface SideFactors {
   conditionPct: number;
   flankCount: number;
   flankBonusPct: number;
+  extraFlankingFrom?: { name: string; bonusPct: number }[];
 }
 
 function buildSideHTML(unit: Unit, dmg: number, hpAfter: number, label: string, labelClass: string, factors: SideFactors): string {
@@ -1122,6 +1124,9 @@ function buildSideHTML(unit: Unit, dmg: number, hpAfter: number, label: string, 
         <div>· Strength: ${unit.strength}</div>
         <div>· Condition: ${factors.conditionPct}%</div>
         ${factors.flankBonusPct > 0 ? `<div>· Flanking ×${factors.flankCount}: +${factors.flankBonusPct}%</div>` : ''}
+        ${(factors.extraFlankingFrom ?? []).map(
+          e => `<div>· Extra flanking bonus from ${e.name}: +${e.bonusPct}%</div>`
+        ).join('')}
       </div>
     </div>`;
 }
@@ -1134,6 +1139,7 @@ function showCombatTooltip(attacker: Unit, defender: Unit, pageX: number, pageY:
     conditionPct: fc.attackerConditionPct,
     flankCount: fc.flankingCount,
     flankBonusPct: fc.flankBonusPct,
+    extraFlankingFrom: fc.extraFlankingFrom.length > 0 ? fc.extraFlankingFrom : undefined,
   };
   const defenderFactors: SideFactors = {
     cs: fc.defenderCS,

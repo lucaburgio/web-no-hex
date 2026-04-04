@@ -77,6 +77,7 @@ const config: GameConfig = {
       movement: 2,
       maxHp: 16,
       strength: 14,
+      extraFlanking: 0.05,
       icon: 'icons/tank.svg',
     },
   ],

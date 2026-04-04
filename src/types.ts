@@ -47,6 +47,8 @@ export interface CombatForecast {
   defenderDies: boolean;
   flankingCount: number;
   flankBonusPct: number;
+  /** Per contributing flanker with extraFlanking on their type (same order as first N flankers). */
+  extraFlankingFrom: { name: string; bonusPct: number }[];
   attackerConditionPct: number;
   defenderConditionPct: number;
 }
@@ -58,6 +60,8 @@ export interface UnitType {
   movement: number;
   maxHp: number;
   strength: number;
+  /** Optional extra additive flanking multiplier when this unit is a contributing flanker (same scale as global flankingBonus). */
+  extraFlanking?: number;
   icon?: string;
 }
 

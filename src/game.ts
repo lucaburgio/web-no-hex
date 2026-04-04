@@ -1,6 +1,6 @@
 import { getNeighbors } from './hex';
 import config from './gameconfig';
-import type { Unit, HexState, GameState, CombatForecast, Owner } from './types';
+import type { Unit, UnitType, HexState, GameState, CombatForecast, Owner } from './types';
 
 export const PLAYER = 1 as const;
 export const AI     = 2 as const;
@@ -258,29 +258,50 @@ function log(state: GameState, msg: string): void {
 
 // ── Combat ────────────────────────────────────────────────────────────────────
 
-// Count friendly units (same side as attacker) adjacent to the defender,
-// excluding the attacker itself — these provide flanking bonus.
-function getFlankingCount(state: GameState, attacker: Unit, defender: Unit): number {
-  const neighbors = getNeighbors(defender.col, defender.row, COLS, ROWS);
-  let count = 0;
-  for (const [nc, nr] of neighbors) {
-    if (nc === attacker.col && nr === attacker.row) continue; // attacker itself doesn't count
-    const u = getUnit(state, nc, nr);
-    if (u && u.owner === attacker.owner) count++;
-  }
-  return Math.min(count, config.maxFlankingUnits);
+function unitTypeForUnit(unit: Unit): UnitType {
+  return config.unitTypes.find(u => u.id === unit.unitTypeId) ?? config.unitTypes[0];
 }
 
-function effectiveCS(unit: Unit, flankingCount: number = 0): number {
+// Adjacent friendlies to the defender in neighbor order (excluding the attacker's hex),
+// capped to maxFlankingUnits — these provide base flanking and optional extraFlanking.
+function analyzeFlanking(state: GameState, attacker: Unit, defender: Unit): {
+  count: number;
+  extraSum: number;
+  extraFlankingFrom: { name: string; bonusPct: number }[];
+} {
+  const neighbors = getNeighbors(defender.col, defender.row, COLS, ROWS);
+  const flankers: Unit[] = [];
+  for (const [nc, nr] of neighbors) {
+    if (nc === attacker.col && nr === attacker.row) continue;
+    const u = getUnit(state, nc, nr);
+    if (u && u.owner === attacker.owner) flankers.push(u);
+  }
+  const max = config.maxFlankingUnits;
+  const count = Math.min(flankers.length, max);
+  const contributing = flankers.slice(0, count);
+  const extraFlankingFrom: { name: string; bonusPct: number }[] = [];
+  let extraSum = 0;
+  for (const u of contributing) {
+    const ut = unitTypeForUnit(u);
+    const ex = ut.extraFlanking ?? 0;
+    if (ex > 0) {
+      extraSum += ex;
+      extraFlankingFrom.push({ name: ut.name, bonusPct: Math.round(ex * 100) });
+    }
+  }
+  return { count, extraSum, extraFlankingFrom };
+}
+
+function effectiveCS(unit: Unit, flankingCount: number = 0, extraFlankingSum: number = 0): number {
   const hpRatio = unit.hp / unit.maxHp;
   const woundedMult = 0.5 + 0.5 * hpRatio;
-  const flankMult = 1 + flankingCount * config.flankingBonus;
+  const flankMult = 1 + flankingCount * config.flankingBonus + extraFlankingSum;
   return unit.strength * woundedMult * flankMult;
 }
 
 function resolveCombat(state: GameState, attacker: Unit, defender: Unit): void {
-  const flanking = getFlankingCount(state, attacker, defender);
-  const csA = effectiveCS(attacker, flanking);
+  const { count: flanking, extraSum } = analyzeFlanking(state, attacker, defender);
+  const csA = effectiveCS(attacker, flanking, extraSum);
   const csD = effectiveCS(defender, 0);
   const delta = csA - csD;
   const scale = config.combatStrengthScale;
@@ -322,8 +343,8 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): void {
 // ── Combat forecast (pure — no state mutation) ────────────────────────────────
 
 export function forecastCombat(state: GameState, attacker: Unit, defender: Unit): CombatForecast {
-  const flanking = getFlankingCount(state, attacker, defender);
-  const csA = effectiveCS(attacker, flanking);
+  const { count: flanking, extraSum, extraFlankingFrom } = analyzeFlanking(state, attacker, defender);
+  const csA = effectiveCS(attacker, flanking, extraSum);
   const csD = effectiveCS(defender, 0);
   const delta = csA - csD;
   const scale = config.combatStrengthScale;
@@ -343,6 +364,7 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
     defenderDies:         defender.hp - dmgToDefender <= 0,
     flankingCount:        flanking,
     flankBonusPct:        Math.round(flanking * config.flankingBonus * 100),
+    extraFlankingFrom,
     attackerConditionPct: Math.round((0.5 + 0.5 * (attacker.hp / attacker.maxHp)) * 100),
     defenderConditionPct: Math.round((0.5 + 0.5 * (defender.hp / defender.maxHp)) * 100),
   };

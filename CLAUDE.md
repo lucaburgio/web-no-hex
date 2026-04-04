@@ -43,7 +43,7 @@ web-strategic/
 - Each **unit type** defines its own **max HP** and **base strength** (see `unitTypes` in `gameconfig.ts`; e.g. infantry vs tank).
 - Combat Strength (CS) = `strength × condition × flanking`
   - **Condition:** scales from 50% (1 HP) to 100% (full HP)
-  - **Flanking:** +15% CS per friendly unit adjacent to the defender (max 2 flankers, capped at +30%)
+  - **Flanking:** +15% CS per friendly unit adjacent to the defender (max 2 flankers, capped at +30%), in fixed neighbor order. Some unit types define **extra flanking**: an additional CS multiplier when that type is among those contributing flankers (same cap and order).
 
 ### Movement & Zone of Control
 - Each unit moves **1 hex** per turn.
