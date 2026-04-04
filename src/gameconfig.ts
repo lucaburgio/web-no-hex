@@ -97,7 +97,7 @@ const config: GameConfig = {
   movePathStrokeWidth: 6,
 
   // How long the movement path preview takes to draw (line stroke + dot stagger)
-  movePathDrawDurationMs: 420,
+  movePathDrawDurationMs: 220,
 };
 
 export default config;

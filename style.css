@@ -20,37 +20,37 @@
   --color-red-500: #ff6b6b;
   --color-green-500: #81e2a0;
 
-  /* ── Background ─────────────────────────────────────────────────────────── */
-  --color-bg: #F3F0E9;
+    /* ── Background ─────────────────────────────────────────────────────────── */
+    --color-bg: #E1D9D6;
 
-  /* ── Player / AI identity colors ────────────────────────────────────────── */
-  --color-player: #43483E;
-  --color-ai:     #000;
-
-  /* ── Unit states ────────────────────────────────────────────────────────── */
-  --color-unit-selected: #C77E00;
-
-  /* ── Hex fill states ─────────────────────────────────────────────────────── */
-  --color-hex-selected:   #FFBE00;
-  --color-hex-valid-move: #ECDBAA;
-  --color-hex-player:     #23251E;
-  --color-hex-ai:         #A5A8A2;
-  --color-hex-can-place:      #73776a;
-  --color-hex-prod-selected: #d5cc91;
-  --color-hex-prod-stroke:   #ab6913;
-  --color-hex-zoc:            #d58f8f;
-  --color-hex-neutral:        #EAE8DE;
-  --color-hex-stroke:         #23251E;
-
-  /* ── Movement area perimeter outline ────────────────────────────────────── */
-  --color-move-border: rgba(199, 126, 0, 1);
-
-  /* ── HP bar thresholds ───────────────────────────────────────────────────── */
-  --color-unit-icon:  #FFF;
-
-  --color-hp-high: #3aca7b;
-  --color-hp-mid:  #edc526;
-  --color-hp-low:  #b72929;
+    /* ── Player / AI identity colors ────────────────────────────────────────── */
+    --color-player: #000100;
+    --color-ai:     #838383;
+  
+    /* ── Unit states ────────────────────────────────────────────────────────── */
+    --color-unit-selected: #C77E00;
+  
+    /* ── Hex fill states ─────────────────────────────────────────────────────── */
+    --color-hex-selected:      #FFBE00;
+    --color-hex-valid-move:    #ECDBAA;
+    --color-hex-player:        #B5AEAB;
+    --color-hex-ai:            #D2CDCA;
+    --color-hex-can-place:     #bebcb2;
+    --color-hex-prod-selected: #e1c47c;
+    --color-hex-prod-stroke:   #e18a17;
+    --color-hex-zoc:           #d58f8f;
+    --color-hex-neutral:       #E1D9D6;
+    --color-hex-stroke:        #000;
+  
+    /* ── Movement area perimeter outline ────────────────────────────────────── */
+    --color-move-border: rgba(199, 126, 0, 1);
+  
+    /* ── Unit icon & HP bar thresholds ──────────────────────────────────────── */
+    --color-unit-icon: #FFF;
+  
+    --color-hp-high: #81E2A0;
+    --color-hp-mid:  #FFBE00;
+    --color-hp-low:  #FF765E;
 
 }
 
