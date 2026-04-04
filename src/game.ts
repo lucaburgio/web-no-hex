@@ -224,6 +224,21 @@ export function getMovePath(state: GameState, unit: Unit, toCol: number, toRow: 
   return path; // first element is the unit's start hex, last is the target
 }
 
+// Move attacker along path to the hex adjacent to the defender (multi-hex attacks).
+function advanceAlongPathBeforeCombat(
+  state: GameState,
+  unit: Unit,
+  path: [number, number][],
+  owner: Owner
+): void {
+  if (path.length < 3) return;
+  for (const [pc, pr] of path.slice(1, -1)) {
+    conquerHex(state, pc, pr, owner);
+    unit.col = pc;
+    unit.row = pr;
+  }
+}
+
 // BFS distance from (fromCol,fromRow) to (toCol,toRow), ignoring units/ZoC.
 // Used to count how many movement points a move actually costs.
 function bfsDistance(state: GameState, fromCol: number, fromRow: number, toCol: number, toRow: number): number {
@@ -556,17 +571,18 @@ export function playerMoveUnit(state: GameState, col: number, row: number, local
     return state;
   }
 
-  const stepsCost = bfsDistance(state, unit.col, unit.row, col, row);
+  const path = getMovePath(state, unit, col, row);
+  const stepsCost = path.length > 0 ? path.length - 1 : bfsDistance(state, unit.col, unit.row, col, row);
   unit.movesUsed += stepsCost;
   state.selectedUnit = null;
 
   if (target && target.owner === enemy) {
     // Combat exhausts remaining movement
     unit.movesUsed = unit.movement;
+    advanceAlongPathBeforeCombat(state, unit, path, localPlayer);
     resolveCombat(state, unit, target);
   } else {
     // Conquer every neutral/enemy hex along the path (intermediate steps)
-    const path = getMovePath(state, unit, col, row);
     for (const [pc, pr] of path.slice(1)) {
       conquerHex(state, pc, pr, localPlayer);
     }
@@ -633,6 +649,8 @@ export function aiMovement(state: GameState): GameState {  // exported for anima
 
       // Attack immediately if reachable
       if (occupant && occupant.owner === PLAYER) {
+        const path = getMovePath(state, unit, nc, nr);
+        advanceAlongPathBeforeCombat(state, unit, path, AI);
         resolveCombat(state, unit, occupant);
         checkVictory(state);
         bestTarget = null; // already moved via combat

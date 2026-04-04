@@ -444,7 +444,7 @@ function buildRulesContent(): string {
     <h3>Turn Phases</h3>
     <ol>
       <li><strong>Production</strong> — spend PP to place units.</li>
-      <li><strong>Movement</strong> — move each of your units up to 1 hex.</li>
+      <li><strong>Movement</strong> — move each of your units up to its movement range.</li>
       <li><strong>End</strong> — AI takes its turn, then the turn counter advances.</li>
     </ol>
 
@@ -462,8 +462,8 @@ function buildRulesContent(): string {
 
     <h3>Movement</h3>
     <ul>
-      <li>Each unit may move <strong>1 hex</strong> per turn. Moving onto an empty hex <strong>conquers</strong> it.</li>
-      <li>Moving onto an enemy unit triggers <strong>combat</strong>.</li>
+      <li>Each unit may move up to its movement range per turn (see unit types). Moving onto an empty hex <strong>conquers</strong> it.</li>
+      <li>Moving onto an enemy unit triggers <strong>combat</strong>. If you need more than one hex to reach them, you move along the path into the hex adjacent to the enemy first, then combat resolves.</li>
       <li><strong>Zone of Control (ZoC):</strong> a unit adjacent to an enemy is locked — it may only attack
         or retreat to a hex not itself adjacent to any enemy.</li>
     </ul>
@@ -825,14 +825,15 @@ svg.addEventListener('click', (e: MouseEvent) => {
         const movingUnitId = state.selectedUnit;
         const movingUnit = getUnitById(state, movingUnitId)!;
         const fromCol = movingUnit.col, fromRow = movingUnit.row;
-        const pathHexes = getMovePath(state, movingUnit, col, row);
-        const pathForAnim = pathHexes.length >= 2 ? pathHexes : undefined;
+        const stateBeforeMove = structuredClone(state);
 
         state = playerMoveUnit(state, col, row, localPlayer);
 
         const unitAfter = getUnitById(state, movingUnitId);
         const toCol = unitAfter?.col ?? col;
         const toRow = unitAfter?.row ?? row;
+        const pathHexes = getMovePath(stateBeforeMove, { ...movingUnit, col: fromCol, row: fromRow }, toCol, toRow);
+        const pathForAnim = pathHexes.length >= 2 ? pathHexes : undefined;
 
         if (fromCol !== toCol || fromRow !== toRow) {
           const animUnit = { ...movingUnit };
@@ -1132,7 +1133,12 @@ function buildSideHTML(unit: Unit, dmg: number, hpAfter: number, label: string, 
 }
 
 function showCombatTooltip(attacker: Unit, defender: Unit, pageX: number, pageY: number): void {
-  const fc: CombatForecast = forecastCombat(state, attacker, defender);
+  const path = getMovePath(state, attacker, defender.col, defender.row);
+  const attackerForForecast =
+    path.length >= 3
+      ? { ...attacker, col: path[path.length - 2][0], row: path[path.length - 2][1] }
+      : attacker;
+  const fc: CombatForecast = forecastCombat(state, attackerForForecast, defender);
 
   const attackerFactors: SideFactors = {
     cs: fc.attackerCS,
