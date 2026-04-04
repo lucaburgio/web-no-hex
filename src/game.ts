@@ -241,7 +241,7 @@ function advanceAlongPathBeforeCombat(
 
 // BFS distance from (fromCol,fromRow) to (toCol,toRow), ignoring units/ZoC.
 // Used to count how many movement points a move actually costs.
-function bfsDistance(state: GameState, fromCol: number, fromRow: number, toCol: number, toRow: number): number {
+export function bfsDistance(state: GameState, fromCol: number, fromRow: number, toCol: number, toRow: number): number {
   const mountains = new Set(state.mountainHexes ?? []);
   const visited = new Set<string>([`${fromCol},${fromRow}`]);
   let frontier: [number, number][] = [[fromCol, fromRow]];
@@ -261,6 +261,18 @@ function bfsDistance(state: GameState, fromCol: number, fromRow: number, toCol: 
     frontier = next;
   }
   return dist;
+}
+
+/** Minimum BFS steps through passable hexes (mountains only) to any cell on the opponent's home row. */
+export function minHexStepsToOpponentHomeRow(state: GameState, col: number, row: number, mover: Owner): number {
+  const goalRow = mover === AI ? ROWS - 1 : 0;
+  const mountains = new Set(state.mountainHexes ?? []);
+  let min = Infinity;
+  for (let c = 0; c < COLS; c++) {
+    if (mountains.has(`${c},${goalRow}`)) continue;
+    min = Math.min(min, bfsDistance(state, col, row, c, goalRow));
+  }
+  return Number.isFinite(min) ? min : 999;
 }
 
 function removeUnit(state: GameState, id: number): void {
@@ -554,14 +566,7 @@ export function playerEndProduction(state: GameState): GameState {
   return advancePhase(state);
 }
 
-export function aiProduction(state: GameState): GameState {
-  const unitType = config.unitTypes[0]; // AI always builds the first unit type
-
-  if (state.productionPoints[AI] < unitType.cost) {
-    log(state, 'AI: not enough production points.');
-    return state;
-  }
-
+function collectAiProductionCandidates(state: GameState): [number, number][] {
   const candidates: [number, number][] = [];
   for (let c = 0; c < COLS; c++) {
     if (!getUnit(state, c, 0)) candidates.push([c, 0]);
@@ -572,17 +577,98 @@ export function aiProduction(state: GameState): GameState {
       if (r !== 0 && !getUnit(state, c, r)) candidates.push([c, r]);
     }
   }
+  return candidates;
+}
 
-  if (candidates.length === 0) {
-    log(state, 'AI: no space to place a unit.');
-    return state;
+function aiUnitCountsByType(state: GameState): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const u of state.units) {
+    if (u.owner !== AI) continue;
+    counts[u.unitTypeId] = (counts[u.unitTypeId] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function scoreAiProductionPlacement(state: GameState, ut: UnitType, col: number, row: number): number {
+  const neighbors = getNeighbors(col, row, COLS, ROWS);
+  let adjacentEnemy = 0;
+  let expandNeighbor = 0;
+  for (const [nc, nr] of neighbors) {
+    const u = getUnit(state, nc, nr);
+    if (u && u.owner === PLAYER) adjacentEnemy++;
+    const hex = state.hexStates[`${nc},${nr}`];
+    if (!hex || hex.owner === null || hex.owner !== AI) expandNeighbor++;
+  }
+  const distToGoal = minHexStepsToOpponentHomeRow(state, col, row, AI);
+  const counts = aiUnitCountsByType(state);
+  const inf = counts.infantry ?? 0;
+  const tn = counts.tank ?? 0;
+  const ar = counts.artillery ?? 0;
+  const total = Math.max(1, inf + tn + ar);
+
+  // Closer to the human home row, more neutral/enemy neighbors to expand territory
+  let score = -distToGoal * 18 + expandNeighbor * 6 + row * 5;
+
+  if (ut.id === 'tank') {
+    score += row * 6;
+    if (adjacentEnemy > 0) score -= 55;
+    if (tn < Math.max(1, inf * 0.25)) score += 45;
+  } else if (ut.id === 'artillery') {
+    score += (ROWS - 1 - row) * 14;
+    if (adjacentEnemy > 0) score -= 85;
+    else score += 35;
+    if (ar < Math.max(1, inf * 0.35)) score += 40;
+  } else {
+    score += row * 4;
+    if (inf / total > 0.65) score -= 25;
   }
 
-  const [col, row] = candidates[Math.floor(Math.random() * candidates.length)];
-  state.productionPoints[AI] -= unitType.cost;
-  state.units.push(makeUnit(AI, col, row, unitType.id));
-  conquerHex(state, col, row, AI);
-  log(state, `AI placed a unit at (${col}, ${row}).`);
+  if (state.productionPoints[AI] >= 60 && (ut.id === 'tank' || ut.id === 'artillery')) {
+    score += 8;
+  }
+
+  return score;
+}
+
+export function aiProduction(state: GameState): GameState {
+  let placed = 0;
+  while (true) {
+    const affordable = config.unitTypes.filter(t => state.productionPoints[AI] >= t.cost);
+    if (affordable.length === 0) {
+      if (placed === 0) log(state, 'AI: not enough production points.');
+      break;
+    }
+
+    const candidates = collectAiProductionCandidates(state);
+    if (candidates.length === 0) {
+      if (placed === 0) log(state, 'AI: no space to place a unit.');
+      break;
+    }
+
+    let best: { ut: UnitType; col: number; row: number; score: number } | null = null;
+    for (const ut of affordable) {
+      for (const [col, row] of candidates) {
+        if (!isValidProductionPlacement(state, col, row, AI)) continue;
+        const score = scoreAiProductionPlacement(state, ut, col, row);
+        if (
+          !best ||
+          score > best.score ||
+          (score === best.score && ut.cost < best.ut.cost)
+        ) {
+          best = { ut, col, row, score };
+        }
+      }
+    }
+
+    if (!best) break;
+
+    state.productionPoints[AI] -= best.ut.cost;
+    state.units.push(makeUnit(AI, best.col, best.row, best.ut.id));
+    conquerHex(state, best.col, best.row, AI);
+    log(state, `AI placed ${best.ut.name} at (${best.col}, ${best.row}). PP: ${state.productionPoints[AI]}.`);
+    placed++;
+  }
+
   return state;
 }
 
@@ -719,55 +805,130 @@ export function syncUnitIdCounter(state: GameState): void {
   if (maxId >= unitIdCounter) unitIdCounter = maxId + 1;
 }
 
-export function aiMovement(state: GameState): GameState {  // exported for animation split
-  const aiUnits = state.units.filter(u => u.owner === AI);
-  for (const unit of aiUnits) {
-    const humanUnits = state.units.filter(u => u.owner === PLAYER);
-    if (humanUnits.length === 0) break;
+const AI_MOVE_TYPE_ORDER: Record<string, number> = { artillery: 0, tank: 1, infantry: 2 };
 
-    const rangedTargets = getRangedAttackTargets(state, unit);
-    if (rangedTargets.length > 0) {
-      const target = rangedTargets[0]!;
-      unit.movesUsed = unit.movement;
-      resolveCombat(state, unit, target);
-      checkVictory(state);
-      continue;
+function pickBestRangedTarget(state: GameState, attacker: Unit, targets: Unit[]): Unit {
+  let best = targets[0]!;
+  let bestScore = -Infinity;
+  for (const t of targets) {
+    const fc = forecastCombat(state, attacker, t);
+    let s = 0;
+    if (fc.defenderDies) s += 520;
+    else s += fc.dmgToDefender * 3;
+    // Frontline enemies (further south) block the win condition most
+    s += t.row * 22;
+    const distGoal = minHexStepsToOpponentHomeRow(state, t.col, t.row, AI);
+    s -= distGoal * 2;
+    if (s > bestScore) {
+      bestScore = s;
+      best = t;
     }
+  }
+  return best;
+}
 
-    const validMoves = getValidMoves(state, unit);
-    let bestTarget: [number, number] | null = null;
-    let bestDist = Infinity;
+function scoreMeleeAttack(state: GameState, attacker: Unit, defender: Unit): number {
+  const fc = forecastCombat(state, attacker, defender);
+  let s = 0;
+  if (fc.defenderDies && !fc.attackerDies) s += 480;
+  else if (fc.defenderDies && fc.attackerDies) s += 120;
+  else s += fc.dmgToDefender * 2 - fc.dmgToAttacker * 2.2;
+  s += defender.row * 18;
+  if (fc.defenderDies && !fc.attackerDies) {
+    const afterGoal = minHexStepsToOpponentHomeRow(state, defender.col, defender.row, AI);
+    s -= afterGoal * 8;
+  }
+  const favorable =
+    fc.defenderDies ||
+    (!fc.attackerDies && fc.dmgToDefender > fc.dmgToAttacker + 1);
+  if (!favorable) s -= 85;
+  return s;
+}
 
-    for (const [nc, nr] of validMoves) {
-      const occupant = getUnit(state, nc, nr);
+function scoreEmptyMove(
+  state: GameState,
+  unit: Unit,
+  toCol: number,
+  toRow: number,
+  stepsCost: number
+): number {
+  if (unit.movesUsed + stepsCost > unit.movement) return -Infinity;
+  const before = minHexStepsToOpponentHomeRow(state, unit.col, unit.row, AI);
+  const after = minHexStepsToOpponentHomeRow(state, toCol, toRow, AI);
+  let s = (before - after) * 28;
+  const hex = state.hexStates[`${toCol},${toRow}`];
+  if (!hex || hex.owner !== AI) s += 14;
+  s += toRow * 1.5;
+  return s;
+}
 
-      // Attack immediately if reachable
-      if (occupant && occupant.owner === PLAYER) {
-        const path = getMovePath(state, unit, nc, nr);
-        advanceAlongPathBeforeCombat(state, unit, path, AI);
-        resolveCombat(state, unit, occupant);
+export function aiMovement(state: GameState): GameState {  // exported for animation split
+  const aiUnits = state.units.filter(u => u.owner === AI).sort((a, b) => {
+    const oa = AI_MOVE_TYPE_ORDER[a.unitTypeId] ?? 9;
+    const ob = AI_MOVE_TYPE_ORDER[b.unitTypeId] ?? 9;
+    if (oa !== ob) return oa - ob;
+    return b.row - a.row;
+  });
+
+  for (const unit of aiUnits) {
+    if (state.winner) break;
+    if (!state.units.some(u => u.owner === PLAYER)) break;
+
+    while (unit.movesUsed < unit.movement && !state.winner) {
+      const rangedTargets = getRangedAttackTargets(state, unit);
+      if (rangedTargets.length > 0) {
+        const target = pickBestRangedTarget(state, unit, rangedTargets);
+        unit.movesUsed = unit.movement;
+        resolveCombat(state, unit, target);
         checkVictory(state);
-        bestTarget = null; // already moved via combat
         break;
       }
 
-      const minDist = Math.min(...humanUnits.map(h =>
-        Math.abs(h.row - nr) + Math.abs(h.col - nc)
-      ));
-      if (minDist < bestDist) {
-        bestDist = minDist;
-        bestTarget = [nc, nr];
-      }
-    }
+      const validMoves = getValidMoves(state, unit);
+      if (validMoves.length === 0) break;
 
-    if (bestTarget && unit.movesUsed < unit.movement) {
-      unit.movesUsed = unit.movement; // AI uses all remaining movement at once
-      const path = getMovePath(state, unit, bestTarget[0], bestTarget[1]);
-      unit.col = bestTarget[0];
-      unit.row = bestTarget[1];
+      type BestAct =
+        | { kind: 'attack'; col: number; row: number; score: number }
+        | { kind: 'move'; col: number; row: number; score: number; stepsCost: number };
+
+      let best: BestAct | null = null;
+
+      for (const [nc, nr] of validMoves) {
+        const occupant = getUnit(state, nc, nr);
+        if (occupant && occupant.owner === PLAYER) {
+          const s = scoreMeleeAttack(state, unit, occupant);
+          if (!best || s > best.score) best = { kind: 'attack', col: nc, row: nr, score: s };
+        } else {
+          const path = getMovePath(state, unit, nc, nr);
+          const stepsCost = path.length > 0 ? path.length - 1 : 0;
+          const s = scoreEmptyMove(state, unit, nc, nr, stepsCost);
+          if (s === -Infinity) continue;
+          if (!best || s > best.score) best = { kind: 'move', col: nc, row: nr, score: s, stepsCost };
+        }
+      }
+
+      if (!best) break;
+
+      if (best.kind === 'attack') {
+        const target = getUnit(state, best.col, best.row);
+        if (!target || target.owner !== PLAYER) break;
+        const path = getMovePath(state, unit, best.col, best.row);
+        unit.movesUsed = unit.movement;
+        advanceAlongPathBeforeCombat(state, unit, path, AI);
+        resolveCombat(state, unit, target);
+        checkVictory(state);
+        break;
+      }
+
+      const path = getMovePath(state, unit, best.col, best.row);
+      const stepsCost = path.length > 0 ? path.length - 1 : 0;
+      if (unit.movesUsed + stepsCost > unit.movement) break;
+      unit.movesUsed += stepsCost;
       for (const [pc, pr] of path.slice(1)) {
         conquerHex(state, pc, pr, AI);
       }
+      unit.col = best.col;
+      unit.row = best.row;
     }
   }
   log(state, 'AI completed movement.');
