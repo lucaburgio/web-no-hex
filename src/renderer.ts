@@ -1,3 +1,4 @@
+import gsap from 'gsap';
 import { hexToPixel, hexPoints, HEX_SIZE, getNeighbors } from './hex';
 import { COLS, ROWS, PLAYER, AI, getUnit, getUnitById, isValidProductionPlacement, getValidMoves, isInEnemyZoC } from './game';
 import type { Owner } from './types';
@@ -585,10 +586,15 @@ export function renderMovePath(svgElement: SVGSVGElement, path: [number, number]
   const pathDots = svgElement.querySelector('#move-path-dots') as SVGGElement | null;
   if (!pathLine || !pathDots) return;
 
+  gsap.killTweensOf(pathLine);
+  gsap.killTweensOf(pathDots.querySelectorAll('circle'));
+
   pathDots.innerHTML = '';
 
   if (path.length < 2) {
     pathLine.setAttribute('points', '');
+    pathLine.removeAttribute('stroke-dasharray');
+    pathLine.removeAttribute('stroke-dashoffset');
     return;
   }
 
@@ -602,6 +608,18 @@ export function renderMovePath(svgElement: SVGSVGElement, path: [number, number]
   pathLine.setAttribute('stroke-width', String(config.movePathStrokeWidth));
   pathLine.setAttribute('opacity', '0.8');
 
+  const pathLen = pathLine.getTotalLength();
+  const drawSec = Math.max(0.08, config.movePathDrawDurationMs / 1000);
+
+  pathLine.setAttribute('stroke-dasharray', String(pathLen));
+  pathLine.setAttribute('stroke-dashoffset', String(pathLen));
+
+  const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+  tl.to(pathLine, {
+    strokeDashoffset: 0,
+    duration: drawSec,
+  });
+
   // Small dot at each intermediate hex (skip start and end)
   for (const [c, r] of path.slice(1, -1)) {
     const { x, y } = hexToPixel(c, r);
@@ -610,7 +628,22 @@ export function renderMovePath(svgElement: SVGSVGElement, path: [number, number]
     dot.setAttribute('cy', String(y));
     dot.setAttribute('r', String(config.movePathStrokeWidth * 1.8));
     dot.setAttribute('fill', config.movePathColor);
-    dot.setAttribute('opacity', '0.8');
+    dot.setAttribute('opacity', '0');
     pathDots.appendChild(dot);
+  }
+
+  const dots = pathDots.querySelectorAll('circle');
+  if (dots.length > 0) {
+    const dotDuration = Math.min(0.22, drawSec * 0.45);
+    const staggerEach = Math.min(0.06, drawSec / (dots.length + 2));
+    tl.to(
+      dots,
+      {
+        opacity: 0.8,
+        duration: dotDuration,
+        stagger: { each: staggerEach, from: 'start' },
+      },
+      drawSec * 0.55,
+    );
   }
 }

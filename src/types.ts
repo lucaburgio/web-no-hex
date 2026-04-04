@@ -90,4 +90,6 @@ export interface GameConfig {
   movePathColor: string;
   // Stroke width of the movement path preview line (in pixels)
   movePathStrokeWidth: number;
+  // Duration in ms for the movement path preview draw animation (line + dots)
+  movePathDrawDurationMs: number;
 }

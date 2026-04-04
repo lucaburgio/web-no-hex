@@ -91,10 +91,13 @@ const config: GameConfig = {
   mountainPct: 0.12,
 
   // Color of the movement path preview line shown when hovering a valid move hex
-  movePathColor: '#ffffff',
+  movePathColor: '#C77E00',
 
   // Stroke width of the movement path preview line (in pixels)
-  movePathStrokeWidth: 2.5,
+  movePathStrokeWidth: 6,
+
+  // How long the movement path preview takes to draw (line stroke + dot stagger)
+  movePathDrawDurationMs: 420,
 };
 
 export default config;
