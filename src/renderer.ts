@@ -5,6 +5,9 @@ import type { Owner } from './types';
 import type { GameState, Unit } from './types';
 import config from './gameconfig';
 
+/** Hover move-path preview timeline; killed whenever the target hex changes or the path clears. */
+let movePathPreviewTl: gsap.core.Timeline | null = null;
+
 export interface MoveAnimation {
   unit: Unit;      // snapshot of the unit before moving (owner/hp for colour)
   fromCol: number;
@@ -586,8 +589,14 @@ export function renderMovePath(svgElement: SVGSVGElement, path: [number, number]
   const pathDots = svgElement.querySelector('#move-path-dots') as SVGGElement | null;
   if (!pathLine || !pathDots) return;
 
+  // Stop any in-flight preview so rapid hover changes don't stack or fight attributes/styles.
+  movePathPreviewTl?.kill();
+  movePathPreviewTl = null;
   gsap.killTweensOf(pathLine);
-  gsap.killTweensOf(pathDots.querySelectorAll('circle'));
+  const prevDots = pathDots.querySelectorAll('circle');
+  if (prevDots.length) gsap.killTweensOf(prevDots);
+  // GSAP often writes stroke-dash* as inline style; leaving it causes glitches on retarget.
+  pathLine.removeAttribute('style');
 
   pathDots.innerHTML = '';
 
@@ -597,6 +606,8 @@ export function renderMovePath(svgElement: SVGSVGElement, path: [number, number]
     pathLine.removeAttribute('stroke-dashoffset');
     return;
   }
+
+  const pathEase = 'expo.out';
 
   const points = path.map(([c, r]) => {
     const { x, y } = hexToPixel(c, r);
@@ -614,10 +625,12 @@ export function renderMovePath(svgElement: SVGSVGElement, path: [number, number]
   pathLine.setAttribute('stroke-dasharray', String(pathLen));
   pathLine.setAttribute('stroke-dashoffset', String(pathLen));
 
-  const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+  const tl = gsap.timeline({ defaults: { ease: pathEase } });
+  movePathPreviewTl = tl;
   tl.to(pathLine, {
     strokeDashoffset: 0,
     duration: drawSec,
+    ease: pathEase,
   });
 
   // Small dot at each intermediate hex (skip start and end)
@@ -641,6 +654,7 @@ export function renderMovePath(svgElement: SVGSVGElement, path: [number, number]
       {
         opacity: 0.8,
         duration: dotDuration,
+        ease: pathEase,
         stagger: { each: staggerEach, from: 'start' },
       },
       drawSec * 0.55,
