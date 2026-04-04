@@ -274,11 +274,6 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   pathLine.setAttribute('stroke-linejoin', 'round');
   pathLine.setAttribute('pointer-events', 'none');
   movePathLayer.appendChild(pathLine);
-
-  // Dot markers group for intermediate path hexes
-  const pathDots = svgEl('g');
-  pathDots.id = 'move-path-dots';
-  movePathLayer.appendChild(pathDots);
 }
 
 export function renderState(svgElement: SVGSVGElement, state: GameState, productionHex: { col: number; row: number } | null = null, hiddenUnitIds: Set<number> = new Set(), localPlayer: Owner = PLAYER): void {
@@ -586,19 +581,14 @@ export function getHexFromEvent(e: MouseEvent): { col: number; row: number } | n
 // `path` is an array of [col, row] pairs including the unit's start hex; pass [] to clear.
 export function renderMovePath(svgElement: SVGSVGElement, path: [number, number][]): void {
   const pathLine = svgElement.querySelector('#move-path-line') as SVGPolylineElement | null;
-  const pathDots = svgElement.querySelector('#move-path-dots') as SVGGElement | null;
-  if (!pathLine || !pathDots) return;
+  if (!pathLine) return;
 
   // Stop any in-flight preview so rapid hover changes don't stack or fight attributes/styles.
   movePathPreviewTl?.kill();
   movePathPreviewTl = null;
   gsap.killTweensOf(pathLine);
-  const prevDots = pathDots.querySelectorAll('circle');
-  if (prevDots.length) gsap.killTweensOf(prevDots);
   // GSAP often writes stroke-dash* as inline style; leaving it causes glitches on retarget.
   pathLine.removeAttribute('style');
-
-  pathDots.innerHTML = '';
 
   if (path.length < 2) {
     pathLine.setAttribute('points', '');
@@ -632,32 +622,4 @@ export function renderMovePath(svgElement: SVGSVGElement, path: [number, number]
     duration: drawSec,
     ease: pathEase,
   });
-
-  // Small dot at each intermediate hex (skip start and end)
-  for (const [c, r] of path.slice(1, -1)) {
-    const { x, y } = hexToPixel(c, r);
-    const dot = svgEl('circle');
-    dot.setAttribute('cx', String(x));
-    dot.setAttribute('cy', String(y));
-    dot.setAttribute('r', String(config.movePathStrokeWidth * 1.8));
-    dot.setAttribute('fill', config.movePathColor);
-    dot.setAttribute('opacity', '0');
-    pathDots.appendChild(dot);
-  }
-
-  const dots = pathDots.querySelectorAll('circle');
-  if (dots.length > 0) {
-    const dotDuration = Math.min(0.22, drawSec * 0.45);
-    const staggerEach = Math.min(0.06, drawSec / (dots.length + 2));
-    tl.to(
-      dots,
-      {
-        opacity: 0.8,
-        duration: dotDuration,
-        ease: pathEase,
-        stagger: { each: staggerEach, from: 'start' },
-      },
-      drawSec * 0.55,
-    );
-  }
 }

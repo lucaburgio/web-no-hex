@@ -795,6 +795,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
     } else {
       const target = getUnit(state, col, row);
       if (target && target.owner === localPlayer) {
+        clearMovePathPreview();
         state = playerSelectUnit(state, col, row, localPlayer);
         render(); updateUI();
         sendStateUpdate();
@@ -803,10 +804,13 @@ svg.addEventListener('click', (e: MouseEvent) => {
         const selUnit = getUnitById(state, state.selectedUnit)!;
         const validMoves = getValidMoves(state, selUnit);
         if (!validMoves.some(([c, r]) => c === col && r === row)) {
+          clearMovePathPreview();
           state.selectedUnit = null;
           render(); updateUI();
           return;
         }
+
+        clearMovePathPreview();
 
         // Snapshot the moving unit before state changes
         const movingUnitId = state.selectedUnit;
@@ -846,6 +850,7 @@ boardWrap.addEventListener('click', (e: MouseEvent) => {
   if (state.activePlayer !== localPlayer) return;
   if (state.phase !== 'movement' || state.selectedUnit === null) return;
   if ((e.target as Element).closest('[data-col]')) return; // hex click already handled
+  clearMovePathPreview();
   state.selectedUnit = null;
   render(); updateUI();
 });
