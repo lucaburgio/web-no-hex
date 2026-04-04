@@ -1,6 +1,6 @@
 import gsap from 'gsap';
 import { hexToPixel, hexPoints, HEX_SIZE, getNeighbors } from './hex';
-import { COLS, ROWS, PLAYER, AI, getUnit, getUnitById, isValidProductionPlacement, getValidMoves, isInEnemyZoC } from './game';
+import { COLS, ROWS, PLAYER, AI, getUnit, getUnitById, isValidProductionPlacement, getValidMoves, getRangedAttackTargets, isInEnemyZoC } from './game';
 import type { Owner } from './types';
 import type { GameState, Unit } from './types';
 import config from './gameconfig';
@@ -85,6 +85,15 @@ const SVG_ICON_DEFS: Record<string, IconDef> = {
       'M41 25.7547C41 36.6814 33.5625 42.1448 24.7225 45.3135C24.2596 45.4748 23.7568 45.4671 23.2988 45.2917C14.4375 42.1448 7 36.6814 7 25.7547V10.4572C11.6263 8.37169 24 1.71484 24 1.71484C24 1.71484 36.3736 8.37209 41 10.4572V25.7547Z',
     ],
   },
+  'icons/artillery.svg': {
+    viewBox: 48,
+    mode: 'fill',
+    paths: [
+      'M18.5 15V4H29.5V15H35L24 26L13 15H18.5Z',
+      'M7.5 34V23H13L18.5 28.5V34H24L13 45L2 34H7.5Z',
+      'M40.5 34V23H35L29.5 28.5V34H24L35 45L46 34H40.5Z',
+    ],
+  },
 };
 
 function inlineIcon(iconSrc: string | undefined, x: number, y: number, size: number, color: string, opacity: string): SVGGElement | null {
@@ -141,6 +150,7 @@ interface Colors {
   hpHigh: string;
   hpMid: string;
   hpLow: string;
+  rangedTarget: string;
 }
 
 let C: Colors | null = null;
@@ -168,6 +178,7 @@ function colors(): Colors {
     hpHigh:          v('--color-hp-high'),
     hpMid:           v('--color-hp-mid'),
     hpLow:           v('--color-hp-low'),
+    rangedTarget:    v('--color-red-700'),
   };
   return C;
 }
@@ -322,6 +333,13 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
 
   const selectedUnit = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
 
+  const rangedTargetKeys = new Set<string>();
+  if (selectedUnit && state.phase === 'movement' && state.activePlayer === localPlayer) {
+    for (const t of getRangedAttackTargets(state, selectedUnit)) {
+      rangedTargetKeys.add(`${t.col},${t.row}`);
+    }
+  }
+
   const validMoveHexes = new Set<string>();
   if (selectedUnit) {
     for (const [col, row] of getValidMoves(state, selectedUnit)) {
@@ -467,7 +485,8 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     const hpRatio    = unit.hp / unit.maxHp;
 
     const baseColor = unit.owner === PLAYER ? c.player : c.ai;
-    const fill      = isSelected ? c.unitSelected : baseColor;
+    const isRangedTarget = rangedTargetKeys.has(`${unit.col},${unit.row}`);
+    const fill      = isRangedTarget ? c.rangedTarget : isSelected ? c.unitSelected : baseColor;
     const unitDimmed = productionFocusHexes.size > 0;
     const opacity   = (unit.movesUsed >= unit.movement || unitDimmed) ? '0.2' : '1';
 
@@ -509,8 +528,14 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
 
     // Icon (shifted up inside shape)
     const icon = unitIcon(unit.unitTypeId);
-    const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.34, HEX_SIZE * 0.4, c.unitIconColor, opacity);
+    const iconColor = isRangedTarget ? '#ffffff' : c.unitIconColor;
+    const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.34, HEX_SIZE * 0.4, iconColor, opacity);
     if (iconEl) unitLayer.appendChild(iconEl);
+
+    if (isRangedTarget) {
+      const aim = inlineIcon('icons/artillery.svg', x, y - HEX_SIZE * 0.62, HEX_SIZE * 0.36, c.rangedTarget, opacity);
+      if (aim) unitLayer.appendChild(aim);
+    }
   }
 }
 

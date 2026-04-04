@@ -40,13 +40,14 @@ web-strategic/
 - Multiple units can be placed per turn if you have enough PP.
 
 ### Units
-- Each **unit type** defines its own **max HP** and **base strength** (see `unitTypes` in `gameconfig.ts`; e.g. infantry vs tank).
+- Each **unit type** defines its own **max HP** and **base strength** (see `unitTypes` in `gameconfig.ts`; e.g. infantry, tank, artillery).
+- **Artillery** may have **`range`**: it can either **move** or **shoot** at an enemy at hex distance 2–`range` in one turn (not both). Ranged hits deal no damage to the artillery and do not conquer the hex if the defender dies; **adjacent** combat uses normal simultaneous damage and advance rules.
 - Combat Strength (CS) = `strength × condition × flanking`
   - **Condition:** scales from 50% (1 HP) to 100% (full HP)
   - **Flanking:** +15% CS per friendly unit adjacent to the defender (max 2 flankers, capped at +30%), in fixed neighbor order. Some unit types define **extra flanking**: an additional CS multiplier when that type is among those contributing flankers (same cap and order).
 
 ### Movement & Zone of Control
-- Each unit moves **1 hex** per turn.
+- Each unit moves up to its **movement** value per turn (see unit types; e.g. infantry 1, tank 2).
 - Moving onto an empty hex conquers it.
 - **Zone of Control (ZoC):** a unit adjacent to an enemy is "locked" — it may only attack an adjacent enemy or retreat to a hex that is itself not adjacent to any enemy.
 

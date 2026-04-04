@@ -37,6 +37,8 @@ export interface GameState {
 }
 
 export interface CombatForecast {
+  /** True when attacker uses ranged rules (no return fire, no advance on kill). */
+  isRanged?: boolean;
   attackerCS: number;
   defenderCS: number;
   dmgToAttacker: number;
@@ -62,6 +64,8 @@ export interface UnitType {
   strength: number;
   /** Optional extra additive flanking multiplier when this unit is a contributing flanker (same scale as global flankingBonus). */
   extraFlanking?: number;
+  /** If set, unit may attack enemies at this hex distance (2..range) without moving (ranged). */
+  range?: number;
   icon?: string;
 }
 

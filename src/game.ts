@@ -1,4 +1,4 @@
-import { getNeighbors } from './hex';
+import { getNeighbors, hexDistance } from './hex';
 import config from './gameconfig';
 import type { Unit, UnitType, HexState, GameState, CombatForecast, Owner } from './types';
 
@@ -314,7 +314,30 @@ function effectiveCS(unit: Unit, flankingCount: number = 0, extraFlankingSum: nu
   return unit.strength * woundedMult * flankMult;
 }
 
+/** Ranged attack: distance 2..range for unit types that define `range`. */
+function isRangedCombat(attacker: Unit, defender: Unit): boolean {
+  const ut = unitTypeForUnit(attacker);
+  if (!ut.range) return false;
+  const d = hexDistance(attacker.col, attacker.row, defender.col, defender.row, COLS, ROWS);
+  return d >= 2 && d <= ut.range;
+}
+
+/** Enemies the unit can shoot without moving (hex distance 2..range). */
+export function getRangedAttackTargets(state: GameState, unit: Unit): Unit[] {
+  const ut = unitTypeForUnit(unit);
+  if (!ut.range || unit.movesUsed >= unit.movement) return [];
+  const enemy: Owner = unit.owner === PLAYER ? AI : PLAYER;
+  const out: Unit[] = [];
+  for (const u of state.units) {
+    if (u.owner !== enemy) continue;
+    const d = hexDistance(unit.col, unit.row, u.col, u.row, COLS, ROWS);
+    if (d >= 2 && d <= ut.range) out.push(u);
+  }
+  return out;
+}
+
 function resolveCombat(state: GameState, attacker: Unit, defender: Unit): void {
+  const ranged = isRangedCombat(attacker, defender);
   const { count: flanking, extraSum } = analyzeFlanking(state, attacker, defender);
   const csA = effectiveCS(attacker, flanking, extraSum);
   const csD = effectiveCS(defender, 0);
@@ -323,12 +346,30 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): void {
   const base  = config.combatDamageBase;
 
   const dmgToDefender = Math.max(1, Math.floor(base * Math.exp( delta / scale)));
-  const dmgToAttacker = Math.max(1, Math.floor(base * Math.exp(-delta / scale)));
+  const dmgToAttacker = ranged ? 0 : Math.max(1, Math.floor(base * Math.exp(-delta / scale)));
 
   const flankStr = flanking > 0 ? ` (${flanking} flanker${flanking > 1 ? 's' : ''})` : '';
-  log(state, `Combat: #${attacker.id} [${Math.round(csA)}CS] vs #${defender.id} [${Math.round(csD)}CS]${flankStr} → dealt ${dmgToDefender}/${dmgToAttacker} dmg`);
+  if (ranged) {
+    log(state, `Ranged: #${attacker.id} [${Math.round(csA)}CS] vs #${defender.id} [${Math.round(csD)}CS]${flankStr} → dealt ${dmgToDefender} dmg (no return fire)`);
+  } else {
+    log(state, `Combat: #${attacker.id} [${Math.round(csA)}CS] vs #${defender.id} [${Math.round(csD)}CS]${flankStr} → dealt ${dmgToDefender}/${dmgToAttacker} dmg`);
+  }
 
-  // Apply damage simultaneously
+  if (ranged) {
+    defender.hp -= dmgToDefender;
+    attacker.attackedThisTurn = true;
+    defender.attackedThisTurn = true;
+    const defenderDied = defender.hp <= 0;
+    if (defenderDied) {
+      log(state, `Unit #${defender.id} was destroyed.`);
+      removeUnit(state, defender.id);
+    } else {
+      log(state, `Defender has ${defender.hp} HP remaining.`);
+    }
+    return;
+  }
+
+  // Melee: apply damage simultaneously
   attacker.hp -= dmgToAttacker;
   defender.hp -= dmgToDefender;
   attacker.attackedThisTurn = true;
@@ -358,6 +399,7 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): void {
 // ── Combat forecast (pure — no state mutation) ────────────────────────────────
 
 export function forecastCombat(state: GameState, attacker: Unit, defender: Unit): CombatForecast {
+  const ranged = isRangedCombat(attacker, defender);
   const { count: flanking, extraSum, extraFlankingFrom } = analyzeFlanking(state, attacker, defender);
   const csA = effectiveCS(attacker, flanking, extraSum);
   const csD = effectiveCS(defender, 0);
@@ -366,16 +408,17 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
   const base  = config.combatDamageBase;
 
   const dmgToDefender = Math.max(1, Math.floor(base * Math.exp( delta / scale)));
-  const dmgToAttacker = Math.max(1, Math.floor(base * Math.exp(-delta / scale)));
+  const dmgToAttacker = ranged ? 0 : Math.max(1, Math.floor(base * Math.exp(-delta / scale)));
 
   return {
+    isRanged:             ranged,
     attackerCS:           Math.round(csA),
     defenderCS:           Math.round(csD),
     dmgToAttacker,
     dmgToDefender,
     attackerHpAfter:      Math.max(0, attacker.hp - dmgToAttacker),
     defenderHpAfter:      Math.max(0, defender.hp - dmgToDefender),
-    attackerDies:         attacker.hp - dmgToAttacker <= 0,
+    attackerDies:         ranged ? false : attacker.hp - dmgToAttacker <= 0,
     defenderDies:         defender.hp - dmgToDefender <= 0,
     flankingCount:        flanking,
     flankBonusPct:        Math.round(flanking * config.flankingBonus * 100),
@@ -599,6 +642,33 @@ export function playerMoveUnit(state: GameState, col: number, row: number, local
   return state;
 }
 
+export function playerRangedAttack(state: GameState, col: number, row: number, localPlayer: Owner = PLAYER): GameState {
+  const enemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
+  if (state.phase !== 'movement' || state.activePlayer !== localPlayer) return state;
+  if (state.selectedUnit === null) return state;
+
+  const unit = getUnitById(state, state.selectedUnit);
+  if (!unit) { state.selectedUnit = null; return state; }
+
+  const target = getUnit(state, col, row);
+  if (!target || target.owner !== enemy) {
+    log(state, 'No enemy at that hex.');
+    return state;
+  }
+
+  const rangedOk = getRangedAttackTargets(state, unit).some(t => t.id === target.id);
+  if (!rangedOk) {
+    log(state, 'Target is out of ranged attack range.');
+    return state;
+  }
+
+  unit.movesUsed = unit.movement;
+  state.selectedUnit = null;
+  resolveCombat(state, unit, target);
+  checkVictory(state);
+  return state;
+}
+
 export function playerEndMovement(state: GameState): GameState {
   if (state.phase !== 'movement' || state.activePlayer !== PLAYER) return state;
   log(state, 'You ended your movement.');
@@ -639,6 +709,15 @@ export function aiMovement(state: GameState): GameState {  // exported for anima
   for (const unit of aiUnits) {
     const humanUnits = state.units.filter(u => u.owner === PLAYER);
     if (humanUnits.length === 0) break;
+
+    const rangedTargets = getRangedAttackTargets(state, unit);
+    if (rangedTargets.length > 0) {
+      const target = rangedTargets[0]!;
+      unit.movesUsed = unit.movement;
+      resolveCombat(state, unit, target);
+      checkVictory(state);
+      continue;
+    }
 
     const validMoves = getValidMoves(state, unit);
     let bestTarget: [number, number] | null = null;

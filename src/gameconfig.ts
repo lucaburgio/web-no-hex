@@ -80,6 +80,16 @@ const config: GameConfig = {
       extraFlanking: 0.05,
       icon: 'icons/tank.svg',
     },
+    {
+      id: 'artillery',
+      name: 'Artillery',
+      cost: 30,
+      movement: 1,
+      maxHp: 10,
+      strength: 10,
+      range: 3,
+      icon: 'icons/artillery.svg',
+    },
   ],
 
   // ── Combat ──────────────────────────────────────────────────────────────────

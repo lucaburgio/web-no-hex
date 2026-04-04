@@ -11,6 +11,8 @@ import {
   getUnitById,
   getValidMoves,
   getMovePath,
+  getRangedAttackTargets,
+  playerRangedAttack,
   isValidProductionPlacement,
   forecastCombat,
   vsHumanEndProduction,
@@ -431,8 +433,18 @@ introContinueBtn.addEventListener('click', () => {
 // ── Rules content ─────────────────────────────────────────────────────────────
 
 function buildRulesContent(): string {
+  const ar = config.unitTypes.find(u => u.id === 'artillery');
+  const arRanged =
+    ar?.range != null
+      ? `2–${ar.range} hexes away`
+      : '2+ hexes away';
   const unitList = config.unitTypes
-    .map(u => `<strong>${u.name}</strong> (${u.cost} PP, ${u.maxHp} HP, base str ${u.strength})`)
+    .map(u => {
+      let s = `<strong>${u.name}</strong> (${u.cost} PP, ${u.maxHp} HP, move ${u.movement}, base str ${u.strength}`;
+      if (u.range) s += `, ranged attack range ${u.range} hexes`;
+      s += ')';
+      return s;
+    })
     .join(', ');
   const maxFlankBonus = Math.round(config.maxFlankingUnits * config.flankingBonus * 100);
   return `
@@ -465,13 +477,15 @@ function buildRulesContent(): string {
     <ul>
       <li>Each unit may move up to its movement range per turn (see unit types). Moving onto an empty hex <strong>conquers</strong> it.</li>
       <li>Moving onto an enemy unit triggers <strong>combat</strong>. If you need more than one hex to reach them, you move along the path into the hex adjacent to the enemy first, then combat resolves.</li>
+      <li><strong>Artillery:</strong> each turn you either <strong>move</strong> one hex or fire a <strong>ranged attack</strong> at an enemy ${arRanged} (not both). Ranged fire does not use movement into the target&rsquo;s hex.</li>
       <li><strong>Zone of Control (ZoC):</strong> a unit adjacent to an enemy is locked — it may only attack
-        or retreat to a hex not itself adjacent to any enemy.</li>
+        or retreat to a hex not itself adjacent to any enemy. ZoC limits movement and adjacent attacks; it does not block artillery ranged fire at longer range.</li>
     </ul>
 
     <h3>Combat</h3>
     <ul>
-      <li>Both sides deal damage <strong>simultaneously</strong>.</li>
+      <li><strong>Adjacent combat:</strong> both sides deal damage <strong>simultaneously</strong>. If the defender is destroyed, the attacker advances and conquers the hex.</li>
+      <li><strong>Artillery ranged (2+ hexes):</strong> only the defender takes damage (no return fire). Destroying a unit with a ranged attack does <strong>not</strong> move the artillery or conquer that hex.</li>
       <li><strong>CS</strong> = unit type&rsquo;s base strength × condition (50–100% of current max HP) × flanking bonus.</li>
       <li><strong>Flanking:</strong> +${Math.round(config.flankingBonus * 100)}% CS per adjacent friendly
         (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%), in fixed neighbor order.
@@ -824,10 +838,24 @@ svg.addEventListener('click', (e: MouseEvent) => {
         render(); updateUI();
         sendStateUpdate();
       } else {
-        // Deselect if clicked hex is not a valid move destination
+        // Deselect if clicked hex is not a valid move destination (unless ranged attack on enemy)
         const selUnit = getUnitById(state, state.selectedUnit)!;
         const validMoves = getValidMoves(state, selUnit);
+        const clickTarget = getUnit(state, col, row);
+        const enemyOwner: Owner = localPlayer === PLAYER ? AI : PLAYER;
+        const canRanged =
+          clickTarget &&
+          clickTarget.owner === enemyOwner &&
+          getRangedAttackTargets(state, selUnit).some(u => u.id === clickTarget.id);
+
         if (!validMoves.some(([c, r]) => c === col && r === row)) {
+          if (canRanged) {
+            clearMovePathPreview();
+            state = playerRangedAttack(state, col, row, localPlayer);
+            if (gameMode === 'vsAI') saveGameState(state);
+            render(); updateUI(); checkWinner(); sendStateUpdate(); maybeAutoEnd();
+            return;
+          }
           clearMovePathPreview();
           state.selectedUnit = null;
           render(); updateUI();
@@ -1012,7 +1040,7 @@ function canAffordAnyUnit(): boolean {
 function hasAnyValidMove(): boolean {
   return state.units
     .filter(u => u.owner === localPlayer && u.movesUsed < u.movement)
-    .some(u => getValidMoves(state, u).length > 0);
+    .some(u => getValidMoves(state, u).length > 0 || getRangedAttackTargets(state, u).length > 0);
 }
 
 function maybeAutoEnd(): void {
@@ -1162,11 +1190,16 @@ function buildSideHTML(unit: Unit, dmg: number, hpAfter: number, label: string, 
 }
 
 function showCombatTooltip(attacker: Unit, defender: Unit, pageX: number, pageY: number): void {
-  const path = getMovePath(state, attacker, defender.col, defender.row);
-  const attackerForForecast =
-    path.length >= 3
-      ? { ...attacker, col: path[path.length - 2][0], row: path[path.length - 2][1] }
-      : attacker;
+  const validMoves = getValidMoves(state, attacker);
+  const meleeAttack = validMoves.some(([c, r]) => c === defender.col && r === defender.row);
+  let attackerForForecast = attacker;
+  if (meleeAttack) {
+    const path = getMovePath(state, attacker, defender.col, defender.row);
+    attackerForForecast =
+      path.length >= 3
+        ? { ...attacker, col: path[path.length - 2][0]!, row: path[path.length - 2][1]! }
+        : attacker;
+  }
   const fc: CombatForecast = forecastCombat(state, attackerForForecast, defender);
 
   const attackerFactors: SideFactors = {
@@ -1197,8 +1230,9 @@ function showCombatTooltip(attacker: Unit, defender: Unit, pageX: number, pageY:
   const attackerLabel = localPlayer === PLAYER ? `You (P${attacker.id})` : `You (A${attacker.id})`;
   const defenderLabel = localPlayer === PLAYER ? `Opponent (A${defender.id})` : `Opponent (P${defender.id})`;
 
+  const title = fc.isRanged ? 'Ranged attack' : 'Combat Forecast';
   tooltipEl.innerHTML = `
-    <div class="tt-title">Combat Forecast</div>
+    <div class="tt-title">${title}</div>
     <div class="tt-columns">
       ${buildSideHTML(attacker, fc.dmgToAttacker, fc.attackerHpAfter, attackerLabel, 'attacker', attackerFactors)}
       ${buildSideHTML(defender, fc.dmgToDefender, fc.defenderHpAfter, defenderLabel, 'defender', defenderFactors)}
@@ -1277,8 +1311,9 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
 
   if (!target || target.owner !== enemyOwner) { tooltipEl.classList.add('hidden'); svg.classList.remove('cursor-fight'); return; }
 
-  const canAttack = validMoves.some(([c, r]) => c === hex.col && r === hex.row);
-  if (!canAttack) { tooltipEl.classList.add('hidden'); svg.classList.remove('cursor-fight'); return; }
+  const canMelee = validMoves.some(([c, r]) => c === hex.col && r === hex.row);
+  const canRanged = getRangedAttackTargets(state, attacker).some(t => t.id === target.id);
+  if (!canMelee && !canRanged) { tooltipEl.classList.add('hidden'); svg.classList.remove('cursor-fight'); return; }
 
   svg.classList.add('cursor-fight');
   showCombatTooltip(attacker, target, e.pageX, e.pageY);
