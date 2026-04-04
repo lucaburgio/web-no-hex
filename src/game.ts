@@ -580,6 +580,39 @@ function collectAiProductionCandidates(state: GameState): [number, number][] {
   return candidates;
 }
 
+/** Minimum BFS steps for any player unit to reach any hex on the AI home row (player win). */
+function minPlayerStepsToAiHome(state: GameState): number {
+  let min = Infinity;
+  for (const u of state.units) {
+    if (u.owner !== PLAYER) continue;
+    min = Math.min(min, minHexStepsToOpponentHomeRow(state, u.col, u.row, PLAYER));
+  }
+  return Number.isFinite(min) ? min : 999;
+}
+
+/** 0 = calm, 1 = player is very close to winning on the AI border. */
+function aiDefensivePressure(state: GameState): number {
+  const minSteps = minPlayerStepsToAiHome(state);
+  const NEAR = 6;
+  if (minSteps >= NEAR) return 0;
+  return (NEAR - minSteps) / NEAR;
+}
+
+/** Player unit closest to reaching the AI home row (primary threat to stop). */
+function criticalThreatPlayerUnit(state: GameState): Unit | null {
+  let best: Unit | null = null;
+  let bestD = Infinity;
+  for (const u of state.units) {
+    if (u.owner !== PLAYER) continue;
+    const d = minHexStepsToOpponentHomeRow(state, u.col, u.row, PLAYER);
+    if (d < bestD || (d === bestD && best && u.row < best.row)) {
+      bestD = d;
+      best = u;
+    }
+  }
+  return best;
+}
+
 function aiUnitCountsByType(state: GameState): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const u of state.units) {
@@ -590,6 +623,7 @@ function aiUnitCountsByType(state: GameState): Record<string, number> {
 }
 
 function scoreAiProductionPlacement(state: GameState, ut: UnitType, col: number, row: number): number {
+  const pressure = aiDefensivePressure(state);
   const neighbors = getNeighbors(col, row, COLS, ROWS);
   let adjacentEnemy = 0;
   let expandNeighbor = 0;
@@ -607,19 +641,25 @@ function scoreAiProductionPlacement(state: GameState, ut: UnitType, col: number,
   const total = Math.max(1, inf + tn + ar);
 
   // Closer to the human home row, more neutral/enemy neighbors to expand territory
-  let score = -distToGoal * 18 + expandNeighbor * 6 + row * 5;
+  let score =
+    -distToGoal * 18 * (1 - pressure * 0.72) +
+    expandNeighbor * 6 * (1 - pressure * 0.55) +
+    row * 5 * (1 - pressure * 0.65);
+  score += pressure * (ROWS - 1 - row) * 18;
+  score += pressure * adjacentEnemy * 28;
 
   if (ut.id === 'tank') {
-    score += row * 6;
-    if (adjacentEnemy > 0) score -= 55;
+    score += row * 6 * (1 - pressure * 0.55);
+    if (adjacentEnemy > 0) score -= 55 * (1 - pressure * 0.65);
     if (tn < Math.max(1, inf * 0.25)) score += 45;
   } else if (ut.id === 'artillery') {
     score += (ROWS - 1 - row) * 14;
-    if (adjacentEnemy > 0) score -= 85;
+    if (adjacentEnemy > 0) score -= 85 * (1 - pressure * 0.45);
     else score += 35;
     if (ar < Math.max(1, inf * 0.35)) score += 40;
+    score += pressure * 22;
   } else {
-    score += row * 4;
+    score += row * 4 * (1 - pressure * 0.55);
     if (inf / total > 0.65) score -= 25;
   }
 
@@ -807,7 +847,7 @@ export function syncUnitIdCounter(state: GameState): void {
 
 const AI_MOVE_TYPE_ORDER: Record<string, number> = { artillery: 0, tank: 1, infantry: 2 };
 
-function pickBestRangedTarget(state: GameState, attacker: Unit, targets: Unit[]): Unit {
+function pickBestRangedTarget(state: GameState, attacker: Unit, targets: Unit[], pressure: number): Unit {
   let best = targets[0]!;
   let bestScore = -Infinity;
   for (const t of targets) {
@@ -815,10 +855,12 @@ function pickBestRangedTarget(state: GameState, attacker: Unit, targets: Unit[])
     let s = 0;
     if (fc.defenderDies) s += 520;
     else s += fc.dmgToDefender * 3;
-    // Frontline enemies (further south) block the win condition most
-    s += t.row * 22;
+    const threatSteps = minHexStepsToOpponentHomeRow(state, t.col, t.row, PLAYER);
+    s += pressure * (8 - Math.min(threatSteps, 8)) * 42;
+    // Frontline enemies (further south) matter more when not in a defensive crisis
+    s += t.row * 22 * (1 - pressure * 0.85);
     const distGoal = minHexStepsToOpponentHomeRow(state, t.col, t.row, AI);
-    s -= distGoal * 2;
+    s -= distGoal * 2 * (1 - pressure * 0.7);
     if (s > bestScore) {
       bestScore = s;
       best = t;
@@ -827,21 +869,24 @@ function pickBestRangedTarget(state: GameState, attacker: Unit, targets: Unit[])
   return best;
 }
 
-function scoreMeleeAttack(state: GameState, attacker: Unit, defender: Unit): number {
+function scoreMeleeAttack(state: GameState, attacker: Unit, defender: Unit, pressure: number): number {
   const fc = forecastCombat(state, attacker, defender);
   let s = 0;
   if (fc.defenderDies && !fc.attackerDies) s += 480;
   else if (fc.defenderDies && fc.attackerDies) s += 120;
   else s += fc.dmgToDefender * 2 - fc.dmgToAttacker * 2.2;
-  s += defender.row * 18;
+  const threatSteps = minHexStepsToOpponentHomeRow(state, defender.col, defender.row, PLAYER);
+  s += pressure * (8 - Math.min(threatSteps, 8)) * 38;
+  s += defender.row * 18 * (1 - pressure * 0.65);
+  s += pressure * (ROWS - 1 - defender.row) * 20;
   if (fc.defenderDies && !fc.attackerDies) {
     const afterGoal = minHexStepsToOpponentHomeRow(state, defender.col, defender.row, AI);
-    s -= afterGoal * 8;
+    s -= afterGoal * 8 * (1 - pressure * 0.5);
   }
   const favorable =
     fc.defenderDies ||
     (!fc.attackerDies && fc.dmgToDefender > fc.dmgToAttacker + 1);
-  if (!favorable) s -= 85;
+  if (!favorable) s -= 85 * (1 - pressure * 0.35);
   return s;
 }
 
@@ -850,20 +895,36 @@ function scoreEmptyMove(
   unit: Unit,
   toCol: number,
   toRow: number,
-  stepsCost: number
+  stepsCost: number,
+  pressure: number,
+  threat: Unit | null
 ): number {
   if (unit.movesUsed + stepsCost > unit.movement) return -Infinity;
   const before = minHexStepsToOpponentHomeRow(state, unit.col, unit.row, AI);
   const after = minHexStepsToOpponentHomeRow(state, toCol, toRow, AI);
-  let s = (before - after) * 28;
+  let s = (before - after) * 28 * (1 - pressure * 0.82);
   const hex = state.hexStates[`${toCol},${toRow}`];
-  if (!hex || hex.owner !== AI) s += 14;
-  s += toRow * 1.5;
+  const terr = !hex || hex.owner !== AI ? 14 : 0;
+  s += terr * (1 - pressure * 0.55);
+  s += toRow * 1.5 * (1 - pressure * 0.65);
+  s += pressure * (ROWS - 1 - toRow) * 10;
+  if (threat && pressure > 0) {
+    const beforeT = bfsDistance(state, unit.col, unit.row, threat.col, threat.row);
+    const afterT = bfsDistance(state, toCol, toRow, threat.col, threat.row);
+    s += (beforeT - afterT) * 52 * pressure;
+  }
   return s;
 }
 
 export function aiMovement(state: GameState): GameState {  // exported for animation split
+  const pressure = aiDefensivePressure(state);
+  const threat = criticalThreatPlayerUnit(state);
   const aiUnits = state.units.filter(u => u.owner === AI).sort((a, b) => {
+    if (pressure > 0.12 && threat) {
+      const da = bfsDistance(state, a.col, a.row, threat.col, threat.row);
+      const db = bfsDistance(state, b.col, b.row, threat.col, threat.row);
+      if (da !== db) return da - db;
+    }
     const oa = AI_MOVE_TYPE_ORDER[a.unitTypeId] ?? 9;
     const ob = AI_MOVE_TYPE_ORDER[b.unitTypeId] ?? 9;
     if (oa !== ob) return oa - ob;
@@ -877,7 +938,7 @@ export function aiMovement(state: GameState): GameState {  // exported for anima
     while (unit.movesUsed < unit.movement && !state.winner) {
       const rangedTargets = getRangedAttackTargets(state, unit);
       if (rangedTargets.length > 0) {
-        const target = pickBestRangedTarget(state, unit, rangedTargets);
+        const target = pickBestRangedTarget(state, unit, rangedTargets, pressure);
         unit.movesUsed = unit.movement;
         resolveCombat(state, unit, target);
         checkVictory(state);
@@ -896,12 +957,12 @@ export function aiMovement(state: GameState): GameState {  // exported for anima
       for (const [nc, nr] of validMoves) {
         const occupant = getUnit(state, nc, nr);
         if (occupant && occupant.owner === PLAYER) {
-          const s = scoreMeleeAttack(state, unit, occupant);
+          const s = scoreMeleeAttack(state, unit, occupant, pressure);
           if (!best || s > best.score) best = { kind: 'attack', col: nc, row: nr, score: s };
         } else {
           const path = getMovePath(state, unit, nc, nr);
           const stepsCost = path.length > 0 ? path.length - 1 : 0;
-          const s = scoreEmptyMove(state, unit, nc, nr, stepsCost);
+          const s = scoreEmptyMove(state, unit, nc, nr, stepsCost, pressure, threat);
           if (s === -Infinity) continue;
           if (!best || s > best.score) best = { kind: 'move', col: nc, row: nr, score: s, stepsCost };
         }
