@@ -4,7 +4,6 @@ import {
   playerEndProduction,
   playerSelectUnit,
   playerMoveUnit,
-  playerEndMovement,
   prepareAiTurn,
   aiMovement,
   endTurnAfterAi,
@@ -999,15 +998,8 @@ function maybeAutoEnd(): void {
     checkWinner();
   } else if (state.phase === 'movement' && autoEndMovementEl.checked && !hasAnyValidMove()) {
     if (gameMode === 'vsAI') {
-      const prevTurn = state.turn;
-      state = playerEndMovement(state);
-      if (state.turn !== prevTurn) {
-        turnSnapshots.push(structuredClone(state));
-        saveGameState(state);
-      }
-      render();
-      updateUI();
-      checkWinner();
+      // Same as clicking "End movement": run AI with move animations (do not use playerEndMovement / advancePhase).
+      runAiTurnWithAnimation();
     } else {
       state = vsHumanEndMovement(state, localPlayer);
       render(); updateUI(); checkWinner();
