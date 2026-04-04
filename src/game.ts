@@ -580,22 +580,30 @@ function collectAiProductionCandidates(state: GameState): [number, number][] {
   return candidates;
 }
 
-/** Minimum BFS steps for any player unit to reach any hex on the AI home row (player win). */
-function minPlayerStepsToAiHome(state: GameState): number {
-  let min = Infinity;
+/**
+ * How far the northernmost player unit has advanced toward the AI home row, as a fraction of the
+ * board height (0 = south / player start row, 1 = north / AI home row). Scales with map size.
+ */
+function minPlayerRowProgressTowardAiHome(state: GameState): number {
+  if (ROWS <= 1) return 0;
+  let minRow = Infinity;
   for (const u of state.units) {
     if (u.owner !== PLAYER) continue;
-    min = Math.min(min, minHexStepsToOpponentHomeRow(state, u.col, u.row, PLAYER));
+    minRow = Math.min(minRow, u.row);
   }
-  return Number.isFinite(min) ? min : 999;
+  if (!Number.isFinite(minRow)) return 0;
+  return (ROWS - 1 - minRow) / (ROWS - 1);
 }
 
-/** 0 = calm, 1 = player is very close to winning on the AI border. */
+/**
+ * 0 = calm, 1 = player is deep in the northern quarter of the map (past 75% of the march from
+ * south to north). Ramps linearly from 75% → 100% progress.
+ */
 function aiDefensivePressure(state: GameState): number {
-  const minSteps = minPlayerStepsToAiHome(state);
-  const NEAR = 6;
-  if (minSteps >= NEAR) return 0;
-  return (NEAR - minSteps) / NEAR;
+  const progress = minPlayerRowProgressTowardAiHome(state);
+  const RAMP_START = 0.75;
+  if (progress <= RAMP_START) return 0;
+  return (progress - RAMP_START) / (1 - RAMP_START);
 }
 
 /** Player unit closest to reaching the AI home row (primary threat to stop). */
