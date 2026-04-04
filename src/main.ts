@@ -816,6 +816,8 @@ svg.addEventListener('click', (e: MouseEvent) => {
         const movingUnitId = state.selectedUnit;
         const movingUnit = getUnitById(state, movingUnitId)!;
         const fromCol = movingUnit.col, fromRow = movingUnit.row;
+        const pathHexes = getMovePath(state, movingUnit, col, row);
+        const pathForAnim = pathHexes.length >= 2 ? pathHexes : undefined;
 
         state = playerMoveUnit(state, col, row, localPlayer);
 
@@ -828,8 +830,8 @@ svg.addEventListener('click', (e: MouseEvent) => {
           isAnimating = true;
           renderState(svg, state, pendingProductionHex, new Set([movingUnitId]), localPlayer);
           updateUI();
-          sendStateUpdate({ unit: animUnit, fromCol, fromRow, toCol, toRow });
-          animateMoves(svg, [{ unit: movingUnit, fromCol, fromRow, toCol, toRow }], config.unitMoveSpeed, () => {
+          sendStateUpdate({ unit: animUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim });
+          animateMoves(svg, [{ unit: movingUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim }], config.unitMoveSpeed, () => {
             isAnimating = false;
             if (gameMode === 'vsAI') saveGameState(state);
             render(); checkWinner(); maybeAutoEnd();
@@ -900,6 +902,7 @@ function runAiTurnWithAnimation(): void {
   );
 
   // 3. Run AI movement (state is now fully updated)
+  const stateBeforeAi = structuredClone(state);
   state = aiMovement(state);
 
   if (state.winner) {
@@ -912,7 +915,16 @@ function runAiTurnWithAnimation(): void {
   for (const unit of state.units.filter(u => u.owner === AI)) {
     const pre = preAiPositions.get(unit.id);
     if (pre && (pre.col !== unit.col || pre.row !== unit.row)) {
-      moves.push({ unit: pre.unit, fromCol: pre.col, fromRow: pre.row, toCol: unit.col, toRow: unit.row });
+      const uBefore = getUnitById(stateBeforeAi, unit.id)!;
+      const pathHexes = getMovePath(stateBeforeAi, uBefore, unit.col, unit.row);
+      moves.push({
+        unit: pre.unit,
+        fromCol: pre.col,
+        fromRow: pre.row,
+        toCol: unit.col,
+        toRow: unit.row,
+        pathHexes: pathHexes.length >= 2 ? pathHexes : undefined,
+      });
     }
   }
 

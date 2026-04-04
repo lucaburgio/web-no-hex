@@ -14,6 +14,49 @@ export interface MoveAnimation {
   fromRow: number;
   toCol: number;
   toRow: number;
+  /** Hex centers from start to destination (inclusive); if omitted, animation is a straight segment. */
+  pathHexes?: [number, number][];
+}
+
+function easeInOutQuad(t: number): number {
+  return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+}
+
+/** Position at fraction `t01` (0–1) of total arc length along the polyline. */
+function positionOnPolyline(points: { x: number; y: number }[], t01: number): { x: number; y: number } {
+  if (points.length === 0) return { x: 0, y: 0 };
+  if (points.length === 1) return points[0]!;
+  const t = Math.min(1, Math.max(0, t01));
+  const segLens: number[] = [];
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const dx = points[i + 1]!.x - points[i]!.x;
+    const dy = points[i + 1]!.y - points[i]!.y;
+    const seg = Math.hypot(dx, dy);
+    segLens.push(seg);
+    total += seg;
+  }
+  if (total <= 0) return points[points.length - 1]!;
+  let targetDist = t * total;
+  for (let i = 0; i < segLens.length; i++) {
+    const seg = segLens[i]!;
+    if (targetDist <= seg) {
+      const ratio = seg === 0 ? 0 : targetDist / seg;
+      return {
+        x: points[i]!.x + (points[i + 1]!.x - points[i]!.x) * ratio,
+        y: points[i]!.y + (points[i + 1]!.y - points[i]!.y) * ratio,
+      };
+    }
+    targetDist -= seg;
+  }
+  return points[points.length - 1]!;
+}
+
+function pixelPathForAnimation(anim: MoveAnimation): { x: number; y: number }[] {
+  if (anim.pathHexes && anim.pathHexes.length >= 2) {
+    return anim.pathHexes.map(([c, r]) => hexToPixel(c, r));
+  }
+  return [hexToPixel(anim.fromCol, anim.fromRow), hexToPixel(anim.toCol, anim.toRow)];
 }
 
 function unitIcon(unitTypeId: string): string | undefined {
@@ -503,8 +546,7 @@ export function animateMoves(
   let completed = 0;
 
   for (const anim of animations) {
-    const from = hexToPixel(anim.fromCol, anim.fromRow);
-    const to   = hexToPixel(anim.toCol,   anim.toRow);
+    const pixelPath = pixelPathForAnimation(anim);
     const baseColor = anim.unit.owner === PLAYER ? c.player : c.ai;
     const hpRatio   = anim.unit.hp / anim.unit.maxHp;
 
@@ -546,9 +588,8 @@ export function animateMoves(
 
     (function step(now: number): void {
       const t    = Math.min((now - startTime) / durationMs, 1);
-      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease-in-out
-      const x    = from.x + (to.x - from.x) * ease;
-      const y    = from.y + (to.y - from.y) * ease;
+      const ease = easeInOutQuad(t);
+      const { x, y } = positionOnPolyline(pixelPath, ease);
 
       circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
       barBg.setAttribute('x',   String(x - animBarW / 2));
