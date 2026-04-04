@@ -118,6 +118,9 @@ const config: GameConfig = {
   // Whether Zone of Control is active (blocks free movement past enemies)
   zoneOfControl: true,
 
+  // If true, artillery cannot ranged-attack while any enemy is adjacent (must fight adjacent first)
+  limitArtillery: false,
+
   // ── Automation ───────────────────────────────────────────────────────────────
 
   // Automatically end the production phase when the player can no longer afford any unit

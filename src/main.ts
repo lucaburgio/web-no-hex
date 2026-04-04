@@ -287,8 +287,9 @@ declare const _cfgNumProxy: {
   mountainPct: number;
 };
 
-const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'autoEndProduction' | 'autoEndMovement']> = [
+const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'limitArtillery' | 'autoEndProduction' | 'autoEndMovement']> = [
   ['cfg-zoneOfControl',      'zoneOfControl'],
+  ['cfg-limitArtillery',     'limitArtillery'],
   ['cfg-autoEndProduction',  'autoEndProduction'],
   ['cfg-autoEndMovement',    'autoEndMovement'],
 ];
@@ -486,6 +487,7 @@ function buildRulesContent(): string {
     <ul>
       <li><strong>Adjacent combat:</strong> both sides deal damage <strong>simultaneously</strong>. If the defender is destroyed, the attacker advances and conquers the hex.</li>
       <li><strong>Artillery ranged (2+ hexes):</strong> only the defender takes damage (no return fire). Destroying a unit with a ranged attack does <strong>not</strong> move the artillery or conquer that hex.</li>
+      <li><strong>Limit Artillery</strong> (optional game setting): when enabled, if <strong>any</strong> enemy is adjacent to your artillery, it cannot use ranged attacks against other hexes until no adjacent enemies remain — use adjacent combat (move to attack) first.</li>
       <li><strong>CS</strong> = unit type&rsquo;s base strength × condition (50–100% of current max HP) × flanking bonus.</li>
       <li><strong>Flanking:</strong> +${Math.round(config.flankingBonus * 100)}% CS per adjacent friendly
         (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%), in fixed neighbor order.

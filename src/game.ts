@@ -314,10 +314,24 @@ function effectiveCS(unit: Unit, flankingCount: number = 0, extraFlankingSum: nu
   return unit.strength * woundedMult * flankMult;
 }
 
+/** True when limit-artillery mode blocks ranged fire (any enemy adjacent to this ranged unit). */
+function limitArtilleryBlocksRanged(state: GameState, unit: Unit): boolean {
+  if (!config.limitArtillery) return false;
+  const ut = unitTypeForUnit(unit);
+  if (!ut.range) return false;
+  const enemy: Owner = unit.owner === PLAYER ? AI : PLAYER;
+  for (const [c, r] of getNeighbors(unit.col, unit.row, COLS, ROWS)) {
+    const u = getUnit(state, c, r);
+    if (u && u.owner === enemy) return true;
+  }
+  return false;
+}
+
 /** Ranged attack: distance 2..range for unit types that define `range`. */
-function isRangedCombat(attacker: Unit, defender: Unit): boolean {
+function isRangedCombat(state: GameState, attacker: Unit, defender: Unit): boolean {
   const ut = unitTypeForUnit(attacker);
   if (!ut.range) return false;
+  if (limitArtilleryBlocksRanged(state, attacker)) return false;
   const d = hexDistance(attacker.col, attacker.row, defender.col, defender.row, COLS, ROWS);
   return d >= 2 && d <= ut.range;
 }
@@ -326,6 +340,7 @@ function isRangedCombat(attacker: Unit, defender: Unit): boolean {
 export function getRangedAttackTargets(state: GameState, unit: Unit): Unit[] {
   const ut = unitTypeForUnit(unit);
   if (!ut.range || unit.movesUsed >= unit.movement) return [];
+  if (limitArtilleryBlocksRanged(state, unit)) return [];
   const enemy: Owner = unit.owner === PLAYER ? AI : PLAYER;
   const out: Unit[] = [];
   for (const u of state.units) {
@@ -337,7 +352,7 @@ export function getRangedAttackTargets(state: GameState, unit: Unit): Unit[] {
 }
 
 function resolveCombat(state: GameState, attacker: Unit, defender: Unit): void {
-  const ranged = isRangedCombat(attacker, defender);
+  const ranged = isRangedCombat(state, attacker, defender);
   const { count: flanking, extraSum } = analyzeFlanking(state, attacker, defender);
   const csA = effectiveCS(attacker, flanking, extraSum);
   const csD = effectiveCS(defender, 0);
@@ -399,7 +414,7 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): void {
 // ── Combat forecast (pure — no state mutation) ────────────────────────────────
 
 export function forecastCombat(state: GameState, attacker: Unit, defender: Unit): CombatForecast {
-  const ranged = isRangedCombat(attacker, defender);
+  const ranged = isRangedCombat(state, attacker, defender);
   const { count: flanking, extraSum, extraFlankingFrom } = analyzeFlanking(state, attacker, defender);
   const csA = effectiveCS(attacker, flanking, extraSum);
   const csD = effectiveCS(defender, 0);

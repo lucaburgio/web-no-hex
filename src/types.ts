@@ -88,6 +88,8 @@ export interface GameConfig {
   healNeutral: number;
   healEnemyTerritory: number;
   zoneOfControl: boolean;
+  /** If true, artillery cannot use ranged fire while any enemy is adjacent; must clear adjacencies first. */
+  limitArtillery: boolean;
   autoEndProduction: boolean;
   autoEndMovement: boolean;
   // Duration in ms for the unit move animation (0 = instant)
