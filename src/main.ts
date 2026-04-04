@@ -901,7 +901,8 @@ function runAiTurnWithAnimation(): void {
     state.units.filter(u => u.owner === AI).map(u => [u.id, { col: u.col, row: u.row, unit: { ...u } as typeof u }])
   );
 
-  // 3. Run AI movement (state is now fully updated)
+  // 3. Run AI movement (state is now fully updated). Snapshot is for visuals only:
+  // same getMovePath + pathHexes + animateMoves arc as human moves (not a straight line).
   const stateBeforeAi = structuredClone(state);
   state = aiMovement(state);
 

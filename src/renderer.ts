@@ -14,7 +14,7 @@ export interface MoveAnimation {
   fromRow: number;
   toCol: number;
   toRow: number;
-  /** Hex centers from start to destination (inclusive); if omitted, animation is a straight segment. */
+  /** Hex centers from start to destination (inclusive); if omitted, falls back to a straight segment (e.g. old sync). Player and AI both pass this from getMovePath. */
   pathHexes?: [number, number][];
 }
 
