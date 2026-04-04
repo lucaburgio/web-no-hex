@@ -749,31 +749,58 @@ function showUnitPicker(col: number, row: number): void {
   pendingProductionHex = { col, row };
   unitPickerList.innerHTML = '';
 
+  const statBoltSrc = 'public/icons/points.svg';
+
   for (const unitType of config.unitTypes) {
     const canAfford = state.productionPoints[localPlayer] >= unitType.cost;
 
     const card = document.createElement('div');
     card.className = 'unit-card' + (canAfford ? '' : ' disabled');
 
-    const img = document.createElement('img');
-    img.src = `public/cards/${unitType.id}.svg`;
-    img.alt = unitType.name;
+    const header = document.createElement('div');
+    header.className = 'unit-card-header';
+    const headerIcon = document.createElement('img');
+    headerIcon.className = 'unit-card-header-icon';
+    headerIcon.src = unitType.icon ? `public/${unitType.icon}` : `public/icons/${unitType.id}.svg`;
+    headerIcon.alt = '';
+    header.appendChild(headerIcon);
 
-    const price = document.createElement('div');
-    price.className = 'unit-card-price';
+    const body = document.createElement('div');
+    body.className = 'unit-card-body';
 
-    const icon = document.createElement('img');
-    icon.src = 'icons/points.svg';
-    icon.alt = 'PP';
-    icon.className = 'unit-card-price-icon';
+    const title = document.createElement('div');
+    title.className = 'unit-card-name';
+    title.textContent = unitType.name.toUpperCase();
 
-    const cost = document.createElement('span');
-    cost.textContent = String(unitType.cost);
+    const stats = document.createElement('div');
+    stats.className = 'unit-card-stats';
 
-    price.appendChild(icon);
-    price.appendChild(cost);
-    card.appendChild(img);
-    card.appendChild(price);
+    function addStat(modClass: string, value: number): void {
+      const row = document.createElement('div');
+      row.className = `unit-card-stat ${modClass}`;
+      const iconWrap = document.createElement('span');
+      iconWrap.className = 'unit-card-stat-icon';
+      const bolt = document.createElement('img');
+      bolt.src = statBoltSrc;
+      bolt.alt = '';
+      const val = document.createElement('span');
+      val.className = 'unit-card-stat-value';
+      val.textContent = String(value);
+      iconWrap.appendChild(bolt);
+      row.appendChild(iconWrap);
+      row.appendChild(val);
+      stats.appendChild(row);
+    }
+
+    addStat('unit-card-stat--cost', unitType.cost);
+    addStat('unit-card-stat--move', unitType.movement);
+    addStat('unit-card-stat--str', unitType.strength);
+    addStat('unit-card-stat--hp', unitType.maxHp);
+
+    body.appendChild(title);
+    body.appendChild(stats);
+    card.appendChild(header);
+    card.appendChild(body);
 
     if (canAfford) {
       card.addEventListener('click', () => {
