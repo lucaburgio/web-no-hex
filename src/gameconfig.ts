@@ -68,7 +68,7 @@ const config: GameConfig = {
       movement: 1,
       maxHp: 10,
       strength: 10,
-      icon: 'icons/grade.svg',
+      icon: 'icons/infantry.svg',
     },
     {
       id: 'tank',
