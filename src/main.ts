@@ -36,6 +36,15 @@ const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
 const WS_URL = `${wsProtocol}//${location.hostname}:3001`;
 
 const svg        = document.getElementById('board') as unknown as SVGSVGElement;
+
+/** Last move-path preview key; redraw only when unit position or hovered destination changes. */
+let movePathPreviewKey: string | null = null;
+
+function clearMovePathPreview(): void {
+  if (movePathPreviewKey === null) return;
+  renderMovePath(svg, []);
+  movePathPreviewKey = null;
+}
 const logEl      = document.getElementById('log') as HTMLUListElement;
 const phaseEl    = document.getElementById('phase') as HTMLElement;
 const turnEl     = document.getElementById('turn') as HTMLElement;
@@ -1148,26 +1157,39 @@ function positionTooltip(pageX: number, pageY: number): void {
 svg.addEventListener('mousemove', (e: MouseEvent) => {
   const enemyOwner: Owner = localPlayer === PLAYER ? AI : PLAYER;
 
-  // Clear path preview by default; will be re-drawn below if hovering a valid move hex
-  renderMovePath(svg, []);
-
   if (state.phase !== 'movement' || state.activePlayer !== localPlayer || state.selectedUnit === null) {
+    clearMovePathPreview();
     tooltipEl.classList.add('hidden');
     svg.classList.remove('cursor-fight');
     return;
   }
   const hex = getHexFromEvent(e);
-  if (!hex) { tooltipEl.classList.add('hidden'); svg.classList.remove('cursor-fight'); return; }
+  if (!hex) {
+    clearMovePathPreview();
+    tooltipEl.classList.add('hidden');
+    svg.classList.remove('cursor-fight');
+    return;
+  }
 
   const attacker = getUnitById(state, state.selectedUnit);
-  if (!attacker) { tooltipEl.classList.add('hidden'); svg.classList.remove('cursor-fight'); return; }
+  if (!attacker) {
+    clearMovePathPreview();
+    tooltipEl.classList.add('hidden');
+    svg.classList.remove('cursor-fight');
+    return;
+  }
 
   const validMoves = getValidMoves(state, attacker);
   const isValidMove = validMoves.some(([c, r]) => c === hex.col && r === hex.row);
 
-  // Show path preview for any valid move destination
+  const pathKey = `${attacker.id}:${attacker.col},${attacker.row}->${hex.col},${hex.row}`;
   if (isValidMove) {
-    renderMovePath(svg, getMovePath(state, attacker, hex.col, hex.row));
+    if (movePathPreviewKey !== pathKey) {
+      renderMovePath(svg, getMovePath(state, attacker, hex.col, hex.row));
+      movePathPreviewKey = pathKey;
+    }
+  } else {
+    clearMovePathPreview();
   }
 
   const target = getUnit(state, hex.col, hex.row);
@@ -1199,6 +1221,7 @@ svg.addEventListener('mouseleave', () => {
   tooltipEl.classList.add('hidden');
   svg.classList.remove('cursor-fight');
   renderMovePath(svg, []);
+  movePathPreviewKey = null;
 });
 
 const pauseOverlayEl   = document.getElementById('pause-overlay') as HTMLDivElement;
