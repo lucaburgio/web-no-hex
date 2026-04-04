@@ -533,7 +533,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     if (iconEl) unitLayer.appendChild(iconEl);
 
     if (isRangedTarget) {
-      const aim = inlineIcon('icons/artillery.svg', x, y - HEX_SIZE * 0.76, HEX_SIZE * 0.36, c.rangedTarget, opacity);
+      const aim = inlineIcon('icons/artillery.svg', x, y - HEX_SIZE * 1, HEX_SIZE * 0.5, c.rangedTarget, opacity);
       if (aim) {
         const aimWrap = svgEl('g');
         aimWrap.setAttribute('class', 'ranged-target-aim');
