@@ -164,16 +164,32 @@ function hexFanShellEndpoints(
   return { from, impact };
 }
 
+/** Mirror Y across horizontal line through center so streak direction matches screen after board Y-flip. */
+function mirrorFanYAcrossCenter(
+  c: ArtilleryPoint,
+  from: ArtilleryPoint,
+  impact: ArtilleryPoint,
+): { from: ArtilleryPoint; impact: ArtilleryPoint } {
+  return {
+    from: { x: from.x, y: 2 * c.y - from.y },
+    impact: { x: impact.x, y: 2 * c.y - impact.y },
+  };
+}
+
 function buildHexFanShuffleTimeline(
   root: SVGGElement,
   c: ArtilleryPoint,
   R: number,
   style: ArtilleryProjectileStyle,
+  mirrorFanY: boolean,
 ): gsap.core.Timeline {
   const stagger = 0.072;
   const tl = gsap.timeline();
   FIRE_ORDER_SHUFFLE.forEach((shellIndex, step) => {
-    const { from, impact } = hexFanShellEndpoints(shellIndex, c, R);
+    let { from, impact } = hexFanShellEndpoints(shellIndex, c, R);
+    if (mirrorFanY) {
+      ({ from, impact } = mirrorFanYAcrossCenter(c, from, impact));
+    }
     tl.add(directStreakSegment(root, from, impact, style, 0.4, 0.52), step * stagger);
   });
   return tl;
@@ -186,6 +202,11 @@ export interface PlayDefenderHexBarrageOptions {
   /** Target layer (e.g. `#vfx-layer`); required. */
   parent: SVGGElement;
   onComplete?: () => void;
+  /**
+   * Mirror shell fan across the horizontal through `center` (swap vertical offset of from/impact).
+   * Use when the board is drawn with a parent Y-flip (vs-human guest) so shells still read as arriving from above.
+   */
+  mirrorFanY?: boolean;
 }
 
 export interface ArtilleryProjectileHandle {
@@ -203,13 +224,14 @@ export function playDefenderHexBarrage(options: PlayDefenderHexBarrageOptions): 
     styleOverrides,
     parent,
     onComplete,
+    mirrorFanY = false,
   } = options;
 
   const root = ns('g');
   root.setAttribute('class', 'artillery-hex-barrage-vfx');
   parent.appendChild(root);
 
-  const tl = buildHexFanShuffleTimeline(root, center, hexRadius, mergeStyle(styleOverrides));
+  const tl = buildHexFanShuffleTimeline(root, center, hexRadius, mergeStyle(styleOverrides), mirrorFanY);
 
   const cleanup = (): void => {
     root.remove();

@@ -1218,6 +1218,7 @@ export function playRangedArtilleryHexBarrageVfx(
     parent: vfxLayer,
     center: { x, y },
     hexRadius: HEX_SIZE * ARTILLERY_HEX_RADIUS_SCALE,
+    mirrorFanY: svgElement.dataset.boardFlipY === '1',
     onComplete,
   });
 }
