@@ -901,7 +901,7 @@ function startGame(initialState: GameState): void {
   isAnimating = false;
   aiPlaybackInProgress = false;
   turnSnapshots = [structuredClone(state)];
-  initRenderer(svg);
+  initRenderer(svg, { flipBoardY: gameMode === 'vsHuman' && localPlayer === AI });
   render();
   updateUI();
   checkWinner();
@@ -1965,7 +1965,7 @@ function renderRecapTurn(index: number): void {
 }
 
 recapBtn.addEventListener('click', () => {
-  initRenderer(recapSvg);
+  initRenderer(recapSvg, { flipBoardY: gameMode === 'vsHuman' && localPlayer === AI });
   recapSliderEl.max = String(turnSnapshots.length - 1);
   recapSliderEl.value = String(turnSnapshots.length - 1);
   renderRecapTurn(turnSnapshots.length - 1);

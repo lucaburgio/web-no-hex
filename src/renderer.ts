@@ -7,6 +7,29 @@ import type { Owner } from './types';
 import type { GameState, Unit } from './types';
 import config from './gameconfig';
 
+/** Margin in px between SVG edge and board origin (must match {@link initRenderer}). */
+export const BOARD_MARGIN = 100;
+
+/** Vertical midpoint of hex *centers* in board-local space (used for vs-human guest Y-mirror). */
+export function boardCenterY(): number {
+  return (HEX_SIZE * 1.5 * (ROWS - 1)) / 2;
+}
+
+/** Mirror board-local Y so simulation row 0 (north) draws toward the bottom of the screen. */
+export function boardViewFlipTransform(): string {
+  const yMid = boardCenterY();
+  return `translate(0,${yMid}) scale(1,-1) translate(0,${-yMid})`;
+}
+
+function getBoardViewRoot(svg: SVGSVGElement): SVGGElement | null {
+  return svg.querySelector('#board-view-root') as SVGGElement | null;
+}
+
+/** Parent for VFX/anim layers: under `#board-view-root` when present so they share margin + flip. */
+function getBoardVfxParent(svg: SVGSVGElement): SVGElement {
+  return getBoardViewRoot(svg) ?? svg;
+}
+
 /** Hover move-path preview timeline; killed whenever the target hex changes or the path clears. */
 let movePathPreviewTl: gsap.core.Timeline | null = null;
 
@@ -320,14 +343,27 @@ function svgEl<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameM
   return document.createElementNS('http://www.w3.org/2000/svg', tag);
 }
 
+/** Counter-flip upright content when the board is under {@link boardViewFlipTransform}. */
+function svgUprightAt(x: number, y: number): SVGGElement {
+  const g = svgEl('g');
+  g.setAttribute('transform', `translate(${x},${y}) scale(1,-1) translate(${-x},${-y})`);
+  return g;
+}
+
 const DECOR_RINGS = 4;
 
-export function initRenderer(svgElement: SVGSVGElement): void {
+export interface InitRendererOptions {
+  /** When true (vs-human guest), mirror the board vertically so local side appears at the bottom. */
+  flipBoardY?: boolean;
+}
+
+export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOptions): void {
   svgElement.innerHTML = '';
+  const flipBoardY = !!options?.flipBoardY;
+  svgElement.dataset.boardFlipY = flipBoardY ? '1' : '';
   const c = colors();
 
-  const boardMargin = 100;
-  const decorMargin = Math.ceil(DECOR_RINGS * HEX_SIZE * Math.sqrt(3)) + HEX_SIZE;
+  const boardMargin = BOARD_MARGIN;
   // Width/height cover only the board — decor overflows visually without affecting scroll
   const W = COLS * HEX_SIZE * Math.sqrt(3) + boardMargin * 2;
   const H = 1.5 * HEX_SIZE * (ROWS - 1) + boardMargin * 2;
@@ -343,12 +379,23 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   bg.setAttribute('fill', 'transparent');
   svgElement.appendChild(bg);
 
+  const boardOrigin = svgEl('g');
+  boardOrigin.id = 'board-origin';
+  boardOrigin.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
+
+  const boardViewRoot = svgEl('g');
+  boardViewRoot.id = 'board-view-root';
+  if (flipBoardY) {
+    boardViewRoot.setAttribute('transform', boardViewFlipTransform());
+  }
+  boardOrigin.appendChild(boardViewRoot);
+  svgElement.appendChild(boardOrigin);
+
   // Decorative hex layer — ghost hexes ringing the board, rendered first (below everything).
-  // Uses decorMargin so hexes align with the board, but the layer overflows the SVG layout box.
+  // Ghost dots ring the board; may extend past the viewBox.
   const decorLayer = svgEl('g');
-  decorLayer.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
   decorLayer.setAttribute('pointer-events', 'none');
-  svgElement.appendChild(decorLayer);
+  boardViewRoot.appendChild(decorLayer);
 
   for (let r = -DECOR_RINGS; r < ROWS + DECOR_RINGS; r++) {
     for (let col = -DECOR_RINGS; col < COLS + DECOR_RINGS; col++) {
@@ -365,14 +412,12 @@ export function initRenderer(svgElement: SVGSVGElement): void {
 
   const hexLayer = svgEl('g');
   hexLayer.id = 'hex-layer';
-  hexLayer.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
-  svgElement.appendChild(hexLayer);
+  boardViewRoot.appendChild(hexLayer);
 
   const unitLayer = svgEl('g');
   unitLayer.id = 'unit-layer';
-  unitLayer.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
   unitLayer.setAttribute('pointer-events', 'none');
-  svgElement.appendChild(unitLayer);
+  boardViewRoot.appendChild(unitLayer);
 
   for (let r = 0; r < ROWS; r++) {
     for (let col = 0; col < COLS; col++) {
@@ -412,9 +457,8 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   // Movement path preview line (above hex layer, below units)
   const movePathLayer = svgEl('g');
   movePathLayer.id = 'move-path-layer';
-  movePathLayer.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
   movePathLayer.setAttribute('pointer-events', 'none');
-  svgElement.insertBefore(movePathLayer, unitLayer);
+  boardViewRoot.insertBefore(movePathLayer, unitLayer);
 
   const pathLine = svgEl('polyline');
   pathLine.id = 'move-path-line';
@@ -427,7 +471,6 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   // Full-hex invisible targets on top of unit artwork so clicks always map to a cell (getHexFromEvent).
   const hexHitLayer = svgEl('g');
   hexHitLayer.id = 'hex-hit-layer';
-  hexHitLayer.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
   for (let r = 0; r < ROWS; r++) {
     for (let col = 0; col < COLS; col++) {
       const { x, y } = hexToPixel(col, r);
@@ -442,7 +485,7 @@ export function initRenderer(svgElement: SVGSVGElement): void {
       hexHitLayer.appendChild(hit);
     }
   }
-  svgElement.appendChild(hexHitLayer);
+  boardViewRoot.appendChild(hexHitLayer);
 
   if (svgElement.id === 'board') clearHpBarAnimationState();
 }
@@ -596,6 +639,8 @@ export function renderState(
     }
   }
 
+  const flipBoardY = svgElement.dataset.boardFlipY === '1';
+
   // Draw mountain icons
   const mountainLayer = svgElement.querySelector('#mountain-layer') as SVGGElement | null;
   if (mountainLayer) {
@@ -612,7 +657,13 @@ export function renderState(
       img.setAttribute('width', String(iw));
       img.setAttribute('height', String(ih));
       img.setAttribute('pointer-events', 'none');
-      mountainLayer.appendChild(img);
+      if (flipBoardY) {
+        const upright = svgUprightAt(x, y);
+        upright.appendChild(img);
+        mountainLayer.appendChild(upright);
+      } else {
+        mountainLayer.appendChild(img);
+      }
     }
   }
 
@@ -650,6 +701,10 @@ export function renderState(
       unit.movesUsed >= unit.movement;
     const opacity   = (moveExhausted || unitDimmed) ? '0.2' : '1';
 
+    const unitRoot = flipBoardY ? svgUprightAt(x, y) : null;
+    if (unitRoot) unitLayer.appendChild(unitRoot);
+    const uParent: SVGGElement = unitRoot ?? unitLayer;
+
     const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
     const sc = (HEX_SIZE * 1.1) / 50;
     const unitEl = svgEl('path');
@@ -661,7 +716,7 @@ export function renderState(
     unitEl.setAttribute('data-row', String(dr));
     unitEl.setAttribute('transform', `translate(${x - 25 * sc},${y - 32 * sc}) scale(${sc})`);
     unitEl.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
-    unitLayer.appendChild(unitEl);
+    uParent.appendChild(unitEl);
 
     // HP bar (inside shape)
     const barW = HEX_SIZE * 0.58;
@@ -675,7 +730,7 @@ export function renderState(
     barBg.setAttribute('fill', '#222'); barBg.setAttribute('rx', '1');
     barBg.setAttribute('pointer-events', 'none');
     barBg.setAttribute('opacity', opacity);
-    unitLayer.appendChild(barBg);
+    uParent.appendChild(barBg);
 
     const barColor = hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
     const barFill = svgEl('rect');
@@ -684,13 +739,13 @@ export function renderState(
     barFill.setAttribute('fill', barColor); barFill.setAttribute('rx', '1');
     barFill.setAttribute('pointer-events', 'none');
     barFill.setAttribute('opacity', opacity);
-    unitLayer.appendChild(barFill);
+    uParent.appendChild(barFill);
 
     // Icon (shifted up inside shape)
     const icon = unitIcon(unit.unitTypeId);
     const iconColor = isRangedTarget ? '#ffffff' : c.unitIconColor;
     const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.34, HEX_SIZE * 0.4, iconColor, opacity);
-    if (iconEl) unitLayer.appendChild(iconEl);
+    if (iconEl) uParent.appendChild(iconEl);
 
     if (isRangedTarget) {
       const aim = inlineIcon('icons/artillery.svg', x, y - HEX_SIZE * 1, HEX_SIZE * 0.5, c.rangedTarget, opacity);
@@ -699,7 +754,7 @@ export function renderState(
         aimWrap.setAttribute('class', 'ranged-target-aim');
         aimWrap.setAttribute('pointer-events', 'none');
         aimWrap.appendChild(aim);
-        unitLayer.appendChild(aimWrap);
+        uParent.appendChild(aimWrap);
       }
     }
   }
@@ -725,14 +780,14 @@ export function animateMoves(
   }
 
   const c = colors();
-  const margin = 100;
+  const flipBoardY = svgElement.dataset.boardFlipY === '1';
 
   let animLayer = svgElement.querySelector('#anim-layer') as SVGGElement | null;
   if (!animLayer) {
     animLayer = svgEl('g');
     animLayer.id = 'anim-layer';
-    animLayer.setAttribute('transform', `translate(${margin},${margin})`);
-    svgElement.appendChild(animLayer);
+    animLayer.setAttribute('pointer-events', 'none');
+    getBoardVfxParent(svgElement).appendChild(animLayer);
   }
   animLayer.setAttribute('pointer-events', 'none');
   animLayer.innerHTML = '';
@@ -758,6 +813,10 @@ export function animateMoves(
     const pixelPath = pixelPathForAnimation(anim);
     const baseColor = anim.unit.owner === PLAYER ? c.player : c.ai;
 
+    const spriteRoot = flipBoardY ? svgEl('g') : null;
+    const layer: SVGGElement = spriteRoot ?? animLayer!;
+    if (spriteRoot) animLayer!.appendChild(spriteRoot);
+
     const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
     const animFill = baseColor;
     const unitSc = (HEX_SIZE * 1.1) / 50;
@@ -766,7 +825,7 @@ export function animateMoves(
     circle.setAttribute('fill', animFill);
     circle.setAttribute('stroke', 'none');
     circle.setAttribute('pointer-events', 'none');
-    animLayer!.appendChild(circle);
+    layer.appendChild(circle);
 
     const animBarW = HEX_SIZE * 0.58;
     const barH = HEX_SIZE * 0.1;
@@ -774,7 +833,7 @@ export function animateMoves(
     barBg.setAttribute('width', String(animBarW)); barBg.setAttribute('height', String(barH));
     barBg.setAttribute('fill', '#222'); barBg.setAttribute('rx', '1');
     barBg.setAttribute('pointer-events', 'none');
-    animLayer!.appendChild(barBg);
+    layer.appendChild(barBg);
 
     const live0 = liveStateForHp ? getUnitById(liveStateForHp, anim.unit.id) : null;
     const maxHp0 = live0?.maxHp ?? anim.unit.maxHp;
@@ -785,7 +844,7 @@ export function animateMoves(
     barFill.setAttribute('width', String(animBarW * hpRatio0)); barFill.setAttribute('height', String(barH));
     barFill.setAttribute('fill', barColor0); barFill.setAttribute('rx', '1');
     barFill.setAttribute('pointer-events', 'none');
-    animLayer!.appendChild(barFill);
+    layer.appendChild(barFill);
 
     const iconSrc = unitIcon(anim.unit.unitTypeId);
     const iconSize = HEX_SIZE * 0.4;
@@ -794,7 +853,7 @@ export function animateMoves(
     const iconWrapper = svgEl('g');
     iconWrapper.setAttribute('pointer-events', 'none');
     if (iconEl) iconWrapper.appendChild(iconEl);
-    animLayer!.appendChild(iconWrapper);
+    layer.appendChild(iconWrapper);
 
     const startTime = performance.now();
 
@@ -813,6 +872,9 @@ export function animateMoves(
       barFill.setAttribute('width', String(animBarW * hpRatio));
       barFill.setAttribute('fill', barColor);
 
+      if (spriteRoot) {
+        spriteRoot.setAttribute('transform', `translate(${x},${y}) scale(1,-1) translate(${-x},${-y})`);
+      }
       circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
       barBg.setAttribute('x',   String(x - animBarW / 2));
       barBg.setAttribute('y',   String(y + HEX_SIZE * 0.13));
@@ -824,7 +886,11 @@ export function animateMoves(
         requestAnimationFrame(step);
       } else {
         if (cancelled) return;
-        circle.remove(); barBg.remove(); barFill.remove(); iconWrapper.remove();
+        if (spriteRoot) {
+          spriteRoot.remove();
+        } else {
+          circle.remove(); barBg.remove(); barFill.remove(); iconWrapper.remove();
+        }
         completed++;
         if (completed >= animations.length) {
           animLayer!.innerHTML = '';
@@ -837,7 +903,6 @@ export function animateMoves(
   return { cancel };
 }
 
-const BOARD_MARGIN = 100;
 
 export interface StrikeReturnParams {
   unit: Unit;
@@ -874,13 +939,14 @@ export function animateStrikeAndReturn(
   ];
 
   const c = colors();
+  const flipBoardY = svgElement.dataset.boardFlipY === '1';
 
   let animLayer = svgElement.querySelector('#anim-layer') as SVGGElement | null;
   if (!animLayer) {
     animLayer = svgEl('g');
     animLayer.id = 'anim-layer';
-    animLayer.setAttribute('transform', `translate(${BOARD_MARGIN},${BOARD_MARGIN})`);
-    svgElement.appendChild(animLayer);
+    animLayer.setAttribute('pointer-events', 'none');
+    getBoardVfxParent(svgElement).appendChild(animLayer);
   }
   animLayer.setAttribute('pointer-events', 'none');
   animLayer.innerHTML = '';
@@ -901,6 +967,10 @@ export function animateStrikeAndReturn(
     animLayer!.innerHTML = '';
   };
 
+  const spriteRoot = flipBoardY ? svgEl('g') : null;
+  const layer: SVGGElement = spriteRoot ?? animLayer!;
+  if (spriteRoot) animLayer.appendChild(spriteRoot);
+
   const baseColor = unit.owner === PLAYER ? c.player : c.ai;
   const live0 = liveStateForHp ? getUnitById(liveStateForHp, unit.id) : null;
   const maxHp0 = live0?.maxHp ?? unit.maxHp;
@@ -914,7 +984,7 @@ export function animateStrikeAndReturn(
   circle.setAttribute('fill', baseColor);
   circle.setAttribute('stroke', 'none');
   circle.setAttribute('pointer-events', 'none');
-  animLayer.appendChild(circle);
+  layer.appendChild(circle);
 
   const animBarW = HEX_SIZE * 0.58;
   const barH = HEX_SIZE * 0.1;
@@ -924,7 +994,7 @@ export function animateStrikeAndReturn(
   barBg.setAttribute('fill', '#222');
   barBg.setAttribute('rx', '1');
   barBg.setAttribute('pointer-events', 'none');
-  animLayer.appendChild(barBg);
+  layer.appendChild(barBg);
 
   const barColor0 = hpRatio0 > 0.6 ? c.hpHigh : hpRatio0 > 0.3 ? c.hpMid : c.hpLow;
   const barFill = svgEl('rect');
@@ -933,7 +1003,7 @@ export function animateStrikeAndReturn(
   barFill.setAttribute('fill', barColor0);
   barFill.setAttribute('rx', '1');
   barFill.setAttribute('pointer-events', 'none');
-  animLayer.appendChild(barFill);
+  layer.appendChild(barFill);
 
   const iconSrc = unitIcon(unit.unitTypeId);
   const iconSize = HEX_SIZE * 0.4;
@@ -941,7 +1011,7 @@ export function animateStrikeAndReturn(
   const iconWrapper = svgEl('g');
   iconWrapper.setAttribute('pointer-events', 'none');
   if (iconEl) iconWrapper.appendChild(iconEl);
-  animLayer.appendChild(iconWrapper);
+  layer.appendChild(iconWrapper);
 
   const startTime = performance.now();
 
@@ -965,6 +1035,9 @@ export function animateStrikeAndReturn(
     barFill.setAttribute('width', String(animBarW * hpRatio));
     barFill.setAttribute('fill', barColor);
 
+    if (spriteRoot) {
+      spriteRoot.setAttribute('transform', `translate(${x},${y}) scale(1,-1) translate(${-x},${-y})`);
+    }
     circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
     barBg.setAttribute('x', String(x - animBarW / 2));
     barBg.setAttribute('y', String(y + HEX_SIZE * 0.13));
@@ -976,10 +1049,14 @@ export function animateStrikeAndReturn(
       requestAnimationFrame(step);
     } else {
       if (cancelled) return;
-      circle.remove();
-      barBg.remove();
-      barFill.remove();
-      iconWrapper.remove();
+      if (spriteRoot) {
+        spriteRoot.remove();
+      } else {
+        circle.remove();
+        barBg.remove();
+        barFill.remove();
+        iconWrapper.remove();
+      }
       animLayer!.innerHTML = '';
       callDoneOnce();
     }
@@ -1004,13 +1081,14 @@ function showHexFloatBadges(
     return { cancel: noopCancel };
   }
 
+  const flipBoardY = svgElement.dataset.boardFlipY === '1';
+
   let vfxLayer = svgElement.querySelector('#vfx-layer') as SVGGElement | null;
   if (!vfxLayer) {
     vfxLayer = svgEl('g');
     vfxLayer.id = 'vfx-layer';
-    vfxLayer.setAttribute('transform', `translate(${BOARD_MARGIN},${BOARD_MARGIN})`);
     vfxLayer.setAttribute('pointer-events', 'none');
-    svgElement.appendChild(vfxLayer);
+    getBoardVfxParent(svgElement).appendChild(vfxLayer);
   }
 
   let cancelled = false;
@@ -1069,7 +1147,14 @@ function showHexFloatBadges(
 
     g.appendChild(rect);
     g.appendChild(text);
-    outer.appendChild(g);
+    if (flipBoardY) {
+      const upright = svgEl('g');
+      upright.setAttribute('transform', 'scale(1,-1)');
+      upright.appendChild(g);
+      outer.appendChild(upright);
+    } else {
+      outer.appendChild(g);
+    }
     vfxLayer.appendChild(outer);
   }
 
@@ -1125,9 +1210,8 @@ export function playRangedArtilleryHexBarrageVfx(
   if (!vfxLayer) {
     vfxLayer = svgEl('g');
     vfxLayer.id = 'vfx-layer';
-    vfxLayer.setAttribute('transform', `translate(${BOARD_MARGIN},${BOARD_MARGIN})`);
     vfxLayer.setAttribute('pointer-events', 'none');
-    svgElement.appendChild(vfxLayer);
+    getBoardVfxParent(svgElement).appendChild(vfxLayer);
   }
   const { x, y } = hexToPixel(col, row);
   return playDefenderHexBarrage({
