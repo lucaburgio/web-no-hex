@@ -863,15 +863,16 @@ export function showDamageFloats(
   };
 
   const stackIndexByHex = new Map<string, number>();
+  const STACK_STEP = 20;
   for (const e of entries) {
     const { x, y } = hexToPixel(e.col, e.row);
     const key = `${e.col},${e.row}`;
     const stack = stackIndexByHex.get(key) ?? 0;
     stackIndexByHex.set(key, stack + 1);
-    const staggerX = stack * 15;
+    const staggerY = -stack * STACK_STEP;
     const label = String(e.amount);
     const outer = svgEl('g');
-    outer.setAttribute('transform', `translate(${x + staggerX},${y - HEX_SIZE * 0.72})`);
+    outer.setAttribute('transform', `translate(${x},${y - HEX_SIZE * 0.72 + staggerY})`);
 
     const g = svgEl('g');
     g.setAttribute('class', 'damage-float-root');
