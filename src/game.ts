@@ -1,6 +1,15 @@
 import { getNeighbors, hexDistance } from './hex';
 import config from './gameconfig';
-import type { Unit, UnitType, HexState, GameState, CombatForecast, CombatVfxPayload, Owner } from './types';
+import type {
+  Unit,
+  UnitType,
+  HexState,
+  GameState,
+  CombatForecast,
+  CombatVfxPayload,
+  Owner,
+  AiAnimStep,
+} from './types';
 
 export const PLAYER = 1 as const;
 export const AI     = 2 as const;
@@ -1028,8 +1037,14 @@ function scoreEmptyMove(
   return s;
 }
 
-export function aiMovement(state: GameState): { state: GameState; combatVfx: CombatVfxPayload[] } {
+export function aiMovement(state: GameState): {
+  state: GameState;
+  combatVfx: CombatVfxPayload[];
+  /** Ordered steps for AI turn animation (one move or combat at a time). */
+  animSteps: AiAnimStep[];
+} {
   const combatVfx: CombatVfxPayload[] = [];
+  const animSteps: AiAnimStep[] = [];
   const pressure = aiDefensivePressure(state);
   const threat = criticalThreatPlayerUnit(state);
   const aiUnits = state.units.filter(u => u.owner === AI).sort((a, b) => {
@@ -1059,7 +1074,9 @@ export function aiMovement(state: GameState): { state: GameState; combatVfx: Com
         const defCol = target.col;
         const defRow = target.row;
         const res = resolveCombat(state, unit, target);
-        combatVfx.push(combatVfxFromResolve(attackerId, atkCol, atkRow, defCol, defRow, res));
+        const vfx = combatVfxFromResolve(attackerId, atkCol, atkRow, defCol, defRow, res);
+        combatVfx.push(vfx);
+        animSteps.push({ type: 'combat', vfx });
         checkVictory(state);
         break;
       }
@@ -1095,11 +1112,30 @@ export function aiMovement(state: GameState): { state: GameState; combatVfx: Com
         const path = getMovePath(state, unit, best.col, best.row);
         unit.movesUsed = unit.movement;
         const attackerId = unit.id;
+        const unitBeforeMelee = { ...unit } as Unit;
         advanceAlongPathBeforeCombat(state, unit, path, AI);
         const atkCol = unit.col;
         const atkRow = unit.row;
         const res = resolveCombat(state, unit, target);
-        combatVfx.push(combatVfxFromResolve(attackerId, atkCol, atkRow, best.col, best.row, res, path));
+        const vfx = combatVfxFromResolve(attackerId, atkCol, atkRow, best.col, best.row, res, path);
+        combatVfx.push(vfx);
+        if (vfx.mutualKillLunge && vfx.mutualKillLunge.pathHexes.length >= 2) {
+          const p = vfx.mutualKillLunge.pathHexes;
+          const s = p[0]!;
+          const e = p[p.length - 1]!;
+          animSteps.push({
+            type: 'move',
+            anim: {
+              unit: unitBeforeMelee,
+              fromCol: s[0],
+              fromRow: s[1],
+              toCol: e[0],
+              toRow: e[1],
+              pathHexes: p,
+            },
+          });
+        }
+        animSteps.push({ type: 'combat', vfx });
         checkVictory(state);
         break;
       }
@@ -1107,16 +1143,30 @@ export function aiMovement(state: GameState): { state: GameState; combatVfx: Com
       const path = getMovePath(state, unit, best.col, best.row);
       const stepsCost = path.length > 0 ? path.length - 1 : 0;
       if (unit.movesUsed + stepsCost > unit.movement) break;
+      const fromCol = unit.col;
+      const fromRow = unit.row;
+      const unitSnap = { ...unit } as Unit;
       unit.movesUsed += stepsCost;
       for (const [pc, pr] of path.slice(1)) {
         conquerHex(state, pc, pr, AI);
       }
       unit.col = best.col;
       unit.row = best.row;
+      animSteps.push({
+        type: 'move',
+        anim: {
+          unit: unitSnap,
+          fromCol,
+          fromRow,
+          toCol: best.col,
+          toRow: best.row,
+          pathHexes: path.length >= 2 ? path : undefined,
+        },
+      });
     }
   }
   log(state, 'AI completed movement.');
-  return { state, combatVfx };
+  return { state, combatVfx, animSteps };
 }
 
 // ── Phase advancement ─────────────────────────────────────────────────────────

@@ -38,7 +38,7 @@ import { getNeighbors } from './hex';
 import { isInEnemyZoC } from './game';
 import type { MoveAnimation } from './renderer';
 import config from './gameconfig';
-import type { GameState, Unit, CombatForecast, Owner } from './types';
+import type { GameState, Unit, CombatForecast, Owner, CombatVfxPayload } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
 import { updateConfig } from './gameconfig';
 import { syncDimensions } from './game';
@@ -1383,68 +1383,18 @@ endMoveBtn.addEventListener('click', () => {
 });
 
 function runAiTurnWithAnimation(): void {
-  // 1. Log end-of-movement and reset AI moved flags
   state = prepareAiTurn(state);
 
-  // 2. Snapshot AI unit positions before AI moves
-  const preAiPositions = new Map(
-    state.units.filter(u => u.owner === AI).map(u => [u.id, { col: u.col, row: u.row, unit: { ...u } as typeof u }])
-  );
-
-  // 3. Run AI movement (state is now fully updated). Snapshot is for visuals only:
-  // same getMovePath + pathHexes + animateMoves arc as human moves (not a straight line).
-  const stateBeforeAi = structuredClone(state);
   const aiResult = aiMovement(state);
   state = aiResult.state;
-  const combatVfxList = aiResult.combatVfx;
+  const animSteps = aiResult.animSteps;
 
   if (state.winner) {
     render(); updateUI(); checkWinner();
     return;
   }
 
-  // 4. Build animation list: AI units that changed position
-  const moves: MoveAnimation[] = [];
-  for (const unit of state.units.filter(u => u.owner === AI)) {
-    const pre = preAiPositions.get(unit.id);
-    if (pre && (pre.col !== unit.col || pre.row !== unit.row)) {
-      const uBefore = getUnitById(stateBeforeAi, unit.id)!;
-      const pathHexes = getMovePath(stateBeforeAi, uBefore, unit.col, unit.row);
-      moves.push({
-        unit: pre.unit,
-        fromCol: pre.col,
-        fromRow: pre.row,
-        toCol: unit.col,
-        toRow: unit.row,
-        pathHexes: pathHexes.length >= 2 ? pathHexes : undefined,
-      });
-    }
-  }
-
-  // Both sides dead: attacker is not in state.units — no position diff; use mutual-kill path from combat VFX.
-  for (const vfx of combatVfxList) {
-    const mk = vfx.mutualKillLunge;
-    if (!mk || mk.pathHexes.length < 2) continue;
-    if (moves.some(m => m.unit.id === mk.attackerId)) continue;
-    const pre = preAiPositions.get(mk.attackerId);
-    if (!pre) continue;
-    const p = mk.pathHexes;
-    const s = p[0]!;
-    const e = p[p.length - 1]!;
-    moves.push({
-      unit: pre.unit,
-      fromCol: s[0],
-      fromRow: s[1],
-      toCol: e[0],
-      toRow: e[1],
-      pathHexes: p,
-    });
-  }
-
-  const hasMoves = moves.length > 0;
-  const hasCombat = combatVfxList.length > 0;
-
-  if (!hasMoves && !hasCombat) {
+  if (animSteps.length === 0) {
     state = endTurnAfterAi(state);
     turnSnapshots.push(structuredClone(state));
     saveGameState(state);
@@ -1463,23 +1413,16 @@ function runAiTurnWithAnimation(): void {
     render(); updateUI(); checkWinner(); maybeAutoEnd();
   };
 
-  const runCombatVfxChain = (index: number): void => {
-    if (index >= combatVfxList.length) {
-      finishAi();
-      return;
-    }
-    const vfx = combatVfxList[index]!;
+  const playOneCombatVfx = (vfx: CombatVfxPayload, onDone: () => void): void => {
     const floats = vfx.damageFloats;
     const sr = vfx.strikeReturn;
 
     const runFloats = (): void => {
       renderState(svg, state, null, new Set(), localPlayer);
       updateUI();
-      if (floats.length === 0) runCombatVfxChain(index + 1);
+      if (floats.length === 0) onDone();
       else {
-        const { cancel } = showDamageFloats(svg, floats, config.damageFloatDurationMs, () =>
-          runCombatVfxChain(index + 1),
-        );
+        const { cancel } = showDamageFloats(svg, floats, config.damageFloatDurationMs, onDone);
         humanMoveAnimCancel = combineAnimCancels(cancel);
       }
     };
@@ -1513,17 +1456,30 @@ function runAiTurnWithAnimation(): void {
 
   isAnimating = true;
 
-  if (hasMoves) {
-    renderState(svg, state, null, new Set(moves.map(m => m.unit.id)));
-    updateUI();
-    const { cancel } = animateMoves(svg, moves, config.unitMoveSpeed, () => {
-      if (hasCombat) runCombatVfxChain(0);
-      else finishAi();
-    }, state);
-    humanMoveAnimCancel = combineAnimCancels(cancel);
-  } else {
-    runCombatVfxChain(0);
-  }
+  const runStep = (index: number): void => {
+    if (index >= animSteps.length) {
+      finishAi();
+      return;
+    }
+    const step = animSteps[index]!;
+    if (step.type === 'move') {
+      const a = step.anim;
+      renderState(svg, state, null, new Set([a.unit.id]), localPlayer);
+      updateUI();
+      const { cancel } = animateMoves(
+        svg,
+        [a],
+        config.unitMoveSpeed,
+        () => runStep(index + 1),
+        state,
+      );
+      humanMoveAnimCancel = combineAnimCancels(cancel);
+    } else {
+      playOneCombatVfx(step.vfx, () => runStep(index + 1));
+    }
+  };
+
+  runStep(0);
 }
 
 restartBtn.addEventListener('click', () => {

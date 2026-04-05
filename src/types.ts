@@ -36,6 +36,20 @@ export interface GameState {
   winner: Owner | null;
 }
 
+/** One AI turn animation step, in chronological order (same order as aiMovement resolves). */
+export interface AiMoveAnimPayload {
+  unit: Unit;
+  fromCol: number;
+  fromRow: number;
+  toCol: number;
+  toRow: number;
+  pathHexes?: [number, number][];
+}
+
+export type AiAnimStep =
+  | { type: 'move'; anim: AiMoveAnimPayload }
+  | { type: 'combat'; vfx: CombatVfxPayload };
+
 /** Visual-only combat feedback for animations (not part of saved game state). */
 export interface CombatVfxPayload {
   /** Melee only: both units survived — play strike onto enemy hex and return. */
