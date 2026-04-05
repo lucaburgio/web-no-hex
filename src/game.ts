@@ -558,7 +558,9 @@ function checkVictory(state: GameState): void {
 
 // ── Healing ───────────────────────────────────────────────────────────────────
 
-function healUnits(state: GameState): void {
+/** Positive HP amounts for floating heal badges (units that did not fight this turn). */
+function healUnits(state: GameState): { col: number; row: number; amount: number }[] {
+  const floats: { col: number; row: number; amount: number }[] = [];
   for (const unit of state.units) {
     if (unit.attackedThisTurn) {
       unit.attackedThisTurn = false;
@@ -571,9 +573,15 @@ function healUnits(state: GameState): void {
       : owner === null
         ? config.healNeutral
         : config.healEnemyTerritory;
+    const before = unit.hp;
     unit.hp = Math.min(unit.maxHp, unit.hp + heal);
+    const gained = unit.hp - before;
+    if (gained > 0) {
+      floats.push({ col: unit.col, row: unit.row, amount: gained });
+    }
     unit.attackedThisTurn = false;
   }
+  return floats;
 }
 
 // ── Initial state ─────────────────────────────────────────────────────────────
@@ -1251,8 +1259,8 @@ export function prepareAiTurn(state: GameState): GameState {
 
 // Runs end-of-turn housekeeping after AI movement: heal, stability, turn counter, PP.
 // Call this after aiMovement has already been applied (used by the animation path).
-export function endTurnAfterAi(state: GameState): GameState {
-  healUnits(state);
+export function endTurnAfterAi(state: GameState): { state: GameState; healFloats: { col: number; row: number; amount: number }[] } {
+  const healFloats = healUnits(state);
   updateHexStability(state);
   state.units.forEach(u => { u.movesUsed = 0; });
   state.turn += 1;
@@ -1266,7 +1274,7 @@ export function endTurnAfterAi(state: GameState): GameState {
   state.productionPoints[PLAYER] += config.productionPointsPerTurn + playerBonus;
   state.productionPoints[AI]     += config.productionPointsPerTurn + aiBonus;
   log(state, `Turn ${state.turn} — Production phase. PP: ${state.productionPoints[PLAYER]} (+${playerBonus} from territory).`);
-  return state;
+  return { state, healFloats };
 }
 
 export function advancePhase(state: GameState): GameState {
@@ -1285,7 +1293,7 @@ export function advancePhase(state: GameState): GameState {
       state = prepareAiTurn(state);
       state = aiMovement(state).state;
       if (state.winner) return state;
-      state = endTurnAfterAi(state);
+      state = endTurnAfterAi(state).state;
     }
   }
 

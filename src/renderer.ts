@@ -981,11 +981,14 @@ export function animateStrikeAndReturn(
   return { cancel };
 }
 
-export function showDamageFloats(
+type FloatBadgeKind = 'damage' | 'heal';
+
+function showHexFloatBadges(
   svgElement: SVGSVGElement,
   entries: { col: number; row: number; amount: number }[],
   durationMs: number,
   onDone: () => void,
+  kind: FloatBadgeKind,
 ): { cancel: () => void } {
   const noopCancel = (): void => {};
 
@@ -1020,6 +1023,10 @@ export function showDamageFloats(
     if (timer !== null) window.clearTimeout(timer);
   };
 
+  const rootClass = kind === 'damage' ? 'damage-float-root' : 'heal-float-root';
+  const bgClass = kind === 'damage' ? 'damage-float-bg' : 'heal-float-bg';
+  const labelClass = kind === 'damage' ? 'damage-float-label' : 'heal-float-label';
+
   const stackIndexByHex = new Map<string, number>();
   const STACK_STEP = 20;
   for (const e of entries) {
@@ -1028,17 +1035,17 @@ export function showDamageFloats(
     const stack = stackIndexByHex.get(key) ?? 0;
     stackIndexByHex.set(key, stack + 1);
     const staggerY = -stack * STACK_STEP;
-    const label = String(e.amount);
+    const label = kind === 'damage' ? String(e.amount) : `+${e.amount}`;
     const outer = svgEl('g');
     outer.setAttribute('transform', `translate(${x},${y - HEX_SIZE * 0.72 + staggerY})`);
 
     const g = svgEl('g');
-    g.setAttribute('class', 'damage-float-root');
+    g.setAttribute('class', rootClass);
 
     const textW = Math.max(22, 7 + label.length * 7);
     const h = 16;
     const rect = svgEl('rect');
-    rect.setAttribute('class', 'damage-float-bg');
+    rect.setAttribute('class', bgClass);
     rect.setAttribute('x', String(-textW / 2));
     rect.setAttribute('y', String(-h / 2));
     rect.setAttribute('width', String(textW));
@@ -1046,7 +1053,7 @@ export function showDamageFloats(
     rect.setAttribute('rx', '3');
 
     const text = svgEl('text');
-    text.setAttribute('class', 'damage-float-label');
+    text.setAttribute('class', labelClass);
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('y', '4');
     text.setAttribute('font-size', '11');
@@ -1066,6 +1073,25 @@ export function showDamageFloats(
   }, durationMs);
 
   return { cancel };
+}
+
+export function showDamageFloats(
+  svgElement: SVGSVGElement,
+  entries: { col: number; row: number; amount: number }[],
+  durationMs: number,
+  onDone: () => void,
+): { cancel: () => void } {
+  return showHexFloatBadges(svgElement, entries, durationMs, onDone, 'damage');
+}
+
+/** Green +N badges for end-of-turn healing (same motion/layout as damage floats). */
+export function showHealFloats(
+  svgElement: SVGSVGElement,
+  entries: { col: number; row: number; amount: number }[],
+  durationMs: number,
+  onDone: () => void,
+): { cancel: () => void } {
+  return showHexFloatBadges(svgElement, entries, durationMs, onDone, 'heal');
 }
 
 /** Clears combat VFX layers (#anim-layer, #vfx-layer) without invoking callbacks. */

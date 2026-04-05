@@ -59,6 +59,10 @@
     --damage-float-text: var(--color-red-700);
     --damage-float-duration: 1600ms;
 
+    /* End-of-turn heal float (green chip, dark green label; same motion as damage) */
+    --heal-float-bg: var(--color-green-500);
+    --heal-float-text: #2d6a4f;
+
 }
 
 @keyframes damage-float-rise {
@@ -85,6 +89,22 @@
 
 .damage-float-label {
   fill: var(--damage-float-text);
+  font-family: 'Disket Mono', 'Courier New', monospace;
+}
+
+.heal-float-root {
+  pointer-events: none;
+  animation: damage-float-rise var(--damage-float-duration) ease-out forwards;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.heal-float-bg {
+  fill: var(--heal-float-bg);
+}
+
+.heal-float-label {
+  fill: var(--heal-float-text);
   font-family: 'Disket Mono', 'Courier New', monospace;
 }
 

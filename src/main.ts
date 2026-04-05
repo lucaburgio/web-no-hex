@@ -30,6 +30,7 @@ import {
   animateMoves,
   animateStrikeAndReturn,
   showDamageFloats,
+  showHealFloats,
   getHexFromEvent,
   renderMovePath,
   clearCombatVfxLayers,
@@ -203,6 +204,28 @@ function combineAnimCancels(...cancels: (() => void)[]): () => void {
     for (const c of cancels) c();
     clearCombatVfxLayers(svg);
   };
+}
+
+/** Green +N heal badges after end-of-turn cleanup (same timing as damage floats). */
+function playEndTurnHealFloats(
+  healFloats: { col: number; row: number; amount: number }[],
+  onDone: () => void,
+): void {
+  syncDamageFloatCssDuration();
+  if (healFloats.length === 0) {
+    isAnimating = false;
+    onDone();
+    return;
+  }
+  isAnimating = true;
+  render();
+  updateUI();
+  const { cancel } = showHealFloats(svg, healFloats, config.damageFloatDurationMs, () => {
+    humanMoveAnimCancel = null;
+    isAnimating = false;
+    onDone();
+  });
+  humanMoveAnimCancel = combineAnimCancels(cancel);
 }
 
 function syncDamageFloatCssDuration(): void {
@@ -747,12 +770,15 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     state = msg.state as GameState;
     syncUnitIdCounter(state);
     // Host runs end-turn cleanup
-    state = endTurnAfterAi(state);
+    const { state: afterHeal, healFloats } = endTurnAfterAi(state);
+    state = afterHeal;
     turnSnapshots.push(structuredClone(state));
-    render();
-    updateUI();
-    checkWinner();
-    maybeAutoEnd();
+    playEndTurnHealFloats(healFloats, () => {
+      render();
+      updateUI();
+      checkWinner();
+      maybeAutoEnd();
+    });
   } else if (msg.type === 'state-update') {
     // Opponent's in-turn update — apply only while it's their turn
     if (state.activePlayer !== localPlayer) {
@@ -1407,22 +1433,33 @@ function runAiTurnWithAnimation(): void {
   }
 
   if (animSteps.length === 0) {
-    state = endTurnAfterAi(state);
+    const { state: next, healFloats } = endTurnAfterAi(state);
+    state = next;
     turnSnapshots.push(structuredClone(state));
     saveGameState(state);
-    render(); updateUI(); checkWinner(); maybeAutoEnd();
+    playEndTurnHealFloats(healFloats, () => {
+      render();
+      updateUI();
+      checkWinner();
+      maybeAutoEnd();
+    });
     return;
   }
 
   syncDamageFloatCssDuration();
 
   const finishAi = (): void => {
-    isAnimating = false;
     humanMoveAnimCancel = null;
-    state = endTurnAfterAi(state);
+    const { state: next, healFloats } = endTurnAfterAi(state);
+    state = next;
     turnSnapshots.push(structuredClone(state));
     saveGameState(state);
-    render(); updateUI(); checkWinner(); maybeAutoEnd();
+    playEndTurnHealFloats(healFloats, () => {
+      render();
+      updateUI();
+      checkWinner();
+      maybeAutoEnd();
+    });
   };
 
   const playOneCombatVfx = (
