@@ -1042,6 +1042,11 @@ function snapshotUnits(st: GameState): Unit[] {
   return st.units.map(u => ({ ...u }));
 }
 
+/** AI replay: one unit at a hex (game state keeps attacker on start hex until resolve for path length 2). */
+function withUnitAtHex(units: Unit[], unitId: number, col: number, row: number): Unit[] {
+  return units.map(u => (u.id === unitId ? { ...u, col, row } : u));
+}
+
 export function aiMovement(state: GameState): {
   state: GameState;
   combatVfx: CombatVfxPayload[];
@@ -1164,6 +1169,12 @@ export function aiMovement(state: GameState): {
         // path.slice(0, -1); for a single step, animate the full path onto the defender hex.
         const needsApproachAnim =
           !hasMk && !res.meleeBothSurvived && path.length >= 2;
+        /** Pre-damage board for floats: for a one-hex attack, state still has the attacker on the start hex, but the move anim ends on the defender hex — match that so units do not snap back before disappearing (same idea as human: token ends on the fight hex). */
+        const boardBeforeMeleeFloats =
+          !hasMk && path.length === 2 && !res.meleeBothSurvived
+            ? withUnitAtHex(beforeResolveUnits, attackerId, path[1]![0], path[1]![1])
+            : beforeResolveUnits;
+
         if (needsApproachAnim) {
           const approachHexes =
             path.length >= 3
@@ -1183,11 +1194,13 @@ export function aiMovement(state: GameState): {
               pathHexes: approachHexes.length >= 2 ? approachHexes : undefined,
             },
           });
-          animUnitsAfter.push(beforeResolveUnits);
+          animUnitsAfter.push(
+            path.length === 2 ? boardBeforeMeleeFloats : beforeResolveUnits,
+          );
         }
 
         // Combat floats / strike: mutual-kill path shows empty board before floats; else pre-damage for strike.
-        animUnitsBefore.push(hasMk ? snapshotUnits(state) : beforeResolveUnits);
+        animUnitsBefore.push(hasMk ? snapshotUnits(state) : boardBeforeMeleeFloats);
         animSteps.push({ type: 'combat', vfx });
         animUnitsAfter.push(snapshotUnits(state));
         checkVictory(state);
