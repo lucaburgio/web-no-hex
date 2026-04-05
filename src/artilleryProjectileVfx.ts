@@ -59,6 +59,12 @@ const DEFAULT_STYLE: ArtilleryProjectileStyle = {
   impactDuration: 0.28,
 };
 
+/** Matches `style.css` --color-red-700 / --color-red-500 (hexFanOrderShuffle only). */
+const HEX_FAN_SHUFFLE_COLORS = {
+  color: '#BD4E4E',
+  accentColor: '#ff6b6b',
+} as const;
+
 export const ARTILLERY_VFX_LABELS: Record<ArtilleryVfxPresetId, string> = {
   ballisticArc: 'Ballistic arc — rotating shell, high arc, impact ring',
   directStreak: 'Direct streak — fast flat shot, motion-style fade',
@@ -658,7 +664,8 @@ function presetHexFanOrderShuffle(
   R: number,
   style: ArtilleryProjectileStyle,
 ): gsap.core.Timeline {
-  return presetHexFanWithOrder(root, c, R, style, [5, 2, 4, 0, 3, 1]);
+  const styleRed: ArtilleryProjectileStyle = { ...style, ...HEX_FAN_SHUFFLE_COLORS };
+  return presetHexFanWithOrder(root, c, R, styleRed, [5, 2, 4, 0, 3, 1]);
 }
 
 function presetHexColumn(
