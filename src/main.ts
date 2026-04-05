@@ -171,6 +171,8 @@ let ws: WebSocket | null = null;
 let state: GameState = createInitialState();
 let pendingProductionHex: { col: number; row: number } | null = null;
 let isAnimating = false;
+/** True while local vs-AI AI turn visuals run (shared cancel token must not be treated as human interrupt). */
+let aiPlaybackInProgress = false;
 /** Cancel function for the local player's in-flight move animation (allows selecting another unit mid-animation). */
 let humanMoveAnimCancel: (() => void) | null = null;
 let turnSnapshots: GameState[] = [];
@@ -885,6 +887,7 @@ function startGame(initialState: GameState): void {
   humanMoveAnimCancel?.();
   humanMoveAnimCancel = null;
   isAnimating = false;
+  aiPlaybackInProgress = false;
   turnSnapshots = [structuredClone(state)];
   initRenderer(svg);
   render();
@@ -1053,7 +1056,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
     // Empty SVG margin / background (no hex under cursor): clear selection
     if (state.phase === 'movement' && state.selectedUnit !== null) {
       let didInterruptHumanMove = false;
-      if (humanMoveAnimCancel) {
+      if (humanMoveAnimCancel && !aiPlaybackInProgress) {
         didInterruptHumanMove = true;
         humanMoveAnimCancel();
         humanMoveAnimCancel = null;
@@ -1074,7 +1077,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
   const { col, row } = hex;
 
   let didInterruptHumanMove = false;
-  if (humanMoveAnimCancel) {
+  if (humanMoveAnimCancel && !aiPlaybackInProgress) {
     didInterruptHumanMove = true;
     humanMoveAnimCancel();
     humanMoveAnimCancel = null;
@@ -1356,7 +1359,7 @@ document.body.addEventListener('click', (e: MouseEvent) => {
   if (svg.contains(t)) return;
 
   let didInterruptHumanMove = false;
-  if (humanMoveAnimCancel) {
+  if (humanMoveAnimCancel && !aiPlaybackInProgress) {
     didInterruptHumanMove = true;
     humanMoveAnimCancel();
     humanMoveAnimCancel = null;
@@ -1419,6 +1422,13 @@ function aiReplayState(base: GameState, units: Unit[]): GameState {
 }
 
 function runAiTurnWithAnimation(): void {
+  // Block input immediately: activePlayer stays PLAYER until endTurnAfterAi, so clicks would
+  // otherwise pass the activePlayer check. Must be true before sync aiMovement() and when
+  // animSteps.length === 0 (no later isAnimating assignment).
+  if (isAnimating) return;
+  isAnimating = true;
+  aiPlaybackInProgress = true;
+
   clearMovePathPreview();
   state = prepareAiTurn(state);
 
@@ -1429,6 +1439,8 @@ function runAiTurnWithAnimation(): void {
   const animUnitsAfter = aiResult.animUnitsAfter;
 
   if (state.winner) {
+    isAnimating = false;
+    aiPlaybackInProgress = false;
     render(); updateUI(); checkWinner();
     return;
   }
@@ -1439,6 +1451,7 @@ function runAiTurnWithAnimation(): void {
     turnSnapshots.push(structuredClone(state));
     saveGameState(state);
     playEndTurnHealFloats(healFloats, () => {
+      aiPlaybackInProgress = false;
       render();
       updateUI();
       checkWinner();
@@ -1456,6 +1469,7 @@ function runAiTurnWithAnimation(): void {
     turnSnapshots.push(structuredClone(state));
     saveGameState(state);
     playEndTurnHealFloats(healFloats, () => {
+      aiPlaybackInProgress = false;
       render();
       updateUI();
       checkWinner();
@@ -1524,8 +1538,6 @@ function runAiTurnWithAnimation(): void {
       runFloats(false);
     }
   };
-
-  isAnimating = true;
 
   const runStep = (index: number): void => {
     if (index >= animSteps.length) {
@@ -1886,6 +1898,7 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
     return;
   }
   if (e.key === 'Enter' && !endMoveBtn.hidden && endMoveBtn.style.display !== 'none') {
+    if (isAnimating) return;
     endMoveBtn.click();
   }
 });
