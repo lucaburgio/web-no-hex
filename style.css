@@ -359,7 +359,8 @@ body {
   font-size: 14px;
   font-weight: 700;
   box-sizing: border-box;
-  width: 240px;
+  width: max-content;
+  max-width: 100%;
   flex: none;
   flex-grow: 0;
   background: #010101;
@@ -455,9 +456,10 @@ body {
   flex-direction: row;
   flex-wrap: nowrap;
   gap: 4px;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
 }
 
 .unit-card-stat {

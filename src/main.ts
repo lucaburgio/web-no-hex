@@ -760,6 +760,7 @@ function showUnitPicker(col: number, row: number): void {
 
   const statIconCost = 'public/icons/points.svg';
   const statIconMove = 'public/icons/movement.svg';
+  const statIconRange = 'public/icons/range.svg';
   const statIconStr = 'public/icons/strength.svg';
   const statIconHp = 'public/icons/hp.svg';
 
@@ -847,6 +848,15 @@ function showUnitPicker(col: number, row: number): void {
       'How many hexes this unit can move on the map each turn.',
       statIconMove
     );
+    if (unitType.range != null) {
+      addStat(
+        'unit-card-stat--range',
+        unitType.range,
+        'Range',
+        'Maximum hex distance for ranged fire (targets from distance 2 through this value). Move or shoot in one turn, not both.',
+        statIconRange
+      );
+    }
     addStat(
       'unit-card-stat--str',
       unitType.strength,
