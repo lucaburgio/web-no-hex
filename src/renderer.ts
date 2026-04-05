@@ -277,6 +277,12 @@ interface Colors {
 }
 
 let C: Colors | null = null;
+
+/** Call after theme or guest identity CSS variables change so the next draw re-reads :root. */
+export function invalidateColorsCache(): void {
+  C = null;
+}
+
 function colors(): Colors {
   if (C) return C;
   const s = getComputedStyle(document.documentElement);

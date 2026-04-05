@@ -35,6 +35,7 @@ import {
   renderMovePath,
   clearCombatVfxLayers,
   playRangedArtilleryHexBarrageVfx,
+  invalidateColorsCache,
 } from './renderer';
 import { getNeighbors } from './hex';
 import { isInEnemyZoC } from './game';
@@ -322,9 +323,54 @@ function render(): void {
 
 setBoardRenderCallback(() => render());
 
+/** CSS vars swapped for vs-human guest so "your" side uses the theme's player palette and the opponent the AI palette. */
+const GUEST_IDENTITY_SWAP_PROPS = [
+  '--color-player',
+  '--color-ai',
+  '--color-hex-player',
+  '--color-hex-ai',
+] as const;
+
+function clearGuestIdentityColorOverrides(): void {
+  const root = document.documentElement;
+  for (const p of GUEST_IDENTITY_SWAP_PROPS) {
+    root.style.removeProperty(p);
+  }
+  invalidateColorsCache();
+}
+
+/**
+ * For multiplayer guest, swap player/AI theme hues so local side matches the normal "player" colors.
+ * No change to game logic — only how `--color-*` resolve. Clears overrides when not guest.
+ */
+function syncGuestIdentityColors(): void {
+  const root = document.documentElement;
+  for (const p of GUEST_IDENTITY_SWAP_PROPS) {
+    root.style.removeProperty(p);
+  }
+  invalidateColorsCache();
+
+  if (gameMode !== 'vsHuman' || localPlayer !== AI) {
+    return;
+  }
+
+  const s = getComputedStyle(root);
+  const player = s.getPropertyValue('--color-player').trim();
+  const ai = s.getPropertyValue('--color-ai').trim();
+  const hexPlayer = s.getPropertyValue('--color-hex-player').trim();
+  const hexAi = s.getPropertyValue('--color-hex-ai').trim();
+
+  root.style.setProperty('--color-player', ai);
+  root.style.setProperty('--color-ai', player);
+  root.style.setProperty('--color-hex-player', hexAi);
+  root.style.setProperty('--color-hex-ai', hexPlayer);
+  invalidateColorsCache();
+}
+
 // ── Main menu ─────────────────────────────────────────────────────────────────
 
 function showMainMenu(): void {
+  clearGuestIdentityColorOverrides();
   mainMenuOverlayEl.classList.remove('hidden');
   if (hasSaveGame()) {
     menuContinueBtn.classList.remove('hidden');
@@ -902,6 +948,7 @@ function startGame(initialState: GameState): void {
   aiPlaybackInProgress = false;
   turnSnapshots = [structuredClone(state)];
   initRenderer(svg, { flipBoardY: gameMode === 'vsHuman' && localPlayer === AI });
+  syncGuestIdentityColors();
   render();
   updateUI();
   checkWinner();
