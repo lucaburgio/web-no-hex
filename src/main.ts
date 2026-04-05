@@ -1145,6 +1145,31 @@ svg.addEventListener('click', (e: MouseEvent) => {
         const pathForAnim = pathHexes.length >= 2 ? pathHexes : undefined;
 
         const needsApproach = fromCol !== toCol || fromRow !== toRow;
+        const mk = combatVfx?.mutualKillLunge;
+        let primaryMove: MoveAnimation | null = null;
+        if (mk && mk.pathHexes.length >= 2) {
+          const p = mk.pathHexes;
+          const s = p[0]!;
+          const e = p[p.length - 1]!;
+          primaryMove = {
+            unit: movingUnit,
+            fromCol: s[0],
+            fromRow: s[1],
+            toCol: e[0],
+            toRow: e[1],
+            pathHexes: p,
+          };
+        } else if (needsApproach) {
+          primaryMove = {
+            unit: movingUnit,
+            fromCol,
+            fromRow,
+            toCol,
+            toRow,
+            pathHexes: pathForAnim,
+          };
+        }
+        const needsMoveAnim = primaryMove !== null;
         const sr = combatVfx?.strikeReturn;
         const floats = combatVfx?.damageFloats ?? [];
 
@@ -1197,15 +1222,15 @@ svg.addEventListener('click', (e: MouseEvent) => {
         } else {
           isAnimating = true;
           const hidden = new Set<number>();
-          if (needsApproach) hidden.add(movingUnitId);
+          if (needsMoveAnim) hidden.add(movingUnitId);
           if (sr) hidden.add(sr.attackerId);
 
           renderState(svg, state, pendingProductionHex, hidden, localPlayer);
           updateUI();
 
           const wsPayload: WsAnimationPayload = {};
-          if (needsApproach) {
-            wsPayload.moves = [{ unit: movingUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim }];
+          if (primaryMove) {
+            wsPayload.moves = [primaryMove];
           }
           if (sr) {
             const u = getUnitById(state, sr.attackerId);
@@ -1222,10 +1247,10 @@ svg.addEventListener('click', (e: MouseEvent) => {
           if (floats.length > 0) wsPayload.damageFloats = floats;
           sendStateUpdate(wsPayload);
 
-          if (needsApproach) {
+          if (needsMoveAnim && primaryMove) {
             const { cancel } = animateMoves(
               svg,
-              [{ unit: movingUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim }],
+              [primaryMove],
               config.unitMoveSpeed,
               () => {
                 if (sr) {
@@ -1386,6 +1411,26 @@ function runAiTurnWithAnimation(): void {
         pathHexes: pathHexes.length >= 2 ? pathHexes : undefined,
       });
     }
+  }
+
+  // Both sides dead: attacker is not in state.units — no position diff; use mutual-kill path from combat VFX.
+  for (const vfx of combatVfxList) {
+    const mk = vfx.mutualKillLunge;
+    if (!mk || mk.pathHexes.length < 2) continue;
+    if (moves.some(m => m.unit.id === mk.attackerId)) continue;
+    const pre = preAiPositions.get(mk.attackerId);
+    if (!pre) continue;
+    const p = mk.pathHexes;
+    const s = p[0]!;
+    const e = p[p.length - 1]!;
+    moves.push({
+      unit: pre.unit,
+      fromCol: s[0],
+      fromRow: s[1],
+      toCol: e[0],
+      toRow: e[1],
+      pathHexes: p,
+    });
   }
 
   const hasMoves = moves.length > 0;

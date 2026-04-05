@@ -368,6 +368,8 @@ export interface CombatResolveResult {
   dmgToAttacker: number;
   dmgToDefender: number;
   meleeBothSurvived: boolean;
+  /** Both sides eliminated in melee (simultaneous). */
+  mutualKill: boolean;
 }
 
 function resolveCombat(state: GameState, attacker: Unit, defender: Unit): CombatResolveResult {
@@ -400,7 +402,13 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): Combat
     } else {
       log(state, `Defender has ${defender.hp} HP remaining.`);
     }
-    return { ranged: true, dmgToAttacker: 0, dmgToDefender, meleeBothSurvived: false };
+    return {
+      ranged: true,
+      dmgToAttacker: 0,
+      dmgToDefender,
+      meleeBothSurvived: false,
+      mutualKill: false,
+    };
   }
 
   // Melee: apply damage simultaneously
@@ -411,6 +419,7 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): Combat
 
   const attackerDied = attacker.hp <= 0;
   const defenderDied = defender.hp <= 0;
+  const mutualKill = attackerDied && defenderDied;
 
   if (defenderDied) {
     log(state, `Unit #${defender.id} was destroyed.`);
@@ -434,6 +443,7 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): Combat
     dmgToAttacker,
     dmgToDefender,
     meleeBothSurvived: !attackerDied && !defenderDied,
+    mutualKill,
   };
 }
 
@@ -444,6 +454,7 @@ function combatVfxFromResolve(
   defCol: number,
   defRow: number,
   res: CombatResolveResult,
+  attackPath?: [number, number][],
 ): CombatVfxPayload {
   if (res.ranged) {
     return {
@@ -464,6 +475,9 @@ function combatVfxFromResolve(
       enemyCol: defCol,
       enemyRow: defRow,
     };
+  }
+  if (res.mutualKill && attackPath && attackPath.length >= 2) {
+    payload.mutualKillLunge = { attackerId, pathHexes: attackPath };
   }
   return payload;
 }
@@ -829,7 +843,7 @@ export function playerMoveUnit(
     checkVictory(state);
     return {
       state,
-      combatVfx: combatVfxFromResolve(attackerId, atkCol, atkRow, col, row, res),
+      combatVfx: combatVfxFromResolve(attackerId, atkCol, atkRow, col, row, res, path),
     };
   }
 
@@ -1064,7 +1078,7 @@ export function aiMovement(state: GameState): { state: GameState; combatVfx: Com
         const atkCol = unit.col;
         const atkRow = unit.row;
         const res = resolveCombat(state, unit, target);
-        combatVfx.push(combatVfxFromResolve(attackerId, atkCol, atkRow, best.col, best.row, res));
+        combatVfx.push(combatVfxFromResolve(attackerId, atkCol, atkRow, best.col, best.row, res, path));
         checkVictory(state);
         break;
       }
