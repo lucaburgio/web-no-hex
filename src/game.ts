@@ -966,6 +966,7 @@ export function vsHumanEndMovement(state: GameState, localPlayer: Owner): GameSt
   state.phase = 'production';
   state.activePlayer = other;
   state.selectedUnit = null;
+  state.units.forEach(u => { if (u.owner === localPlayer) u.movesUsed = 0; });
   return state;
 }
 
@@ -1257,7 +1258,8 @@ export function prepareAiTurn(state: GameState): GameState {
   if (state.phase !== 'movement' || state.activePlayer !== PLAYER) return state;
   log(state, 'You ended your movement.');
   state.selectedUnit = null;
-  state.units.forEach(u => { if (u.owner === AI) u.movesUsed = 0; });
+  // Clear exhaustion from the human's movement so pieces render at full opacity during AI play; AI counters also reset before aiMovement.
+  state.units.forEach(u => { u.movesUsed = 0; });
   return state;
 }
 

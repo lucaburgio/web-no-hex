@@ -644,7 +644,11 @@ export function renderState(
     const isRangedTarget = rangedTargetKeys.has(`${dc},${dr}`);
     const fill      = isRangedTarget ? c.rangedTarget : isSelected ? c.unitSelected : baseColor;
     const unitDimmed = productionFocusHexes.size > 0;
-    const opacity   = (unit.movesUsed >= unit.movement || unitDimmed) ? '0.2' : '1';
+    const moveExhausted =
+      state.phase === 'movement' &&
+      state.activePlayer === unit.owner &&
+      unit.movesUsed >= unit.movement;
+    const opacity   = (moveExhausted || unitDimmed) ? '0.2' : '1';
 
     const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
     const sc = (HEX_SIZE * 1.1) / 50;
