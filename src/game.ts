@@ -1,6 +1,6 @@
 import { getNeighbors, hexDistance } from './hex';
 import config from './gameconfig';
-import type { Unit, UnitType, HexState, GameState, CombatForecast, Owner } from './types';
+import type { Unit, UnitType, HexState, GameState, CombatForecast, CombatVfxPayload, Owner } from './types';
 
 export const PLAYER = 1 as const;
 export const AI     = 2 as const;
@@ -363,7 +363,14 @@ export function getRangedAttackTargets(state: GameState, unit: Unit): Unit[] {
   return out;
 }
 
-function resolveCombat(state: GameState, attacker: Unit, defender: Unit): void {
+export interface CombatResolveResult {
+  ranged: boolean;
+  dmgToAttacker: number;
+  dmgToDefender: number;
+  meleeBothSurvived: boolean;
+}
+
+function resolveCombat(state: GameState, attacker: Unit, defender: Unit): CombatResolveResult {
   const ranged = isRangedCombat(state, attacker, defender);
   const { count: flanking, extraSum } = analyzeFlanking(state, attacker, defender);
   const csA = effectiveCS(attacker, flanking, extraSum);
@@ -393,7 +400,7 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): void {
     } else {
       log(state, `Defender has ${defender.hp} HP remaining.`);
     }
-    return;
+    return { ranged: true, dmgToAttacker: 0, dmgToDefender, meleeBothSurvived: false };
   }
 
   // Melee: apply damage simultaneously
@@ -421,6 +428,44 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): void {
   if (!attackerDied && !defenderDied) {
     log(state, `Both units survived (${attacker.hp}/${defender.hp} HP remaining).`);
   }
+
+  return {
+    ranged: false,
+    dmgToAttacker,
+    dmgToDefender,
+    meleeBothSurvived: !attackerDied && !defenderDied,
+  };
+}
+
+function combatVfxFromResolve(
+  attackerId: number,
+  atkCol: number,
+  atkRow: number,
+  defCol: number,
+  defRow: number,
+  res: CombatResolveResult,
+): CombatVfxPayload {
+  if (res.ranged) {
+    return {
+      damageFloats: [{ col: defCol, row: defRow, amount: -res.dmgToDefender }],
+    };
+  }
+  const payload: CombatVfxPayload = {
+    damageFloats: [
+      { col: atkCol, row: atkRow, amount: -res.dmgToAttacker },
+      { col: defCol, row: defRow, amount: -res.dmgToDefender },
+    ],
+  };
+  if (res.meleeBothSurvived) {
+    payload.strikeReturn = {
+      attackerId,
+      fromCol: atkCol,
+      fromRow: atkRow,
+      enemyCol: defCol,
+      enemyRow: defRow,
+    };
+  }
+  return payload;
 }
 
 // ── Combat forecast (pure — no state mutation) ────────────────────────────────
@@ -738,13 +783,18 @@ export function playerSelectUnit(state: GameState, col: number, row: number, loc
   return state;
 }
 
-export function playerMoveUnit(state: GameState, col: number, row: number, localPlayer: Owner = PLAYER): GameState {
+export function playerMoveUnit(
+  state: GameState,
+  col: number,
+  row: number,
+  localPlayer: Owner = PLAYER,
+): { state: GameState; combatVfx: CombatVfxPayload | null } {
   const enemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
-  if (state.phase !== 'movement' || state.activePlayer !== localPlayer) return state;
-  if (state.selectedUnit === null) return state;
+  if (state.phase !== 'movement' || state.activePlayer !== localPlayer) return { state, combatVfx: null };
+  if (state.selectedUnit === null) return { state, combatVfx: null };
 
   const unit = getUnitById(state, state.selectedUnit);
-  if (!unit) { state.selectedUnit = null; return state; }
+  if (!unit) { state.selectedUnit = null; return { state, combatVfx: null }; }
 
   const validMoves = getValidMoves(state, unit);
   if (!validMoves.some(([c, r]) => c === col && r === row)) {
@@ -754,13 +804,13 @@ export function playerMoveUnit(state: GameState, col: number, row: number, local
     } else {
       log(state, 'Invalid move: blocked by Zone of Control or not adjacent.');
     }
-    return state;
+    return { state, combatVfx: null };
   }
 
   const target = getUnit(state, col, row);
   if (target && target.owner === localPlayer) {
     log(state, 'Cannot move onto your own unit.');
-    return state;
+    return { state, combatVfx: null };
   }
 
   const path = getMovePath(state, unit, col, row);
@@ -771,51 +821,70 @@ export function playerMoveUnit(state: GameState, col: number, row: number, local
   if (target && target.owner === enemy) {
     // Combat exhausts remaining movement
     unit.movesUsed = unit.movement;
+    const attackerId = unit.id;
     advanceAlongPathBeforeCombat(state, unit, path, localPlayer);
-    resolveCombat(state, unit, target);
-  } else {
-    // Conquer every neutral/enemy hex along the path (intermediate steps)
-    for (const [pc, pr] of path.slice(1)) {
-      conquerHex(state, pc, pr, localPlayer);
-    }
-    unit.col = col;
-    unit.row = row;
-    log(state, `Moved unit #${unit.id} to (${col}, ${row}).`);
-    // Keep the unit selected if it still has movement left
-    if (unit.movesUsed < unit.movement) {
-      state.selectedUnit = unit.id;
-    }
+    const atkCol = unit.col;
+    const atkRow = unit.row;
+    const res = resolveCombat(state, unit, target);
+    checkVictory(state);
+    return {
+      state,
+      combatVfx: combatVfxFromResolve(attackerId, atkCol, atkRow, col, row, res),
+    };
+  }
+
+  // Conquer every neutral/enemy hex along the path (intermediate steps)
+  for (const [pc, pr] of path.slice(1)) {
+    conquerHex(state, pc, pr, localPlayer);
+  }
+  unit.col = col;
+  unit.row = row;
+  log(state, `Moved unit #${unit.id} to (${col}, ${row}).`);
+  // Keep the unit selected if it still has movement left
+  if (unit.movesUsed < unit.movement) {
+    state.selectedUnit = unit.id;
   }
 
   checkVictory(state);
-  return state;
+  return { state, combatVfx: null };
 }
 
-export function playerRangedAttack(state: GameState, col: number, row: number, localPlayer: Owner = PLAYER): GameState {
+export function playerRangedAttack(
+  state: GameState,
+  col: number,
+  row: number,
+  localPlayer: Owner = PLAYER,
+): { state: GameState; combatVfx: CombatVfxPayload | null } {
   const enemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
-  if (state.phase !== 'movement' || state.activePlayer !== localPlayer) return state;
-  if (state.selectedUnit === null) return state;
+  if (state.phase !== 'movement' || state.activePlayer !== localPlayer) return { state, combatVfx: null };
+  if (state.selectedUnit === null) return { state, combatVfx: null };
 
   const unit = getUnitById(state, state.selectedUnit);
-  if (!unit) { state.selectedUnit = null; return state; }
+  if (!unit) { state.selectedUnit = null; return { state, combatVfx: null }; }
 
   const target = getUnit(state, col, row);
   if (!target || target.owner !== enemy) {
     log(state, 'No enemy at that hex.');
-    return state;
+    return { state, combatVfx: null };
   }
 
   const rangedOk = getRangedAttackTargets(state, unit).some(t => t.id === target.id);
   if (!rangedOk) {
     log(state, 'Target is out of ranged attack range.');
-    return state;
+    return { state, combatVfx: null };
   }
 
   unit.movesUsed = unit.movement;
   state.selectedUnit = null;
-  resolveCombat(state, unit, target);
+  const attackerId = unit.id;
+  const atkCol = unit.col;
+  const atkRow = unit.row;
+  const res = resolveCombat(state, unit, target);
   checkVictory(state);
-  return state;
+  return {
+    state,
+    combatVfx: combatVfxFromResolve(attackerId, atkCol, atkRow, col, row, res),
+  };
 }
 
 export function playerEndMovement(state: GameState): GameState {
@@ -924,7 +993,8 @@ function scoreEmptyMove(
   return s;
 }
 
-export function aiMovement(state: GameState): GameState {  // exported for animation split
+export function aiMovement(state: GameState): { state: GameState; combatVfx: CombatVfxPayload[] } {
+  const combatVfx: CombatVfxPayload[] = [];
   const pressure = aiDefensivePressure(state);
   const threat = criticalThreatPlayerUnit(state);
   const aiUnits = state.units.filter(u => u.owner === AI).sort((a, b) => {
@@ -948,7 +1018,13 @@ export function aiMovement(state: GameState): GameState {  // exported for anima
       if (rangedTargets.length > 0) {
         const target = pickBestRangedTarget(state, unit, rangedTargets, pressure);
         unit.movesUsed = unit.movement;
-        resolveCombat(state, unit, target);
+        const attackerId = unit.id;
+        const atkCol = unit.col;
+        const atkRow = unit.row;
+        const defCol = target.col;
+        const defRow = target.row;
+        const res = resolveCombat(state, unit, target);
+        combatVfx.push(combatVfxFromResolve(attackerId, atkCol, atkRow, defCol, defRow, res));
         checkVictory(state);
         break;
       }
@@ -983,8 +1059,12 @@ export function aiMovement(state: GameState): GameState {  // exported for anima
         if (!target || target.owner !== PLAYER) break;
         const path = getMovePath(state, unit, best.col, best.row);
         unit.movesUsed = unit.movement;
+        const attackerId = unit.id;
         advanceAlongPathBeforeCombat(state, unit, path, AI);
-        resolveCombat(state, unit, target);
+        const atkCol = unit.col;
+        const atkRow = unit.row;
+        const res = resolveCombat(state, unit, target);
+        combatVfx.push(combatVfxFromResolve(attackerId, atkCol, atkRow, best.col, best.row, res));
         checkVictory(state);
         break;
       }
@@ -1001,7 +1081,7 @@ export function aiMovement(state: GameState): GameState {  // exported for anima
     }
   }
   log(state, 'AI completed movement.');
-  return state;
+  return { state, combatVfx };
 }
 
 // ── Phase advancement ─────────────────────────────────────────────────────────
@@ -1049,7 +1129,7 @@ export function advancePhase(state: GameState): GameState {
   } else if (state.phase === 'movement') {
     if (state.activePlayer === PLAYER) {
       state = prepareAiTurn(state);
-      state = aiMovement(state);
+      state = aiMovement(state).state;
       if (state.winner) return state;
       state = endTurnAfterAi(state);
     }

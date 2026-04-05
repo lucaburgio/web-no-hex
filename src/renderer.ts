@@ -685,6 +685,233 @@ export function animateMoves(
   return { cancel };
 }
 
+const BOARD_MARGIN = 100;
+
+export interface StrikeReturnParams {
+  unit: Unit;
+  fromCol: number;
+  fromRow: number;
+  enemyCol: number;
+  enemyRow: number;
+  durationMs: number;
+  /** Fires once when the unit reaches the enemy hex (halfway along the out-and-back path). */
+  onHit?: () => void;
+}
+
+/** Melee: attacker moves onto the defender hex and returns (both units survived). */
+export function animateStrikeAndReturn(
+  svgElement: SVGSVGElement,
+  params: StrikeReturnParams,
+  onDone: () => void,
+): { cancel: () => void } {
+  const noopCancel = (): void => {};
+  const { unit, fromCol, fromRow, enemyCol, enemyRow, durationMs, onHit } = params;
+
+  if (durationMs <= 0) {
+    onHit?.();
+    onDone();
+    return { cancel: noopCancel };
+  }
+
+  const pixelPath = [
+    hexToPixel(fromCol, fromRow),
+    hexToPixel(enemyCol, enemyRow),
+    hexToPixel(fromCol, fromRow),
+  ];
+
+  const c = colors();
+
+  let animLayer = svgElement.querySelector('#anim-layer') as SVGGElement | null;
+  if (!animLayer) {
+    animLayer = svgEl('g');
+    animLayer.id = 'anim-layer';
+    animLayer.setAttribute('transform', `translate(${BOARD_MARGIN},${BOARD_MARGIN})`);
+    svgElement.appendChild(animLayer);
+  }
+  animLayer.setAttribute('pointer-events', 'none');
+  animLayer.innerHTML = '';
+
+  let cancelled = false;
+  let doneCalled = false;
+  let hitCalled = false;
+
+  function callDoneOnce(): void {
+    if (cancelled || doneCalled) return;
+    doneCalled = true;
+    onDone();
+  }
+
+  const cancel = (): void => {
+    if (cancelled || doneCalled) return;
+    cancelled = true;
+    animLayer!.innerHTML = '';
+  };
+
+  const baseColor = unit.owner === PLAYER ? c.player : c.ai;
+  const hpRatio = unit.hp / unit.maxHp;
+  const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
+  const unitSc = (HEX_SIZE * 1.1) / 50;
+
+  const circle = svgEl('path');
+  circle.setAttribute('d', UNIT_PATH_D);
+  circle.setAttribute('fill', baseColor);
+  circle.setAttribute('stroke', 'none');
+  circle.setAttribute('pointer-events', 'none');
+  animLayer.appendChild(circle);
+
+  const animBarW = HEX_SIZE * 0.58;
+  const barH = HEX_SIZE * 0.1;
+  const barBg = svgEl('rect');
+  barBg.setAttribute('width', String(animBarW));
+  barBg.setAttribute('height', String(barH));
+  barBg.setAttribute('fill', '#222');
+  barBg.setAttribute('rx', '1');
+  barBg.setAttribute('pointer-events', 'none');
+  animLayer.appendChild(barBg);
+
+  const barColor = hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
+  const barFill = svgEl('rect');
+  barFill.setAttribute('width', String(animBarW * hpRatio));
+  barFill.setAttribute('height', String(barH));
+  barFill.setAttribute('fill', barColor);
+  barFill.setAttribute('rx', '1');
+  barFill.setAttribute('pointer-events', 'none');
+  animLayer.appendChild(barFill);
+
+  const iconSrc = unitIcon(unit.unitTypeId);
+  const iconSize = HEX_SIZE * 0.4;
+  const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, c.unitIconColor, '1');
+  const iconWrapper = svgEl('g');
+  iconWrapper.setAttribute('pointer-events', 'none');
+  if (iconEl) iconWrapper.appendChild(iconEl);
+  animLayer.appendChild(iconWrapper);
+
+  const startTime = performance.now();
+
+  (function step(now: number): void {
+    if (cancelled) return;
+
+    const t = Math.min((now - startTime) / durationMs, 1);
+    const ease = easeInOutQuad(t);
+    const { x, y } = positionOnPolyline(pixelPath, ease);
+
+    if (!hitCalled && t >= 0.5) {
+      hitCalled = true;
+      onHit?.();
+    }
+
+    circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
+    barBg.setAttribute('x', String(x - animBarW / 2));
+    barBg.setAttribute('y', String(y + HEX_SIZE * 0.13));
+    barFill.setAttribute('x', String(x - animBarW / 2));
+    barFill.setAttribute('y', String(y + HEX_SIZE * 0.13));
+    iconWrapper.setAttribute('transform', `translate(${x},${y - HEX_SIZE * 0.34})`);
+
+    if (t < 1) {
+      requestAnimationFrame(step);
+    } else {
+      if (cancelled) return;
+      circle.remove();
+      barBg.remove();
+      barFill.remove();
+      iconWrapper.remove();
+      animLayer!.innerHTML = '';
+      callDoneOnce();
+    }
+  })(performance.now());
+
+  return { cancel };
+}
+
+export function showDamageFloats(
+  svgElement: SVGSVGElement,
+  entries: { col: number; row: number; amount: number }[],
+  durationMs: number,
+  onDone: () => void,
+): { cancel: () => void } {
+  const noopCancel = (): void => {};
+
+  if (entries.length === 0 || durationMs <= 0) {
+    onDone();
+    return { cancel: noopCancel };
+  }
+
+  let vfxLayer = svgElement.querySelector('#vfx-layer') as SVGGElement | null;
+  if (!vfxLayer) {
+    vfxLayer = svgEl('g');
+    vfxLayer.id = 'vfx-layer';
+    vfxLayer.setAttribute('transform', `translate(${BOARD_MARGIN},${BOARD_MARGIN})`);
+    vfxLayer.setAttribute('pointer-events', 'none');
+    svgElement.appendChild(vfxLayer);
+  }
+
+  let cancelled = false;
+  let doneCalled = false;
+  let timer: number | null = null;
+
+  function callDoneOnce(): void {
+    if (cancelled || doneCalled) return;
+    doneCalled = true;
+    onDone();
+  }
+
+  const cancel = (): void => {
+    if (cancelled || doneCalled) return;
+    cancelled = true;
+    if (vfxLayer) vfxLayer.innerHTML = '';
+    if (timer !== null) window.clearTimeout(timer);
+  };
+
+  for (const e of entries) {
+    const { x, y } = hexToPixel(e.col, e.row);
+    const label = String(e.amount);
+    const outer = svgEl('g');
+    outer.setAttribute('transform', `translate(${x},${y - HEX_SIZE * 0.72})`);
+
+    const g = svgEl('g');
+    g.setAttribute('class', 'damage-float-root');
+
+    const textW = Math.max(22, 7 + label.length * 7);
+    const h = 16;
+    const rect = svgEl('rect');
+    rect.setAttribute('class', 'damage-float-bg');
+    rect.setAttribute('x', String(-textW / 2));
+    rect.setAttribute('y', String(-h / 2));
+    rect.setAttribute('width', String(textW));
+    rect.setAttribute('height', String(h));
+    rect.setAttribute('rx', '3');
+
+    const text = svgEl('text');
+    text.setAttribute('class', 'damage-float-label');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('y', '4');
+    text.setAttribute('font-size', '11');
+    text.setAttribute('font-weight', '700');
+    text.textContent = label;
+
+    g.appendChild(rect);
+    g.appendChild(text);
+    outer.appendChild(g);
+    vfxLayer.appendChild(outer);
+  }
+
+  timer = window.setTimeout(() => {
+    if (cancelled) return;
+    vfxLayer!.innerHTML = '';
+    callDoneOnce();
+  }, durationMs);
+
+  return { cancel };
+}
+
+/** Clears combat VFX layers (#anim-layer, #vfx-layer) without invoking callbacks. */
+export function clearCombatVfxLayers(svgElement: SVGSVGElement): void {
+  const anim = svgElement.querySelector('#anim-layer') as SVGGElement | null;
+  if (anim) anim.innerHTML = '';
+  const vfx = svgElement.querySelector('#vfx-layer') as SVGGElement | null;
+  if (vfx) vfx.innerHTML = '';
+}
+
 export function getHexFromEvent(e: MouseEvent): { col: number; row: number } | null {
   const target = (e.target as Element).closest('[data-col]') as HTMLElement | null;
   if (!target) return null;

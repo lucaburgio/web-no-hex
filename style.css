@@ -54,6 +54,38 @@
     --color-hp-mid:  #FFBE00;
     --color-hp-low:  #FF765E;
 
+    /* Combat damage float (matches strike UI ref: warm red chip, dark label) */
+    --damage-float-bg: #E85A3C;
+    --damage-float-text: #1a1a1a;
+    --damage-float-duration: 900ms;
+
+}
+
+@keyframes damage-float-rise {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+}
+
+.damage-float-root {
+  pointer-events: none;
+  animation: damage-float-rise var(--damage-float-duration) ease-out forwards;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.damage-float-bg {
+  fill: var(--damage-float-bg);
+}
+
+.damage-float-label {
+  fill: var(--damage-float-text);
+  font-family: 'Disket Mono', 'Courier New', monospace;
 }
 
 body {
@@ -455,7 +487,7 @@ body {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
-  gap: 4px;
+  gap: 12px;
   justify-content: flex-start;
   align-items: center;
   width: max-content;
@@ -899,7 +931,7 @@ body {
 #settings-overlay.hidden { display: none; }
 
 #settings-left {
-  width: 340px;
+  width: 70%;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;

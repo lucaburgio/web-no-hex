@@ -36,6 +36,20 @@ export interface GameState {
   winner: Owner | null;
 }
 
+/** Visual-only combat feedback for animations (not part of saved game state). */
+export interface CombatVfxPayload {
+  /** Melee only: both units survived — play strike onto enemy hex and return. */
+  strikeReturn?: {
+    attackerId: number;
+    fromCol: number;
+    fromRow: number;
+    enemyCol: number;
+    enemyRow: number;
+  };
+  /** Negative amounts (e.g. -2) for damage dealt. */
+  damageFloats: { col: number; row: number; amount: number }[];
+}
+
 export interface CombatForecast {
   /** True when attacker uses ranged rules (no return fire, no advance on kill). */
   isRanged?: boolean;
@@ -102,4 +116,8 @@ export interface GameConfig {
   movePathStrokeWidth: number;
   // Duration in ms for the movement path preview draw animation (line + dots)
   movePathDrawDurationMs: number;
+  /** Duration in ms for floating damage labels (fade + move up). */
+  damageFloatDurationMs: number;
+  /** Duration in ms for melee strike-and-return (out + back). */
+  strikeReturnSpeedMs: number;
 }

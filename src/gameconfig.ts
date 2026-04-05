@@ -83,7 +83,7 @@ const config: GameConfig = {
     {
       id: 'artillery',
       name: 'Artillery',
-      cost: 30,
+      cost: 34,
       movement: 1,
       maxHp: 10,
       strength: 10,
@@ -131,6 +131,12 @@ const config: GameConfig = {
 
   // Duration in ms for the unit move animation (0 = instant)
   unitMoveSpeed: 480,
+
+  // Floating damage labels above hexes (fade out + move up)
+  damageFloatDurationMs: 900,
+
+  // Melee strike-and-return: out to enemy hex and back (full round trip)
+  strikeReturnSpeedMs: 520,
 
   // Fraction of board hexes to randomly set as impassable mountains at game start (0–1)
   mountainPct: 0.12,
