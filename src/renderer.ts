@@ -115,12 +115,9 @@ function inlineIcon(iconSrc: string | undefined, x: number, y: number, size: num
   }
   g.setAttribute('opacity', opacity);
   g.setAttribute('pointer-events', 'none');
-  g.style.pointerEvents = 'none';
   for (const d of def.paths) {
     const p = svgEl('path');
     p.setAttribute('d', d);
-    p.setAttribute('pointer-events', 'none');
-    p.style.pointerEvents = 'none';
     g.appendChild(p);
   }
   return g;
@@ -274,6 +271,7 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   const unitLayer = svgEl('g');
   unitLayer.id = 'unit-layer';
   unitLayer.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
+  unitLayer.setAttribute('pointer-events', 'none');
   svgElement.appendChild(unitLayer);
 
   for (let r = 0; r < ROWS; r++) {
@@ -325,6 +323,26 @@ export function initRenderer(svgElement: SVGSVGElement): void {
   pathLine.setAttribute('stroke-linejoin', 'round');
   pathLine.setAttribute('pointer-events', 'none');
   movePathLayer.appendChild(pathLine);
+
+  // Full-hex invisible targets on top of unit artwork so clicks always map to a cell (getHexFromEvent).
+  const hexHitLayer = svgEl('g');
+  hexHitLayer.id = 'hex-hit-layer';
+  hexHitLayer.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
+  for (let r = 0; r < ROWS; r++) {
+    for (let col = 0; col < COLS; col++) {
+      const { x, y } = hexToPixel(col, r);
+      const hit = svgEl('polygon');
+      hit.setAttribute('points', hexPoints(x, y));
+      hit.setAttribute('data-col', String(col));
+      hit.setAttribute('data-row', String(r));
+      hit.setAttribute('fill', 'rgba(0,0,0,0)');
+      hit.setAttribute('stroke', 'none');
+      hit.setAttribute('pointer-events', 'all');
+      hit.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
+      hexHitLayer.appendChild(hit);
+    }
+  }
+  svgElement.appendChild(hexHitLayer);
 }
 
 export function renderState(svgElement: SVGSVGElement, state: GameState, productionHex: { col: number; row: number } | null = null, hiddenUnitIds: Set<number> = new Set(), localPlayer: Owner = PLAYER): void {
@@ -575,6 +593,7 @@ export function animateMoves(
     animLayer.setAttribute('transform', `translate(${margin},${margin})`);
     svgElement.appendChild(animLayer);
   }
+  animLayer.setAttribute('pointer-events', 'none');
   animLayer.innerHTML = '';
 
   let cancelled = false;
