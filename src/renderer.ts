@@ -537,6 +537,7 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
       if (aim) {
         const aimWrap = svgEl('g');
         aimWrap.setAttribute('class', 'ranged-target-aim');
+        aimWrap.setAttribute('pointer-events', 'none');
         aimWrap.appendChild(aim);
         unitLayer.appendChild(aimWrap);
       }

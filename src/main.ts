@@ -908,7 +908,28 @@ svg.addEventListener('click', (e: MouseEvent) => {
   if (state.winner) return;
   if (state.activePlayer !== localPlayer) return;
   const hex = getHexFromEvent(e);
-  if (!hex) return;
+  if (!hex) {
+    // Empty SVG margin / background (no hex under cursor): clear selection
+    if (state.phase === 'movement' && state.selectedUnit !== null) {
+      let didInterruptHumanMove = false;
+      if (humanMoveAnimCancel) {
+        didInterruptHumanMove = true;
+        humanMoveAnimCancel();
+        humanMoveAnimCancel = null;
+        isAnimating = false;
+        if (gameMode === 'vsAI') saveGameState(state);
+        render();
+        checkWinner();
+      }
+      if (!isAnimating) {
+        clearMovePathPreview();
+        state.selectedUnit = null;
+        render(); updateUI();
+        if (didInterruptHumanMove) maybeAutoEnd();
+      }
+    }
+    return;
+  }
   const { col, row } = hex;
 
   let didInterruptHumanMove = false;
@@ -1010,16 +1031,16 @@ svg.addEventListener('click', (e: MouseEvent) => {
   }
 });
 
-// Deselect when clicking outside the board (header, footer, game-area padding, or empty SVG margin).
-// Hex/unit clicks use [data-col] and are handled on #board first (bubble order).
-document.addEventListener('click', (e: MouseEvent) => {
+// Deselect when clicking outside the SVG (header, footer, game-area padding). Bubble order runs the
+// #board handler before this, so hex/unit clicks never hit this path.
+document.body.addEventListener('click', (e: MouseEvent) => {
   if (state.winner) return;
   if (state.activePlayer !== localPlayer) return;
   if (state.phase !== 'movement' || state.selectedUnit === null) return;
 
   const t = e.target;
   if (!(t instanceof Element)) return;
-  if (svg.contains(t) && t.closest('[data-col]')) return;
+  if (svg.contains(t)) return;
 
   let didInterruptHumanMove = false;
   if (humanMoveAnimCancel) {
