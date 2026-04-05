@@ -758,7 +758,10 @@ function showUnitPicker(col: number, row: number): void {
   pendingProductionHex = { col, row };
   unitPickerList.innerHTML = '';
 
-  const statPointsSrc = 'public/icons/points.svg';
+  const statIconCost = 'public/icons/points.svg';
+  const statIconMove = 'public/icons/movement.svg';
+  const statIconStr = 'public/icons/strength.svg';
+  const statIconHp = 'public/icons/hp.svg';
 
   for (const unitType of config.unitTypes) {
     const canAfford = state.productionPoints[localPlayer] >= unitType.cost;
@@ -784,14 +787,20 @@ function showUnitPicker(col: number, row: number): void {
     const stats = document.createElement('div');
     stats.className = 'unit-card-stats';
 
-    function addStat(modClass: string, value: number, statTitle: string, statDesc: string): void {
+    function addStat(
+      modClass: string,
+      value: number,
+      statTitle: string,
+      statDesc: string,
+      iconSrc: string
+    ): void {
       const row = document.createElement('div');
       row.className = `unit-card-stat ${modClass}`;
       const iconWrap = document.createElement('span');
       iconWrap.className = 'unit-card-stat-icon';
       iconWrap.setAttribute('aria-hidden', 'true');
       const iconImg = document.createElement('img');
-      iconImg.src = statPointsSrc;
+      iconImg.src = iconSrc;
       iconImg.alt = '';
       const val = document.createElement('span');
       val.className = 'unit-card-stat-value';
@@ -815,25 +824,29 @@ function showUnitPicker(col: number, row: number): void {
       'unit-card-stat--cost',
       unitType.cost,
       'Cost',
-      'Production points (PP) required to build this unit.'
+      'Production points (PP) required to build this unit.',
+      statIconCost
     );
     addStat(
       'unit-card-stat--move',
       unitType.movement,
       'Movement',
-      'How many hexes this unit can move on the map each turn.'
+      'How many hexes this unit can move on the map each turn.',
+      statIconMove
     );
     addStat(
       'unit-card-stat--str',
       unitType.strength,
       'Strength',
-      'Base combat strength; condition and flanking modify it in battle.'
+      'Base combat strength; condition and flanking modify it in battle.',
+      statIconStr
     );
     addStat(
       'unit-card-stat--hp',
       unitType.maxHp,
       'Hit points',
-      'Maximum HP; the unit is removed when reduced to zero.'
+      'Maximum HP; the unit is removed when reduced to zero.',
+      statIconHp
     );
 
     body.appendChild(title);
