@@ -21,6 +21,7 @@
   --color-red-700: #BD4E4E;
   --color-red-500: #ff6b6b;
   --color-green-500: #81e2a0;
+  --color-green-700: #345B41;
 
     /* ── Background ─────────────────────────────────────────────────────────── */
     --color-bg: #E1D9D6;
@@ -61,7 +62,7 @@
 
     /* End-of-turn heal float (green chip, dark green label; same motion as damage) */
     --heal-float-bg: var(--color-green-500);
-    --heal-float-text: #2d6a4f;
+    --heal-float-text: var(--color-green-700);
 
 }
 
