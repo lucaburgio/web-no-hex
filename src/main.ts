@@ -237,6 +237,8 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
   };
 
   const runFloats = (): void => {
+    renderState(svg, state, null, new Set(), localPlayer);
+    updateUI();
     if (floats.length === 0) finish();
     else {
       const { cancel } = showDamageFloats(svg, floats, config.damageFloatDurationMs, finish);
@@ -1156,6 +1158,10 @@ svg.addEventListener('click', (e: MouseEvent) => {
         };
 
         const runFloatsOnly = (): void => {
+          // Strike/move anims hide units on the static layer; show them again before damage floats
+          // so the attacker does not vanish until float playback ends.
+          renderState(svg, state, pendingProductionHex, new Set(), localPlayer);
+          updateUI();
           if (floats.length === 0) finishHumanAnim();
           else {
             const { cancel } = showDamageFloats(svg, floats, config.damageFloatDurationMs, finishHumanAnim);
@@ -1414,6 +1420,8 @@ function runAiTurnWithAnimation(): void {
     const sr = vfx.strikeReturn;
 
     const runFloats = (): void => {
+      renderState(svg, state, null, new Set(), localPlayer);
+      updateUI();
       if (floats.length === 0) runCombatVfxChain(index + 1);
       else {
         const { cancel } = showDamageFloats(svg, floats, config.damageFloatDurationMs, () =>
