@@ -6,87 +6,28 @@ export interface ArtilleryPoint {
   y: number;
 }
 
-export type ArtilleryVfxPresetId =
-  | 'ballisticArc'
-  | 'directStreak'
-  | 'mortarVolley'
-  | 'guidedWobble'
-  | 'plasmaDrop';
-
-/** Defender-hex-only barrage: 5–6 short direct-streak shells, all localized on the target hex. */
-export type ArtilleryHexBarragePresetId =
-  | 'hexFan'
-  | 'hexFanOrderOutIn'
-  | 'hexFanOrderShuffle'
-  | 'hexColumn'
-  | 'hexConverge'
-  | 'hexSalvo'
-  | 'hexBracket'
-  | 'hexGrowCascade'
-  | 'hexGrowBurst'
-  | 'hexGrowCross'
-  | 'hexGrowStrafe'
-  | 'hexGrowHammer';
-
-/** Tweakable knobs for projectile visuals (merged per preset). */
+/** Styling for ranged artillery shell streaks and impact rings on the defender hex. */
 export interface ArtilleryProjectileStyle {
-  /** Flight duration in seconds (full attacker→defender shot; hex barrage scales this down). */
   duration: number;
-  /** Shell / projectile radius in SVG units. */
-  shellRadius: number;
-  /** Peak height of arc above the chord from→to (negative = bow downward). */
-  arcHeight: number;
-  /** Stroke width for streak-style shells. */
   streakWidth: number;
-  /** Primary fill/stroke color. */
   color: string;
-  /** Secondary (trail, glow) color. */
   accentColor: string;
-  /** Impact pulse scale multiplier. */
   impactScale: number;
-  /** How long the impact ring lasts (s). */
   impactDuration: number;
 }
 
+/** Default reds: `style.css` --color-red-700 / --color-red-500 */
 const DEFAULT_STYLE: ArtilleryProjectileStyle = {
   duration: 0.55,
-  shellRadius: 6,
-  arcHeight: 72,
   streakWidth: 4,
-  color: '#c45c3e',
-  accentColor: '#f4a574',
+  color: '#BD4E4E',
+  accentColor: '#ff6b6b',
   impactScale: 2.2,
   impactDuration: 0.28,
 };
 
-/** Matches `style.css` --color-red-700 / --color-red-500 (hexFanOrderShuffle only). */
-const HEX_FAN_SHUFFLE_COLORS = {
-  color: '#BD4E4E',
-  accentColor: '#ff6b6b',
-} as const;
-
-export const ARTILLERY_VFX_LABELS: Record<ArtilleryVfxPresetId, string> = {
-  ballisticArc: 'Ballistic arc — rotating shell, high arc, impact ring',
-  directStreak: 'Direct streak — fast flat shot, motion-style fade',
-  mortarVolley: 'Mortar volley — three staggered smaller shells',
-  guidedWobble: 'Guided wobble — arc with lateral sine wobble',
-  plasmaDrop: 'Plasma drop — glowing drop, ease-in slam',
-};
-
 function mergeStyle(overrides?: Partial<ArtilleryProjectileStyle>): ArtilleryProjectileStyle {
   return { ...DEFAULT_STYLE, ...overrides };
-}
-
-function quadBezier(p0: ArtilleryPoint, p1: ArtilleryPoint, p2: ArtilleryPoint, t: number): ArtilleryPoint {
-  const u = 1 - t;
-  return {
-    x: u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x,
-    y: u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y,
-  };
-}
-
-function midpoint(a: ArtilleryPoint, b: ArtilleryPoint): ArtilleryPoint {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
 function ns<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K] {
@@ -117,16 +58,6 @@ function impactRing(
   });
 }
 
-/** Tweak grow/fade for one streak (hex presets can vary these). */
-export interface DirectStreakSegmentOpts {
-  /** Multiplier on max trail length (default 1). */
-  maxTrailMul?: number;
-  /** Linear progress 0→1 reaches full opacity by this fraction (default 0.09). */
-  fadeInLinear?: number;
-  /** Linear progress at which trail reaches full length (default 0.42). */
-  growFullLinear?: number;
-}
-
 const easePower3In = gsap.parseEase('power3.in');
 
 function lerpPoint(a: ArtilleryPoint, b: ArtilleryPoint, t: number): ArtilleryPoint {
@@ -134,8 +65,7 @@ function lerpPoint(a: ArtilleryPoint, b: ArtilleryPoint, t: number): ArtilleryPo
 }
 
 /**
- * One direct streak: starts invisible and stub-length, quick fade-in, trail grows then head accelerates in (power3.in).
- * @param durationScale multiplies the base streak flight time (short hex-local shots use ~0.3–0.45).
+ * One shell streak: quick fade-in, trail grows, head accelerates in (power3.in).
  */
 function directStreakSegment(
   root: SVGGElement,
@@ -144,18 +74,16 @@ function directStreakSegment(
   style: ArtilleryProjectileStyle,
   durationScale: number,
   impactScale = 0.55,
-  segmentOpts?: DirectStreakSegmentOpts,
 ): gsap.core.Timeline {
-  const fadeInLinear = segmentOpts?.fadeInLinear ?? 0.09;
-  const growFullLinear = segmentOpts?.growFullLinear ?? 0.42;
-  const maxTrailMul = segmentOpts?.maxTrailMul ?? 1;
+  const fadeInLinear = 0.09;
+  const growFullLinear = 0.42;
 
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const pathLen = Math.hypot(dx, dy) || 1;
   const ux = dx / pathLen;
   const uy = dy / pathLen;
-  const maxTrail = Math.min(28 * maxTrailMul, pathLen * 0.92);
+  const maxTrail = Math.min(28, pathLen * 0.92);
 
   const streak = ns('line');
   streak.setAttribute('x1', String(from.x));
@@ -206,15 +134,45 @@ function directStreakSegment(
   return tl;
 }
 
-export interface PlayArtilleryProjectileOptions {
-  svg: SVGSVGElement;
-  from: ArtilleryPoint;
-  to: ArtilleryPoint;
-  preset: ArtilleryVfxPresetId;
-  /** Optional style overrides (e.g. duration, colors). */
+const SHELL_COUNT = 6;
+const DEFAULT_HEX_RADIUS = 28;
+
+/** Non-sequential order across the fan (shell indices 0 = left … 5 = right). */
+const FIRE_ORDER_SHUFFLE: readonly number[] = [5, 2, 4, 0, 3, 1];
+
+function hexFanShellEndpoints(
+  shellIndex: number,
+  c: ArtilleryPoint,
+  R: number,
+): { from: ArtilleryPoint; impact: ArtilleryPoint } {
+  const t = SHELL_COUNT > 1 ? shellIndex / (SHELL_COUNT - 1) : 0;
+  const spread = (t - 0.5) * R * 1.15;
+  const impact: ArtilleryPoint = { x: c.x + spread, y: c.y + R * 0.28 };
+  const from: ArtilleryPoint = { x: c.x + spread * 0.88, y: c.y - R * 1.12 };
+  return { from, impact };
+}
+
+function buildHexFanShuffleTimeline(
+  root: SVGGElement,
+  c: ArtilleryPoint,
+  R: number,
+  style: ArtilleryProjectileStyle,
+): gsap.core.Timeline {
+  const stagger = 0.072;
+  const tl = gsap.timeline();
+  FIRE_ORDER_SHUFFLE.forEach((shellIndex, step) => {
+    const { from, impact } = hexFanShellEndpoints(shellIndex, c, R);
+    tl.add(directStreakSegment(root, from, impact, style, 0.4, 0.52), step * stagger);
+  });
+  return tl;
+}
+
+export interface PlayDefenderHexBarrageOptions {
+  center: ArtilleryPoint;
+  hexRadius?: number;
   styleOverrides?: Partial<ArtilleryProjectileStyle>;
-  /** If set, projectiles are appended here; otherwise a transient group is appended to `svg`. */
-  parent?: SVGGElement;
+  /** Target layer (e.g. `#vfx-layer`); required. */
+  parent: SVGGElement;
   onComplete?: () => void;
 }
 
@@ -224,372 +182,22 @@ export interface ArtilleryProjectileHandle {
 }
 
 /**
- * Plays a one-off artillery projectile VFX between two points. Removes DOM on finish or cancel.
- * Safe to call from game code once a preset is chosen; tweak via {@link ArtilleryProjectileStyle}.
- */
-export function playArtilleryProjectile(options: PlayArtilleryProjectileOptions): ArtilleryProjectileHandle {
-  const {
-    svg,
-    from,
-    to,
-    preset,
-    styleOverrides,
-    parent: parentOpt,
-    onComplete,
-  } = options;
-
-  const root = ns('g');
-  root.setAttribute('class', 'artillery-projectile-vfx');
-  const parent = parentOpt ?? svg;
-  parent.appendChild(root);
-
-  const base = mergeStyle(styleOverrides);
-  let tl: gsap.core.Timeline;
-
-  switch (preset) {
-    case 'ballisticArc':
-      tl = presetBallisticArc(root, from, to, base);
-      break;
-    case 'directStreak':
-      tl = presetDirectStreak(root, from, to, base);
-      break;
-    case 'mortarVolley':
-      tl = presetMortarVolley(root, from, to, base);
-      break;
-    case 'guidedWobble':
-      tl = presetGuidedWobble(root, from, to, base);
-      break;
-    case 'plasmaDrop':
-      tl = presetPlasmaDrop(root, from, to, base);
-      break;
-    default: {
-      const _exhaustive: never = preset;
-      throw new Error(`Unknown preset: ${_exhaustive}`);
-    }
-  }
-
-  const cleanup = (): void => {
-    root.remove();
-    onComplete?.();
-  };
-
-  tl.eventCallback('onComplete', cleanup);
-
-  return {
-    timeline: tl,
-    cancel: (): void => {
-      tl.kill();
-      root.remove();
-    },
-  };
-}
-
-function presetBallisticArc(
-  root: SVGGElement,
-  from: ArtilleryPoint,
-  to: ArtilleryPoint,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const mid = midpoint(from, to);
-  const control: ArtilleryPoint = { x: mid.x, y: mid.y - style.arcHeight };
-  const g = ns('g');
-  const shell = ns('circle');
-  shell.setAttribute('r', String(style.shellRadius));
-  shell.setAttribute('fill', style.color);
-  shell.setAttribute('stroke', '#2a1810');
-  shell.setAttribute('stroke-width', '1.5');
-  g.appendChild(shell);
-  root.appendChild(g);
-
-  const pos = { t: 0, rot: 0 };
-  const tl = gsap.timeline();
-  tl.to(pos, {
-    t: 1,
-    duration: style.duration,
-    ease: 'power2.in',
-    onUpdate: (): void => {
-      const p = quadBezier(from, control, to, pos.t);
-      g.setAttribute('transform', `translate(${p.x} ${p.y}) rotate(${pos.rot})`);
-    },
-  }).to(
-    pos,
-    { rot: 720, duration: style.duration, ease: 'none' },
-    0,
-  );
-  tl.add(impactRing(root, to, style));
-  return tl;
-}
-
-function presetDirectStreak(
-  root: SVGGElement,
-  from: ArtilleryPoint,
-  to: ArtilleryPoint,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  return directStreakSegment(root, from, to, style, 1, 1);
-}
-
-function presetMortarVolley(
-  root: SVGGElement,
-  from: ArtilleryPoint,
-  to: ArtilleryPoint,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const mid = midpoint(from, to);
-  const control: ArtilleryPoint = { x: mid.x, y: mid.y - style.arcHeight * 0.85 };
-  const tl = gsap.timeline();
-  const offsets = [-0.02, 0, 0.02];
-  const scales = [0.75, 0.9, 0.8];
-
-  offsets.forEach((startAt, i) => {
-    const g = ns('g');
-    const shell = ns('circle');
-    const r = style.shellRadius * scales[i]!;
-    shell.setAttribute('r', String(r));
-    shell.setAttribute('fill', style.color);
-    shell.setAttribute('stroke', '#3d2918');
-    shell.setAttribute('stroke-width', '1');
-    g.appendChild(shell);
-    root.appendChild(g);
-    const pos = { t: 0 };
-    const d = style.duration * (0.92 + i * 0.04);
-    tl.to(
-      pos,
-      {
-        t: 1,
-        duration: d,
-        ease: 'power2.in',
-        onUpdate: (): void => {
-          const p = quadBezier(from, control, to, pos.t);
-          g.setAttribute('transform', `translate(${p.x} ${p.y})`);
-        },
-      },
-      startAt,
-    );
-  });
-
-  tl.add(impactRing(root, to, style), '-=0.08');
-  return tl;
-}
-
-function presetGuidedWobble(
-  root: SVGGElement,
-  from: ArtilleryPoint,
-  to: ArtilleryPoint,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const mid = midpoint(from, to);
-  const control: ArtilleryPoint = { x: mid.x, y: mid.y - style.arcHeight * 0.9 };
-  const g = ns('g');
-  const shell = ns('circle');
-  shell.setAttribute('r', String(style.shellRadius * 0.95));
-  shell.setAttribute('fill', style.color);
-  shell.setAttribute('stroke', style.accentColor);
-  shell.setAttribute('stroke-width', '2');
-  g.appendChild(shell);
-  root.appendChild(g);
-
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len = Math.hypot(dx, dy) || 1;
-  const px = -dy / len;
-  const py = dx / len;
-  const wobbleAmp = 10;
-
-  const pos = { t: 0 };
-  const tl = gsap.timeline();
-  tl.to(pos, {
-    t: 1,
-    duration: style.duration,
-    ease: 'power1.inOut',
-    onUpdate: (): void => {
-      const base = quadBezier(from, control, to, pos.t);
-      const w = Math.sin(pos.t * Math.PI * 5) * wobbleAmp * (1 - pos.t * 0.3);
-      g.setAttribute('transform', `translate(${base.x + px * w} ${base.y + py * w})`);
-    },
-  }).add(impactRing(root, to, style));
-  return tl;
-}
-
-function presetPlasmaDrop(
-  root: SVGGElement,
-  from: ArtilleryPoint,
-  to: ArtilleryPoint,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const defs = ns('defs');
-  const fid = `glow-${Math.random().toString(36).slice(2, 9)}`;
-  const filter = ns('filter');
-  filter.setAttribute('id', fid);
-  const blur = ns('feGaussianBlur');
-  blur.setAttribute('stdDeviation', '3');
-  blur.setAttribute('result', 'blur');
-  filter.appendChild(blur);
-  defs.appendChild(filter);
-  root.appendChild(defs);
-
-  const high: ArtilleryPoint = {
-    x: from.x + (to.x - from.x) * 0.35,
-    y: from.y - Math.max(100, style.arcHeight * 1.4),
-  };
-  const g = ns('g');
-  const core = ns('circle');
-  core.setAttribute('r', String(style.shellRadius * 0.85));
-  core.setAttribute('fill', style.accentColor);
-  const glow = ns('circle');
-  glow.setAttribute('r', String(style.shellRadius * 1.6));
-  glow.setAttribute('fill', style.color);
-  glow.setAttribute('opacity', '0.55');
-  glow.setAttribute('filter', `url(#${fid})`);
-  g.appendChild(glow);
-  g.appendChild(core);
-  root.appendChild(g);
-
-  const pos = { t: 0 };
-  const tl = gsap.timeline();
-  tl.to(pos, {
-    t: 1,
-    duration: style.duration * 1.05,
-    ease: 'power4.in',
-    onUpdate: (): void => {
-      const p = quadBezier(high, midpoint(high, to), to, pos.t);
-      const slam = pos.t > 0.94 ? 1 + (pos.t - 0.94) / 0.06 * 0.25 : 0.85 + pos.t * 0.3;
-      g.setAttribute('transform', `translate(${p.x} ${p.y}) scale(${slam})`);
-    },
-  }).add(
-    impactRing(root, to, {
-      ...style,
-      accentColor: style.accentColor,
-      impactDuration: style.impactDuration * 1.15,
-    }),
-  );
-  return tl;
-}
-
-// ── Defender-hex-only barrage (direct-streak shells localized on target hex) ──
-
-const HEX_BARRAGE_SHELLS = 6;
-const DEFAULT_HEX_RADIUS = 28;
-
-export const ARTILLERY_HEX_BARRAGE_LABELS: Record<ArtilleryHexBarragePresetId, string> = {
-  hexFan:
-    'Fan — six streaks from a shallow arc above; impacts sweep across the hex like a bracketing salvo',
-  hexFanOrderOutIn:
-    'Fan (out→in) — same geometry as fan, but shells fire from both outer impacts first, then inward pairs',
-  hexFanOrderShuffle:
-    'Fan (shuffle) — same geometry as fan, firing order scrambled (e.g. not 1→2→3 across the face)',
-  hexColumn:
-    'Column — six near-vertical drops with slight horizontal jitter, top-to-bottom ripples on the hex',
-  hexConverge:
-    'Converge — shells dive inward from six directions around the rim into a tight central cluster',
-  hexSalvo:
-    'Salvo — rapid tight group: very fast streaks with minimal stagger, machine-gun feel on one footprint',
-  hexBracket:
-    'Bracket — alternating left/right pairs from the top edge, impacts ping-pong across the hex face',
-  hexGrowCascade:
-    'Grow cascade — each shell uses a longer visible trail than the last (staggered “ripping in”)',
-  hexGrowBurst:
-    'Grow burst — two volleys of three with a short pause between groups',
-  hexGrowCross:
-    'Grow cross — six impacts on vertex directions; streaks read as a pinwheel on the hex',
-  hexGrowStrafe:
-    'Grow strafe — impacts sweep left-to-right with tight cadence and snappy fade',
-  hexGrowHammer:
-    'Grow hammer — narrow drop zone above center, heavy ring of hits around the unit',
-};
-
-export const ARTILLERY_HEX_BARRAGE_PRESET_IDS: ArtilleryHexBarragePresetId[] = [
-  'hexFan',
-  'hexFanOrderOutIn',
-  'hexFanOrderShuffle',
-  'hexColumn',
-  'hexConverge',
-  'hexSalvo',
-  'hexBracket',
-  'hexGrowCascade',
-  'hexGrowBurst',
-  'hexGrowCross',
-  'hexGrowStrafe',
-  'hexGrowHammer',
-];
-
-export interface PlayDefenderHexBarrageOptions {
-  svg: SVGSVGElement;
-  /** Center of the defender hex in SVG space (e.g. from hex center pixel coords). */
-  center: ArtilleryPoint;
-  /** Approximate hex extent from center (vertex distance); impacts stay within ~this band. */
-  hexRadius?: number;
-  preset: ArtilleryHexBarragePresetId;
-  styleOverrides?: Partial<ArtilleryProjectileStyle>;
-  parent?: SVGGElement;
-  onComplete?: () => void;
-}
-
-/**
- * Plays 5–6 short direct-streak shells whose motion stays on/near the defender hex (no line from attacker).
- * Intended for ranged artillery feedback on the target tile.
+ * Six shell streaks on the defender hex (shuffled fan salvo, theme reds). Removes DOM on finish or cancel.
  */
 export function playDefenderHexBarrage(options: PlayDefenderHexBarrageOptions): ArtilleryProjectileHandle {
   const {
-    svg,
     center,
     hexRadius = DEFAULT_HEX_RADIUS,
-    preset,
     styleOverrides,
-    parent: parentOpt,
+    parent,
     onComplete,
   } = options;
 
   const root = ns('g');
   root.setAttribute('class', 'artillery-hex-barrage-vfx');
-  const parent = parentOpt ?? svg;
   parent.appendChild(root);
 
-  const base = mergeStyle(styleOverrides);
-  let tl: gsap.core.Timeline;
-
-  switch (preset) {
-    case 'hexFan':
-      tl = presetHexFan(root, center, hexRadius, base);
-      break;
-    case 'hexFanOrderOutIn':
-      tl = presetHexFanOrderOutIn(root, center, hexRadius, base);
-      break;
-    case 'hexFanOrderShuffle':
-      tl = presetHexFanOrderShuffle(root, center, hexRadius, base);
-      break;
-    case 'hexColumn':
-      tl = presetHexColumn(root, center, hexRadius, base);
-      break;
-    case 'hexConverge':
-      tl = presetHexConverge(root, center, hexRadius, base);
-      break;
-    case 'hexSalvo':
-      tl = presetHexSalvo(root, center, hexRadius, base);
-      break;
-    case 'hexBracket':
-      tl = presetHexBracket(root, center, hexRadius, base);
-      break;
-    case 'hexGrowCascade':
-      tl = presetHexGrowCascade(root, center, hexRadius, base);
-      break;
-    case 'hexGrowBurst':
-      tl = presetHexGrowBurst(root, center, hexRadius, base);
-      break;
-    case 'hexGrowCross':
-      tl = presetHexGrowCross(root, center, hexRadius, base);
-      break;
-    case 'hexGrowStrafe':
-      tl = presetHexGrowStrafe(root, center, hexRadius, base);
-      break;
-    case 'hexGrowHammer':
-      tl = presetHexGrowHammer(root, center, hexRadius, base);
-      break;
-    default: {
-      const _exhaustive: never = preset;
-      throw new Error(`Unknown hex barrage preset: ${_exhaustive}`);
-    }
-  }
+  const tl = buildHexFanShuffleTimeline(root, center, hexRadius, mergeStyle(styleOverrides));
 
   const cleanup = (): void => {
     root.remove();
@@ -606,301 +214,3 @@ export function playDefenderHexBarrage(options: PlayDefenderHexBarrageOptions): 
     },
   };
 }
-
-/** Shell index 0 = left along the fan, 5 = right (same spread as original hexFan). */
-function hexFanShellEndpoints(
-  shellIndex: number,
-  c: ArtilleryPoint,
-  R: number,
-): { from: ArtilleryPoint; impact: ArtilleryPoint } {
-  const i = shellIndex;
-  const t = HEX_BARRAGE_SHELLS > 1 ? i / (HEX_BARRAGE_SHELLS - 1) : 0;
-  const spread = (t - 0.5) * R * 1.15;
-  const impact: ArtilleryPoint = { x: c.x + spread, y: c.y + R * 0.28 };
-  const from: ArtilleryPoint = { x: c.x + spread * 0.88, y: c.y - R * 1.12 };
-  return { from, impact };
-}
-
-function presetHexFanWithOrder(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-  /** Which shell (0…5) fires on each step, in time order. */
-  fireOrder: readonly number[],
-): gsap.core.Timeline {
-  const stagger = 0.072;
-  const tl = gsap.timeline();
-  fireOrder.forEach((shellIndex, step) => {
-    const { from, impact } = hexFanShellEndpoints(shellIndex, c, R);
-    tl.add(directStreakSegment(root, from, impact, style, 0.4, 0.52), step * stagger);
-  });
-  return tl;
-}
-
-function presetHexFan(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  return presetHexFanWithOrder(root, c, R, style, [0, 1, 2, 3, 4, 5]);
-}
-
-/** Outer impacts (indices 0 and 5) first, then the next pair inward: 1 & 4, then 2 & 3. */
-function presetHexFanOrderOutIn(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  return presetHexFanWithOrder(root, c, R, style, [0, 5, 1, 4, 2, 3]);
-}
-
-/** Deliberately non-sequential order across the face (left-to-right index order is not 0,1,2…). */
-function presetHexFanOrderShuffle(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const styleRed: ArtilleryProjectileStyle = { ...style, ...HEX_FAN_SHUFFLE_COLORS };
-  return presetHexFanWithOrder(root, c, R, styleRed, [5, 2, 4, 0, 3, 1]);
-}
-
-function presetHexColumn(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const tl = gsap.timeline();
-  const jitters = [-6, 5, -4, 7, -5, 4];
-  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
-    const jx = jitters[i] ?? 0;
-    const impact: ArtilleryPoint = {
-      x: c.x + jx,
-      y: c.y - R * 0.42 + (i / (HEX_BARRAGE_SHELLS - 1)) * R * 0.88,
-    };
-    const from: ArtilleryPoint = { x: impact.x + (i % 2 === 0 ? 3 : -3), y: impact.y - R * 0.92 };
-    tl.add(directStreakSegment(root, from, impact, style, 0.42, 0.5), i * 0.085);
-  }
-  return tl;
-}
-
-function presetHexConverge(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const tl = gsap.timeline();
-  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
-    const ang = (i / HEX_BARRAGE_SHELLS) * Math.PI * 2 - Math.PI / 2;
-    const outer = R * 1.5;
-    const from: ArtilleryPoint = {
-      x: c.x + Math.cos(ang) * outer,
-      y: c.y + Math.sin(ang) * outer,
-    };
-    const land: ArtilleryPoint = {
-      x: c.x + Math.cos(ang) * R * 0.2,
-      y: c.y + Math.sin(ang) * R * 0.2,
-    };
-    tl.add(directStreakSegment(root, from, land, style, 0.34, 0.46), i * 0.058);
-  }
-  return tl;
-}
-
-function presetHexSalvo(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const tl = gsap.timeline();
-  const cluster: ArtilleryPoint[] = [
-    { x: 0, y: 0 },
-    { x: 7, y: -5 },
-    { x: -6, y: 4 },
-    { x: 5, y: 6 },
-    { x: -7, y: -3 },
-    { x: 4, y: -7 },
-  ];
-  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
-    const o = cluster[i]!;
-    const impact: ArtilleryPoint = { x: c.x + o.x, y: c.y + o.y };
-    const from: ArtilleryPoint = {
-      x: c.x + o.x * 0.35,
-      y: c.y - R * 0.88 + o.y * 0.15,
-    };
-    tl.add(directStreakSegment(root, from, impact, style, 0.24, 0.4), i * 0.038);
-  }
-  return tl;
-}
-
-function presetHexBracket(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const tl = gsap.timeline();
-  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
-    const side = i % 2 === 0 ? -1 : 1;
-    const row = Math.floor(i / 2);
-    const impact: ArtilleryPoint = {
-      x: c.x + side * R * 0.44,
-      y: c.y - R * 0.05 + row * R * 0.16,
-    };
-    const from: ArtilleryPoint = {
-      x: c.x + side * R * 0.38,
-      y: c.y - R * 1.02,
-    };
-    tl.add(directStreakSegment(root, from, impact, style, 0.38, 0.48), i * 0.078);
-  }
-  return tl;
-}
-
-function presetHexGrowCascade(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const tl = gsap.timeline();
-  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
-    const t = HEX_BARRAGE_SHELLS > 1 ? i / (HEX_BARRAGE_SHELLS - 1) : 0;
-    const spread = (t - 0.5) * R * 0.95;
-    const impact: ArtilleryPoint = { x: c.x + spread, y: c.y + R * 0.22 };
-    const from: ArtilleryPoint = { x: c.x + spread * 0.9, y: c.y - R * 1.08 };
-    const opts: DirectStreakSegmentOpts = {
-      maxTrailMul: 0.55 + i * 0.14,
-      fadeInLinear: Math.max(0.055, 0.11 - i * 0.008),
-      growFullLinear: 0.38 + i * 0.025,
-    };
-    tl.add(directStreakSegment(root, from, impact, style, 0.4, 0.5, opts), i * 0.078);
-  }
-  return tl;
-}
-
-function presetHexGrowBurst(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const tl = gsap.timeline();
-  const offsets = [0, 0.05, 0.1, 0.24, 0.29, 0.34];
-  const cluster: ArtilleryPoint[] = [
-    { x: -4, y: 2 },
-    { x: 5, y: -3 },
-    { x: -6, y: -4 },
-    { x: 3, y: 5 },
-    { x: -3, y: 7 },
-    { x: 6, y: 2 },
-  ];
-  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
-    const o = cluster[i]!;
-    const impact: ArtilleryPoint = { x: c.x + o.x, y: c.y + o.y };
-    const from: ArtilleryPoint = {
-      x: c.x + o.x * 0.4,
-      y: c.y - R * 0.95 + o.y * 0.1,
-    };
-    const burstFast: DirectStreakSegmentOpts =
-      i < 3 ? { fadeInLinear: 0.07, growFullLinear: 0.36 } : { fadeInLinear: 0.065, growFullLinear: 0.33 };
-    tl.add(directStreakSegment(root, from, impact, style, 0.26, 0.42, burstFast), offsets[i]!);
-  }
-  return tl;
-}
-
-function presetHexGrowCross(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const tl = gsap.timeline();
-  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
-    const ang = -Math.PI / 2 + (i * Math.PI) / 3;
-    const landR = R * 0.42;
-    const outerR = R * 1.38;
-    const impact: ArtilleryPoint = {
-      x: c.x + Math.cos(ang) * landR,
-      y: c.y + Math.sin(ang) * landR,
-    };
-    const from: ArtilleryPoint = {
-      x: c.x + Math.cos(ang) * outerR,
-      y: c.y + Math.sin(ang) * outerR,
-    };
-    const opts: DirectStreakSegmentOpts = {
-      maxTrailMul: 0.92,
-      fadeInLinear: 0.075,
-      growFullLinear: 0.4,
-    };
-    tl.add(directStreakSegment(root, from, impact, style, 0.36, 0.47, opts), i * 0.055);
-  }
-  return tl;
-}
-
-function presetHexGrowStrafe(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const tl = gsap.timeline();
-  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
-    const x = c.x - R * 0.62 + (i / (HEX_BARRAGE_SHELLS - 1)) * R * 1.24;
-    const impact: ArtilleryPoint = { x, y: c.y + R * 0.32 };
-    const from: ArtilleryPoint = { x, y: c.y - R * 1.05 };
-    const opts: DirectStreakSegmentOpts = {
-      maxTrailMul: 1.05,
-      fadeInLinear: 0.065,
-      growFullLinear: 0.35,
-    };
-    tl.add(directStreakSegment(root, from, impact, style, 0.35, 0.46, opts), i * 0.052);
-  }
-  return tl;
-}
-
-function presetHexGrowHammer(
-  root: SVGGElement,
-  c: ArtilleryPoint,
-  R: number,
-  style: ArtilleryProjectileStyle,
-): gsap.core.Timeline {
-  const tl = gsap.timeline();
-  const ring: ArtilleryPoint[] = [
-    { x: 0, y: 0 },
-    { x: R * 0.38, y: -R * 0.12 },
-    { x: -R * 0.36, y: -R * 0.1 },
-    { x: R * 0.22, y: R * 0.28 },
-    { x: -R * 0.24, y: R * 0.26 },
-    { x: R * 0.08, y: -R * 0.34 },
-  ];
-  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
-    const o = ring[i]!;
-    const impact: ArtilleryPoint = { x: c.x + o.x, y: c.y + o.y };
-    const jitter = (i - 2.5) * 3;
-    const from: ArtilleryPoint = {
-      x: c.x + jitter * 0.4,
-      y: c.y - R * 1.18,
-    };
-    const opts: DirectStreakSegmentOpts = {
-      maxTrailMul: 1.08,
-      fadeInLinear: 0.058,
-      growFullLinear: 0.34,
-    };
-    tl.add(directStreakSegment(root, from, impact, style, 0.32, 0.44, opts), i * 0.048);
-  }
-  return tl;
-}
-
-/** All preset ids for iteration (e.g. legacy test page). */
-export const ARTILLERY_VFX_PRESET_IDS: ArtilleryVfxPresetId[] = [
-  'ballisticArc',
-  'directStreak',
-  'mortarVolley',
-  'guidedWobble',
-  'plasmaDrop',
-];

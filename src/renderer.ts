@@ -1108,7 +1108,7 @@ export function clearCombatVfxLayers(svgElement: SVGSVGElement): void {
 const ARTILLERY_HEX_RADIUS_SCALE = 0.55;
 
 /**
- * Artillery ranged attack: shell streak barrage on the defender hex (`hexFanOrderShuffle`, theme reds).
+ * Artillery ranged attack: shuffled fan shell streaks on the defender hex (theme reds).
  * Coordinates match the board / damage floats (same layer transform as {@link showDamageFloats}).
  */
 export function playRangedArtilleryHexBarrageVfx(
@@ -1127,11 +1127,9 @@ export function playRangedArtilleryHexBarrageVfx(
   }
   const { x, y } = hexToPixel(col, row);
   return playDefenderHexBarrage({
-    svg: svgElement,
     parent: vfxLayer,
     center: { x, y },
     hexRadius: HEX_SIZE * ARTILLERY_HEX_RADIUS_SCALE,
-    preset: 'hexFanOrderShuffle',
     onComplete,
   });
 }
