@@ -19,7 +19,12 @@ export type ArtilleryHexBarragePresetId =
   | 'hexColumn'
   | 'hexConverge'
   | 'hexSalvo'
-  | 'hexBracket';
+  | 'hexBracket'
+  | 'hexGrowCascade'
+  | 'hexGrowBurst'
+  | 'hexGrowCross'
+  | 'hexGrowStrafe'
+  | 'hexGrowHammer';
 
 /** Tweakable knobs for projectile visuals (merged per preset). */
 export interface ArtilleryProjectileStyle {
@@ -104,8 +109,24 @@ function impactRing(
   });
 }
 
+/** Tweak grow/fade for one streak (hex presets can vary these). */
+export interface DirectStreakSegmentOpts {
+  /** Multiplier on max trail length (default 1). */
+  maxTrailMul?: number;
+  /** Linear progress 0→1 reaches full opacity by this fraction (default 0.09). */
+  fadeInLinear?: number;
+  /** Linear progress at which trail reaches full length (default 0.42). */
+  growFullLinear?: number;
+}
+
+const easePower3In = gsap.parseEase('power3.in');
+
+function lerpPoint(a: ArtilleryPoint, b: ArtilleryPoint, t: number): ArtilleryPoint {
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+
 /**
- * One fast direct streak (same visual language as full-board direct streak, tunable length).
+ * One direct streak: starts invisible and stub-length, quick fade-in, trail grows then head accelerates in (power3.in).
  * @param durationScale multiplies the base streak flight time (short hex-local shots use ~0.3–0.45).
  */
 function directStreakSegment(
@@ -115,39 +136,64 @@ function directStreakSegment(
   style: ArtilleryProjectileStyle,
   durationScale: number,
   impactScale = 0.55,
+  segmentOpts?: DirectStreakSegmentOpts,
 ): gsap.core.Timeline {
+  const fadeInLinear = segmentOpts?.fadeInLinear ?? 0.09;
+  const growFullLinear = segmentOpts?.growFullLinear ?? 0.42;
+  const maxTrailMul = segmentOpts?.maxTrailMul ?? 1;
+
   const dx = to.x - from.x;
   const dy = to.y - from.y;
-  const len = Math.hypot(dx, dy) || 1;
-  const ux = dx / len;
-  const uy = dy / len;
+  const pathLen = Math.hypot(dx, dy) || 1;
+  const ux = dx / pathLen;
+  const uy = dy / pathLen;
+  const maxTrail = Math.min(28 * maxTrailMul, pathLen * 0.92);
+
   const streak = ns('line');
   streak.setAttribute('x1', String(from.x));
   streak.setAttribute('y1', String(from.y));
-  streak.setAttribute('x2', String(from.x + ux * 14));
-  streak.setAttribute('y2', String(from.y + uy * 14));
+  streak.setAttribute('x2', String(from.x));
+  streak.setAttribute('y2', String(from.y));
   streak.setAttribute('stroke', style.color);
   streak.setAttribute('stroke-width', String(style.streakWidth * (0.85 + 0.15 * impactScale)));
   streak.setAttribute('stroke-linecap', 'round');
-  streak.setAttribute('opacity', '1');
+  streak.setAttribute('opacity', '0');
   root.appendChild(streak);
 
-  const head = { x: from.x, y: from.y };
   const flight = style.duration * 0.42 * durationScale;
+  const linear = { t: 0 };
   const tl = gsap.timeline();
-  tl.to(head, {
-    x: to.x,
-    y: to.y,
+
+  tl.to(linear, {
+    t: 1,
     duration: flight,
-    ease: 'power3.in',
+    ease: 'none',
     onUpdate: (): void => {
+      const w = linear.t;
+      const move = easePower3In(w);
+      const head = lerpPoint(from, to, move);
+
+      const growT = Math.min(1, w / growFullLinear);
+      const trailLen = maxTrail * (1 - (1 - growT) * (1 - growT));
+
+      let tailX = head.x - ux * trailLen;
+      let tailY = head.y - uy * trailLen;
+      const along = (head.x - from.x) * ux + (head.y - from.y) * uy;
+      if (trailLen > along) {
+        tailX = from.x;
+        tailY = from.y;
+      }
+
+      streak.setAttribute('x1', String(tailX));
+      streak.setAttribute('y1', String(tailY));
       streak.setAttribute('x2', String(head.x));
       streak.setAttribute('y2', String(head.y));
-      streak.setAttribute('x1', String(head.x - ux * 22));
-      streak.setAttribute('y1', String(head.y - uy * 22));
+
+      const opacity = Math.min(1, w / fadeInLinear);
+      streak.setAttribute('opacity', String(opacity));
     },
   })
-    .to(streak, { opacity: 0, duration: 0.05 }, '-=0.02')
+    .to(streak, { opacity: 0, duration: 0.045 }, '-=0.015')
     .add(impactRing(root, to, { ...style, impactDuration: style.impactDuration * 1.05 }, impactScale));
   return tl;
 }
@@ -428,6 +474,16 @@ export const ARTILLERY_HEX_BARRAGE_LABELS: Record<ArtilleryHexBarragePresetId, s
     'Salvo — rapid tight group: very fast streaks with minimal stagger, machine-gun feel on one footprint',
   hexBracket:
     'Bracket — alternating left/right pairs from the top edge, impacts ping-pong across the hex face',
+  hexGrowCascade:
+    'Grow cascade — each shell uses a longer visible trail than the last (staggered “ripping in”)',
+  hexGrowBurst:
+    'Grow burst — two volleys of three with a short pause between groups',
+  hexGrowCross:
+    'Grow cross — six impacts on vertex directions; streaks read as a pinwheel on the hex',
+  hexGrowStrafe:
+    'Grow strafe — impacts sweep left-to-right with tight cadence and snappy fade',
+  hexGrowHammer:
+    'Grow hammer — narrow drop zone above center, heavy ring of hits around the unit',
 };
 
 export const ARTILLERY_HEX_BARRAGE_PRESET_IDS: ArtilleryHexBarragePresetId[] = [
@@ -436,6 +492,11 @@ export const ARTILLERY_HEX_BARRAGE_PRESET_IDS: ArtilleryHexBarragePresetId[] = [
   'hexConverge',
   'hexSalvo',
   'hexBracket',
+  'hexGrowCascade',
+  'hexGrowBurst',
+  'hexGrowCross',
+  'hexGrowStrafe',
+  'hexGrowHammer',
 ];
 
 export interface PlayDefenderHexBarrageOptions {
@@ -488,6 +549,21 @@ export function playDefenderHexBarrage(options: PlayDefenderHexBarrageOptions): 
       break;
     case 'hexBracket':
       tl = presetHexBracket(root, center, hexRadius, base);
+      break;
+    case 'hexGrowCascade':
+      tl = presetHexGrowCascade(root, center, hexRadius, base);
+      break;
+    case 'hexGrowBurst':
+      tl = presetHexGrowBurst(root, center, hexRadius, base);
+      break;
+    case 'hexGrowCross':
+      tl = presetHexGrowCross(root, center, hexRadius, base);
+      break;
+    case 'hexGrowStrafe':
+      tl = presetHexGrowStrafe(root, center, hexRadius, base);
+      break;
+    case 'hexGrowHammer':
+      tl = presetHexGrowHammer(root, center, hexRadius, base);
       break;
     default: {
       const _exhaustive: never = preset;
@@ -617,6 +693,141 @@ function presetHexBracket(
       y: c.y - R * 1.02,
     };
     tl.add(directStreakSegment(root, from, impact, style, 0.38, 0.48), i * 0.078);
+  }
+  return tl;
+}
+
+function presetHexGrowCascade(
+  root: SVGGElement,
+  c: ArtilleryPoint,
+  R: number,
+  style: ArtilleryProjectileStyle,
+): gsap.core.Timeline {
+  const tl = gsap.timeline();
+  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
+    const t = HEX_BARRAGE_SHELLS > 1 ? i / (HEX_BARRAGE_SHELLS - 1) : 0;
+    const spread = (t - 0.5) * R * 0.95;
+    const impact: ArtilleryPoint = { x: c.x + spread, y: c.y + R * 0.22 };
+    const from: ArtilleryPoint = { x: c.x + spread * 0.9, y: c.y - R * 1.08 };
+    const opts: DirectStreakSegmentOpts = {
+      maxTrailMul: 0.55 + i * 0.14,
+      fadeInLinear: Math.max(0.055, 0.11 - i * 0.008),
+      growFullLinear: 0.38 + i * 0.025,
+    };
+    tl.add(directStreakSegment(root, from, impact, style, 0.4, 0.5, opts), i * 0.078);
+  }
+  return tl;
+}
+
+function presetHexGrowBurst(
+  root: SVGGElement,
+  c: ArtilleryPoint,
+  R: number,
+  style: ArtilleryProjectileStyle,
+): gsap.core.Timeline {
+  const tl = gsap.timeline();
+  const offsets = [0, 0.05, 0.1, 0.24, 0.29, 0.34];
+  const cluster: ArtilleryPoint[] = [
+    { x: -4, y: 2 },
+    { x: 5, y: -3 },
+    { x: -6, y: -4 },
+    { x: 3, y: 5 },
+    { x: -3, y: 7 },
+    { x: 6, y: 2 },
+  ];
+  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
+    const o = cluster[i]!;
+    const impact: ArtilleryPoint = { x: c.x + o.x, y: c.y + o.y };
+    const from: ArtilleryPoint = {
+      x: c.x + o.x * 0.4,
+      y: c.y - R * 0.95 + o.y * 0.1,
+    };
+    const burstFast: DirectStreakSegmentOpts =
+      i < 3 ? { fadeInLinear: 0.07, growFullLinear: 0.36 } : { fadeInLinear: 0.065, growFullLinear: 0.33 };
+    tl.add(directStreakSegment(root, from, impact, style, 0.26, 0.42, burstFast), offsets[i]!);
+  }
+  return tl;
+}
+
+function presetHexGrowCross(
+  root: SVGGElement,
+  c: ArtilleryPoint,
+  R: number,
+  style: ArtilleryProjectileStyle,
+): gsap.core.Timeline {
+  const tl = gsap.timeline();
+  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
+    const ang = -Math.PI / 2 + (i * Math.PI) / 3;
+    const landR = R * 0.42;
+    const outerR = R * 1.38;
+    const impact: ArtilleryPoint = {
+      x: c.x + Math.cos(ang) * landR,
+      y: c.y + Math.sin(ang) * landR,
+    };
+    const from: ArtilleryPoint = {
+      x: c.x + Math.cos(ang) * outerR,
+      y: c.y + Math.sin(ang) * outerR,
+    };
+    const opts: DirectStreakSegmentOpts = {
+      maxTrailMul: 0.92,
+      fadeInLinear: 0.075,
+      growFullLinear: 0.4,
+    };
+    tl.add(directStreakSegment(root, from, impact, style, 0.36, 0.47, opts), i * 0.055);
+  }
+  return tl;
+}
+
+function presetHexGrowStrafe(
+  root: SVGGElement,
+  c: ArtilleryPoint,
+  R: number,
+  style: ArtilleryProjectileStyle,
+): gsap.core.Timeline {
+  const tl = gsap.timeline();
+  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
+    const x = c.x - R * 0.62 + (i / (HEX_BARRAGE_SHELLS - 1)) * R * 1.24;
+    const impact: ArtilleryPoint = { x, y: c.y + R * 0.32 };
+    const from: ArtilleryPoint = { x, y: c.y - R * 1.05 };
+    const opts: DirectStreakSegmentOpts = {
+      maxTrailMul: 1.05,
+      fadeInLinear: 0.065,
+      growFullLinear: 0.35,
+    };
+    tl.add(directStreakSegment(root, from, impact, style, 0.35, 0.46, opts), i * 0.052);
+  }
+  return tl;
+}
+
+function presetHexGrowHammer(
+  root: SVGGElement,
+  c: ArtilleryPoint,
+  R: number,
+  style: ArtilleryProjectileStyle,
+): gsap.core.Timeline {
+  const tl = gsap.timeline();
+  const ring: ArtilleryPoint[] = [
+    { x: 0, y: 0 },
+    { x: R * 0.38, y: -R * 0.12 },
+    { x: -R * 0.36, y: -R * 0.1 },
+    { x: R * 0.22, y: R * 0.28 },
+    { x: -R * 0.24, y: R * 0.26 },
+    { x: R * 0.08, y: -R * 0.34 },
+  ];
+  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
+    const o = ring[i]!;
+    const impact: ArtilleryPoint = { x: c.x + o.x, y: c.y + o.y };
+    const jitter = (i - 2.5) * 3;
+    const from: ArtilleryPoint = {
+      x: c.x + jitter * 0.4,
+      y: c.y - R * 1.18,
+    };
+    const opts: DirectStreakSegmentOpts = {
+      maxTrailMul: 1.08,
+      fadeInLinear: 0.058,
+      growFullLinear: 0.34,
+    };
+    tl.add(directStreakSegment(root, from, impact, style, 0.32, 0.44, opts), i * 0.048);
   }
   return tl;
 }
