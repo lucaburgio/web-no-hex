@@ -370,6 +370,8 @@ export interface CombatResolveResult {
   meleeBothSurvived: boolean;
   /** Both sides eliminated in melee (simultaneous). */
   mutualKill: boolean;
+  attackerDied: boolean;
+  defenderDied: boolean;
 }
 
 function resolveCombat(state: GameState, attacker: Unit, defender: Unit): CombatResolveResult {
@@ -408,6 +410,8 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): Combat
       dmgToDefender,
       meleeBothSurvived: false,
       mutualKill: false,
+      attackerDied: false,
+      defenderDied,
     };
   }
 
@@ -444,7 +448,29 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): Combat
     dmgToDefender,
     meleeBothSurvived: !attackerDied && !defenderDied,
     mutualKill,
+    attackerDied,
+    defenderDied,
   };
+}
+
+/** Hex centers for damage floats: each badge sits where that unit ended (or was eliminated). */
+function meleeDamageFloatHexes(
+  atkCol: number,
+  atkRow: number,
+  defCol: number,
+  defRow: number,
+  res: CombatResolveResult,
+): { atk: [number, number]; def: [number, number] } {
+  if (res.meleeBothSurvived) {
+    return { atk: [atkCol, atkRow], def: [defCol, defRow] };
+  }
+  if (res.mutualKill) {
+    return { atk: [defCol, defRow], def: [defCol, defRow] };
+  }
+  if (res.defenderDied && !res.attackerDied) {
+    return { atk: [defCol, defRow], def: [defCol, defRow] };
+  }
+  return { atk: [atkCol, atkRow], def: [defCol, defRow] };
 }
 
 function combatVfxFromResolve(
@@ -461,10 +487,11 @@ function combatVfxFromResolve(
       damageFloats: [{ col: defCol, row: defRow, amount: -res.dmgToDefender }],
     };
   }
+  const { atk, def: defHex } = meleeDamageFloatHexes(atkCol, atkRow, defCol, defRow, res);
   const payload: CombatVfxPayload = {
     damageFloats: [
-      { col: atkCol, row: atkRow, amount: -res.dmgToAttacker },
-      { col: defCol, row: defRow, amount: -res.dmgToDefender },
+      { col: atk[0], row: atk[1], amount: -res.dmgToAttacker },
+      { col: defHex[0], row: defHex[1], amount: -res.dmgToDefender },
     ],
   };
   if (res.meleeBothSurvived) {
