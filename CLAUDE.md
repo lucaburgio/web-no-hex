@@ -36,7 +36,7 @@ web-strategic/
 - **Territory bonus:** +2 PP per 10 owned hexes per turn.
 - Spend **20 PP** to place an Infantry unit on a valid hex.
 - Valid placement: **home row** (bottom row for player) or any **owned production hex**.
-- **Production hex:** an owned hex becomes a production hex after being stable for **2 consecutive turns**. Stability requires all hexes within distance 2 to be owned by the same player. Breaks immediately if any nearby hex becomes neutral or enemy.
+- **Production hex:** an owned hex becomes a production hex after being stable for **2 consecutive turns**. Stability requires all hexes within distance 2 to be owned by the same player; **mountain** hexes in that ring count as secure (impassable, not unconquered “holes”). Breaks immediately if any nearby non-mountain hex becomes neutral or enemy.
 - Multiple units can be placed per turn if you have enough PP.
 
 ### Units

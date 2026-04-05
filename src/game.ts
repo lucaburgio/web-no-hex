@@ -88,13 +88,17 @@ function getHexesWithinDistance(col: number, row: number, dist: number, cols: nu
 }
 
 function updateHexStability(state: GameState): void {
+  const mountains = new Set(state.mountainHexes ?? []);
   for (const [key, hex] of Object.entries(state.hexStates)) {
     if (hex.owner === null) continue;
     const [col, row] = key.split(',').map(Number);
     const nearby = getHexesWithinDistance(col, row, config.productionSafeDistance, COLS, ROWS);
 
     const isStable = nearby.every(([nc, nr]) => {
-      const nhex = state.hexStates[`${nc},${nr}`];
+      const nk = `${nc},${nr}`;
+      // Mountains are never in hexStates (unconquerable); treat as secure for this rule — not neutral/enemy holes.
+      if (mountains.has(nk)) return true;
+      const nhex = state.hexStates[nk];
       return nhex && nhex.owner === hex.owner;
     });
 

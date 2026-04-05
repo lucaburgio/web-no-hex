@@ -678,7 +678,8 @@ function buildRulesContent(): string {
       <li>Available units: ${unitList}.</li>
       <li>Valid placement: your <strong>home row</strong> (bottom), or any owned <strong>production hex</strong>.</li>
       <li><strong>Production hex:</strong> an owned hex stable for <strong>${config.productionTurns} consecutive turns</strong>.
-        Stability requires all hexes within distance ${config.productionSafeDistance} to be owned by you.
+        Stability requires all hexes within distance ${config.productionSafeDistance} to be owned by you
+        (impassable <strong>mountain</strong> hexes in that ring count as secure — they are not neutral or enemy territory).
         Resets immediately if that condition breaks.</li>
       <li>You can place multiple units per turn as long as you have PP.</li>
     </ul>
