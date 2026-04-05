@@ -223,12 +223,6 @@ function inlineIcon(iconSrc: string | undefined, x: number, y: number, size: num
   return g;
 }
 
-// Corner-bracket dash params — one full cycle = one hex edge (HEX_SIZE)
-const BRACKET     = 0.22;
-const DASH        = HEX_SIZE * BRACKET * 2;
-const GAP         = HEX_SIZE * (1 - BRACKET * 2);
-const DASH_OFFSET = HEX_SIZE * BRACKET;
-
 // CSS color variables — read once after DOM is ready, then cached
 interface Colors {
   bg: string;
@@ -243,8 +237,6 @@ interface Colors {
   hexProdSelected: string;
   hexZoc: string;
   hexNeutral: string;
-  hexStroke: string;
-  hexProdStroke: string;
   unitIconColor: string;
   moveBorder: string;
   hpHigh: string;
@@ -271,8 +263,6 @@ function colors(): Colors {
     hexProdSelected: v('--color-hex-prod-selected'),
     hexZoc:          v('--color-hex-zoc'),
     hexNeutral:      v('--color-hex-neutral'),
-    hexStroke:       v('--color-hex-stroke'),
-    hexProdStroke:   v('--color-hex-prod-stroke'),
     unitIconColor:   v('--color-unit-icon'),
     moveBorder:      v('--color-move-border'),
     hpHigh:          v('--color-hp-high'),
@@ -384,10 +374,11 @@ export function initRenderer(svgElement: SVGSVGElement): void {
       poly.setAttribute('data-col', String(col));
       poly.setAttribute('data-row', String(r));
       poly.setAttribute('fill', c.bg);
-      poly.setAttribute('stroke', 'transparent');
-      poly.setAttribute('stroke-width', '2.5');
-      poly.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);
-      poly.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
+      poly.setAttribute('stroke', 'none');
+      poly.setAttribute('stroke-width', '0');
+      // Reduces 1px “seams” between adjacent hex fills (often visible as a tinted line on
+      // high-contrast neighbor pairs, e.g. guest / AI territory vs placement tint).
+      poly.setAttribute('shape-rendering', 'crispEdges');
       poly.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
       hexLayer.appendChild(poly);
 
@@ -547,8 +538,7 @@ export function renderState(
       const isProdSelected     = productionHex && col === productionHex.col && r === productionHex.row;
       const isConquered        = !!hexState;
 
-      let fill   = c.hexNeutral;
-      let stroke = 'transparent';
+      let fill = c.hexNeutral;
 
       if (isMountain) {
         fill = c.hexNeutral;
@@ -559,33 +549,17 @@ export function renderState(
       } else if (isValidMove) {
         fill = c.hexMove;
       } else if (isProdSelected) {
-        fill   = c.hexProdSelected;
-        stroke = c.hexProdStroke;
+        fill = c.hexProdSelected;
       } else if (canPlace) {
-        fill   = c.hexCanPlace;
-        stroke = c.hexStroke;
+        fill = c.hexCanPlace;
       } else if (isConquered) {
-        if (hexState.owner === PLAYER) {
-          fill = c.hexPlayer;
-        } else {
-          fill   = c.hexAi;
-          stroke = 'transparent';
-        }
+        fill = hexState.owner === PLAYER ? c.hexPlayer : c.hexAi;
       }
 
       const hexOccupied = !!getUnit(state, col, r);
       const hexDimmed = productionFocusHexes.size > 0 && isConquered && (!productionFocusHexes.has(key) || hexOccupied) && !isProdSelected;
       poly.setAttribute('fill', fill);
-      poly.setAttribute('stroke', stroke);
-      // Bracket dashes leave long gaps along each edge; a visible stroke would show the
-      // neighbor hex fill through those gaps (very obvious for P2 / AI territory red vs P1 blue).
-      if (stroke === 'transparent') {
-        poly.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);
-        poly.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
-      } else {
-        poly.setAttribute('stroke-dasharray', 'none');
-        poly.removeAttribute('stroke-dashoffset');
-      }
+      poly.setAttribute('stroke', 'none');
       poly.setAttribute('opacity', hexDimmed ? '0.2' : '1');
       poly.style.cursor = "url('/icons/pointer.svg') 13 14, auto";
 
