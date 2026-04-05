@@ -1158,13 +1158,19 @@ export function aiMovement(state: GameState): {
           animUnitsAfter.push(snapshotUnits(state));
         }
 
-        // Multi-hex approach without strike (e.g. AI loses unit): animate to the defender, then floats.
+        // Approach without strike (e.g. AI loses unit): animate along the attack path. Human player
+        // uses needsApproach = from !== to; that includes path.length === 2 (one step into combat), not
+        // only path.length >= 3. For longer paths, advanceAlongPath stops adjacent — animate
+        // path.slice(0, -1); for a single step, animate the full path onto the defender hex.
         const needsApproachAnim =
-          !hasMk && !res.meleeBothSurvived && path.length >= 3;
+          !hasMk && !res.meleeBothSurvived && path.length >= 2;
         if (needsApproachAnim) {
-          const approachPath = path.slice(0, -1) as [number, number][];
-          const from = approachPath[0]!;
-          const to = approachPath[approachPath.length - 1]!;
+          const approachHexes =
+            path.length >= 3
+              ? (path.slice(0, -1) as [number, number][])
+              : path;
+          const from = approachHexes[0]!;
+          const to = approachHexes[approachHexes.length - 1]!;
           animUnitsBefore.push(unitsBeforeApproach);
           animSteps.push({
             type: 'move',
@@ -1174,7 +1180,7 @@ export function aiMovement(state: GameState): {
               fromRow: from[1],
               toCol: to[0],
               toRow: to[1],
-              pathHexes: approachPath.length >= 2 ? approachPath : undefined,
+              pathHexes: approachHexes.length >= 2 ? approachHexes : undefined,
             },
           });
           animUnitsAfter.push(beforeResolveUnits);
