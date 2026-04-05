@@ -577,6 +577,15 @@ export function renderState(
       const hexDimmed = productionFocusHexes.size > 0 && isConquered && (!productionFocusHexes.has(key) || hexOccupied) && !isProdSelected;
       poly.setAttribute('fill', fill);
       poly.setAttribute('stroke', stroke);
+      // Bracket dashes leave long gaps along each edge; a visible stroke would show the
+      // neighbor hex fill through those gaps (very obvious for P2 / AI territory red vs P1 blue).
+      if (stroke === 'transparent') {
+        poly.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);
+        poly.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
+      } else {
+        poly.setAttribute('stroke-dasharray', 'none');
+        poly.removeAttribute('stroke-dashoffset');
+      }
       poly.setAttribute('opacity', hexDimmed ? '0.2' : '1');
       poly.style.cursor = "url('/icons/pointer.svg') 13 14, auto";
 
