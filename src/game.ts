@@ -1126,6 +1126,8 @@ export function aiMovement(state: GameState): {
         unit.movesUsed = unit.movement;
         const attackerId = unit.id;
         const unitBeforeMelee = { ...unit } as Unit;
+        const unitsBeforeApproach = snapshotUnits(state);
+
         advanceAlongPathBeforeCombat(state, unit, path, AI);
         const atkCol = unit.col;
         const atkRow = unit.row;
@@ -1141,7 +1143,7 @@ export function aiMovement(state: GameState): {
           const p = vfx.mutualKillLunge!.pathHexes;
           const s = p[0]!;
           const e = p[p.length - 1]!;
-          animUnitsBefore.push(beforeResolveUnits);
+          animUnitsBefore.push(unitsBeforeApproach);
           animSteps.push({
             type: 'move',
             anim: {
@@ -1154,6 +1156,28 @@ export function aiMovement(state: GameState): {
             },
           });
           animUnitsAfter.push(snapshotUnits(state));
+        }
+
+        // Multi-hex approach without strike (e.g. AI loses unit): animate to the defender, then floats.
+        const needsApproachAnim =
+          !hasMk && !res.meleeBothSurvived && path.length >= 3;
+        if (needsApproachAnim) {
+          const approachPath = path.slice(0, -1) as [number, number][];
+          const from = approachPath[0]!;
+          const to = approachPath[approachPath.length - 1]!;
+          animUnitsBefore.push(unitsBeforeApproach);
+          animSteps.push({
+            type: 'move',
+            anim: {
+              unit: unitBeforeMelee,
+              fromCol: from[0],
+              fromRow: from[1],
+              toCol: to[0],
+              toRow: to[1],
+              pathHexes: approachPath.length >= 2 ? approachPath : undefined,
+            },
+          });
+          animUnitsAfter.push(beforeResolveUnits);
         }
 
         // Combat floats / strike: mutual-kill path shows empty board before floats; else pre-damage for strike.
