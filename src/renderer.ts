@@ -22,6 +22,100 @@ function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 }
 
+function easeOutQuad(t: number): number {
+  return 1 - (1 - t) * (1 - t);
+}
+
+/** Last committed game HP we showed (per unit); used to detect changes and drive bar animation. */
+let lastRenderedGameHp = new Map<number, number>();
+/** In-flight HP bar tweens: visual HP lerps from fromHp → toHp. */
+let hpBarAnim = new Map<number, { fromHp: number; toHp: number; maxHp: number; startMs: number }>();
+let boardRenderCallback: (() => void) | null = null;
+let hpBarRafScheduled = false;
+
+/** Wire the main board redraw (e.g. `() => render()`) so HP bars can tick after damage/healing. */
+export function setBoardRenderCallback(cb: (() => void) | null): void {
+  boardRenderCallback = cb;
+}
+
+function scheduleHpBarFrame(): void {
+  if (hpBarRafScheduled || !boardRenderCallback) return;
+  hpBarRafScheduled = true;
+  requestAnimationFrame(() => {
+    hpBarRafScheduled = false;
+    boardRenderCallback!();
+  });
+}
+
+function clearHpBarAnimationState(): void {
+  lastRenderedGameHp.clear();
+  hpBarAnim.clear();
+}
+
+/** Visual HP for bar + color tiers (may differ from `unit.hp` while animating). */
+function visualHpForUnit(unit: Unit, now: number): number {
+  const anim = hpBarAnim.get(unit.id);
+  if (!anim) return unit.hp;
+  const dur = config.hpBarAnimDurationMs;
+  const t = dur <= 0 ? 1 : Math.min(1, (now - anim.startMs) / dur);
+  const hp = anim.fromHp + (anim.toHp - anim.fromHp) * easeOutQuad(t);
+  if (t >= 1) {
+    hpBarAnim.delete(unit.id);
+    lastRenderedGameHp.set(unit.id, unit.hp);
+  }
+  return Math.max(0, hp);
+}
+
+function syncHpBarAnimState(state: GameState, now: number): void {
+  const alive = new Set(state.units.map(u => u.id));
+  for (const id of lastRenderedGameHp.keys()) {
+    if (!alive.has(id)) lastRenderedGameHp.delete(id);
+  }
+  for (const id of hpBarAnim.keys()) {
+    if (!alive.has(id)) hpBarAnim.delete(id);
+  }
+
+  const dur = config.hpBarAnimDurationMs;
+
+  for (const unit of state.units) {
+    const existing = hpBarAnim.get(unit.id);
+    if (existing) {
+      if (existing.toHp !== unit.hp) {
+        const t = dur <= 0 ? 1 : Math.min(1, (now - existing.startMs) / dur);
+        const fromVisual =
+          existing.fromHp + (existing.toHp - existing.fromHp) * easeOutQuad(t);
+        hpBarAnim.set(unit.id, {
+          fromHp: fromVisual,
+          toHp: unit.hp,
+          maxHp: unit.maxHp,
+          startMs: now,
+        });
+      }
+      continue;
+    }
+    const prev = lastRenderedGameHp.get(unit.id);
+    if (prev === undefined) {
+      lastRenderedGameHp.set(unit.id, unit.hp);
+    } else if (prev !== unit.hp) {
+      hpBarAnim.set(unit.id, {
+        fromHp: prev,
+        toHp: unit.hp,
+        maxHp: unit.maxHp,
+        startMs: now,
+      });
+    }
+  }
+
+  let anyInProgress = false;
+  for (const [, anim] of hpBarAnim) {
+    if (dur > 0 && now - anim.startMs < dur) {
+      anyInProgress = true;
+      break;
+    }
+  }
+  if (anyInProgress) scheduleHpBarFrame();
+}
+
 /** Position at fraction `t01` (0–1) of total arc length along the polyline. */
 function positionOnPolyline(points: { x: number; y: number }[], t01: number): { x: number; y: number } {
   if (points.length === 0) return { x: 0, y: 0 };
@@ -343,9 +437,21 @@ export function initRenderer(svgElement: SVGSVGElement): void {
     }
   }
   svgElement.appendChild(hexHitLayer);
+
+  if (svgElement.id === 'board') clearHpBarAnimationState();
 }
 
-export function renderState(svgElement: SVGSVGElement, state: GameState, productionHex: { col: number; row: number } | null = null, hiddenUnitIds: Set<number> = new Set(), localPlayer: Owner = PLAYER): void {
+export function renderState(
+  svgElement: SVGSVGElement,
+  state: GameState,
+  productionHex: { col: number; row: number } | null = null,
+  hiddenUnitIds: Set<number> = new Set(),
+  localPlayer: Owner = PLAYER,
+): void {
+  const trackHpBars = svgElement.id === 'board';
+  const now = performance.now();
+  if (trackHpBars) syncHpBarAnimState(state, now);
+
   const c = colors();
   const unitLayer = svgElement.querySelector('#unit-layer') as SVGGElement;
   unitLayer.innerHTML = '';
@@ -503,7 +609,8 @@ export function renderState(svgElement: SVGSVGElement, state: GameState, product
     if (hiddenUnitIds.has(unit.id)) continue;
     const { x, y } = hexToPixel(unit.col, unit.row);
     const isSelected = state.selectedUnit === unit.id;
-    const hpRatio    = unit.hp / unit.maxHp;
+    const displayHp  = trackHpBars ? visualHpForUnit(unit, now) : unit.hp;
+    const hpRatio    = displayHp / unit.maxHp;
 
     const baseColor = unit.owner === PLAYER ? c.player : c.ai;
     const isRangedTarget = rangedTargetKeys.has(`${unit.col},${unit.row}`);

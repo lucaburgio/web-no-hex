@@ -125,4 +125,6 @@ export interface GameConfig {
   damageFloatDurationMs: number;
   /** Duration in ms for melee strike-and-return (out + back). */
   strikeReturnSpeedMs: number;
+  /** Duration in ms when the on-board HP bar width eases to a new value after HP changes. */
+  hpBarAnimDurationMs: number;
 }

@@ -138,6 +138,9 @@ const config: GameConfig = {
   // Melee strike-and-return: out to enemy hex and back (full round trip)
   strikeReturnSpeedMs: 520,
 
+  // HP bar fill eases when unit HP changes (combat, healing, etc.)
+  hpBarAnimDurationMs: 280,
+
   // Fraction of board hexes to randomly set as impassable mountains at game start (0–1)
   mountainPct: 0.12,
 

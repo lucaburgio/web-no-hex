@@ -26,6 +26,7 @@ import {
 import {
   initRenderer,
   renderState,
+  setBoardRenderCallback,
   animateMoves,
   animateStrikeAndReturn,
   showDamageFloats,
@@ -280,6 +281,8 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
 function render(): void {
   renderState(svg, state, pendingProductionHex, new Set(), localPlayer);
 }
+
+setBoardRenderCallback(() => render());
 
 // ── Main menu ─────────────────────────────────────────────────────────────────
 
