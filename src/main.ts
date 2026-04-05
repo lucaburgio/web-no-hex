@@ -853,7 +853,7 @@ function showUnitPicker(col: number, row: number): void {
         'unit-card-stat--range',
         unitType.range,
         'Range',
-        'Maximum hex distance for ranged fire (targets from distance 2 through this value). Move or shoot in one turn, not both.',
+        'Maximum hex distance for ranged fire. Move or shoot in one turn, not both.',
         statIconRange
       );
     }
@@ -1010,13 +1010,16 @@ svg.addEventListener('click', (e: MouseEvent) => {
   }
 });
 
-// Deselect when tapping outside the hex board (decorative overflow area or true background)
-const boardWrap = document.getElementById('board-wrap') as HTMLDivElement;
-boardWrap.addEventListener('click', (e: MouseEvent) => {
+// Deselect when clicking outside the board (header, footer, game-area padding, or empty SVG margin).
+// Hex/unit clicks use [data-col] and are handled on #board first (bubble order).
+document.addEventListener('click', (e: MouseEvent) => {
   if (state.winner) return;
   if (state.activePlayer !== localPlayer) return;
   if (state.phase !== 'movement' || state.selectedUnit === null) return;
-  if ((e.target as Element).closest('[data-col]')) return; // hex click already handled
+
+  const t = e.target;
+  if (!(t instanceof Element)) return;
+  if (svg.contains(t) && t.closest('[data-col]')) return;
 
   let didInterruptHumanMove = false;
   if (humanMoveAnimCancel) {
