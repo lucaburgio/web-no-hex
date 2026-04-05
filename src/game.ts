@@ -1250,9 +1250,12 @@ export function aiMovement(state: GameState): {
 
 // Prepares the AI turn: logs end-of-movement and resets AI moved flags.
 // Call this before running aiMovement separately (used by the animation path).
+// Clears selectedUnit: activePlayer stays PLAYER until endTurnAfterAi, but the renderer
+// must not keep movement/ranged highlights during AI resolution.
 export function prepareAiTurn(state: GameState): GameState {
   if (state.phase !== 'movement' || state.activePlayer !== PLAYER) return state;
   log(state, 'You ended your movement.');
+  state.selectedUnit = null;
   state.units.forEach(u => { if (u.owner === AI) u.movesUsed = 0; });
   return state;
 }

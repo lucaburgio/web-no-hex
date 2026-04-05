@@ -467,7 +467,8 @@ export function renderState(
 
   const mountainSet = new Set(state.mountainHexes ?? []);
 
-  const selectedUnit = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
+  let selectedUnit = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
+  if (selectedUnit && selectedUnit.owner !== localPlayer) selectedUnit = null;
 
   const rangedTargetKeys = new Set<string>();
   if (selectedUnit && state.phase === 'movement' && state.activePlayer === localPlayer) {

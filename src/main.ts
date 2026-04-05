@@ -1419,6 +1419,7 @@ function aiReplayState(base: GameState, units: Unit[]): GameState {
 }
 
 function runAiTurnWithAnimation(): void {
+  clearMovePathPreview();
   state = prepareAiTurn(state);
 
   const aiResult = aiMovement(state);
