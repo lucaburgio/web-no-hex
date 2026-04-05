@@ -66,6 +66,7 @@ const playerConquerLabel  = document.getElementById('player-conquer-label') as H
 const aiConquerLabel      = document.getElementById('ai-conquer-label') as HTMLElement;
 const conquerBarEl        = document.getElementById('conquer-bar-line') as HTMLElement;
 const ppTooltipEl         = document.getElementById('pp-tooltip') as HTMLDivElement;
+const unitStatTooltipEl   = document.getElementById('unit-stat-tooltip') as HTMLDivElement;
 const ppInfoEl            = document.getElementById('pp-info') as HTMLDivElement;
 
 const autoEndProductionEl = document.getElementById('auto-end-production') as HTMLInputElement;
@@ -97,19 +98,27 @@ ppInfoEl.addEventListener('mouseenter', () => {
     <div class="pp-tt-row"><span>Territory (${ownedHexes} hexes)</span><span>+${territoryBonus} PP</span></div>
     <div class="pp-tt-row total"><span>This turn</span><span>+${total} PP</span></div>
     <div class="pp-tt-next">${nextLine}</div>`;
-  ppTooltipEl.classList.remove('hidden');
-  const anchor = ppInfoEl.getBoundingClientRect();
-  const ttRect = ppTooltipEl.getBoundingClientRect();
-  let left = anchor.left;
-  let top  = anchor.bottom + 8;
-  if (left + ttRect.width > window.innerWidth) left = window.innerWidth - ttRect.width - 8;
-  ppTooltipEl.style.left = `${left}px`;
-  ppTooltipEl.style.top  = `${top}px`;
+  positionFixedTooltipBelow(ppTooltipEl, ppInfoEl.getBoundingClientRect());
 });
 
 ppInfoEl.addEventListener('mouseleave', () => {
   ppTooltipEl.classList.add('hidden');
 });
+
+function positionFixedTooltipBelow(tooltip: HTMLElement, anchor: DOMRect): void {
+  tooltip.classList.remove('hidden');
+  const ttRect = tooltip.getBoundingClientRect();
+  let left = anchor.left;
+  let top = anchor.bottom + 8;
+  if (left + ttRect.width > window.innerWidth - 8) {
+    left = Math.max(8, window.innerWidth - ttRect.width - 8);
+  }
+  if (top + ttRect.height > window.innerHeight - 8) {
+    top = Math.max(8, anchor.top - ttRect.height - 8);
+  }
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+}
 
 // ── Main menu DOM refs ────────────────────────────────────────────────────────
 
@@ -775,7 +784,7 @@ function showUnitPicker(col: number, row: number): void {
     const stats = document.createElement('div');
     stats.className = 'unit-card-stats';
 
-    function addStat(modClass: string, value: number): void {
+    function addStat(modClass: string, value: number, statTitle: string, statDesc: string): void {
       const row = document.createElement('div');
       row.className = `unit-card-stat ${modClass}`;
       const iconWrap = document.createElement('span');
@@ -790,13 +799,42 @@ function showUnitPicker(col: number, row: number): void {
       iconWrap.appendChild(iconImg);
       row.appendChild(iconWrap);
       row.appendChild(val);
+      row.addEventListener('mouseenter', () => {
+        unitStatTooltipEl.innerHTML = `
+          <div class="unit-stat-tt-title">${statTitle}</div>
+          <div class="unit-stat-tt-desc">${statDesc}</div>`;
+        positionFixedTooltipBelow(unitStatTooltipEl, row.getBoundingClientRect());
+      });
+      row.addEventListener('mouseleave', () => {
+        unitStatTooltipEl.classList.add('hidden');
+      });
       stats.appendChild(row);
     }
 
-    addStat('unit-card-stat--cost', unitType.cost);
-    addStat('unit-card-stat--move', unitType.movement);
-    addStat('unit-card-stat--str', unitType.strength);
-    addStat('unit-card-stat--hp', unitType.maxHp);
+    addStat(
+      'unit-card-stat--cost',
+      unitType.cost,
+      'Cost',
+      'Production points (PP) required to build this unit.'
+    );
+    addStat(
+      'unit-card-stat--move',
+      unitType.movement,
+      'Movement',
+      'How many hexes this unit can move on the map each turn.'
+    );
+    addStat(
+      'unit-card-stat--str',
+      unitType.strength,
+      'Strength',
+      'Base combat strength; condition and flanking modify it in battle.'
+    );
+    addStat(
+      'unit-card-stat--hp',
+      unitType.maxHp,
+      'Hit points',
+      'Maximum HP; the unit is removed when reduced to zero.'
+    );
 
     body.appendChild(title);
     body.appendChild(stats);
@@ -825,6 +863,7 @@ function showUnitPicker(col: number, row: number): void {
 function hideUnitPicker(): void {
   pendingProductionHex = null;
   unitPickerEl.style.display = 'none';
+  unitStatTooltipEl.classList.add('hidden');
 }
 
 // ── Board click ───────────────────────────────────────────────────────────────

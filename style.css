@@ -16,6 +16,7 @@
   --color-white: #FFF;
   --color-yellow-500: #FFC13A;
   --color-gray-500: #9E9E9E;
+  --color-gray-400: #B0B0B0;
   --color-dark: #000100;
   --color-red-700: #BD4E4E;
   --color-red-500: #ff6b6b;
@@ -292,7 +293,7 @@ body {
 #unit-picker-list {
   display: flex;
   flex-direction: row;
-  gap: 16px;
+  gap: 4px;
   align-items: flex-end;
 }
 
@@ -303,8 +304,10 @@ body {
   justify-content: flex-start;
   align-items: flex-start;
   padding: 0;
+  font-size: 14px;
+  font-weight: 700;
   box-sizing: border-box;
-  width: 200px;
+  width: 240px;
   flex: none;
   flex-grow: 0;
   background: #010101;
@@ -359,9 +362,8 @@ body {
 }
 
 .unit-card-name {
-  height: 80px;
+  min-height: 40px;
   max-height: 80px;
-  font-size: 14px;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.06em;
@@ -390,40 +392,43 @@ body {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 
 .unit-card-stat-icon {
   flex-shrink: 0;
-  width: 10px;
-  height: 10px;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .unit-card-stat-icon img {
-  width: 10px;
-  height: 10px;
+  width: 16px;
+  height: 16px;
   display: block;
-  /* Black artwork → theme colors (SVG file unchanged) */
-  filter: brightness(0) saturate(100%) invert(62%) sepia(6%) saturate(12%) hue-rotate(169deg) brightness(96%) contrast(89%);
 }
 
 .unit-card-stat--cost .unit-card-stat-icon img {
-  filter: brightness(0) saturate(100%) invert(77%) sepia(99%) saturate(1352%) hue-rotate(359deg) brightness(102%) contrast(101%);
+  filter: brightness(0) saturate(100%) invert(77%) sepia(99%) saturate(1352%) hue-rotate(334deg) brightness(102%) contrast(101%);
 }
 .unit-card-stat--cost .unit-card-stat-value {
   color: var(--color-yellow-500);
 }
 .unit-card-stat:not(.unit-card-stat--cost) .unit-card-stat-value {
-  color: var(--color-white);
+  color: var(--color-gray-400);
+}
+.unit-card-stat--cost .unit-card-stat-icon img {
+  filter: brightness(0) saturate(100%) invert(77%) sepia(99%) saturate(1352%) hue-rotate(334deg) brightness(102%) contrast(101%);
+}
+
+.unit-card-stat:not(.unit-card-stat--cost) .unit-card-stat-icon img {
+  filter: brightness(0) saturate(0%) invert(77%) sepia(19%) saturate(0%) hue-rotate(334deg) brightness(102%) contrast(40%);
 }
 
 .unit-card-stat-value {
-  font-size: 10px;
-  font-weight: 700;
   letter-spacing: 0.03em;
   line-height: 1;
 }
@@ -1180,4 +1185,27 @@ body {
   color: var(--color-gray-500);
   border-top: 1px solid rgba(255,255,255,0.08);
   padding-top: 8px;
+}
+
+/* ── Unit card stat tooltip (production picker) ───────────────────────────── */
+
+#unit-stat-tooltip {
+  min-width: 0;
+  max-width: 280px;
+  padding: 16px 20px;
+}
+
+.unit-stat-tt-title {
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--color-yellow-500);
+  margin-bottom: 8px;
+}
+
+.unit-stat-tt-desc {
+  color: var(--color-gray-500);
+  line-height: 1.45;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.02em;
 }
