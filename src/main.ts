@@ -1385,9 +1385,12 @@ endMoveBtn.addEventListener('click', () => {
 function runAiTurnWithAnimation(): void {
   state = prepareAiTurn(state);
 
+  /** Board positions before the AI acts (sequential anim must not use end-of-turn coords between steps). */
+  const posBeforeAi = new Map(state.units.map(u => [u.id, { col: u.col, row: u.row }]));
   const aiResult = aiMovement(state);
   state = aiResult.state;
   const animSteps = aiResult.animSteps;
+  const animSnapshots = aiResult.animSnapshots;
 
   if (state.winner) {
     render(); updateUI(); checkWinner();
@@ -1413,12 +1416,21 @@ function runAiTurnWithAnimation(): void {
     render(); updateUI(); checkWinner(); maybeAutoEnd();
   };
 
-  const playOneCombatVfx = (vfx: CombatVfxPayload, onDone: () => void): void => {
+  /** Static positions before anim step `stepIndex` (what the player should see as “current” before this step). */
+  const posBeforeStep = (stepIndex: number): Map<number, { col: number; row: number }> =>
+    stepIndex === 0 ? posBeforeAi : animSnapshots[stepIndex - 1]!;
+
+  const playOneCombatVfx = (
+    vfx: CombatVfxPayload,
+    posBefore: Map<number, { col: number; row: number }>,
+    posAfter: Map<number, { col: number; row: number }>,
+    onDone: () => void,
+  ): void => {
     const floats = vfx.damageFloats;
     const sr = vfx.strikeReturn;
 
     const runFloats = (): void => {
-      renderState(svg, state, null, new Set(), localPlayer);
+      renderState(svg, state, null, new Set(), localPlayer, posAfter);
       updateUI();
       if (floats.length === 0) onDone();
       else {
@@ -1433,7 +1445,7 @@ function runAiTurnWithAnimation(): void {
         runFloats();
         return;
       }
-      renderState(svg, state, null, new Set([sr.attackerId]), localPlayer);
+      renderState(svg, state, null, new Set([sr.attackerId]), localPlayer, posBefore);
       updateUI();
       const { cancel } = animateStrikeAndReturn(
         svg,
@@ -1462,9 +1474,10 @@ function runAiTurnWithAnimation(): void {
       return;
     }
     const step = animSteps[index]!;
+    const before = posBeforeStep(index);
     if (step.type === 'move') {
       const a = step.anim;
-      renderState(svg, state, null, new Set([a.unit.id]), localPlayer);
+      renderState(svg, state, null, new Set([a.unit.id]), localPlayer, before);
       updateUI();
       const { cancel } = animateMoves(
         svg,
@@ -1475,7 +1488,7 @@ function runAiTurnWithAnimation(): void {
       );
       humanMoveAnimCancel = combineAnimCancels(cancel);
     } else {
-      playOneCombatVfx(step.vfx, () => runStep(index + 1));
+      playOneCombatVfx(step.vfx, before, animSnapshots[index]!, () => runStep(index + 1));
     }
   };
 

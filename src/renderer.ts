@@ -451,6 +451,8 @@ export function renderState(
   productionHex: { col: number; row: number } | null = null,
   hiddenUnitIds: Set<number> = new Set(),
   localPlayer: Owner = PLAYER,
+  /** Draw these units at override hexes (e.g. AI turn replay before end-of-turn positions). */
+  unitPosOverride?: Map<number, { col: number; row: number }> | null,
 ): void {
   const trackHpBars = svgElement.id === 'board';
   const now = performance.now();
@@ -620,13 +622,16 @@ export function renderState(
   // Draw units
   for (const unit of state.units) {
     if (hiddenUnitIds.has(unit.id)) continue;
-    const { x, y } = hexToPixel(unit.col, unit.row);
+    const o = unitPosOverride?.get(unit.id);
+    const dc = o?.col ?? unit.col;
+    const dr = o?.row ?? unit.row;
+    const { x, y } = hexToPixel(dc, dr);
     const isSelected = state.selectedUnit === unit.id;
     const displayHp  = trackHpBars ? displayHpByUnit.get(unit.id)! : unit.hp;
     const hpRatio    = displayHp / unit.maxHp;
 
     const baseColor = unit.owner === PLAYER ? c.player : c.ai;
-    const isRangedTarget = rangedTargetKeys.has(`${unit.col},${unit.row}`);
+    const isRangedTarget = rangedTargetKeys.has(`${dc},${dr}`);
     const fill      = isRangedTarget ? c.rangedTarget : isSelected ? c.unitSelected : baseColor;
     const unitDimmed = productionFocusHexes.size > 0;
     const opacity   = (unit.movesUsed >= unit.movement || unitDimmed) ? '0.2' : '1';
@@ -638,8 +643,8 @@ export function renderState(
     unitEl.setAttribute('fill', fill);
     unitEl.setAttribute('stroke', 'none');
     unitEl.setAttribute('opacity', opacity);
-    unitEl.setAttribute('data-col', String(unit.col));
-    unitEl.setAttribute('data-row', String(unit.row));
+    unitEl.setAttribute('data-col', String(dc));
+    unitEl.setAttribute('data-row', String(dr));
     unitEl.setAttribute('transform', `translate(${x - 25 * sc},${y - 32 * sc}) scale(${sc})`);
     unitEl.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
     unitLayer.appendChild(unitEl);

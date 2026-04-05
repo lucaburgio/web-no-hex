@@ -1037,14 +1037,22 @@ function scoreEmptyMove(
   return s;
 }
 
+/** Unit positions after each AI anim step (aligned with animSteps indices). Used so the board does not show end-of-turn positions between steps. */
+function snapshotUnitPositions(st: GameState): Map<number, { col: number; row: number }> {
+  return new Map(st.units.map(u => [u.id, { col: u.col, row: u.row }]));
+}
+
 export function aiMovement(state: GameState): {
   state: GameState;
   combatVfx: CombatVfxPayload[];
   /** Ordered steps for AI turn animation (one move or combat at a time). */
   animSteps: AiAnimStep[];
+  /** After each step completes, where every surviving unit sits (same length as animSteps). */
+  animSnapshots: Map<number, { col: number; row: number }>[];
 } {
   const combatVfx: CombatVfxPayload[] = [];
   const animSteps: AiAnimStep[] = [];
+  const animSnapshots: Map<number, { col: number; row: number }>[] = [];
   const pressure = aiDefensivePressure(state);
   const threat = criticalThreatPlayerUnit(state);
   const aiUnits = state.units.filter(u => u.owner === AI).sort((a, b) => {
@@ -1077,6 +1085,7 @@ export function aiMovement(state: GameState): {
         const vfx = combatVfxFromResolve(attackerId, atkCol, atkRow, defCol, defRow, res);
         combatVfx.push(vfx);
         animSteps.push({ type: 'combat', vfx });
+        animSnapshots.push(snapshotUnitPositions(state));
         checkVictory(state);
         break;
       }
@@ -1134,8 +1143,10 @@ export function aiMovement(state: GameState): {
               pathHexes: p,
             },
           });
+          animSnapshots.push(snapshotUnitPositions(state));
         }
         animSteps.push({ type: 'combat', vfx });
+        animSnapshots.push(snapshotUnitPositions(state));
         checkVictory(state);
         break;
       }
@@ -1163,10 +1174,11 @@ export function aiMovement(state: GameState): {
           pathHexes: path.length >= 2 ? path : undefined,
         },
       });
+      animSnapshots.push(snapshotUnitPositions(state));
     }
   }
   log(state, 'AI completed movement.');
-  return { state, combatVfx, animSteps };
+  return { state, combatVfx, animSteps, animSnapshots };
 }
 
 // ── Phase advancement ─────────────────────────────────────────────────────────
