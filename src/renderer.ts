@@ -1125,10 +1125,12 @@ function showHexFloatBadges(
     const key = `${e.col},${e.row}`;
     const stack = stackIndexByHex.get(key) ?? 0;
     stackIndexByHex.set(key, stack + 1);
-    const staggerY = -stack * STACK_STEP;
+    // Board Y-flip negates vertical offset from hex center → invert base + stagger so badges stay north of the unit.
+    const staggerY = flipBoardY ? stack * STACK_STEP : -stack * STACK_STEP;
+    const yAnchor = flipBoardY ? y + HEX_SIZE * 0.72 + staggerY : y - HEX_SIZE * 0.72 + staggerY;
     const label = kind === 'damage' ? String(e.amount) : `heal +${e.amount}`;
     const outer = svgEl('g');
-    outer.setAttribute('transform', `translate(${x},${y - HEX_SIZE * 0.72 + staggerY})`);
+    outer.setAttribute('transform', `translate(${x},${yAnchor})`);
 
     const g = svgEl('g');
     g.setAttribute('class', rootClass);
