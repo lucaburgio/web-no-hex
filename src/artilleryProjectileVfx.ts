@@ -16,6 +16,8 @@ export type ArtilleryVfxPresetId =
 /** Defender-hex-only barrage: 5–6 short direct-streak shells, all localized on the target hex. */
 export type ArtilleryHexBarragePresetId =
   | 'hexFan'
+  | 'hexFanOrderOutIn'
+  | 'hexFanOrderShuffle'
   | 'hexColumn'
   | 'hexConverge'
   | 'hexSalvo'
@@ -466,6 +468,10 @@ const DEFAULT_HEX_RADIUS = 28;
 export const ARTILLERY_HEX_BARRAGE_LABELS: Record<ArtilleryHexBarragePresetId, string> = {
   hexFan:
     'Fan — six streaks from a shallow arc above; impacts sweep across the hex like a bracketing salvo',
+  hexFanOrderOutIn:
+    'Fan (out→in) — same geometry as fan, but shells fire from both outer impacts first, then inward pairs',
+  hexFanOrderShuffle:
+    'Fan (shuffle) — same geometry as fan, firing order scrambled (e.g. not 1→2→3 across the face)',
   hexColumn:
     'Column — six near-vertical drops with slight horizontal jitter, top-to-bottom ripples on the hex',
   hexConverge:
@@ -488,6 +494,8 @@ export const ARTILLERY_HEX_BARRAGE_LABELS: Record<ArtilleryHexBarragePresetId, s
 
 export const ARTILLERY_HEX_BARRAGE_PRESET_IDS: ArtilleryHexBarragePresetId[] = [
   'hexFan',
+  'hexFanOrderOutIn',
+  'hexFanOrderShuffle',
   'hexColumn',
   'hexConverge',
   'hexSalvo',
@@ -538,6 +546,12 @@ export function playDefenderHexBarrage(options: PlayDefenderHexBarrageOptions): 
     case 'hexFan':
       tl = presetHexFan(root, center, hexRadius, base);
       break;
+    case 'hexFanOrderOutIn':
+      tl = presetHexFanOrderOutIn(root, center, hexRadius, base);
+      break;
+    case 'hexFanOrderShuffle':
+      tl = presetHexFanOrderShuffle(root, center, hexRadius, base);
+      break;
     case 'hexColumn':
       tl = presetHexColumn(root, center, hexRadius, base);
       break;
@@ -587,21 +601,64 @@ export function playDefenderHexBarrage(options: PlayDefenderHexBarrageOptions): 
   };
 }
 
+/** Shell index 0 = left along the fan, 5 = right (same spread as original hexFan). */
+function hexFanShellEndpoints(
+  shellIndex: number,
+  c: ArtilleryPoint,
+  R: number,
+): { from: ArtilleryPoint; impact: ArtilleryPoint } {
+  const i = shellIndex;
+  const t = HEX_BARRAGE_SHELLS > 1 ? i / (HEX_BARRAGE_SHELLS - 1) : 0;
+  const spread = (t - 0.5) * R * 1.15;
+  const impact: ArtilleryPoint = { x: c.x + spread, y: c.y + R * 0.28 };
+  const from: ArtilleryPoint = { x: c.x + spread * 0.88, y: c.y - R * 1.12 };
+  return { from, impact };
+}
+
+function presetHexFanWithOrder(
+  root: SVGGElement,
+  c: ArtilleryPoint,
+  R: number,
+  style: ArtilleryProjectileStyle,
+  /** Which shell (0…5) fires on each step, in time order. */
+  fireOrder: readonly number[],
+): gsap.core.Timeline {
+  const stagger = 0.072;
+  const tl = gsap.timeline();
+  fireOrder.forEach((shellIndex, step) => {
+    const { from, impact } = hexFanShellEndpoints(shellIndex, c, R);
+    tl.add(directStreakSegment(root, from, impact, style, 0.4, 0.52), step * stagger);
+  });
+  return tl;
+}
+
 function presetHexFan(
   root: SVGGElement,
   c: ArtilleryPoint,
   R: number,
   style: ArtilleryProjectileStyle,
 ): gsap.core.Timeline {
-  const tl = gsap.timeline();
-  for (let i = 0; i < HEX_BARRAGE_SHELLS; i++) {
-    const t = HEX_BARRAGE_SHELLS > 1 ? i / (HEX_BARRAGE_SHELLS - 1) : 0;
-    const spread = (t - 0.5) * R * 1.15;
-    const impact: ArtilleryPoint = { x: c.x + spread, y: c.y + R * 0.28 };
-    const from: ArtilleryPoint = { x: c.x + spread * 0.88, y: c.y - R * 1.12 };
-    tl.add(directStreakSegment(root, from, impact, style, 0.4, 0.52), i * 0.072);
-  }
-  return tl;
+  return presetHexFanWithOrder(root, c, R, style, [0, 1, 2, 3, 4, 5]);
+}
+
+/** Outer impacts (indices 0 and 5) first, then the next pair inward: 1 & 4, then 2 & 3. */
+function presetHexFanOrderOutIn(
+  root: SVGGElement,
+  c: ArtilleryPoint,
+  R: number,
+  style: ArtilleryProjectileStyle,
+): gsap.core.Timeline {
+  return presetHexFanWithOrder(root, c, R, style, [0, 5, 1, 4, 2, 3]);
+}
+
+/** Deliberately non-sequential order across the face (left-to-right index order is not 0,1,2…). */
+function presetHexFanOrderShuffle(
+  root: SVGGElement,
+  c: ArtilleryPoint,
+  R: number,
+  style: ArtilleryProjectileStyle,
+): gsap.core.Timeline {
+  return presetHexFanWithOrder(root, c, R, style, [5, 2, 4, 0, 3, 1]);
 }
 
 function presetHexColumn(
