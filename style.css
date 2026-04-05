@@ -297,6 +297,28 @@ body {
   align-items: flex-end;
 }
 
+@keyframes unit-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes unit-card-enter-disabled {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 0.38;
+    transform: translateY(0);
+  }
+}
+
 /* Production unit card — outer frame per Figma card-v2 */
 .unit-card {
   display: flex;
@@ -316,6 +338,26 @@ body {
   cursor: url('/icons/pointer.svg') 13 14, pointer;
   user-select: none;
   transition: transform 0.2s ease;
+}
+
+.unit-card.unit-card--enter {
+  animation: unit-card-enter 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--card-enter-i, 0) * 70ms);
+}
+
+.unit-card.unit-card--enter.disabled {
+  animation-name: unit-card-enter-disabled;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .unit-card.unit-card--enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .unit-card.unit-card--enter.disabled {
+    opacity: 0.38;
+  }
 }
 .unit-card:hover:not(.disabled) {
   transform: translateY(-3px);

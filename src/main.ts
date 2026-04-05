@@ -763,11 +763,24 @@ function showUnitPicker(col: number, row: number): void {
   const statIconStr = 'public/icons/strength.svg';
   const statIconHp = 'public/icons/hp.svg';
 
-  for (const unitType of config.unitTypes) {
+  config.unitTypes.forEach((unitType, cardIndex) => {
     const canAfford = state.productionPoints[localPlayer] >= unitType.cost;
 
     const card = document.createElement('div');
-    card.className = 'unit-card' + (canAfford ? '' : ' disabled');
+    card.className = 'unit-card unit-card--enter' + (canAfford ? '' : ' disabled');
+    card.style.setProperty('--card-enter-i', String(cardIndex));
+    card.addEventListener(
+      'animationend',
+      (e: AnimationEvent) => {
+        if (
+          e.animationName === 'unit-card-enter' ||
+          e.animationName === 'unit-card-enter-disabled'
+        ) {
+          card.classList.remove('unit-card--enter');
+        }
+      },
+      { once: true }
+    );
 
     const header = document.createElement('div');
     header.className = 'unit-card-header';
@@ -868,7 +881,7 @@ function showUnitPicker(col: number, row: number): void {
     }
 
     unitPickerList.appendChild(card);
-  }
+  });
 
   unitPickerEl.style.display = 'block';
 }
