@@ -453,7 +453,7 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): Combat
   };
 }
 
-/** Hex centers for damage floats: each badge sits where that unit ended (or was eliminated). */
+/** Hex centers for damage floats (melee). Both-survive: separate tiles; all other fights: both badges on defender hex so they stack. */
 function meleeDamageFloatHexes(
   atkCol: number,
   atkRow: number,
@@ -464,13 +464,7 @@ function meleeDamageFloatHexes(
   if (res.meleeBothSurvived) {
     return { atk: [atkCol, atkRow], def: [defCol, defRow] };
   }
-  if (res.mutualKill) {
-    return { atk: [defCol, defRow], def: [defCol, defRow] };
-  }
-  if (res.defenderDied && !res.attackerDied) {
-    return { atk: [defCol, defRow], def: [defCol, defRow] };
-  }
-  return { atk: [atkCol, atkRow], def: [defCol, defRow] };
+  return { atk: [defCol, defRow], def: [defCol, defRow] };
 }
 
 function combatVfxFromResolve(
