@@ -285,9 +285,15 @@ body {
   display: none;
   position: fixed;
   bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 12px;
+  right: 12px;
   z-index: 10;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+#unit-picker > * {
+  pointer-events: auto;
 }
 
 #unit-picker-list {
@@ -295,6 +301,30 @@ body {
   flex-direction: row;
   gap: 4px;
   align-items: flex-end;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 138, 90, 0.55) rgba(0, 0, 0, 0.25);
+}
+
+#unit-picker-list::-webkit-scrollbar {
+  height: 8px;
+}
+
+#unit-picker-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+}
+
+#unit-picker-list::-webkit-scrollbar-thumb {
+  background: rgba(90, 138, 90, 0.55);
+  border-radius: 4px;
 }
 
 @keyframes unit-card-enter {
