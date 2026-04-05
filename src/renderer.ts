@@ -53,6 +53,10 @@ function clearHpBarAnimationState(): void {
 }
 
 /** Visual HP for bar + color tiers (may differ from `unit.hp` while animating). */
+export function getBoardVisualHp(unit: Unit, now: number = performance.now()): number {
+  return visualHpForUnit(unit, now);
+}
+
 function visualHpForUnit(unit: Unit, now: number): number {
   const anim = hpBarAnim.get(unit.id);
   if (!anim) return unit.hp;
@@ -604,12 +608,21 @@ export function renderState(
     }
   }
 
+  // Advance HP bar tweens for every unit (including hidden — moving/strike sprites skip
+  // the draw loop, so we must tick visualHpForUnit for them or their bars never animate).
+  const displayHpByUnit = new Map<number, number>();
+  if (trackHpBars) {
+    for (const unit of state.units) {
+      displayHpByUnit.set(unit.id, visualHpForUnit(unit, now));
+    }
+  }
+
   // Draw units
   for (const unit of state.units) {
     if (hiddenUnitIds.has(unit.id)) continue;
     const { x, y } = hexToPixel(unit.col, unit.row);
     const isSelected = state.selectedUnit === unit.id;
-    const displayHp  = trackHpBars ? visualHpForUnit(unit, now) : unit.hp;
+    const displayHp  = trackHpBars ? displayHpByUnit.get(unit.id)! : unit.hp;
     const hpRatio    = displayHp / unit.maxHp;
 
     const baseColor = unit.owner === PLAYER ? c.player : c.ai;
@@ -682,6 +695,8 @@ export function animateMoves(
   animations: MoveAnimation[],
   durationMs: number,
   onDone: () => void,
+  /** When set, HP bar on the moving sprite uses live state + board HP tween each frame. */
+  liveStateForHp?: GameState | null,
 ): { cancel: () => void } {
   const noopCancel = (): void => {};
 
@@ -723,7 +738,6 @@ export function animateMoves(
   for (const anim of animations) {
     const pixelPath = pixelPathForAnimation(anim);
     const baseColor = anim.unit.owner === PLAYER ? c.player : c.ai;
-    const hpRatio   = anim.unit.hp / anim.unit.maxHp;
 
     const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
     const animFill = baseColor;
@@ -743,10 +757,14 @@ export function animateMoves(
     barBg.setAttribute('pointer-events', 'none');
     animLayer!.appendChild(barBg);
 
-    const barColor = hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
+    const live0 = liveStateForHp ? getUnitById(liveStateForHp, anim.unit.id) : null;
+    const maxHp0 = live0?.maxHp ?? anim.unit.maxHp;
+    const displayHp0 = live0 ? getBoardVisualHp(live0, performance.now()) : anim.unit.hp;
+    const hpRatio0 = maxHp0 > 0 ? Math.min(1, Math.max(0, displayHp0 / maxHp0)) : 0;
+    const barColor0 = hpRatio0 > 0.6 ? c.hpHigh : hpRatio0 > 0.3 ? c.hpMid : c.hpLow;
     const barFill = svgEl('rect');
-    barFill.setAttribute('width', String(animBarW * hpRatio)); barFill.setAttribute('height', String(barH));
-    barFill.setAttribute('fill', barColor); barFill.setAttribute('rx', '1');
+    barFill.setAttribute('width', String(animBarW * hpRatio0)); barFill.setAttribute('height', String(barH));
+    barFill.setAttribute('fill', barColor0); barFill.setAttribute('rx', '1');
     barFill.setAttribute('pointer-events', 'none');
     animLayer!.appendChild(barFill);
 
@@ -767,6 +785,14 @@ export function animateMoves(
       const t    = Math.min((now - startTime) / durationMs, 1);
       const ease = easeInOutQuad(t);
       const { x, y } = positionOnPolyline(pixelPath, ease);
+
+      const live = liveStateForHp ? getUnitById(liveStateForHp, anim.unit.id) : null;
+      const maxHp = live?.maxHp ?? anim.unit.maxHp;
+      const displayHp = live ? getBoardVisualHp(live, now) : anim.unit.hp;
+      const hpRatio = maxHp > 0 ? Math.min(1, Math.max(0, displayHp / maxHp)) : 0;
+      const barColor = hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
+      barFill.setAttribute('width', String(animBarW * hpRatio));
+      barFill.setAttribute('fill', barColor);
 
       circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
       barBg.setAttribute('x',   String(x - animBarW / 2));
@@ -810,6 +836,8 @@ export function animateStrikeAndReturn(
   svgElement: SVGSVGElement,
   params: StrikeReturnParams,
   onDone: () => void,
+  /** When set, HP bar on the sprite uses live state + board HP tween each frame. */
+  liveStateForHp?: GameState | null,
 ): { cancel: () => void } {
   const noopCancel = (): void => {};
   const { unit, fromCol, fromRow, enemyCol, enemyRow, durationMs, onHit } = params;
@@ -855,7 +883,10 @@ export function animateStrikeAndReturn(
   };
 
   const baseColor = unit.owner === PLAYER ? c.player : c.ai;
-  const hpRatio = unit.hp / unit.maxHp;
+  const live0 = liveStateForHp ? getUnitById(liveStateForHp, unit.id) : null;
+  const maxHp0 = live0?.maxHp ?? unit.maxHp;
+  const displayHp0 = live0 ? getBoardVisualHp(live0, performance.now()) : unit.hp;
+  const hpRatio0 = maxHp0 > 0 ? Math.min(1, Math.max(0, displayHp0 / maxHp0)) : 0;
   const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
   const unitSc = (HEX_SIZE * 1.1) / 50;
 
@@ -876,11 +907,11 @@ export function animateStrikeAndReturn(
   barBg.setAttribute('pointer-events', 'none');
   animLayer.appendChild(barBg);
 
-  const barColor = hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
+  const barColor0 = hpRatio0 > 0.6 ? c.hpHigh : hpRatio0 > 0.3 ? c.hpMid : c.hpLow;
   const barFill = svgEl('rect');
-  barFill.setAttribute('width', String(animBarW * hpRatio));
+  barFill.setAttribute('width', String(animBarW * hpRatio0));
   barFill.setAttribute('height', String(barH));
-  barFill.setAttribute('fill', barColor);
+  barFill.setAttribute('fill', barColor0);
   barFill.setAttribute('rx', '1');
   barFill.setAttribute('pointer-events', 'none');
   animLayer.appendChild(barFill);
@@ -906,6 +937,14 @@ export function animateStrikeAndReturn(
       hitCalled = true;
       onHit?.();
     }
+
+    const live = liveStateForHp ? getUnitById(liveStateForHp, unit.id) : null;
+    const maxHp = live?.maxHp ?? unit.maxHp;
+    const displayHp = live ? getBoardVisualHp(live, now) : unit.hp;
+    const hpRatio = maxHp > 0 ? Math.min(1, Math.max(0, displayHp / maxHp)) : 0;
+    const barColor = hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
+    barFill.setAttribute('width', String(animBarW * hpRatio));
+    barFill.setAttribute('fill', barColor);
 
     circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
     barBg.setAttribute('x', String(x - animBarW / 2));

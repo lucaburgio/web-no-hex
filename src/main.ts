@@ -218,7 +218,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
   if (isLegacySingleMoveAnimation(anim)) {
     renderState(svg, state, null, new Set([anim.unit.id]), localPlayer);
     updateUI();
-    const { cancel } = animateMoves(svg, [anim], config.unitMoveSpeed, onDone);
+    const { cancel } = animateMoves(svg, [anim], config.unitMoveSpeed, onDone, state);
     humanMoveAnimCancel = combineAnimCancels(cancel);
     return;
   }
@@ -260,6 +260,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
           durationMs: config.strikeReturnSpeedMs,
         },
         runFloats,
+        state,
       );
       humanMoveAnimCancel = combineAnimCancels(cSt);
     } else {
@@ -271,7 +272,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
   updateUI();
 
   if (moves.length > 0) {
-    const { cancel } = animateMoves(svg, moves, config.unitMoveSpeed, runStrike);
+    const { cancel } = animateMoves(svg, moves, config.unitMoveSpeed, runStrike, state);
     humanMoveAnimCancel = combineAnimCancels(cancel);
   } else {
     runStrike();
@@ -1212,6 +1213,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
               [{ unit: movingUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim }],
               config.unitMoveSpeed,
               finishHumanAnim,
+              state,
             );
             humanMoveAnimCancel = combineAnimCancels(cancel);
           } else {
@@ -1273,12 +1275,14 @@ svg.addEventListener('click', (e: MouseEvent) => {
                       durationMs: config.strikeReturnSpeedMs,
                     },
                     runFloatsOnly,
+                    state,
                   );
                   humanMoveAnimCancel = combineAnimCancels(cSt);
                 } else {
                   runFloatsOnly();
                 }
               },
+              state,
             );
             humanMoveAnimCancel = combineAnimCancels(cancel);
           } else if (sr) {
@@ -1296,6 +1300,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
                   durationMs: config.strikeReturnSpeedMs,
                 },
                 runFloatsOnly,
+                state,
               );
               humanMoveAnimCancel = combineAnimCancels(cancel);
             }
@@ -1498,6 +1503,7 @@ function runAiTurnWithAnimation(): void {
           durationMs: config.strikeReturnSpeedMs,
         },
         runFloats,
+        state,
       );
       humanMoveAnimCancel = combineAnimCancels(cancel);
     } else {
@@ -1513,7 +1519,7 @@ function runAiTurnWithAnimation(): void {
     const { cancel } = animateMoves(svg, moves, config.unitMoveSpeed, () => {
       if (hasCombat) runCombatVfxChain(0);
       else finishAi();
-    });
+    }, state);
     humanMoveAnimCancel = combineAnimCancels(cancel);
   } else {
     runCombatVfxChain(0);
