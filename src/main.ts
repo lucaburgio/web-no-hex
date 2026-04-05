@@ -1434,14 +1434,27 @@ function runAiTurnWithAnimation(): void {
     const floats = vfx.damageFloats;
     const sr = vfx.strikeReturn;
 
-    const runFloats = (): void => {
-      renderState(svg, state, null, new Set(), localPlayer, cloneUnits(unitsAfter));
+    /**
+     * After strike: board already showed the exchange — use unitsAfter for floats.
+     * No strike (e.g. attacker dies): show unitsBefore while floats play so casualties
+     * do not vanish before the damage labels; then snap to unitsAfter.
+     */
+    const runFloats = (afterStrike: boolean): void => {
+      const initial = cloneUnits(afterStrike ? unitsAfter : unitsBefore);
+      renderState(svg, state, null, new Set(), localPlayer, initial);
       updateUI();
-      if (floats.length === 0) onDone();
-      else {
-        const { cancel } = showDamageFloats(svg, floats, config.damageFloatDurationMs, onDone);
-        humanMoveAnimCancel = combineAnimCancels(cancel);
+      if (floats.length === 0) {
+        renderState(svg, state, null, new Set(), localPlayer, cloneUnits(unitsAfter));
+        updateUI();
+        onDone();
+        return;
       }
+      const { cancel } = showDamageFloats(svg, floats, config.damageFloatDurationMs, () => {
+        renderState(svg, state, null, new Set(), localPlayer, cloneUnits(unitsAfter));
+        updateUI();
+        onDone();
+      });
+      humanMoveAnimCancel = combineAnimCancels(cancel);
     };
 
     if (sr) {
@@ -1449,7 +1462,7 @@ function runAiTurnWithAnimation(): void {
         getUnitById(state, sr.attackerId) ??
         unitsBefore.find(x => x.id === sr.attackerId);
       if (!u) {
-        runFloats();
+        runFloats(false);
         return;
       }
       const ub = cloneUnits(unitsBefore);
@@ -1465,12 +1478,12 @@ function runAiTurnWithAnimation(): void {
           enemyRow: sr.enemyRow,
           durationMs: config.strikeReturnSpeedMs,
         },
-        runFloats,
+        () => runFloats(true),
         aiReplayState(state, ub),
       );
       humanMoveAnimCancel = combineAnimCancels(cancel);
     } else {
-      runFloats();
+      runFloats(false);
     }
   };
 
