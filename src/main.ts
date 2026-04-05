@@ -34,6 +34,7 @@ import {
   getHexFromEvent,
   renderMovePath,
   clearCombatVfxLayers,
+  playRangedArtilleryHexBarrageVfx,
 } from './renderer';
 import { getNeighbors } from './hex';
 import { isInEnemyZoC } from './game';
@@ -188,6 +189,8 @@ interface WsAnimationPayload {
     enemyRow: number;
   };
   damageFloats?: { col: number; row: number; amount: number }[];
+  /** Ranged artillery: shell barrage on defender hex before damage floats. */
+  ranged?: boolean;
 }
 
 function isLegacySingleMoveAnimation(x: unknown): x is MoveAnimation {
@@ -267,8 +270,17 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
     updateUI();
     if (floats.length === 0) finish();
     else {
-      const { cancel } = showDamageFloats(svg, floats, config.damageFloatDurationMs, finish);
-      humanMoveAnimCancel = combineAnimCancels(cancel);
+      const playDamageFloats = (): void => {
+        const { cancel } = showDamageFloats(svg, floats, config.damageFloatDurationMs, finish);
+        humanMoveAnimCancel = combineAnimCancels(cancel);
+      };
+      if (payload.ranged && floats.length > 0) {
+        const d = floats[0]!;
+        const { cancel } = playRangedArtilleryHexBarrageVfx(svg, d.col, d.row, playDamageFloats);
+        humanMoveAnimCancel = combineAnimCancels(cancel);
+      } else {
+        playDamageFloats();
+      }
     }
   };
 
@@ -1129,21 +1141,34 @@ svg.addEventListener('click', (e: MouseEvent) => {
             if (combatVfx && combatVfx.damageFloats.length > 0) {
               isAnimating = true;
               render();
-              sendStateUpdate({ damageFloats: combatVfx.damageFloats });
-              const { cancel } = showDamageFloats(
-                svg,
-                combatVfx.damageFloats,
-                config.damageFloatDurationMs,
-                () => {
-                  humanMoveAnimCancel = null;
-                  isAnimating = false;
-                  if (gameMode === 'vsAI') saveGameState(state);
-                  render();
-                  updateUI();
-                  maybeAutoEnd();
-                },
-              );
-              humanMoveAnimCancel = combineAnimCancels(cancel);
+              const floats = combatVfx.damageFloats;
+              const wsAnim: WsAnimationPayload = { damageFloats: floats };
+              if (combatVfx.ranged) wsAnim.ranged = true;
+              sendStateUpdate(wsAnim);
+              const afterFloats = (): void => {
+                humanMoveAnimCancel = null;
+                isAnimating = false;
+                if (gameMode === 'vsAI') saveGameState(state);
+                render();
+                updateUI();
+                maybeAutoEnd();
+              };
+              const playDamageFloats = (): void => {
+                const { cancel } = showDamageFloats(
+                  svg,
+                  floats,
+                  config.damageFloatDurationMs,
+                  afterFloats,
+                );
+                humanMoveAnimCancel = combineAnimCancels(cancel);
+              };
+              if (combatVfx.ranged) {
+                const d = floats[0]!;
+                const { cancel } = playRangedArtilleryHexBarrageVfx(svg, d.col, d.row, playDamageFloats);
+                humanMoveAnimCancel = combineAnimCancels(cancel);
+              } else {
+                playDamageFloats();
+              }
               updateUI();
             } else {
               render();
@@ -1279,6 +1304,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
             }
           }
           if (floats.length > 0) wsPayload.damageFloats = floats;
+          if (combatVfx.ranged) wsPayload.ranged = true;
           sendStateUpdate(wsPayload);
 
           if (needsMoveAnim && primaryMove) {
@@ -1501,12 +1527,22 @@ function runAiTurnWithAnimation(): void {
         onDone();
         return;
       }
-      const { cancel } = showDamageFloats(svg, floats, config.damageFloatDurationMs, () => {
+      const afterDamageFloats = (): void => {
         renderState(svg, state, null, new Set(), localPlayer, cloneUnits(unitsAfter));
         updateUI();
         onDone();
-      });
-      humanMoveAnimCancel = combineAnimCancels(cancel);
+      };
+      const playDamageFloats = (): void => {
+        const { cancel } = showDamageFloats(svg, floats, config.damageFloatDurationMs, afterDamageFloats);
+        humanMoveAnimCancel = combineAnimCancels(cancel);
+      };
+      if (vfx.ranged) {
+        const d = floats[0]!;
+        const { cancel } = playRangedArtilleryHexBarrageVfx(svg, d.col, d.row, playDamageFloats);
+        humanMoveAnimCancel = combineAnimCancels(cancel);
+      } else {
+        playDamageFloats();
+      }
     };
 
     if (sr) {

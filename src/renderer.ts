@@ -1,4 +1,6 @@
 import gsap from 'gsap';
+import { playDefenderHexBarrage } from './artilleryProjectileVfx';
+import type { ArtilleryProjectileHandle } from './artilleryProjectileVfx';
 import { hexToPixel, hexPoints, HEX_SIZE, getNeighbors } from './hex';
 import { COLS, ROWS, PLAYER, AI, getUnit, getUnitById, isValidProductionPlacement, getValidMoves, getRangedAttackTargets, isInEnemyZoC } from './game';
 import type { Owner } from './types';
@@ -1101,6 +1103,37 @@ export function clearCombatVfxLayers(svgElement: SVGSVGElement): void {
   if (anim) anim.innerHTML = '';
   const vfx = svgElement.querySelector('#vfx-layer') as SVGGElement | null;
   if (vfx) vfx.innerHTML = '';
+}
+
+const ARTILLERY_HEX_RADIUS_SCALE = 0.55;
+
+/**
+ * Artillery ranged attack: shell streak barrage on the defender hex (`hexFanOrderShuffle`, theme reds).
+ * Coordinates match the board / damage floats (same layer transform as {@link showDamageFloats}).
+ */
+export function playRangedArtilleryHexBarrageVfx(
+  svgElement: SVGSVGElement,
+  col: number,
+  row: number,
+  onComplete?: () => void,
+): ArtilleryProjectileHandle {
+  let vfxLayer = svgElement.querySelector('#vfx-layer') as SVGGElement | null;
+  if (!vfxLayer) {
+    vfxLayer = svgEl('g');
+    vfxLayer.id = 'vfx-layer';
+    vfxLayer.setAttribute('transform', `translate(${BOARD_MARGIN},${BOARD_MARGIN})`);
+    vfxLayer.setAttribute('pointer-events', 'none');
+    svgElement.appendChild(vfxLayer);
+  }
+  const { x, y } = hexToPixel(col, row);
+  return playDefenderHexBarrage({
+    svg: svgElement,
+    parent: vfxLayer,
+    center: { x, y },
+    hexRadius: HEX_SIZE * ARTILLERY_HEX_RADIUS_SCALE,
+    preset: 'hexFanOrderShuffle',
+    onComplete,
+  });
 }
 
 export function getHexFromEvent(e: MouseEvent): { col: number; row: number } | null {

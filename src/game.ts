@@ -487,6 +487,7 @@ function combatVfxFromResolve(
 ): CombatVfxPayload {
   if (res.ranged) {
     return {
+      ranged: true,
       damageFloats: [{ col: defCol, row: defRow, amount: -res.dmgToDefender }],
     };
   }

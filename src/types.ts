@@ -62,6 +62,8 @@ export interface CombatVfxPayload {
   };
   /** Negative amounts (e.g. -2) for damage dealt. */
   damageFloats: { col: number; row: number; amount: number }[];
+  /** Artillery / ranged: play hex-local shell streak VFX on the defender tile before damage floats. */
+  ranged?: boolean;
   /** Melee: both units destroyed — animate attacker along path onto defender, then both gone. */
   mutualKillLunge?: {
     attackerId: number;
