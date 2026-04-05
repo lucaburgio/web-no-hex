@@ -451,10 +451,13 @@ export function renderState(
   productionHex: { col: number; row: number } | null = null,
   hiddenUnitIds: Set<number> = new Set(),
   localPlayer: Owner = PLAYER,
-  /** Draw these units at override hexes (e.g. AI turn replay before end-of-turn positions). */
-  unitPosOverride?: Map<number, { col: number; row: number }> | null,
+  /**
+   * When set, draw this unit list instead of state.units (AI turn replay).
+   * Skips HP bar tween sync so bars match the snapshot, not end-of-turn state.
+   */
+  unitDrawOverride?: Unit[] | null,
 ): void {
-  const trackHpBars = svgElement.id === 'board';
+  const trackHpBars = svgElement.id === 'board' && !unitDrawOverride;
   const now = performance.now();
   if (trackHpBars) syncHpBarAnimState(state, now);
 
@@ -613,21 +616,25 @@ export function renderState(
   // Advance HP bar tweens for every unit (including hidden — moving/strike sprites skip
   // the draw loop, so we must tick visualHpForUnit for them or their bars never animate).
   const displayHpByUnit = new Map<number, number>();
+  const unitsToDraw = unitDrawOverride ?? state.units;
   if (trackHpBars) {
     for (const unit of state.units) {
       displayHpByUnit.set(unit.id, visualHpForUnit(unit, now));
     }
+  } else if (unitDrawOverride) {
+    for (const unit of unitDrawOverride) {
+      displayHpByUnit.set(unit.id, unit.hp);
+    }
   }
 
   // Draw units
-  for (const unit of state.units) {
+  for (const unit of unitsToDraw) {
     if (hiddenUnitIds.has(unit.id)) continue;
-    const o = unitPosOverride?.get(unit.id);
-    const dc = o?.col ?? unit.col;
-    const dr = o?.row ?? unit.row;
+    const dc = unit.col;
+    const dr = unit.row;
     const { x, y } = hexToPixel(dc, dr);
     const isSelected = state.selectedUnit === unit.id;
-    const displayHp  = trackHpBars ? displayHpByUnit.get(unit.id)! : unit.hp;
+    const displayHp  = displayHpByUnit.get(unit.id) ?? unit.hp;
     const hpRatio    = displayHp / unit.maxHp;
 
     const baseColor = unit.owner === PLAYER ? c.player : c.ai;

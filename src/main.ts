@@ -1382,15 +1382,24 @@ endMoveBtn.addEventListener('click', () => {
   }
 });
 
+/** Shallow-clone units array for AI replay draws / synthetic state. */
+function cloneUnits(units: Unit[]): Unit[] {
+  return units.map(u => ({ ...u }));
+}
+
+/** GameState with replaced units (HP/positions) for anim HP bars during AI replay. */
+function aiReplayState(base: GameState, units: Unit[]): GameState {
+  return { ...base, units: cloneUnits(units) };
+}
+
 function runAiTurnWithAnimation(): void {
   state = prepareAiTurn(state);
 
-  /** Board positions before the AI acts (sequential anim must not use end-of-turn coords between steps). */
-  const posBeforeAi = new Map(state.units.map(u => [u.id, { col: u.col, row: u.row }]));
   const aiResult = aiMovement(state);
   state = aiResult.state;
   const animSteps = aiResult.animSteps;
-  const animSnapshots = aiResult.animSnapshots;
+  const animUnitsBefore = aiResult.animUnitsBefore;
+  const animUnitsAfter = aiResult.animUnitsAfter;
 
   if (state.winner) {
     render(); updateUI(); checkWinner();
@@ -1416,21 +1425,17 @@ function runAiTurnWithAnimation(): void {
     render(); updateUI(); checkWinner(); maybeAutoEnd();
   };
 
-  /** Static positions before anim step `stepIndex` (what the player should see as “current” before this step). */
-  const posBeforeStep = (stepIndex: number): Map<number, { col: number; row: number }> =>
-    stepIndex === 0 ? posBeforeAi : animSnapshots[stepIndex - 1]!;
-
   const playOneCombatVfx = (
     vfx: CombatVfxPayload,
-    posBefore: Map<number, { col: number; row: number }>,
-    posAfter: Map<number, { col: number; row: number }>,
+    unitsBefore: Unit[],
+    unitsAfter: Unit[],
     onDone: () => void,
   ): void => {
     const floats = vfx.damageFloats;
     const sr = vfx.strikeReturn;
 
     const runFloats = (): void => {
-      renderState(svg, state, null, new Set(), localPlayer, posAfter);
+      renderState(svg, state, null, new Set(), localPlayer, cloneUnits(unitsAfter));
       updateUI();
       if (floats.length === 0) onDone();
       else {
@@ -1440,12 +1445,15 @@ function runAiTurnWithAnimation(): void {
     };
 
     if (sr) {
-      const u = getUnitById(state, sr.attackerId);
+      const u =
+        getUnitById(state, sr.attackerId) ??
+        unitsBefore.find(x => x.id === sr.attackerId);
       if (!u) {
         runFloats();
         return;
       }
-      renderState(svg, state, null, new Set([sr.attackerId]), localPlayer, posBefore);
+      const ub = cloneUnits(unitsBefore);
+      renderState(svg, state, null, new Set([sr.attackerId]), localPlayer, ub);
       updateUI();
       const { cancel } = animateStrikeAndReturn(
         svg,
@@ -1458,7 +1466,7 @@ function runAiTurnWithAnimation(): void {
           durationMs: config.strikeReturnSpeedMs,
         },
         runFloats,
-        state,
+        aiReplayState(state, ub),
       );
       humanMoveAnimCancel = combineAnimCancels(cancel);
     } else {
@@ -1474,7 +1482,7 @@ function runAiTurnWithAnimation(): void {
       return;
     }
     const step = animSteps[index]!;
-    const before = posBeforeStep(index);
+    const before = cloneUnits(animUnitsBefore[index]!);
     if (step.type === 'move') {
       const a = step.anim;
       renderState(svg, state, null, new Set([a.unit.id]), localPlayer, before);
@@ -1484,11 +1492,11 @@ function runAiTurnWithAnimation(): void {
         [a],
         config.unitMoveSpeed,
         () => runStep(index + 1),
-        state,
+        aiReplayState(state, before),
       );
       humanMoveAnimCancel = combineAnimCancels(cancel);
     } else {
-      playOneCombatVfx(step.vfx, before, animSnapshots[index]!, () => runStep(index + 1));
+      playOneCombatVfx(step.vfx, before, animUnitsAfter[index]!, () => runStep(index + 1));
     }
   };
 

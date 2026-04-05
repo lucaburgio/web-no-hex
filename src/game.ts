@@ -1037,9 +1037,9 @@ function scoreEmptyMove(
   return s;
 }
 
-/** Unit positions after each AI anim step (aligned with animSteps indices). Used so the board does not show end-of-turn positions between steps. */
-function snapshotUnitPositions(st: GameState): Map<number, { col: number; row: number }> {
-  return new Map(st.units.map(u => [u.id, { col: u.col, row: u.row }]));
+/** Full unit copies for AI anim replay (positions + HP). */
+function snapshotUnits(st: GameState): Unit[] {
+  return st.units.map(u => ({ ...u }));
 }
 
 export function aiMovement(state: GameState): {
@@ -1047,12 +1047,15 @@ export function aiMovement(state: GameState): {
   combatVfx: CombatVfxPayload[];
   /** Ordered steps for AI turn animation (one move or combat at a time). */
   animSteps: AiAnimStep[];
-  /** After each step completes, where every surviving unit sits (same length as animSteps). */
-  animSnapshots: Map<number, { col: number; row: number }>[];
+  /** Board state immediately before each step (same length as animSteps). */
+  animUnitsBefore: Unit[][];
+  /** Board state immediately after each step (same length as animSteps). */
+  animUnitsAfter: Unit[][];
 } {
   const combatVfx: CombatVfxPayload[] = [];
   const animSteps: AiAnimStep[] = [];
-  const animSnapshots: Map<number, { col: number; row: number }>[] = [];
+  const animUnitsBefore: Unit[][] = [];
+  const animUnitsAfter: Unit[][] = [];
   const pressure = aiDefensivePressure(state);
   const threat = criticalThreatPlayerUnit(state);
   const aiUnits = state.units.filter(u => u.owner === AI).sort((a, b) => {
@@ -1081,11 +1084,12 @@ export function aiMovement(state: GameState): {
         const atkRow = unit.row;
         const defCol = target.col;
         const defRow = target.row;
+        animUnitsBefore.push(snapshotUnits(state));
         const res = resolveCombat(state, unit, target);
         const vfx = combatVfxFromResolve(attackerId, atkCol, atkRow, defCol, defRow, res);
         combatVfx.push(vfx);
         animSteps.push({ type: 'combat', vfx });
-        animSnapshots.push(snapshotUnitPositions(state));
+        animUnitsAfter.push(snapshotUnits(state));
         checkVictory(state);
         break;
       }
@@ -1125,13 +1129,19 @@ export function aiMovement(state: GameState): {
         advanceAlongPathBeforeCombat(state, unit, path, AI);
         const atkCol = unit.col;
         const atkRow = unit.row;
+        const beforeResolveUnits = snapshotUnits(state);
+
         const res = resolveCombat(state, unit, target);
         const vfx = combatVfxFromResolve(attackerId, atkCol, atkRow, best.col, best.row, res, path);
         combatVfx.push(vfx);
-        if (vfx.mutualKillLunge && vfx.mutualKillLunge.pathHexes.length >= 2) {
-          const p = vfx.mutualKillLunge.pathHexes;
+
+        const hasMk =
+          vfx.mutualKillLunge && vfx.mutualKillLunge.pathHexes.length >= 2;
+        if (hasMk) {
+          const p = vfx.mutualKillLunge!.pathHexes;
           const s = p[0]!;
           const e = p[p.length - 1]!;
+          animUnitsBefore.push(beforeResolveUnits);
           animSteps.push({
             type: 'move',
             anim: {
@@ -1143,10 +1153,13 @@ export function aiMovement(state: GameState): {
               pathHexes: p,
             },
           });
-          animSnapshots.push(snapshotUnitPositions(state));
+          animUnitsAfter.push(snapshotUnits(state));
         }
+
+        // Combat floats / strike: mutual-kill path shows empty board before floats; else pre-damage for strike.
+        animUnitsBefore.push(hasMk ? snapshotUnits(state) : beforeResolveUnits);
         animSteps.push({ type: 'combat', vfx });
-        animSnapshots.push(snapshotUnitPositions(state));
+        animUnitsAfter.push(snapshotUnits(state));
         checkVictory(state);
         break;
       }
@@ -1157,6 +1170,7 @@ export function aiMovement(state: GameState): {
       const fromCol = unit.col;
       const fromRow = unit.row;
       const unitSnap = { ...unit } as Unit;
+      animUnitsBefore.push(snapshotUnits(state));
       unit.movesUsed += stepsCost;
       for (const [pc, pr] of path.slice(1)) {
         conquerHex(state, pc, pr, AI);
@@ -1174,11 +1188,11 @@ export function aiMovement(state: GameState): {
           pathHexes: path.length >= 2 ? path : undefined,
         },
       });
-      animSnapshots.push(snapshotUnitPositions(state));
+      animUnitsAfter.push(snapshotUnits(state));
     }
   }
   log(state, 'AI completed movement.');
-  return { state, combatVfx, animSteps, animSnapshots };
+  return { state, combatVfx, animSteps, animUnitsBefore, animUnitsAfter };
 }
 
 // ── Phase advancement ─────────────────────────────────────────────────────────
