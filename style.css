@@ -55,9 +55,9 @@
     --color-hp-low:  #FF765E;
 
     /* Combat damage float (matches strike UI ref: warm red chip, dark label) */
-    --damage-float-bg: #E85A3C;
-    --damage-float-text: #1a1a1a;
-    --damage-float-duration: 900ms;
+    --damage-float-bg: var(--color-red-500);
+    --damage-float-text: var(--color-red-700);
+    --damage-float-duration: 1600ms;
 
 }
 
