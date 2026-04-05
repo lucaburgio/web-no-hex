@@ -451,6 +451,12 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   mountainLayer.setAttribute('pointer-events', 'none');
   hexLayer.appendChild(mountainLayer);
 
+  // Production placement dashed stroke (above mountain art so corners aren’t clipped)
+  const prodStrokeLayer = svgEl('g');
+  prodStrokeLayer.id = 'prod-stroke-layer';
+  prodStrokeLayer.setAttribute('pointer-events', 'none');
+  hexLayer.appendChild(prodStrokeLayer);
+
   // Movement area boundary overlay (drawn above hexes, below units)
   const boundary = svgEl('path');
   boundary.setAttribute('id', 'move-boundary');
@@ -580,6 +586,9 @@ export function renderState(
     }
   }
 
+  const prodStrokeLayer = svgElement.querySelector('#prod-stroke-layer') as SVGGElement | null;
+  if (prodStrokeLayer) prodStrokeLayer.innerHTML = '';
+
   // Update each hex polygon
   for (let r = 0; r < ROWS; r++) {
     for (let col = 0; col < COLS; col++) {
@@ -622,11 +631,32 @@ export function renderState(
         }
       }
 
+      // Draw dashed production stroke above #mountain-layer (SVG paint order), not on the base hex polygon.
+      let prodOverlayStroke: string | null = null;
+      if (!isSelectedHex && !isZoc && !isValidMove) {
+        if (isProdSelected) prodOverlayStroke = c.hexProdStroke;
+        else if (canPlace) prodOverlayStroke = c.hexStroke;
+      }
+      if (prodOverlayStroke) stroke = 'transparent';
+
       const hexOccupied = !!getUnit(state, col, r);
       const hexDimmed = productionFocusHexes.size > 0 && isConquered && (!productionFocusHexes.has(key) || hexOccupied) && !isProdSelected;
       poly.setAttribute('fill', fill);
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('opacity', hexDimmed ? '0.2' : '1');
+
+      if (prodOverlayStroke && prodStrokeLayer) {
+        const overlay = svgEl('polygon');
+        overlay.setAttribute('points', poly.getAttribute('points') ?? '');
+        overlay.setAttribute('fill', 'none');
+        overlay.setAttribute('stroke', prodOverlayStroke);
+        overlay.setAttribute('stroke-width', '2.5');
+        overlay.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);
+        overlay.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
+        overlay.setAttribute('opacity', hexDimmed ? '0.2' : '1');
+        overlay.setAttribute('pointer-events', 'none');
+        prodStrokeLayer.appendChild(overlay);
+      }
       poly.style.cursor = "url('/icons/pointer.svg') 13 14, auto";
 
       // Production marker
