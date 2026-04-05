@@ -173,6 +173,24 @@ let isAnimating = false;
 let humanMoveAnimCancel: (() => void) | null = null;
 let turnSnapshots: GameState[] = [];
 
+/** Until damage floats: draw HP bars at pre-exchange values; cleared when floats play. */
+let combatHpBarDisplay: Map<number, number> | null = null;
+
+function buildCombatHpBarDisplay(before: GameState, after: GameState): Map<number, number> | null {
+  const m = new Map<number, number>();
+  for (const u of before.units) {
+    const v = getUnitById(after, u.id);
+    if (v && v.hp < u.hp) m.set(u.id, u.hp);
+  }
+  return m.size ? m : null;
+}
+
+/** Move-animation glyph: use post-combat HP when the unit still exists. */
+function unitForMoveAnimation(pre: Unit, state: GameState, id: number): Unit {
+  const u = getUnitById(state, id);
+  return u ? { ...pre, hp: u.hp, maxHp: u.maxHp, col: u.col, row: u.row } : { ...pre, hp: 0 };
+}
+
 /** Multiplayer: full combat/move mirror (replaces legacy single {@link MoveAnimation} only). */
 interface WsAnimationPayload {
   moves?: MoveAnimation[];
@@ -184,6 +202,8 @@ interface WsAnimationPayload {
     enemyRow: number;
   };
   damageFloats?: { col: number; row: number; amount: number }[];
+  /** [unitId, hp][] — pre-damage HP for bars until floats (host → guest). */
+  hpBarHold?: [number, number][];
 }
 
 function isLegacySingleMoveAnimation(x: unknown): x is MoveAnimation {
@@ -215,7 +235,7 @@ function syncDamageFloatCssDuration(): void {
 function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, onDone: () => void): void {
   syncDamageFloatCssDuration();
   if (isLegacySingleMoveAnimation(anim)) {
-    renderState(svg, state, null, new Set([anim.unit.id]), localPlayer);
+    renderState(svg, state, null, new Set([anim.unit.id]), localPlayer, null);
     updateUI();
     const { cancel } = animateMoves(svg, [anim], config.unitMoveSpeed, onDone);
     humanMoveAnimCancel = combineAnimCancels(cancel);
@@ -223,6 +243,11 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
   }
 
   const payload = anim as WsAnimationPayload;
+  if (payload.hpBarHold && payload.hpBarHold.length > 0) {
+    combatHpBarDisplay = new Map(payload.hpBarHold);
+  } else {
+    combatHpBarDisplay = null;
+  }
   const moves = payload.moves ?? [];
   const floats = payload.damageFloats ?? [];
   const sr = payload.strikeReturn;
@@ -237,7 +262,8 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
   };
 
   const runFloats = (): void => {
-    renderState(svg, state, null, new Set(), localPlayer);
+    combatHpBarDisplay = null;
+    renderState(svg, state, null, new Set(), localPlayer, null);
     updateUI();
     if (floats.length === 0) finish();
     else {
@@ -266,7 +292,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
     }
   };
 
-  renderState(svg, state, null, hidden, localPlayer);
+  renderState(svg, state, null, hidden, localPlayer, combatHpBarDisplay);
   updateUI();
 
   if (moves.length > 0) {
@@ -278,7 +304,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
 }
 
 function render(): void {
-  renderState(svg, state, pendingProductionHex, new Set(), localPlayer);
+  renderState(svg, state, pendingProductionHex, new Set(), localPlayer, combatHpBarDisplay);
 }
 
 // ── Main menu ─────────────────────────────────────────────────────────────────
@@ -658,7 +684,16 @@ function hideLobby(): void {
 function sendStateUpdate(anim?: WsAnimationPayload | MoveAnimation): void {
   if (gameMode === 'vsHuman' && ws && ws.readyState === WebSocket.OPEN) {
     const payload: Record<string, unknown> = { type: 'state-update', state };
-    if (anim) payload.animation = anim;
+    if (anim) {
+      if (!isLegacySingleMoveAnimation(anim) && combatHpBarDisplay?.size) {
+        payload.animation = {
+          ...(anim as WsAnimationPayload),
+          hpBarHold: [...combatHpBarDisplay.entries()],
+        };
+      } else {
+        payload.animation = anim;
+      }
+    }
     ws.send(JSON.stringify(payload));
   }
 }
@@ -1023,11 +1058,12 @@ svg.addEventListener('click', (e: MouseEvent) => {
     // Empty SVG margin / background (no hex under cursor): clear selection
     if (state.phase === 'movement' && state.selectedUnit !== null) {
       let didInterruptHumanMove = false;
-      if (humanMoveAnimCancel) {
+        if (humanMoveAnimCancel) {
         didInterruptHumanMove = true;
         humanMoveAnimCancel();
         humanMoveAnimCancel = null;
         isAnimating = false;
+        combatHpBarDisplay = null;
         if (gameMode === 'vsAI') saveGameState(state);
         render();
         checkWinner();
@@ -1049,6 +1085,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
     humanMoveAnimCancel();
     humanMoveAnimCancel = null;
     isAnimating = false;
+    combatHpBarDisplay = null;
     if (gameMode === 'vsAI') saveGameState(state);
     render();
     checkWinner();
@@ -1089,10 +1126,24 @@ svg.addEventListener('click', (e: MouseEvent) => {
           if (canRanged) {
             clearMovePathPreview();
             syncDamageFloatCssDuration();
+            const rangedDefender = getUnit(state, col, row);
+            const rangedDefPreHp = rangedDefender?.hp;
             const { state: nextState, combatVfx } = playerRangedAttack(state, col, row, localPlayer);
             state = nextState;
             if (gameMode === 'vsAI') saveGameState(state);
             checkWinner();
+            combatHpBarDisplay = null;
+            if (
+              combatVfx &&
+              combatVfx.damageFloats.length > 0 &&
+              rangedDefender &&
+              rangedDefPreHp !== undefined
+            ) {
+              const d = getUnitById(state, rangedDefender.id);
+              if (d && d.hp !== rangedDefPreHp) {
+                combatHpBarDisplay = new Map([[rangedDefender.id, rangedDefPreHp]]);
+              }
+            }
             if (combatVfx && combatVfx.damageFloats.length > 0) {
               isAnimating = true;
               render();
@@ -1104,6 +1155,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
                 () => {
                   humanMoveAnimCancel = null;
                   isAnimating = false;
+                  combatHpBarDisplay = null;
                   if (gameMode === 'vsAI') saveGameState(state);
                   render();
                   updateUI();
@@ -1134,6 +1186,12 @@ svg.addEventListener('click', (e: MouseEvent) => {
         const movingUnit = getUnitById(state, movingUnitId)!;
         const fromCol = movingUnit.col, fromRow = movingUnit.row;
         const stateBeforeMove = structuredClone(state);
+        const targetEnemyForCombat = getUnit(state, col, row);
+        const attackerPreHp = movingUnit.hp;
+        const defenderPreHp =
+          targetEnemyForCombat && targetEnemyForCombat.owner === enemyOwner
+            ? targetEnemyForCombat.hp
+            : undefined;
 
         const { state: nextState, combatVfx } = playerMoveUnit(state, col, row, localPlayer);
         state = nextState;
@@ -1147,12 +1205,13 @@ svg.addEventListener('click', (e: MouseEvent) => {
         const needsApproach = fromCol !== toCol || fromRow !== toRow;
         const mk = combatVfx?.mutualKillLunge;
         let primaryMove: MoveAnimation | null = null;
+        const moveAnimUnit = unitForMoveAnimation(movingUnit, state, movingUnitId);
         if (mk && mk.pathHexes.length >= 2) {
           const p = mk.pathHexes;
           const s = p[0]!;
           const e = p[p.length - 1]!;
           primaryMove = {
-            unit: movingUnit,
+            unit: moveAnimUnit,
             fromCol: s[0],
             fromRow: s[1],
             toCol: e[0],
@@ -1161,7 +1220,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
           };
         } else if (needsApproach) {
           primaryMove = {
-            unit: movingUnit,
+            unit: moveAnimUnit,
             fromCol,
             fromRow,
             toCol,
@@ -1176,6 +1235,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
         const finishHumanAnim = (): void => {
           humanMoveAnimCancel = null;
           isAnimating = false;
+          combatHpBarDisplay = null;
           if (gameMode === 'vsAI') saveGameState(state);
           render();
           checkWinner();
@@ -1185,7 +1245,8 @@ svg.addEventListener('click', (e: MouseEvent) => {
         const runFloatsOnly = (): void => {
           // Strike/move anims hide units on the static layer; show them again before damage floats
           // so the attacker does not vanish until float playback ends.
-          renderState(svg, state, pendingProductionHex, new Set(), localPlayer);
+          combatHpBarDisplay = null;
+          renderState(svg, state, pendingProductionHex, new Set(), localPlayer, null);
           updateUI();
           if (floats.length === 0) finishHumanAnim();
           else {
@@ -1199,14 +1260,14 @@ svg.addEventListener('click', (e: MouseEvent) => {
         if (!combatVfx) {
           if (needsApproach) {
             isAnimating = true;
-            renderState(svg, state, pendingProductionHex, new Set([movingUnitId]), localPlayer);
+            renderState(svg, state, pendingProductionHex, new Set([movingUnitId]), localPlayer, null);
             updateUI();
             sendStateUpdate({
-              moves: [{ unit: movingUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim }],
+              moves: [{ unit: moveAnimUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim }],
             });
             const { cancel } = animateMoves(
               svg,
-              [{ unit: movingUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim }],
+              [{ unit: moveAnimUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim }],
               config.unitMoveSpeed,
               finishHumanAnim,
             );
@@ -1221,11 +1282,24 @@ svg.addEventListener('click', (e: MouseEvent) => {
           }
         } else {
           isAnimating = true;
+          const m = new Map<number, number>();
+          const a = getUnitById(state, movingUnitId);
+          if (a && a.hp !== attackerPreHp) m.set(a.id, attackerPreHp);
+          if (
+            defenderPreHp !== undefined &&
+            targetEnemyForCombat &&
+            targetEnemyForCombat.owner === enemyOwner
+          ) {
+            const d = getUnitById(state, targetEnemyForCombat.id);
+            if (d && d.hp !== defenderPreHp) m.set(d.id, defenderPreHp);
+          }
+          combatHpBarDisplay = m.size ? m : null;
+
           const hidden = new Set<number>();
           if (needsMoveAnim) hidden.add(movingUnitId);
           if (sr) hidden.add(sr.attackerId);
 
-          renderState(svg, state, pendingProductionHex, hidden, localPlayer);
+          renderState(svg, state, pendingProductionHex, hidden, localPlayer, combatHpBarDisplay);
           updateUI();
 
           const wsPayload: WsAnimationPayload = {};
@@ -1327,6 +1401,7 @@ document.body.addEventListener('click', (e: MouseEvent) => {
     humanMoveAnimCancel();
     humanMoveAnimCancel = null;
     isAnimating = false;
+    combatHpBarDisplay = null;
     if (gameMode === 'vsAI') saveGameState(state);
     render();
     checkWinner();
@@ -1436,6 +1511,8 @@ function runAiTurnWithAnimation(): void {
   const hasMoves = moves.length > 0;
   const hasCombat = combatVfxList.length > 0;
 
+  combatHpBarDisplay = hasCombat ? buildCombatHpBarDisplay(stateBeforeAi, state) : null;
+
   if (!hasMoves && !hasCombat) {
     state = endTurnAfterAi(state);
     turnSnapshots.push(structuredClone(state));
@@ -1449,6 +1526,7 @@ function runAiTurnWithAnimation(): void {
   const finishAi = (): void => {
     isAnimating = false;
     humanMoveAnimCancel = null;
+    combatHpBarDisplay = null;
     state = endTurnAfterAi(state);
     turnSnapshots.push(structuredClone(state));
     saveGameState(state);
@@ -1465,7 +1543,8 @@ function runAiTurnWithAnimation(): void {
     const sr = vfx.strikeReturn;
 
     const runFloats = (): void => {
-      renderState(svg, state, null, new Set(), localPlayer);
+      combatHpBarDisplay = null;
+      renderState(svg, state, null, new Set(), localPlayer, null);
       updateUI();
       if (floats.length === 0) runCombatVfxChain(index + 1);
       else {
@@ -1482,7 +1561,7 @@ function runAiTurnWithAnimation(): void {
         runFloats();
         return;
       }
-      renderState(svg, state, null, new Set([sr.attackerId]), localPlayer);
+      renderState(svg, state, null, new Set([sr.attackerId]), localPlayer, combatHpBarDisplay);
       updateUI();
       const { cancel } = animateStrikeAndReturn(
         svg,
@@ -1505,7 +1584,7 @@ function runAiTurnWithAnimation(): void {
   isAnimating = true;
 
   if (hasMoves) {
-    renderState(svg, state, null, new Set(moves.map(m => m.unit.id)));
+    renderState(svg, state, null, new Set(moves.map(m => m.unit.id)), localPlayer, combatHpBarDisplay);
     updateUI();
     const { cancel } = animateMoves(svg, moves, config.unitMoveSpeed, () => {
       if (hasCombat) runCombatVfxChain(0);
@@ -1866,7 +1945,7 @@ function renderRecapTurn(index: number): void {
   const snap = turnSnapshots[index];
   if (!snap) return;
   // Override phase/selectedUnit so renderState never dims hexes or highlights moves
-  renderState(recapSvg, { ...snap, phase: 'movement', selectedUnit: null }, null, new Set(), localPlayer);
+  renderState(recapSvg, { ...snap, phase: 'movement', selectedUnit: null }, null, new Set(), localPlayer, null);
   recapTurnLabel.textContent = index === 0
     ? 'TURN 1 — START'
     : `TURN ${snap.turn - 1} — END`;
