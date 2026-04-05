@@ -115,9 +115,12 @@ function inlineIcon(iconSrc: string | undefined, x: number, y: number, size: num
   }
   g.setAttribute('opacity', opacity);
   g.setAttribute('pointer-events', 'none');
+  g.style.pointerEvents = 'none';
   for (const d of def.paths) {
     const p = svgEl('path');
     p.setAttribute('d', d);
+    p.setAttribute('pointer-events', 'none');
+    p.style.pointerEvents = 'none';
     g.appendChild(p);
   }
   return g;
