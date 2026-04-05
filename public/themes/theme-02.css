@@ -3,8 +3,8 @@
   --color-bg: #E1D9D6;
 
   /* ── Player / AI identity colors ────────────────────────────────────────── */
-  --color-player: #000100;
-  --color-ai:     #838383;
+  --color-player: #457cdb;
+  --color-ai:     #bc4949;
 
   /* ── Unit states ────────────────────────────────────────────────────────── */
   --color-unit-selected: #C77E00;
@@ -12,8 +12,8 @@
   /* ── Hex fill states ─────────────────────────────────────────────────────── */
   --color-hex-selected:      #FFBE00;
   --color-hex-valid-move:    #ECDBAA;
-  --color-hex-player:        #B5AEAB;
-  --color-hex-ai:            #D2CDCA;
+  --color-hex-player:        #7e9fd8;
+  --color-hex-ai:            #df8080;
   --color-hex-can-place:     #bebcb2;
   --color-hex-prod-selected: #e1c47c;
   --color-hex-prod-stroke:   #e18a17;
