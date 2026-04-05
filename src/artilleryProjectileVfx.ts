@@ -18,12 +18,12 @@ export interface ArtilleryProjectileStyle {
 
 /** Default reds: `style.css` --color-red-700 / --color-red-500 */
 const DEFAULT_STYLE: ArtilleryProjectileStyle = {
-  duration: 0.55,
-  streakWidth: 4,
+  duration: 1.55,
+  streakWidth: 6,
   color: '#BD4E4E',
   accentColor: '#ff6b6b',
-  impactScale: 2.2,
-  impactDuration: 0.28,
+  impactScale: 3.2,
+  impactDuration: 0.88,
 };
 
 function mergeStyle(overrides?: Partial<ArtilleryProjectileStyle>): ArtilleryProjectileStyle {
@@ -34,28 +34,40 @@ function ns<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[
   return document.createElementNS('http://www.w3.org/2000/svg', tag);
 }
 
+/**
+ * Expanding ring at impact. The circle is created when this callback runs (see GSAP `timeline.add`
+ * function-returning-tween), not when the parent timeline is constructed — so no dots at impacts
+ * before each shell arrives.
+ */
 function impactRing(
   parent: SVGGElement,
   at: ArtilleryPoint,
   style: ArtilleryProjectileStyle,
   scale = 1,
 ): gsap.core.Timeline {
-  const ring = ns('circle');
-  ring.setAttribute('cx', String(at.x));
-  ring.setAttribute('cy', String(at.y));
-  ring.setAttribute('r', '4');
-  ring.setAttribute('fill', 'none');
-  ring.setAttribute('stroke', style.accentColor);
-  ring.setAttribute('stroke-width', String(Math.max(1, 1.5 * scale)));
-  ring.setAttribute('opacity', String(0.75 + 0.15 * scale));
-  parent.appendChild(ring);
   const maxR = 28 * style.impactScale * scale;
-  return gsap.timeline().to(ring, {
-    attr: { r: maxR },
-    opacity: 0,
-    duration: style.impactDuration * (0.75 + 0.25 * scale),
-    ease: 'power2.out',
-  });
+  const duration = style.impactDuration * (0.75 + 0.25 * scale);
+  const opacity0 = 0.75 + 0.15 * scale;
+  return gsap.timeline().add(
+    (() => {
+      const ring = ns('circle');
+      ring.setAttribute('cx', String(at.x));
+      ring.setAttribute('cy', String(at.y));
+      ring.setAttribute('r', '4');
+      ring.setAttribute('fill', style.accentColor);
+      ring.setAttribute('stroke', style.accentColor);
+      ring.setAttribute('stroke-width', '4');
+      ring.setAttribute('opacity', String(opacity0));
+      parent.appendChild(ring);
+      return gsap.to(ring, {
+        attr: { r: maxR },
+        opacity: 0,
+        duration,
+        ease: 'power2.out',
+      });
+      // GSAP nests returned tweens; Callback type is void-only in @types/gsap.
+    }) as () => void,
+  );
 }
 
 const easePower3In = gsap.parseEase('power3.in');
@@ -135,7 +147,7 @@ function directStreakSegment(
 }
 
 const SHELL_COUNT = 6;
-const DEFAULT_HEX_RADIUS = 28;
+const DEFAULT_HEX_RADIUS = 120;
 
 /** Non-sequential order across the fan (shell indices 0 = left … 5 = right). */
 const FIRE_ORDER_SHUFFLE: readonly number[] = [5, 2, 4, 0, 3, 1];
@@ -148,7 +160,7 @@ function hexFanShellEndpoints(
   const t = SHELL_COUNT > 1 ? shellIndex / (SHELL_COUNT - 1) : 0;
   const spread = (t - 0.5) * R * 1.15;
   const impact: ArtilleryPoint = { x: c.x + spread, y: c.y + R * 0.28 };
-  const from: ArtilleryPoint = { x: c.x + spread * 0.88, y: c.y - R * 1.12 };
+  const from: ArtilleryPoint = { x: c.x + spread * 0.88, y: c.y - R * 2.12 };
   return { from, impact };
 }
 
