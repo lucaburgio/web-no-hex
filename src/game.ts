@@ -238,11 +238,29 @@ export function getUnitById(state: GameState, id: number): Unit | null {
   return state.units.find(u => u.id === id) ?? null;
 }
 
+/** True if the player controls at least one non-mountain hex on their home row (supply from the border). */
+export function hasHomeProductionAccess(state: GameState, localPlayer: Owner): boolean {
+  const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
+  const mountains = state.mountainHexes ?? [];
+  for (let c = 0; c < COLS; c++) {
+    if (mountains.includes(`${c},${homeRow}`)) continue;
+    const hex = state.hexStates[`${c},${homeRow}`];
+    if (hex && hex.owner === localPlayer) return true;
+  }
+  return false;
+}
+
 export function isValidProductionPlacement(state: GameState, col: number, row: number, localPlayer: Owner = PLAYER): boolean {
   if ((state.mountainHexes ?? []).includes(`${col},${row}`)) return false;
   if (getUnit(state, col, row)) return false;
+  if (!hasHomeProductionAccess(state, localPlayer)) return false;
   const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
-  if (row === homeRow) return true;
+  const enemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
+  if (row === homeRow) {
+    const hex = state.hexStates[`${col},${row}`];
+    if (hex && hex.owner === enemy) return false;
+    return true;
+  }
   const hex = state.hexStates[`${col},${row}`];
   return !!(hex && hex.isProduction && hex.owner === localPlayer);
 }
@@ -875,7 +893,11 @@ export function playerPlaceUnit(state: GameState, col: number, row: number, unit
   if (state.phase !== 'production' || state.activePlayer !== localPlayer) return state;
 
   if (!isValidProductionPlacement(state, col, row, localPlayer)) {
-    log(state, 'Invalid placement hex.');
+    if (!hasHomeProductionAccess(state, localPlayer)) {
+      log(state, 'Cannot produce units — control at least one hex on your home border (reconquer it if the enemy took it).');
+    } else {
+      log(state, 'Invalid placement hex.');
+    }
     return state;
   }
 
@@ -1031,6 +1053,11 @@ export function aiProduction(state: GameState): GameState {
     const affordable = config.unitTypes.filter(t => state.productionPoints[AI] >= t.cost);
     if (affordable.length === 0) {
       if (placed === 0) log(state, 'AI: not enough production points.');
+      break;
+    }
+
+    if (!hasHomeProductionAccess(state, AI)) {
+      if (placed === 0) log(state, 'AI: cannot produce — no home border hex controlled.');
       break;
     }
 

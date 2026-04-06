@@ -14,6 +14,7 @@ import {
   getRangedAttackTargets,
   playerRangedAttack,
   isValidProductionPlacement,
+  hasHomeProductionAccess,
   forecastCombat,
   vsHumanEndProduction,
   vsHumanEndMovement,
@@ -706,7 +707,10 @@ function buildRulesContent(): string {
       <li>Each turn you earn <strong>${config.productionPointsPerTurn} PP</strong> (production points).</li>
       <li><strong>Territory bonus:</strong> +${config.pointsPerQuota} PP for every ${config.territoryQuota} hexes you own.</li>
       <li>Available units: ${unitList}.</li>
-      <li>Valid placement: your <strong>home row</strong> (bottom), or any owned <strong>production hex</strong>.</li>
+      <li>Valid placement: your <strong>home row</strong> (bottom), or any owned <strong>production hex</strong>.
+        You must control <strong>at least one hex on your home row</strong> to produce anywhere; if the enemy takes
+        every border hex, reconquer one before you can build again. You cannot place on home-row hexes the enemy controls
+        until you retake them.</li>
       <li><strong>Production hex:</strong> an owned hex stable for <strong>${config.productionTurns} consecutive turns</strong>.
         Stability requires all hexes within distance ${config.productionSafeDistance} to be owned by you
         (impassable <strong>mountain</strong> hexes in that ring count as secure — they are not neutral or enemy territory).
@@ -1713,7 +1717,11 @@ function hasAnyValidMove(): boolean {
 
 function maybeAutoEnd(): void {
   if (isAnimating || state.winner || state.activePlayer !== localPlayer) return;
-  if (state.phase === 'production' && autoEndProductionEl.checked && !canAffordAnyUnit()) {
+  if (
+    state.phase === 'production' &&
+    autoEndProductionEl.checked &&
+    (!canAffordAnyUnit() || !hasHomeProductionAccess(state, localPlayer))
+  ) {
     if (gameMode === 'vsAI') {
       state = playerEndProduction(state);
     } else {
