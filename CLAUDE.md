@@ -61,7 +61,7 @@ web-strategic/
 
 ### Game modes
 - **Domination** (default): move a unit onto the **opponent's home row**, or **eliminate all enemy units**.
-- **Conquest:** control **control point** hexes on the map; each side has **Conquer Points**. After each full round, the opponent loses 1 Conquer Point per control point you own (stacking). First side to **0** Conquer Points loses. Home row and elimination do **not** end the match in this mode. If both hit 0 in the same tick, the **northern** player wins the tie. Settings: `gameMode`, `controlPointCount`, `conquestPointsPlayer`, `conquestPointsAi` in `gameconfig.ts`.
+- **Conquest:** control **control point** hexes on the map; each side has **Conquer Points**. After each full round, the opponent loses 1 Conquer Point per control point you own (stacking). First side to **0** Conquer Points loses. A side also loses if they have **no units** and **no owned territory** (full map elimination). Reaching the opponent’s home row alone does not end the match. If both hit 0 in the same tick, or both are fully eliminated from the map in the same check, the **northern** player wins the tie. Settings: `gameMode`, `controlPointCount`, `conquestPointsPlayer`, `conquestPointsAi` in `gameconfig.ts`.
 
 ## Coordinate System
 Axial hex coordinates (q, r). Offset display via `axialToPixel()`.

@@ -738,12 +738,40 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
 
 // ── Victory check ─────────────────────────────────────────────────────────────
 
+/** No units and no owned (non-mountain) hexes — used for Conquest map elimination. */
+function sideFullyEliminated(state: GameState, owner: Owner): boolean {
+  if (state.units.some(u => u.owner === owner)) return false;
+  for (const hex of Object.values(state.hexStates)) {
+    if (hex.owner === owner) return false;
+  }
+  return true;
+}
+
 function checkVictory(state: GameState): void {
   if (state.winner) return;
 
   if (state.gameMode === 'conquest') {
     const cp = state.conquestPoints;
     if (!cp) return;
+
+    const playerGone = sideFullyEliminated(state, PLAYER);
+    const aiGone = sideFullyEliminated(state, AI);
+    if (playerGone && aiGone) {
+      state.winner = AI;
+      log(state, 'Conquest: both sides wiped from the map — tie goes to the northern player.');
+      return;
+    }
+    if (aiGone) {
+      state.winner = PLAYER;
+      log(state, 'Conquest: opponent has no units and no territory.');
+      return;
+    }
+    if (playerGone) {
+      state.winner = AI;
+      log(state, 'Conquest: you have no units and no territory.');
+      return;
+    }
+
     if (cp[AI] <= 0 && cp[PLAYER] <= 0) {
       state.winner = AI;
       log(state, 'Both sides reached 0 Conquer Points — tie goes to the northern player.');

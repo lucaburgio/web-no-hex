@@ -756,8 +756,10 @@ function buildRulesContent(): string {
       <li><strong>Conquest:</strong> marked <strong>control point</strong> hexes appear on the map (default ${config.controlPointCount} in current settings).
         Each side starts with <strong>Conquer Points</strong> (south ${config.conquestPointsPlayer}, north ${config.conquestPointsAi} — configurable).
         After each full round, for every control point you <strong>own</strong>, the opponent loses 1 Conquer Point (multiple points stack).
-        The first side reduced to <strong>0</strong> Conquer Points loses. Reaching the home row or wiping the enemy army does <strong>not</strong> end the match in this mode.
-        If both sides hit 0 in the same tick, the <strong>northern</strong> player wins the tie.</li>
+        The first side reduced to <strong>0</strong> Conquer Points loses.
+        You also lose immediately if you have <strong>no units</strong> and <strong>no owned territory</strong> (even if your Conquer Points are still above 0).
+        Reaching the opponent&rsquo;s home row alone does <strong>not</strong> end the match.
+        If both sides hit 0 Conquer Points in the same tick, or both are totally eliminated from the map at once, the <strong>northern</strong> player wins the tie.</li>
     </ul>
   `;
 }
