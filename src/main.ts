@@ -1780,6 +1780,27 @@ function updateUI(): void {
     const total = localPct + opponentPct;
     leftPct = total > 0 ? Math.round(localPct / total * 100) : 50;
   }
+
+  playerConquerPctEl.classList.remove('conquest-cp-leader');
+  aiConquerPctEl.classList.remove('conquest-cp-leader');
+  if (isConquest) {
+    const cpKeys = state.controlPointHexes ?? [];
+    let playerOwned = 0;
+    let aiOwned = 0;
+    for (const key of cpKeys) {
+      const hex = state.hexStates[key];
+      if (!hex) continue;
+      if (hex.owner === PLAYER) playerOwned++;
+      else if (hex.owner === AI) aiOwned++;
+    }
+    if (playerOwned !== aiOwned) {
+      const playerLeads = playerOwned > aiOwned;
+      const localIsPlayer = localPlayer === PLAYER;
+      const highlightLocal = playerLeads === localIsPlayer;
+      (highlightLocal ? playerConquerPctEl : aiConquerPctEl).classList.add('conquest-cp-leader');
+    }
+  }
+
   playerConquerLabel.textContent = 'YOU';
   aiConquerLabel.textContent     = localPlayer === PLAYER && gameMode !== 'vsHuman' ? 'AI' : 'OPPONENT';
 

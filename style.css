@@ -224,6 +224,31 @@ body {
   line-height: 1;
 }
 
+.conquer-pct.conquest-cp-leader {
+  padding: 4px;
+  border-radius: 4px;
+  background-color: rgba(255, 214, 120, 0.55);
+  animation: conquest-cp-leader-glow 2.8s ease-in-out infinite;
+}
+
+@keyframes conquest-cp-leader-glow {
+  0%,
+  100% {
+    background-color: rgba(255, 214, 120, 0.45);
+    box-shadow: 0 0 0 0 rgba(255, 190, 80, 0.25);
+  }
+  50% {
+    background-color: rgba(255, 224, 150, 0.65);
+    box-shadow: 0 0 10px 1px rgba(255, 180, 60, 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conquer-pct.conquest-cp-leader {
+    animation: none;
+  }
+}
+
 #conquer-bar-line {
   width: 80px;
   height: 6px;
@@ -273,7 +298,7 @@ body {
 
 #board .control-point-ring {
   stroke-dasharray: 8 6;
-  animation: control-point-ring-dash 1.2s linear infinite;
+  animation: control-point-ring-dash 4.2s linear infinite;
 }
 
 /* ── Sticky footer ───────────────────────────────────────────────────────────── */
