@@ -1,7 +1,7 @@
 import gsap from 'gsap';
 
 /** Default entrance used by the live multiplayer end screen (see `mp-result-lab.html` for all options). */
-export const DEFAULT_MP_RESULT_VARIANT = 11;
+export const DEFAULT_MP_RESULT_VARIANT = 10;
 
 export interface MpResultOverlayEls {
   overlay: HTMLElement;
@@ -192,17 +192,22 @@ function runVariant(variant: number, els: MpResultOverlayEls): void {
       break;
     }
     case 10: {
+      /** Horizontal line reveal: expand from mid-screen (scaleY), full-screen cover. */
+      gsap.set(overlay, {
+        clearProps: 'top,left,right,bottom,width,height,xPercent,yPercent,clipPath',
+      });
       gsap.set(overlay, {
         opacity: 1,
         scaleY: 0,
         transformOrigin: '50% 50%',
+        force3D: true,
       });
       gsap.set(text, { opacity: 0 });
       if (actions) gsap.set(actions, { opacity: 0 });
       const tl = gsap.timeline();
-      tl.to(overlay, { scaleY: 1, duration: 0.5, ease: 'power3.out' });
-      tl.to(text, { opacity: 1, duration: 0.35, ease: 'power2.out' }, '-=0.18');
-      if (actions) tl.to(actions, { opacity: 1, duration: 0.35, ease: 'power2.out' }, '-=0.2');
+      tl.to(overlay, { scaleY: 1, duration: 0.55, ease: 'power3.out' });
+      tl.to(text, { opacity: 1, duration: 0.38, ease: 'power2.out' }, '-=0.2');
+      if (actions) tl.to(actions, { opacity: 1, duration: 0.35, ease: 'power2.out' }, '-=0.22');
       break;
     }
     case 11: {
