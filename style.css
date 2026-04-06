@@ -197,39 +197,6 @@ body {
   gap: 6px;
 }
 
-#cp-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: 1rem;
-}
-
-#cp-info.hidden {
-  display: none;
-}
-
-.header-cp-label {
-  font-family: 'Disket Mono', monospace;
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: var(--color-gray-500);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.header-cp-values {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: bold;
-  color: #23251E;
-}
-
-.header-cp-sep {
-  color: var(--color-gray-500);
-  font-weight: 400;
-}
-
 #header-pp-icon {
   display: block;
   width: 20px;
@@ -1051,6 +1018,11 @@ body {
   z-index: 38;
 }
 #settings-overlay.hidden { display: none; }
+
+/* Generic utility: hide Conquest-only settings until mode is Conquest */
+#settings-conquest-only.hidden {
+  display: none;
+}
 
 #settings-left {
   width: 70%;

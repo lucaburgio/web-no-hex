@@ -70,7 +70,7 @@ Row = r, Col = q offset per row parity.
 ## Dev Notes
 - No frameworks, no bundler — just `<script type="module">` imports
 - SVG for rendering (scalable, easy hit-testing)
-- AI uses simple greedy logic: move toward nearest enemy, attack if adjacent
+- AI uses greedy heuristics in `game.ts`: **Domination** — pressure toward the player home row and threats; **Conquest** — prioritize capturing neutral/enemy control points, defending AI-owned CPs when player units are close, and prefer ranged/melee targets on CP hexes.
 
 ## Workflow
 - After completing a concrete task with no errors, commit automatically without asking.

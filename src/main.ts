@@ -92,9 +92,6 @@ const conquerBarEl        = document.getElementById('conquer-bar-line') as HTMLE
 const ppTooltipEl         = document.getElementById('pp-tooltip') as HTMLDivElement;
 const unitStatTooltipEl   = document.getElementById('unit-stat-tooltip') as HTMLDivElement;
 const ppInfoEl            = document.getElementById('pp-info') as HTMLDivElement;
-const cpInfoEl            = document.getElementById('cp-info') as HTMLDivElement;
-const cpYouEl             = document.getElementById('cp-you') as HTMLElement;
-const cpOpponentEl        = document.getElementById('cp-opponent') as HTMLElement;
 
 const autoEndProductionEl = document.getElementById('auto-end-production') as HTMLInputElement;
 const autoEndMovementEl   = document.getElementById('auto-end-movement') as HTMLInputElement;
@@ -1765,32 +1762,38 @@ function updateUI(): void {
   ppDisplay.textContent = String(state.productionPoints[localPlayer]);
 
   const isConquest = state.gameMode === 'conquest' && state.conquestPoints;
-  cpInfoEl.classList.toggle('hidden', !isConquest);
+
+  // Update conquer header — territory % (Domination) or Conquer Points split (Conquest)
+  let localPct: number;
+  let opponentPct: number;
+  let leftPct: number;
   if (isConquest) {
     const cp = state.conquestPoints!;
     const youCp = localPlayer === PLAYER ? cp[PLAYER] : cp[AI];
     const oppCp = localPlayer === PLAYER ? cp[AI] : cp[PLAYER];
-    cpYouEl.textContent = String(youCp);
-    cpOpponentEl.textContent = String(oppCp);
+    playerConquerPctEl.textContent = String(youCp);
+    aiConquerPctEl.textContent     = String(oppCp);
+    const sum = youCp + oppCp;
+    localPct = youCp;
+    opponentPct = oppCp;
+    leftPct = sum > 0 ? Math.round((youCp / sum) * 100) : 50;
+  } else {
+    const totalHexes = COLS * ROWS;
+    const playerHexes = Object.values(state.hexStates).filter(h => h.owner === PLAYER).length;
+    const aiHexes     = Object.values(state.hexStates).filter(h => h.owner === AI).length;
+    const playerPct = Math.round(playerHexes / totalHexes * 100);
+    const aiPct     = Math.round(aiHexes / totalHexes * 100);
+    localPct    = localPlayer === PLAYER ? playerPct : aiPct;
+    opponentPct = localPlayer === PLAYER ? aiPct : playerPct;
+    playerConquerPctEl.textContent = `${localPct}%`;
+    aiConquerPctEl.textContent     = `${opponentPct}%`;
+    const total = localPct + opponentPct;
+    leftPct = total > 0 ? Math.round(localPct / total * 100) : 50;
   }
-
-  // Update conquer header
-  const totalHexes = COLS * ROWS;
-  const playerHexes = Object.values(state.hexStates).filter(h => h.owner === PLAYER).length;
-  const aiHexes     = Object.values(state.hexStates).filter(h => h.owner === AI).length;
-  const playerPct = Math.round(playerHexes / totalHexes * 100);
-  const aiPct     = Math.round(aiHexes / totalHexes * 100);
-  // Show from localPlayer's perspective: "YOU" = localPlayer side
-  const localPct    = localPlayer === PLAYER ? playerPct : aiPct;
-  const opponentPct = localPlayer === PLAYER ? aiPct : playerPct;
-  playerConquerPctEl.textContent = `${localPct}%`;
-  aiConquerPctEl.textContent     = `${opponentPct}%`;
   playerConquerLabel.textContent = 'YOU';
   aiConquerLabel.textContent     = localPlayer === PLAYER && gameMode !== 'vsHuman' ? 'AI' : 'OPPONENT';
 
-  // Two-color conquer bar: left = local player, right = opponent
-  const total = localPct + opponentPct;
-  const leftPct = total > 0 ? Math.round(localPct / total * 100) : 50;
+  // Two-color bar: left = local player, right = opponent
   const style = getComputedStyle(document.documentElement);
   const localColor    = localPlayer === PLAYER
     ? style.getPropertyValue('--color-hex-player').trim()
