@@ -1,6 +1,6 @@
 import gsap from 'gsap';
 
-/** Default entrance used by the live multiplayer end screen (see `mp-result-lab.html` for all options). */
+/** Default GSAP entrance preset for the multiplayer end screen (`src/main.ts`). */
 export const DEFAULT_MP_RESULT_VARIANT = 10;
 
 export interface MpResultOverlayEls {
