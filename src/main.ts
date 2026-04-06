@@ -45,6 +45,11 @@ import type { GameState, Unit, CombatForecast, Owner, CombatVfxPayload } from '.
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
 import { updateConfig } from './gameconfig';
 import { syncDimensions } from './game';
+import {
+  playMpResultIntro,
+  revertMpResultIntro,
+  DEFAULT_MP_RESULT_VARIANT,
+} from './mpResultOverlay';
 
 const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
 const WS_URL = `${wsProtocol}//${location.hostname}:3001`;
@@ -69,6 +74,12 @@ const overlayEl  = document.getElementById('overlay') as HTMLDivElement;
 const overlayMsg = document.getElementById('overlay-msg') as HTMLDivElement;
 const restartBtn = document.getElementById('restart-btn') as HTMLButtonElement;
 const recapOverlayEl = document.getElementById('recap-overlay') as HTMLDivElement;
+
+const mpResultOverlayEl = document.getElementById('mp-result-overlay') as HTMLDivElement;
+const mpResultMsg = document.getElementById('mp-result-msg') as HTMLParagraphElement;
+const mpResultActionsEl = document.getElementById('mp-result-actions') as HTMLDivElement;
+const mpRestartBtn = document.getElementById('mp-restart-btn') as HTMLButtonElement;
+const mpRecapBtn = document.getElementById('mp-recap-btn') as HTMLButtonElement;
 
 const unitPickerEl   = document.getElementById('unit-picker') as HTMLDivElement;
 const unitPickerList = document.getElementById('unit-picker-list') as HTMLDivElement;
@@ -940,6 +951,8 @@ lobbyCodeInputEl.addEventListener('keydown', (e: KeyboardEvent) => {
 // ── Game start ────────────────────────────────────────────────────────────────
 
 function startGame(initialState: GameState): void {
+  revertMpResultIntro();
+  mpResultOverlayEl.classList.add('hidden');
   state = initialState;
   syncUnitIdCounter(state);
   pendingProductionHex = null;
@@ -1650,12 +1663,17 @@ function runAiTurnWithAnimation(): void {
   runStep(0);
 }
 
-restartBtn.addEventListener('click', () => {
+function leaveEndGameToMainMenu(): void {
   closeLobbyWs();
+  revertMpResultIntro();
   overlayEl.classList.add('hidden');
+  mpResultOverlayEl.classList.add('hidden');
   hideUnitPicker();
   showMainMenu();
-});
+}
+
+restartBtn.addEventListener('click', leaveEndGameToMainMenu);
+mpRestartBtn.addEventListener('click', leaveEndGameToMainMenu);
 
 // ── Auto-end helpers ──────────────────────────────────────────────────────────
 
@@ -1757,14 +1775,21 @@ function updateUI(): void {
 }
 
 function checkWinner(): void {
-  if (state.winner) {
-    if (state.winner === localPlayer) {
-      overlayMsg.textContent = 'You win!';
-    } else {
-      overlayMsg.textContent = gameMode === 'vsHuman' ? 'Opponent wins.' : 'AI wins.';
+  if (!state.winner) return;
+  if (gameMode === 'vsHuman') {
+    mpResultMsg.textContent = state.winner === localPlayer ? 'victory' : 'you lost';
+    if (mpResultOverlayEl.classList.contains('hidden')) {
+      mpResultOverlayEl.classList.remove('hidden');
+      playMpResultIntro(DEFAULT_MP_RESULT_VARIANT, {
+        overlay: mpResultOverlayEl,
+        text: mpResultMsg,
+        actions: mpResultActionsEl,
+      });
     }
-    overlayEl.classList.remove('hidden');
+    return;
   }
+  overlayMsg.textContent = state.winner === localPlayer ? 'You win!' : 'AI wins.';
+  overlayEl.classList.remove('hidden');
 }
 
 // ── Combat forecast tooltip ───────────────────────────────────────────────────
@@ -1959,7 +1984,9 @@ const pauseContinueBtn = document.getElementById('pause-continue-btn') as HTMLBu
 pauseReturnBtn.addEventListener('click', () => {
   pauseOverlayEl.classList.add('hidden');
   closeLobbyWs();
+  revertMpResultIntro();
   overlayEl.classList.add('hidden');
+  mpResultOverlayEl.classList.add('hidden');
   hideUnitPicker();
   showMainMenu();
 });
@@ -2012,14 +2039,18 @@ function renderRecapTurn(index: number): void {
   }
 }
 
-recapBtn.addEventListener('click', () => {
+function openReplayFromEndGame(): void {
   initRenderer(recapSvg, { flipBoardY: gameMode === 'vsHuman' && localPlayer === AI });
   recapSliderEl.max = String(turnSnapshots.length - 1);
   recapSliderEl.value = String(turnSnapshots.length - 1);
   renderRecapTurn(turnSnapshots.length - 1);
   overlayEl.classList.add('hidden');
+  mpResultOverlayEl.classList.add('hidden');
   recapOverlayEl.classList.remove('hidden');
-});
+}
+
+recapBtn.addEventListener('click', openReplayFromEndGame);
+mpRecapBtn.addEventListener('click', openReplayFromEndGame);
 
 recapSliderEl.addEventListener('input', () => {
   renderRecapTurn(parseInt(recapSliderEl.value));
@@ -2027,7 +2058,13 @@ recapSliderEl.addEventListener('input', () => {
 
 recapCloseBtn.addEventListener('click', () => {
   recapOverlayEl.classList.add('hidden');
-  overlayEl.classList.remove('hidden');
+  if (state.winner) {
+    if (gameMode === 'vsHuman') {
+      mpResultOverlayEl.classList.remove('hidden');
+    } else {
+      overlayEl.classList.remove('hidden');
+    }
+  }
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────

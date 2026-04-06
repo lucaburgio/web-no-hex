@@ -275,6 +275,17 @@
     </div>
   </div>
 
+  <!-- Multiplayer end-of-game full screen (GSAP entrance; vs AI uses #overlay above) -->
+  <div id="mp-result-overlay" class="hidden" aria-live="polite">
+    <div id="mp-result-inner">
+      <p id="mp-result-msg"></p>
+      <div id="mp-result-actions">
+        <button type="button" id="mp-restart-btn" class="menu-btn">Restart</button>
+        <button type="button" id="mp-recap-btn" class="menu-btn secondary">View Replay</button>
+      </div>
+    </div>
+  </div>
+
   <div id="recap-overlay" class="hidden">
     <div id="recap-header">
       <button id="recap-close-btn">&#x2715; Back</button>
