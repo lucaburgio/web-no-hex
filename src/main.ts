@@ -952,7 +952,6 @@ lobbyCodeInputEl.addEventListener('keydown', (e: KeyboardEvent) => {
 
 function startGame(initialState: GameState): void {
   revertMpResultIntro();
-  mpResultOverlayEl.removeAttribute('data-outcome');
   mpResultOverlayEl.classList.add('hidden');
   state = initialState;
   syncUnitIdCounter(state);
@@ -1779,7 +1778,6 @@ function checkWinner(): void {
   if (!state.winner) return;
   if (gameMode === 'vsHuman') {
     mpResultMsg.textContent = state.winner === localPlayer ? 'victory' : 'you lost';
-    mpResultOverlayEl.dataset.outcome = state.winner === localPlayer ? 'win' : 'lose';
     if (mpResultOverlayEl.classList.contains('hidden')) {
       mpResultOverlayEl.classList.remove('hidden');
       playMpResultIntro(DEFAULT_MP_RESULT_VARIANT, {

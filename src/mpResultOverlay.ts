@@ -1,7 +1,7 @@
 import gsap from 'gsap';
 
 /** Default entrance used by the live multiplayer end screen (see `mp-result-lab.html` for all options). */
-export const DEFAULT_MP_RESULT_VARIANT = 10;
+export const DEFAULT_MP_RESULT_VARIANT = 11;
 
 export interface MpResultOverlayEls {
   overlay: HTMLElement;
@@ -26,12 +26,10 @@ export function revertMpResultIntro(): void {
   activeCtx = null;
   if (els?.overlay) {
     els.overlay.querySelectorAll('.mp-result-curtain').forEach(el => el.remove());
-    const blobRoot = els.overlay.querySelector('.mp-blob-scene');
-    blobRoot?.classList.remove('is-visible');
-    const scaleG = els.overlay.querySelector('.mp-result-blob-scale-group');
-    const kenG = els.overlay.querySelector('.mp-result-blob-ken-group');
-    if (scaleG) gsap.set(scaleG, { clearProps: 'transform' });
-    if (kenG) gsap.set(kenG, { clearProps: 'transform' });
+    gsap.set(els.overlay, {
+      clearProps:
+        'transform,top,left,right,bottom,width,height,xPercent,yPercent,scale,scaleX,scaleY,clipPath,filter,opacity',
+    });
   }
   if (els?.text) killSplitChars(els.text);
   lastEls = null;
@@ -39,7 +37,7 @@ export function revertMpResultIntro(): void {
 
 function runVariant(variant: number, els: MpResultOverlayEls): void {
   const { overlay, text, actions } = els;
-  const v = variant >= 1 && variant <= 10 ? variant : 1;
+  const v = variant >= 1 && variant <= 11 ? variant : 1;
 
   killSplitChars(text);
 
@@ -194,100 +192,48 @@ function runVariant(variant: number, els: MpResultOverlayEls): void {
       break;
     }
     case 10: {
-      /**
-       * Pebblelife-inspired: organic blob mask (SVG) grows from center while the photo
-       * inside eases from a slight zoom (Ken Burns). Typography follows with a short lag.
-       * @see https://pebblelife.com/ (hero opening)
-       */
-      const blobRoot = overlay.querySelector('.mp-blob-scene') as HTMLElement | null;
-      const scaleG = overlay.querySelector('.mp-result-blob-scale-group') as SVGGElement | null;
-      const kenG = overlay.querySelector('.mp-result-blob-ken-group') as SVGGElement | null;
-      if (!blobRoot || !scaleG || !kenG) {
-        gsap.set(overlay, { opacity: 1, scaleY: 0, transformOrigin: '50% 50%' });
-        gsap.set(text, { opacity: 0 });
-        if (actions) gsap.set(actions, { opacity: 0 });
-        const tl = gsap.timeline();
-        tl.to(overlay, { scaleY: 1, duration: 0.5, ease: 'power3.out' });
-        tl.to(text, { opacity: 1, duration: 0.35, ease: 'power2.out' }, '-=0.18');
-        if (actions) tl.to(actions, { opacity: 1, duration: 0.35, ease: 'power2.out' }, '-=0.2');
-        break;
-      }
-
-      blobRoot.classList.add('is-visible');
-      gsap.set(overlay, { opacity: 1, clearProps: 'clipPath' });
-      gsap.set(scaleG, {
-        scale: 0,
-        rotation: 0,
-        svgOrigin: '0.5 0.5',
+      gsap.set(overlay, {
+        opacity: 1,
+        scaleY: 0,
+        transformOrigin: '50% 50%',
       });
-      gsap.set(kenG, {
-        scale: 1.22,
-        svgOrigin: '0.5 0.5',
-      });
-      gsap.set(text, { opacity: 0, y: 22 });
-      if (actions) gsap.set(actions, { opacity: 0, y: 14 });
-
+      gsap.set(text, { opacity: 0 });
+      if (actions) gsap.set(actions, { opacity: 0 });
       const tl = gsap.timeline();
-      tl.to(
-        scaleG,
+      tl.to(overlay, { scaleY: 1, duration: 0.5, ease: 'power3.out' });
+      tl.to(text, { opacity: 1, duration: 0.35, ease: 'power2.out' }, '-=0.18');
+      if (actions) tl.to(actions, { opacity: 1, duration: 0.35, ease: 'power2.out' }, '-=0.2');
+      break;
+    }
+    case 11: {
+      /** Starts below the viewport as a centered 60vw strip; eases to full-screen cover. */
+      gsap.set(overlay, { opacity: 1, clearProps: 'clipPath,scaleY' });
+      gsap.set(text, { opacity: 0 });
+      if (actions) gsap.set(actions, { opacity: 0 });
+      const tl = gsap.timeline();
+      tl.fromTo(
+        overlay,
         {
-          scale: 1,
-          duration: 1.2,
-          ease: 'expo.out',
+          top: '100vh',
+          left: '50%',
+          width: '60vw',
+          height: '100vh',
+          xPercent: -50,
+        },
+        {
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          xPercent: 0,
+          duration: 0.92,
+          ease: 'power2.inOut',
         },
         0,
       );
-      tl.to(
-        kenG,
-        {
-          scale: 1,
-          duration: 1.65,
-          ease: 'power2.out',
-        },
-        0,
-      );
-      tl.to(
-        scaleG,
-        {
-          rotation: 3.2,
-          duration: 0.5,
-          ease: 'power2.out',
-        },
-        0.4,
-      );
-      tl.to(scaleG, {
-        rotation: 0,
-        duration: 0.88,
-        ease: 'power3.out',
-      });
-      tl.to(scaleG, {
-        scale: 1.012,
-        duration: 0.5,
-        ease: 'sine.inOut',
-        yoyo: true,
-        repeat: 1,
-      });
-      tl.to(
-        text,
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.58,
-          ease: 'power3.out',
-        },
-        '-=0.55',
-      );
+      tl.to(text, { opacity: 1, duration: 0.45, ease: 'power2.out' }, '-=0.34');
       if (actions) {
-        tl.to(
-          actions,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.42,
-            ease: 'power2.out',
-          },
-          '-=0.4',
-        );
+        tl.to(actions, { opacity: 1, duration: 0.35, ease: 'power2.out' }, '-=0.28');
       }
       break;
     }
