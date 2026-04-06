@@ -712,8 +712,8 @@ export function renderState(
   if (controlPointLayer) {
     controlPointLayer.innerHTML = '';
     const cpKeys = state.controlPointHexes ?? [];
-    const iw = HEX_SIZE * 0.9;
-    const ih = HEX_SIZE * 0.9;
+    const iw = HEX_SIZE * 0.5;
+    const ih = HEX_SIZE * 0.5;
     for (const key of cpKeys) {
       if (mountainSet.has(key)) continue;
       const [mc, mr] = key.split(',').map(Number);
@@ -721,7 +721,7 @@ export function renderState(
       const ring = svgEl('polygon');
       ring.setAttribute('points', hexPoints(x, y));
       ring.setAttribute('fill', 'none');
-      ring.setAttribute('stroke', '#000');
+      ring.setAttribute('stroke', '#6B6B6B');
       ring.setAttribute('stroke-width', '2.5');
       ring.setAttribute('stroke-linejoin', 'round');
       ring.setAttribute('pointer-events', 'none');
