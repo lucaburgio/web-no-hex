@@ -46,10 +46,14 @@ import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gam
 import { updateConfig } from './gameconfig';
 import { syncDimensions } from './game';
 import {
-  playMpResultIntro,
-  revertMpResultIntro,
-  DEFAULT_MP_RESULT_VARIANT,
-} from './mpResultOverlay';
+  hideGameEndScreen,
+  hideGameEndOverlayForReplay,
+  revealGameEndScreenAfterReplay,
+  showGameEndScreenForOutcome,
+  showGameEndScreenDisconnected,
+  gameEndRestartBtn,
+  gameEndRecapBtn,
+} from './gameEndScreen';
 
 const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
 const WS_URL = `${wsProtocol}//${location.hostname}:3001`;
@@ -70,16 +74,7 @@ const turnEl     = document.getElementById('turn') as HTMLElement;
 const ppDisplay  = document.getElementById('pp-display') as HTMLElement;
 const endMoveBtn  = document.getElementById('end-move-btn') as HTMLButtonElement;
 const phaseLabelEl = document.getElementById('phase-label') as HTMLElement;
-const overlayEl  = document.getElementById('overlay') as HTMLDivElement;
-const overlayMsg = document.getElementById('overlay-msg') as HTMLDivElement;
-const restartBtn = document.getElementById('restart-btn') as HTMLButtonElement;
 const recapOverlayEl = document.getElementById('recap-overlay') as HTMLDivElement;
-
-const mpResultOverlayEl = document.getElementById('mp-result-overlay') as HTMLDivElement;
-const mpResultMsg = document.getElementById('mp-result-msg') as HTMLParagraphElement;
-const mpResultActionsEl = document.getElementById('mp-result-actions') as HTMLDivElement;
-const mpRestartBtn = document.getElementById('mp-restart-btn') as HTMLButtonElement;
-const mpRecapBtn = document.getElementById('mp-recap-btn') as HTMLButtonElement;
 
 const unitPickerEl   = document.getElementById('unit-picker') as HTMLDivElement;
 const unitPickerList = document.getElementById('unit-picker-list') as HTMLDivElement;
@@ -912,8 +907,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
 }
 
 function showDisconnected(): void {
-  overlayMsg.textContent = 'Opponent disconnected.';
-  overlayEl.classList.remove('hidden');
+  showGameEndScreenDisconnected();
 }
 
 // ── Lobby button handlers ─────────────────────────────────────────────────────
@@ -985,8 +979,7 @@ lobbyCodeInputEl.addEventListener('keydown', (e: KeyboardEvent) => {
 // ── Game start ────────────────────────────────────────────────────────────────
 
 function startGame(initialState: GameState): void {
-  revertMpResultIntro();
-  mpResultOverlayEl.classList.add('hidden');
+  hideGameEndScreen();
   state = initialState;
   syncUnitIdCounter(state);
   pendingProductionHex = null;
@@ -1699,15 +1692,12 @@ function runAiTurnWithAnimation(): void {
 
 function leaveEndGameToMainMenu(): void {
   closeLobbyWs();
-  revertMpResultIntro();
-  overlayEl.classList.add('hidden');
-  mpResultOverlayEl.classList.add('hidden');
+  hideGameEndScreen();
   hideUnitPicker();
   showMainMenu();
 }
 
-restartBtn.addEventListener('click', leaveEndGameToMainMenu);
-mpRestartBtn.addEventListener('click', leaveEndGameToMainMenu);
+gameEndRestartBtn.addEventListener('click', leaveEndGameToMainMenu);
 
 // ── Auto-end helpers ──────────────────────────────────────────────────────────
 
@@ -1826,20 +1816,7 @@ function updateUI(): void {
 
 function checkWinner(): void {
   if (!state.winner) return;
-  if (gameMode === 'vsHuman') {
-    mpResultMsg.textContent = state.winner === localPlayer ? 'victory' : 'you lost';
-    if (mpResultOverlayEl.classList.contains('hidden')) {
-      mpResultOverlayEl.classList.remove('hidden');
-      playMpResultIntro(DEFAULT_MP_RESULT_VARIANT, {
-        overlay: mpResultOverlayEl,
-        text: mpResultMsg,
-        actions: mpResultActionsEl,
-      });
-    }
-    return;
-  }
-  overlayMsg.textContent = state.winner === localPlayer ? 'You win!' : 'AI wins.';
-  overlayEl.classList.remove('hidden');
+  showGameEndScreenForOutcome(state.winner === localPlayer);
 }
 
 // ── Combat forecast tooltip ───────────────────────────────────────────────────
@@ -2034,9 +2011,7 @@ const pauseContinueBtn = document.getElementById('pause-continue-btn') as HTMLBu
 pauseReturnBtn.addEventListener('click', () => {
   pauseOverlayEl.classList.add('hidden');
   closeLobbyWs();
-  revertMpResultIntro();
-  overlayEl.classList.add('hidden');
-  mpResultOverlayEl.classList.add('hidden');
+  hideGameEndScreen();
   hideUnitPicker();
   showMainMenu();
 });
@@ -2071,7 +2046,6 @@ const recapTurnLabel  = document.getElementById('recap-turn-label') as HTMLEleme
 const recapLogEl      = document.getElementById('recap-log') as HTMLUListElement;
 const recapSvg        = document.getElementById('recap-board') as unknown as SVGSVGElement;
 const recapCloseBtn   = document.getElementById('recap-close-btn') as HTMLButtonElement;
-const recapBtn        = document.getElementById('recap-btn') as HTMLButtonElement;
 
 function renderRecapTurn(index: number): void {
   const snap = turnSnapshots[index];
@@ -2094,13 +2068,11 @@ function openReplayFromEndGame(): void {
   recapSliderEl.max = String(turnSnapshots.length - 1);
   recapSliderEl.value = String(turnSnapshots.length - 1);
   renderRecapTurn(turnSnapshots.length - 1);
-  overlayEl.classList.add('hidden');
-  mpResultOverlayEl.classList.add('hidden');
+  hideGameEndOverlayForReplay();
   recapOverlayEl.classList.remove('hidden');
 }
 
-recapBtn.addEventListener('click', openReplayFromEndGame);
-mpRecapBtn.addEventListener('click', openReplayFromEndGame);
+gameEndRecapBtn.addEventListener('click', openReplayFromEndGame);
 
 recapSliderEl.addEventListener('input', () => {
   renderRecapTurn(parseInt(recapSliderEl.value));
@@ -2108,13 +2080,7 @@ recapSliderEl.addEventListener('input', () => {
 
 recapCloseBtn.addEventListener('click', () => {
   recapOverlayEl.classList.add('hidden');
-  if (state.winner) {
-    if (gameMode === 'vsHuman') {
-      mpResultOverlayEl.classList.remove('hidden');
-    } else {
-      overlayEl.classList.remove('hidden');
-    }
-  }
+  revealGameEndScreenAfterReplay();
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────

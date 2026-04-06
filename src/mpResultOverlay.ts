@@ -1,6 +1,6 @@
 import gsap from 'gsap';
 
-/** Default GSAP entrance preset for the multiplayer end screen (`src/main.ts`). */
+/** Default GSAP entrance preset for the game end screen (`src/gameEndScreen.ts`). */
 export const DEFAULT_MP_RESULT_VARIANT = 10;
 
 export interface MpResultOverlayEls {
@@ -25,7 +25,7 @@ export function revertMpResultIntro(): void {
   activeCtx?.revert();
   activeCtx = null;
   if (els?.overlay) {
-    els.overlay.querySelectorAll('.mp-result-curtain').forEach(el => el.remove());
+    els.overlay.querySelectorAll('.game-end-curtain').forEach(el => el.remove());
     gsap.set(els.overlay, {
       clearProps:
         'transform,top,left,right,bottom,width,height,xPercent,yPercent,scale,scaleX,scaleY,clipPath,filter,opacity',
@@ -82,7 +82,7 @@ function runVariant(variant: number, els: MpResultOverlayEls): void {
       savedPlainText = text.textContent ?? '';
       const chars = [...savedPlainText].map(ch => {
         const span = document.createElement('span');
-        span.className = 'mp-result-char';
+        span.className = 'game-end-char';
         span.textContent = ch === ' ' ? '\u00a0' : ch;
         return span;
       });
@@ -108,8 +108,8 @@ function runVariant(variant: number, els: MpResultOverlayEls): void {
     case 5: {
       const left = document.createElement('div');
       const right = document.createElement('div');
-      left.className = 'mp-result-curtain mp-result-curtain--left';
-      right.className = 'mp-result-curtain mp-result-curtain--right';
+      left.className = 'game-end-curtain game-end-curtain--left';
+      right.className = 'game-end-curtain game-end-curtain--right';
       overlay.prepend(right);
       overlay.prepend(left);
       gsap.set(overlay, { opacity: 1 });
@@ -248,7 +248,7 @@ function runVariant(variant: number, els: MpResultOverlayEls): void {
 }
 
 /**
- * Plays the chosen GSAP entrance. Call {@link revertMpResultIntro} when the overlay is dismissed
+ * Plays the chosen GSAP entrance. Call {@link revertMpResultIntro} when the game end overlay is dismissed
  * so inline styles and split-letter DOM are cleaned up.
  */
 export function playMpResultIntro(variant: number, els: MpResultOverlayEls): void {

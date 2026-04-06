@@ -664,23 +664,8 @@ body {
 .tt-outcome.both { color: var(--color-red-500); }
 .tt-outcome.none { color: var(--color-gray-500) }
 
-/* ── Winner overlay ────────────────────────────────────────────────────────── */
-#overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.7);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  z-index: 10;
-}
-
-#overlay.hidden { display: none; }
-
-/* ── Multiplayer end screen (full viewport, theme bg) ─────────────────────── */
-#mp-result-overlay {
+/* ── Game end screen (vs AI + multiplayer — full viewport, theme bg, GSAP intro) ─ */
+#game-end-overlay {
   position: fixed;
   inset: 0;
   background: var(--color-bg);
@@ -691,11 +676,11 @@ body {
   overflow: hidden;
 }
 
-#mp-result-overlay.hidden {
+#game-end-overlay.hidden {
   display: none;
 }
 
-#mp-result-inner {
+#game-end-inner {
   position: relative;
   z-index: 2;
   display: flex;
@@ -707,7 +692,7 @@ body {
   text-align: center;
 }
 
-#mp-result-msg {
+#game-end-msg {
   font-family: 'Disket Mono', monospace;
   font-weight: 700;
   font-size: clamp(1.75rem, 6vw, 3rem);
@@ -717,14 +702,14 @@ body {
   margin: 0;
 }
 
-#mp-result-actions {
+#game-end-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   justify-content: center;
 }
 
-.mp-result-curtain {
+.game-end-curtain {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -735,47 +720,17 @@ body {
   filter: brightness(0.94);
 }
 
-.mp-result-curtain--left {
+.game-end-curtain--left {
   left: 0;
 }
 
-.mp-result-curtain--right {
+.game-end-curtain--right {
   right: 0;
 }
 
-.mp-result-char {
+.game-end-char {
   display: inline-block;
 }
-
-#overlay-msg {
-  color: #aaddaa;
-  letter-spacing: 0.15em;
-}
-
-#overlay-actions {
-  display: flex;
-  gap: 12px;
-}
-
-#restart-btn {
-  padding: 8px 24px;
-  background: #2a4a2a;
-  color: #aaddaa;
-  border: 1px solid #5a8a5a;
-  cursor: url('/icons/pointer.svg') 13 14, pointer;
-  font-family: inherit;
-}
-#restart-btn:hover { background: #3a6a3a; }
-
-#recap-btn {
-  padding: 8px 24px;
-  background: transparent;
-  color: #aaddaa;
-  border: 1px solid #3a5a3a;
-  cursor: url('/icons/pointer.svg') 13 14, pointer;
-  font-family: inherit;
-}
-#recap-btn:hover { background: #1a2a1a; }
 
 /* ── Replay overlay ─────────────────────────────────────────────────────────── */
 #recap-overlay {
