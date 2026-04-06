@@ -451,6 +451,11 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   mountainLayer.setAttribute('pointer-events', 'none');
   hexLayer.appendChild(mountainLayer);
 
+  const controlPointLayer = svgEl('g');
+  controlPointLayer.id = 'control-point-layer';
+  controlPointLayer.setAttribute('pointer-events', 'none');
+  hexLayer.appendChild(controlPointLayer);
+
   // Production placement dashed stroke (above mountain art so corners aren’t clipped)
   const prodStrokeLayer = svgEl('g');
   prodStrokeLayer.id = 'prod-stroke-layer';
@@ -699,6 +704,33 @@ export function renderState(
         mountainLayer.appendChild(upright);
       } else {
         mountainLayer.appendChild(img);
+      }
+    }
+  }
+
+  const controlPointLayer = svgElement.querySelector('#control-point-layer') as SVGGElement | null;
+  if (controlPointLayer) {
+    controlPointLayer.innerHTML = '';
+    const cpKeys = state.controlPointHexes ?? [];
+    const iw = HEX_SIZE * 0.9;
+    const ih = HEX_SIZE * 0.9;
+    for (const key of cpKeys) {
+      if (mountainSet.has(key)) continue;
+      const [mc, mr] = key.split(',').map(Number);
+      const { x, y } = hexToPixel(mc, mr);
+      const img = svgEl('image');
+      img.setAttribute('href', '/icons/control-point.svg');
+      img.setAttribute('x', String(x - iw / 2));
+      img.setAttribute('y', String(y - ih / 2));
+      img.setAttribute('width', String(iw));
+      img.setAttribute('height', String(ih));
+      img.setAttribute('pointer-events', 'none');
+      if (flipBoardY) {
+        const upright = svgUprightAt(x, y);
+        upright.appendChild(img);
+        controlPointLayer.appendChild(upright);
+      } else {
+        controlPointLayer.appendChild(img);
       }
     }
   }

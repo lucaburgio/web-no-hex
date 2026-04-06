@@ -9,6 +9,7 @@ import type {
   CombatVfxPayload,
   Owner,
   AiAnimStep,
+  GameMode,
 } from './types';
 
 export const PLAYER = 1 as const;
@@ -552,6 +553,21 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
 // ── Victory check ─────────────────────────────────────────────────────────────
 
 function checkVictory(state: GameState): void {
+  if (state.winner) return;
+
+  if (state.gameMode === 'conquest') {
+    const cp = state.conquestPoints;
+    if (!cp) return;
+    if (cp[AI] <= 0 && cp[PLAYER] <= 0) {
+      state.winner = AI;
+      log(state, 'Both sides reached 0 Conquer Points — tie goes to the northern player.');
+      return;
+    }
+    if (cp[AI] <= 0) state.winner = PLAYER;
+    else if (cp[PLAYER] <= 0) state.winner = AI;
+    return;
+  }
+
   const humanAtNorth = state.units.some(u => u.owner === PLAYER && u.row === 0);
   const aiAtSouth    = state.units.some(u => u.owner === AI && u.row === ROWS - 1);
   const noHuman      = !state.units.some(u => u.owner === PLAYER);
@@ -559,6 +575,29 @@ function checkVictory(state: GameState): void {
 
   if (humanAtNorth || noAI) state.winner = PLAYER;
   else if (aiAtSouth || noHuman) state.winner = AI;
+}
+
+/** Conquest: drain opponent Conquer Points for each control point they do not own. */
+function applyConquestEndOfRound(state: GameState): void {
+  if (state.gameMode !== 'conquest' || !state.conquestPoints) return;
+  const cp = state.conquestPoints;
+  let drainToAi = 0;
+  let drainToPlayer = 0;
+  for (const key of state.controlPointHexes) {
+    const hex = state.hexStates[key];
+    if (!hex) continue;
+    if (hex.owner === PLAYER) drainToAi += 1;
+    else if (hex.owner === AI) drainToPlayer += 1;
+  }
+  if (drainToAi > 0 || drainToPlayer > 0) {
+    cp[AI] -= drainToAi;
+    cp[PLAYER] -= drainToPlayer;
+    log(
+      state,
+      `Conquer Points — South: ${cp[PLAYER]} (−${drainToPlayer}), North: ${cp[AI]} (−${drainToAi}).`,
+    );
+  }
+  checkVictory(state);
 }
 
 // ── Healing ───────────────────────────────────────────────────────────────────
@@ -619,11 +658,40 @@ export function createInitialState(): GameState {
     [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
   }
   const mountainHexes = candidates.slice(0, Math.min(mountainCount, candidates.length));
+  const mountainSet = new Set(mountainHexes);
+
+  const cpCandidates: string[] = [];
+  for (let r = 1; r < ROWS - 1; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const key = `${c},${r}`;
+      if (!reservedKeys.has(key) && !mountainSet.has(key)) cpCandidates.push(key);
+    }
+  }
+  const gm = config.gameMode as GameMode;
+  let controlPointHexes: string[] = [];
+  if (gm === 'conquest' && config.controlPointCount > 0 && cpCandidates.length > 0) {
+    for (let i = cpCandidates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cpCandidates[i], cpCandidates[j]] = [cpCandidates[j], cpCandidates[i]];
+    }
+    controlPointHexes = cpCandidates.slice(0, Math.min(config.controlPointCount, cpCandidates.length));
+  }
+
+  const conquestPoints =
+    gm === 'conquest'
+      ? ({
+          [PLAYER]: config.conquestPointsPlayer,
+          [AI]: config.conquestPointsAi,
+        } as Record<Owner, number>)
+      : null;
 
   return {
     units,
     hexStates,
     mountainHexes,
+    gameMode: gm,
+    controlPointHexes,
+    conquestPoints,
     turn: 1,
     phase: 'production',
     activePlayer: PLAYER,
@@ -1284,6 +1352,7 @@ export function endTurnAfterAi(state: GameState): { state: GameState; healFloats
   state.productionPoints[PLAYER] += config.productionPointsPerTurn + playerBonus;
   state.productionPoints[AI]     += config.productionPointsPerTurn + aiBonus;
   log(state, `Turn ${state.turn} — Production phase. PP: ${state.productionPoints[PLAYER]} (+${playerBonus} from territory).`);
+  applyConquestEndOfRound(state);
   return { state, healFloats };
 }
 

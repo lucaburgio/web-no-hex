@@ -3,6 +3,9 @@
 export type Owner = 1 | 2;
 export type Phase = 'production' | 'movement';
 
+/** Match rules: core gameplay is shared; each mode tweaks victory and scoring. */
+export type GameMode = 'domination' | 'conquest';
+
 export interface Unit {
   id: number;
   owner: Owner;
@@ -27,6 +30,12 @@ export interface GameState {
   units: Unit[];
   hexStates: Record<string, HexState>;
   mountainHexes: string[];
+  /** Set at match start from config; used for saves / multiplayer. */
+  gameMode: GameMode;
+  /** Hex keys `col,row` that are control points (Conquest). Empty in Domination. */
+  controlPointHexes: string[];
+  /** Remaining Conquer Points per side (Conquest only; null in Domination). */
+  conquestPoints: Record<Owner, number> | null;
   turn: number;
   phase: Phase;
   activePlayer: Owner;
@@ -105,6 +114,15 @@ export interface UnitType {
 }
 
 export interface GameConfig {
+  /** Default when starting a new match from settings. */
+  gameMode: GameMode;
+  /** Number of control-point hexes placed on the map (Conquest). */
+  controlPointCount: number;
+  /** Starting Conquer Points for the southern player (owner 1). */
+  conquestPointsPlayer: number;
+  /** Starting Conquer Points for the northern player (owner 2). */
+  conquestPointsAi: number;
+
   boardCols: number;
   boardRows: number;
   startingUnits: number;

@@ -23,6 +23,14 @@
       <img src="public/icons/points.svg" id="header-pp-icon" alt="PP" />
       <strong id="pp-display">0</strong>
     </div>
+    <div id="cp-info" class="hidden">
+      <span class="header-cp-label" id="cp-info-title">Conquer</span>
+      <span class="header-cp-values">
+        <strong id="cp-you">0</strong>
+        <span class="header-cp-sep">·</span>
+        <strong id="cp-opponent">0</strong>
+      </span>
+    </div>
     <div id="header-territory">
       <span class="conquer-pct" id="player-conquer-pct">0%</span>
       <div id="conquer-bar-line"></div>
@@ -98,6 +106,31 @@
       </div>
     </div>
     <div id="settings-right">
+
+      <div class="settings-group">
+        <div class="settings-group-title">MATCH</div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-gameMode">Game mode</label>
+          <select class="settings-input settings-select" id="cfg-gameMode">
+            <option value="domination">Domination</option>
+            <option value="conquest">Conquest</option>
+          </select>
+        </div>
+        <div id="settings-conquest-only" class="hidden">
+          <div class="settings-row">
+            <label class="settings-label" for="cfg-controlPointCount">Control points on map</label>
+            <input class="settings-input" type="number" id="cfg-controlPointCount" min="0" max="48" step="1" />
+          </div>
+          <div class="settings-row">
+            <label class="settings-label" for="cfg-conquestPointsPlayer">Starting Conquer Points (south)</label>
+            <input class="settings-input" type="number" id="cfg-conquestPointsPlayer" min="1" max="999" step="1" />
+          </div>
+          <div class="settings-row">
+            <label class="settings-label" for="cfg-conquestPointsAi">Starting Conquer Points (north)</label>
+            <input class="settings-input" type="number" id="cfg-conquestPointsAi" min="1" max="999" step="1" />
+          </div>
+        </div>
+      </div>
 
       <div class="settings-group">
         <div class="settings-group-title">BOARD</div>

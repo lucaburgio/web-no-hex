@@ -19,7 +19,7 @@ web-strategic/
 
 ## Game Rules
 
-> **IMPORTANT — keep in sync:** Whenever production, movement, victory conditions, or combat logic changes in `game.js` or `gameconfig.js`, you **must** also update the in-game rules overlay in `index.html` (`#rules-modal`) to reflect the new logic. The overlay is the canonical player-facing description of the rules and must always match the actual code.
+> **IMPORTANT — keep in sync:** Whenever production, movement, victory conditions, game modes, or combat logic changes in `game.ts`, `gameconfig.ts`, or related code, you **must** also update the in-game rules overlay built by `buildRulesContent()` in `src/main.ts` (shown in `#rules-modal`) to reflect the new logic. The overlay is the canonical player-facing description of the rules and must always match the actual code.
 
 ### Board
 - 6×4 hexagonal grid (configurable in `gameconfig.js`), pointy-top orientation
@@ -59,8 +59,9 @@ web-strategic/
 - If both die: both removed.
 - **Healing** (units that did not fight): +2 HP on own territory, +1 HP on neutral, +0 HP on enemy territory.
 
-### Victory
-- Move a unit onto the **opponent's home row**, or **eliminate all enemy units**.
+### Game modes
+- **Domination** (default): move a unit onto the **opponent's home row**, or **eliminate all enemy units**.
+- **Conquest:** control **control point** hexes on the map; each side has **Conquer Points**. After each full round, the opponent loses 1 Conquer Point per control point you own (stacking). First side to **0** Conquer Points loses. Home row and elimination do **not** end the match in this mode. If both hit 0 in the same tick, the **northern** player wins the tie. Settings: `gameMode`, `controlPointCount`, `conquestPointsPlayer`, `conquestPointsAi` in `gameconfig.ts`.
 
 ## Coordinate System
 Axial hex coordinates (q, r). Offset display via `axialToPixel()`.

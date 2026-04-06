@@ -197,6 +197,39 @@ body {
   gap: 6px;
 }
 
+#cp-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 1rem;
+}
+
+#cp-info.hidden {
+  display: none;
+}
+
+.header-cp-label {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--color-gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.header-cp-values {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+  color: #23251E;
+}
+
+.header-cp-sep {
+  color: var(--color-gray-500);
+  font-weight: 400;
+}
+
 #header-pp-icon {
   display: block;
   width: 20px;
@@ -1110,6 +1143,13 @@ body {
 
 .settings-input:focus {
   border-bottom-color: var(--color-yellow-500);
+}
+
+select.settings-input.settings-select {
+  width: auto;
+  min-width: 11rem;
+  text-align: left;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 
 .settings-toggle {

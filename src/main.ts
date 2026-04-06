@@ -41,7 +41,7 @@ import { getNeighbors } from './hex';
 import { isInEnemyZoC } from './game';
 import type { MoveAnimation } from './renderer';
 import config from './gameconfig';
-import type { GameState, Unit, CombatForecast, Owner, CombatVfxPayload } from './types';
+import type { GameState, Unit, CombatForecast, Owner, CombatVfxPayload, GameMode } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
 import { updateConfig } from './gameconfig';
 import { syncDimensions } from './game';
@@ -92,6 +92,9 @@ const conquerBarEl        = document.getElementById('conquer-bar-line') as HTMLE
 const ppTooltipEl         = document.getElementById('pp-tooltip') as HTMLDivElement;
 const unitStatTooltipEl   = document.getElementById('unit-stat-tooltip') as HTMLDivElement;
 const ppInfoEl            = document.getElementById('pp-info') as HTMLDivElement;
+const cpInfoEl            = document.getElementById('cp-info') as HTMLDivElement;
+const cpYouEl             = document.getElementById('cp-you') as HTMLElement;
+const cpOpponentEl        = document.getElementById('cp-opponent') as HTMLElement;
 
 const autoEndProductionEl = document.getElementById('auto-end-production') as HTMLInputElement;
 const autoEndMovementEl   = document.getElementById('auto-end-movement') as HTMLInputElement;
@@ -99,7 +102,11 @@ autoEndProductionEl.checked = config.autoEndProduction;
 autoEndMovementEl.checked   = config.autoEndMovement;
 
 const rulesOverlayEl = document.getElementById('rules-overlay') as HTMLDivElement;
-document.getElementById('rules-btn')!.addEventListener('click', () => rulesOverlayEl.classList.remove('hidden'));
+const rulesContentEl = document.getElementById('rules-content') as HTMLDivElement;
+document.getElementById('rules-btn')!.addEventListener('click', () => {
+  rulesContentEl.innerHTML = buildRulesContent();
+  rulesOverlayEl.classList.remove('hidden');
+});
 document.getElementById('rules-close')!.addEventListener('click', () => rulesOverlayEl.classList.add('hidden'));
 rulesOverlayEl.addEventListener('click', e => { if (e.target === rulesOverlayEl) rulesOverlayEl.classList.add('hidden'); });
 
@@ -468,6 +475,9 @@ const settingsBackBtn    = document.getElementById('settings-back-btn') as HTMLB
 
 // Numeric fields: [elementId, configKey, scale factor (e.g. 100 for % fields)]
 const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
+  ['cfg-controlPointCount',       'controlPointCount',       1],
+  ['cfg-conquestPointsPlayer',    'conquestPointsPlayer',    1],
+  ['cfg-conquestPointsAi',        'conquestPointsAi',        1],
   ['cfg-boardCols',               'boardCols',               1],
   ['cfg-boardRows',               'boardRows',               1],
   ['cfg-startingUnits',           'startingUnits',           1],
@@ -494,6 +504,7 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
 
 // Proxy type for key checking only — never instantiated
 declare const _cfgNumProxy: {
+  controlPointCount: number; conquestPointsPlayer: number; conquestPointsAi: number;
   boardCols: number; boardRows: number; startingUnits: number;
   productionPointsPerTurn: number; infantryCost: number;
   territoryQuota: number; pointsPerQuota: number;
@@ -519,6 +530,9 @@ function populateSettings(): void {
   const tank = config.unitTypes.find(u => u.id === 'tank') ?? config.unitTypes[0];
   const infantryCost = infantry.cost;
   const vals: Record<string, number> = {
+    controlPointCount: config.controlPointCount,
+    conquestPointsPlayer: config.conquestPointsPlayer,
+    conquestPointsAi: config.conquestPointsAi,
     boardCols: config.boardCols, boardRows: config.boardRows,
     startingUnits: config.startingUnits,
     productionPointsPerTurn: config.productionPointsPerTurn,
@@ -544,10 +558,19 @@ function populateSettings(): void {
     el.dataset.value = String(val);
     el.textContent = val ? 'ON' : 'OFF';
   }
+  const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
+  gameModeEl.value = config.gameMode;
+  updateConquestSettingsVisibility();
+}
+
+function updateConquestSettingsVisibility(): void {
+  const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
+  const wrap = document.getElementById('settings-conquest-only') as HTMLDivElement;
+  wrap.classList.toggle('hidden', gameModeEl.value !== 'conquest');
 }
 
 function collectSettings(): Parameters<typeof updateConfig>[0] {
-  const out: Record<string, number | boolean> = {};
+  const out: Record<string, number | boolean | GameMode> = {};
   for (const [id, key, scale] of NUM_FIELDS) {
     const el = document.getElementById(id) as HTMLInputElement;
     out[key] = parseFloat(el.value) / scale;
@@ -556,6 +579,8 @@ function collectSettings(): Parameters<typeof updateConfig>[0] {
     const el = document.getElementById(id) as HTMLButtonElement;
     out[key] = el.dataset.value === 'true';
   }
+  const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
+  out.gameMode = gameModeEl.value as GameMode;
   return out as Parameters<typeof updateConfig>[0];
 }
 
@@ -568,6 +593,8 @@ for (const [id] of TOGGLE_FIELDS) {
     el.textContent = next ? 'ON' : 'OFF';
   });
 }
+
+document.getElementById('cfg-gameMode')!.addEventListener('change', updateConquestSettingsVisibility);
 
 let settingsOnStart: (() => void) | null = null;
 
@@ -726,14 +753,18 @@ function buildRulesContent(): string {
           +${config.healEnemyTerritory} HP on <strong>enemy territory</strong>.</li>
     </ul>
 
-    <h3>Victory</h3>
+    <h3>Game modes</h3>
+    <p>The match mode is chosen in <strong>Game settings</strong> before play.</p>
     <ul>
-      <li>Move a unit onto the <strong>opponent's home row</strong>, or <strong>eliminate all enemy units</strong>.</li>
+      <li><strong>Domination:</strong> move a unit onto the <strong>opponent&rsquo;s home row</strong>, or <strong>eliminate all enemy units</strong>.</li>
+      <li><strong>Conquest:</strong> marked <strong>control point</strong> hexes appear on the map (default ${config.controlPointCount} in current settings).
+        Each side starts with <strong>Conquer Points</strong> (south ${config.conquestPointsPlayer}, north ${config.conquestPointsAi} — configurable).
+        After each full round, for every control point you <strong>own</strong>, the opponent loses 1 Conquer Point (multiple points stack).
+        The first side reduced to <strong>0</strong> Conquer Points loses. Reaching the home row or wiping the enemy army does <strong>not</strong> end the match in this mode.
+        If both sides hit 0 in the same tick, the <strong>northern</strong> player wins the tie.</li>
     </ul>
   `;
 }
-
-(document.getElementById('rules-content') as HTMLDivElement).innerHTML = buildRulesContent();
 
 // ── Lobby helpers ─────────────────────────────────────────────────────────────
 
@@ -1732,6 +1763,16 @@ function updateUI(): void {
   turnEl.textContent  = `Turn ${state.turn}`;
   phaseEl.textContent = state.phase.charAt(0).toUpperCase() + state.phase.slice(1);
   ppDisplay.textContent = String(state.productionPoints[localPlayer]);
+
+  const isConquest = state.gameMode === 'conquest' && state.conquestPoints;
+  cpInfoEl.classList.toggle('hidden', !isConquest);
+  if (isConquest) {
+    const cp = state.conquestPoints!;
+    const youCp = localPlayer === PLAYER ? cp[PLAYER] : cp[AI];
+    const oppCp = localPlayer === PLAYER ? cp[AI] : cp[PLAYER];
+    cpYouEl.textContent = String(youCp);
+    cpOpponentEl.textContent = String(oppCp);
+  }
 
   // Update conquer header
   const totalHexes = COLS * ROWS;

@@ -23,6 +23,16 @@ export function loadGameState(): GameState | null {
 
     // Backward-compat: mountainHexes added later
     if (!state.mountainHexes) state.mountainHexes = [];
+    if (state.gameMode == null) state.gameMode = 'domination';
+    if (!state.controlPointHexes) state.controlPointHexes = [];
+    if (state.gameMode !== 'conquest') {
+      state.conquestPoints = null;
+    } else if (state.conquestPoints == null) {
+      state.conquestPoints = {
+        1: config.conquestPointsPlayer,
+        2: config.conquestPointsAi,
+      };
+    }
 
     // Migrate units — fill in fields that may be absent from older saves
     for (const unit of state.units) {

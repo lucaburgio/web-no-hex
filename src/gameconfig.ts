@@ -1,4 +1,4 @@
-import type { GameConfig, UnitType } from './types';
+import type { GameConfig, GameMode, UnitType } from './types';
 
 type UnitTypePatches = {
   infantryCost?: number;
@@ -32,6 +32,11 @@ export function updateConfig(overrides: Partial<Omit<GameConfig, 'unitTypes'>> &
 }
 
 const config: GameConfig = {
+  gameMode: 'domination' as GameMode,
+  controlPointCount: 1,
+  conquestPointsPlayer: 14,
+  conquestPointsAi: 14,
+
   // Board dimensions (number of hexes)
   boardCols: 8,
   boardRows: 8,
