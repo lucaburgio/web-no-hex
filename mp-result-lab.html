@@ -93,6 +93,15 @@
       text-transform: lowercase;
       color: var(--color-dark);
       margin: 0;
+      text-shadow:
+        0 0 24px rgba(225, 217, 214, 0.95),
+        0 2px 10px rgba(225, 217, 214, 0.85);
+    }
+    .lab-overlay[data-outcome='win'] .mp-result-blob-image {
+      filter: saturate(1.08) brightness(1.03);
+    }
+    .lab-overlay[data-outcome='lose'] .mp-result-blob-image {
+      filter: saturate(0.52) brightness(0.86) contrast(1.06);
     }
     .lab-actions {
       display: flex;
@@ -284,7 +293,7 @@
       </div>
     </section>
     <section class="lab-panel" data-variant="9">
-      <h2>9 — Iris circle (default)</h2>
+      <h2>9 — Iris circle</h2>
       <div class="lab-stage">
         <div class="lab-overlay lab-hidden">
           <div class="lab-inner">
@@ -302,9 +311,37 @@
       </div>
     </section>
     <section class="lab-panel" data-variant="10">
-      <h2>10 — Horizontal unfold</h2>
+      <h2>10 — Organic blob + photo (Pebble-style, production default)</h2>
       <div class="lab-stage">
-        <div class="lab-overlay lab-hidden">
+        <div class="lab-overlay lab-hidden" data-outcome="win">
+          <div class="mp-blob-scene" aria-hidden="true">
+            <svg class="mp-result-blob-svg" viewBox="0 0 1 1" preserveAspectRatio="xMidYMid slice">
+              <defs>
+                <mask id="lab-blob-mask-10" maskUnits="userSpaceOnUse" x="0" y="0" width="1" height="1">
+                  <rect width="1" height="1" fill="black"/>
+                  <g class="mp-result-blob-scale-group">
+                    <path
+                      fill="white"
+                      d="M0.48,0.09 C0.68,0.02 0.93,0.20 0.97,0.46 C0.99,0.72 0.85,0.94 0.55,0.97 C0.28,0.99 0.03,0.78 0.03,0.48 C0.03,0.18 0.26,0.05 0.48,0.09 Z"
+                    />
+                  </g>
+                </mask>
+              </defs>
+              <g class="mp-result-blob-media-root" mask="url(#lab-blob-mask-10)">
+                <g class="mp-result-blob-ken-group">
+                  <image
+                    class="mp-result-blob-image"
+                    href="public/mp-result-blob-texture.svg"
+                    x="0"
+                    y="0"
+                    width="1"
+                    height="1"
+                    preserveAspectRatio="xMidYMid slice"
+                  />
+                </g>
+              </g>
+            </svg>
+          </div>
           <div class="lab-inner">
             <p class="lab-text">victory</p>
             <div class="lab-actions">
