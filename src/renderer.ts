@@ -718,6 +718,15 @@ export function renderState(
       if (mountainSet.has(key)) continue;
       const [mc, mr] = key.split(',').map(Number);
       const { x, y } = hexToPixel(mc, mr);
+      const ring = svgEl('polygon');
+      ring.setAttribute('points', hexPoints(x, y));
+      ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke', '#000');
+      ring.setAttribute('stroke-width', '2.5');
+      ring.setAttribute('stroke-linejoin', 'round');
+      ring.setAttribute('pointer-events', 'none');
+      ring.setAttribute('class', 'control-point-ring');
+
       const img = svgEl('image');
       img.setAttribute('href', '/icons/control-point.svg');
       img.setAttribute('x', String(x - iw / 2));
@@ -727,9 +736,11 @@ export function renderState(
       img.setAttribute('pointer-events', 'none');
       if (flipBoardY) {
         const upright = svgUprightAt(x, y);
+        upright.appendChild(ring);
         upright.appendChild(img);
         controlPointLayer.appendChild(upright);
       } else {
+        controlPointLayer.appendChild(ring);
         controlPointLayer.appendChild(img);
       }
     }

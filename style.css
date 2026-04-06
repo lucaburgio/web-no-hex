@@ -265,6 +265,17 @@ body {
   animation: ranged-target-aim-bounce 1.35s ease-in-out infinite;
 }
 
+@keyframes control-point-ring-dash {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+
+#board .control-point-ring {
+  stroke-dasharray: 8 6;
+  animation: control-point-ring-dash 1.2s linear infinite;
+}
+
 /* ── Sticky footer ───────────────────────────────────────────────────────────── */
 #game-footer {
   position: fixed;
