@@ -852,21 +852,27 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
       maybeAutoEnd();
     });
   } else if (msg.type === 'state-update') {
-    // Opponent's in-turn update — apply only while it's their turn
-    if (state.activePlayer !== localPlayer) {
-      state = msg.state as GameState;
+    const incoming = msg.state as GameState;
+    // Apply opponent updates while it's their turn, or always accept terminal game-over state
+    // (otherwise the loser never runs checkWinner — only the winner does locally after their move).
+    if (incoming.winner != null || state.activePlayer !== localPlayer) {
+      state = incoming;
       syncUnitIdCounter(state);
       const anim = msg.animation as WsAnimationPayload | MoveAnimation | undefined;
+      const afterOpponentState = (): void => {
+        render();
+        updateUI();
+        checkWinner();
+        maybeAutoEnd();
+      };
       if (anim && !isAnimating) {
         isAnimating = true;
         runOpponentAnimationPayload(anim, () => {
           isAnimating = false;
-          render();
-          updateUI();
+          afterOpponentState();
         });
       } else {
-        render();
-        updateUI();
+        afterOpponentState();
       }
     }
   } else if (msg.type === 'error') {
