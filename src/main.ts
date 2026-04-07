@@ -944,6 +944,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     // Host runs end-turn cleanup
     const { state: afterHeal, healFloats } = endTurnAfterAi(state);
     state = afterHeal;
+    applyImmediateAutoSkipProductionIfNeeded();
     turnSnapshots.push(structuredClone(state));
     playEndTurnHealFloats(healFloats, () => {
       render();
@@ -1639,6 +1640,7 @@ function runAiTurnWithAnimation(): void {
   if (animSteps.length === 0) {
     const { state: next, healFloats } = endTurnAfterAi(state);
     state = next;
+    applyImmediateAutoSkipProductionIfNeeded();
     turnSnapshots.push(structuredClone(state));
     saveGameState(state);
     playEndTurnHealFloats(healFloats, () => {
@@ -1657,6 +1659,7 @@ function runAiTurnWithAnimation(): void {
     humanMoveAnimCancel = null;
     const { state: next, healFloats } = endTurnAfterAi(state);
     state = next;
+    applyImmediateAutoSkipProductionIfNeeded();
     turnSnapshots.push(structuredClone(state));
     saveGameState(state);
     playEndTurnHealFloats(healFloats, () => {
@@ -1795,6 +1798,19 @@ function shouldAutoSkipProductionPhase(): boolean {
     autoEndProductionEl.checked &&
     (!canAffordAnyUnit() || !hasHomeProductionAccess(state, localPlayer))
   );
+}
+
+/**
+ * Apply production auto-skip immediately before transient renders (like heal floats).
+ */
+function applyImmediateAutoSkipProductionIfNeeded(): void {
+  if (!shouldAutoSkipProductionPhase()) return;
+  if (gameMode === 'vsAI') {
+    state = playerEndProduction(state);
+  } else {
+    state = vsHumanEndProduction(state, localPlayer);
+  }
+  hideUnitPicker();
 }
 
 function maybeAutoEnd(): void {
@@ -1972,6 +1988,8 @@ interface SideFactors {
   flankCount: number;
   flankBonusPct: number;
   extraFlankingFrom?: { name: string; bonusPct: number }[];
+  breakthroughMalusMultPct?: number;
+  breakthroughMalusDeltaPct?: number;
 }
 
 function buildSideHTML(unit: Unit, dmg: number, hpAfter: number, label: string, labelClass: string, factors: SideFactors): string {
@@ -2000,6 +2018,9 @@ function buildSideHTML(unit: Unit, dmg: number, hpAfter: number, label: string, 
         ${(factors.extraFlankingFrom ?? []).map(
           e => `<div>· Extra flanking bonus from ${e.name}: +${e.bonusPct}%</div>`
         ).join('')}
+        ${factors.breakthroughMalusMultPct !== undefined && factors.breakthroughMalusDeltaPct !== undefined
+          ? `<div>· Breakthrough captured-sector malus: ${factors.breakthroughMalusDeltaPct}% (×${factors.breakthroughMalusMultPct}%)</div>`
+          : ''}
       </div>
     </div>`;
 }
@@ -2029,6 +2050,8 @@ function showCombatTooltip(attacker: Unit, defender: Unit, pageX: number, pageY:
     conditionPct: fc.defenderConditionPct,
     flankCount: 0,
     flankBonusPct: 0,
+    breakthroughMalusMultPct: fc.breakthroughDefenderMalus ? Math.round(config.breakthroughEnemySectorStrengthMult * 100) : undefined,
+    breakthroughMalusDeltaPct: fc.breakthroughDefenderMalus ? Math.round((config.breakthroughEnemySectorStrengthMult - 1) * 100) : undefined,
   };
 
   let outcomeText: string, outcomeClass: string;
