@@ -105,6 +105,7 @@ const aiConquerLabel      = document.getElementById('ai-conquer-label') as HTMLE
 const conquerBarEl        = document.getElementById('conquer-bar-line') as HTMLElement;
 const ppTooltipEl         = document.getElementById('pp-tooltip') as HTMLDivElement;
 const unitStatTooltipEl   = document.getElementById('unit-stat-tooltip') as HTMLDivElement;
+const settingsTooltipEl   = document.getElementById('settings-tooltip') as HTMLDivElement;
 const ppInfoEl            = document.getElementById('pp-info') as HTMLDivElement;
 
 const autoEndProductionEl = document.getElementById('auto-end-production') as HTMLInputElement;
@@ -634,6 +635,21 @@ function updateModeSpecificSettingsVisibility(): void {
   conquestWrap.classList.toggle('hidden', v !== 'conquest');
   breakthroughWrap.classList.toggle('hidden', v !== 'breakthrough');
   domConqWrap.classList.toggle('hidden', v !== 'domination' && v !== 'conquest');
+
+  // Breakthrough balance: territory quota economy is disabled for both factions.
+  const territoryQuotaEl = document.getElementById('cfg-territoryQuota') as HTMLInputElement;
+  const pointsPerQuotaEl = document.getElementById('cfg-pointsPerQuota') as HTMLInputElement;
+  const territoryQuotaRowEl = document.getElementById('cfg-territoryQuota-row') as HTMLDivElement | null;
+  const pointsPerQuotaRowEl = document.getElementById('cfg-pointsPerQuota-row') as HTMLDivElement | null;
+  const isBreakthrough = v === 'breakthrough';
+  if (isBreakthrough) {
+    territoryQuotaEl.value = '0';
+    pointsPerQuotaEl.value = '0';
+  }
+  territoryQuotaEl.disabled = isBreakthrough;
+  pointsPerQuotaEl.disabled = isBreakthrough;
+  territoryQuotaRowEl?.toggleAttribute('disabled', isBreakthrough);
+  pointsPerQuotaRowEl?.toggleAttribute('disabled', isBreakthrough);
 }
 
 function clampNumericInputToBounds(el: HTMLInputElement): number {
@@ -659,6 +675,10 @@ function collectSettings(): Parameters<typeof updateConfig>[0] {
   }
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   out.gameMode = gameModeEl.value as GameMode;
+  if (out.gameMode === 'breakthrough') {
+    out.territoryQuota = 0;
+    out.pointsPerQuota = 0;
+  }
   if (out.gameMode === 'breakthrough') {
     // Ignore Player 1/2 starting-unit fields in Breakthrough mode.
     out.startingUnitsPlayer1 = config.startingUnitsPlayer1;
@@ -702,6 +722,32 @@ for (const [id] of NUM_FIELDS) {
 
 document.getElementById('cfg-gameMode')!.addEventListener('change', updateModeSpecificSettingsVisibility);
 document.getElementById('cfg-breakthroughRandomRoles')?.addEventListener('change', syncBreakthroughRoleControls);
+
+const territoryQuotaLabelEl = document.getElementById('cfg-territoryQuota-label') as HTMLLabelElement | null;
+const pointsPerQuotaLabelEl = document.getElementById('cfg-pointsPerQuota-label') as HTMLLabelElement | null;
+const territoryQuotaInputEl = document.getElementById('cfg-territoryQuota') as HTMLInputElement | null;
+const pointsPerQuotaInputEl = document.getElementById('cfg-pointsPerQuota') as HTMLInputElement | null;
+const disabledBreakthroughTooltip =
+  'Disabled in Breakthrough mode to fairly balance the game for both factions.';
+
+function hideSettingsTooltip(): void {
+  settingsTooltipEl.classList.add('hidden');
+}
+
+function maybeShowSettingsTooltip(labelEl: HTMLLabelElement | null, inputEl: HTMLInputElement | null): void {
+  if (!labelEl || !inputEl || !inputEl.disabled) return;
+  settingsTooltipEl.textContent = disabledBreakthroughTooltip;
+  positionFixedTooltipBelow(settingsTooltipEl, labelEl.getBoundingClientRect());
+}
+
+territoryQuotaLabelEl?.addEventListener('mouseenter', () => {
+  maybeShowSettingsTooltip(territoryQuotaLabelEl, territoryQuotaInputEl);
+});
+territoryQuotaLabelEl?.addEventListener('mouseleave', hideSettingsTooltip);
+pointsPerQuotaLabelEl?.addEventListener('mouseenter', () => {
+  maybeShowSettingsTooltip(pointsPerQuotaLabelEl, pointsPerQuotaInputEl);
+});
+pointsPerQuotaLabelEl?.addEventListener('mouseleave', hideSettingsTooltip);
 
 let settingsOnStart: (() => void) | null = null;
 

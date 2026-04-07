@@ -17,11 +17,19 @@
   --color-yellow-500: #FFC13A;
   --color-gray-500: #9E9E9E;
   --color-gray-400: #B0B0B0;
+  --color-beige-500: #b2a8a5;
+  --color-beige-400: #c4bab7;
+  --color-beige-300: #d3cbc9;
   --color-dark: #000100;
   --color-red-700: #BD4E4E;
   --color-red-500: #ff6b6b;
   --color-green-500: #81e2a0;
   --color-green-700: #345B41;
+
+
+  --color-input: var(--color-beige-300);
+  --color-input-hover: var(--color-beige-400);
+  --color-input-focus: var(--color-beige-500);
 
     /* ── Background ─────────────────────────────────────────────────────────── */
     --color-bg: #E1D9D6;
@@ -1079,6 +1087,9 @@ body {
   padding: 6px 0;
   gap: 1rem;
 }
+.settings-row[disabled] .settings-label {
+  color: var(--color-gray-500);
+}
 
 .settings-label {
   font-family: 'Disket Mono', monospace;
@@ -1087,6 +1098,7 @@ body {
   color: var(--color-dark);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 
 .settings-input {
@@ -1094,17 +1106,20 @@ body {
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--color-dark);
-  background: transparent;
+  background: var(--color-input);
   border: none;
-  border-bottom: 1px solid var(--color-dark);
   outline: none;
   width: 64px;
   text-align: right;
-  padding: 4px 0;
+  padding: 10px 0;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 
+.settings-input:hover {
+  background: var(--color-input-hover);
+}
 .settings-input:focus {
-  border-bottom-color: var(--color-yellow-500);
+  background: var(--color-input-focus);
 }
 
 select.settings-input.settings-select {

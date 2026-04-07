@@ -194,12 +194,12 @@
           <label class="settings-label" for="cfg-productionPointsPerTurn">PP per turn</label>
           <input class="settings-input" type="number" id="cfg-productionPointsPerTurn" min="1" max="200" step="1" />
         </div>
-        <div class="settings-row">
-          <label class="settings-label" for="cfg-territoryQuota">Territory quota (hexes)</label>
+        <div class="settings-row" id="cfg-territoryQuota-row">
+          <label class="settings-label" id="cfg-territoryQuota-label" for="cfg-territoryQuota">Territory quota (hexes)</label>
           <input class="settings-input" type="number" id="cfg-territoryQuota" min="1" max="50" step="1" />
         </div>
-        <div class="settings-row">
-          <label class="settings-label" for="cfg-pointsPerQuota">Bonus PP per quota</label>
+        <div class="settings-row" id="cfg-pointsPerQuota-row">
+          <label class="settings-label" id="cfg-pointsPerQuota-label" for="cfg-pointsPerQuota">Bonus PP per quota</label>
           <input class="settings-input" type="number" id="cfg-pointsPerQuota" min="0" max="50" step="1" />
         </div>
         <div class="settings-row">
@@ -342,6 +342,8 @@
   <div id="pp-tooltip" class="tooltip hidden"></div>
 
   <div id="unit-stat-tooltip" class="tooltip hidden"></div>
+
+  <div id="settings-tooltip" class="tooltip hidden"></div>
 
   <script type="module" src="src/main.ts"></script>
 </body>
