@@ -236,6 +236,8 @@ let pendingProductionHex: { col: number; row: number } | null = null;
 let isAnimating = false;
 /** True while local vs-AI AI turn visuals run (shared cancel token must not be treated as human interrupt). */
 let aiPlaybackInProgress = false;
+/** True after player ends movement, before AI playback starts. */
+let aiTurnPendingStart = false;
 /** Cancel function for the local player's in-flight move animation (allows selecting another unit mid-animation). */
 let humanMoveAnimCancel: (() => void) | null = null;
 let turnSnapshots: GameState[] = [];
@@ -1112,6 +1114,7 @@ function startGame(initialState: GameState): void {
   humanMoveAnimCancel = null;
   isAnimating = false;
   aiPlaybackInProgress = false;
+  aiTurnPendingStart = false;
   turnSnapshots = [structuredClone(state)];
   initRenderer(svg, { flipBoardY: gameMode === 'vsHuman' && localPlayer === AI });
   syncGuestIdentityColors();
@@ -1664,184 +1667,190 @@ function aiReplayState(base: GameState, units: Unit[]): GameState {
 }
 
 function runAiTurnWithAnimation(): void {
-  // Block input immediately: activePlayer stays PLAYER until endTurnAfterAi, so clicks would
-  // otherwise pass the activePlayer check. Must be true before sync aiMovement() and when
-  // animSteps.length === 0 (no later isAnimating assignment).
+  // Block input immediately, then yield one frame so "waiting" status can paint
+  // before synchronous AI planning starts.
   if (isAnimating) return;
+  aiTurnPendingStart = true;
   isAnimating = true;
-  aiPlaybackInProgress = true;
-  aiTurnPerfStartMs = performance.now();
+  updateUI();
+  // Use a macrotask so the "Waiting for AI.." label gets a chance to paint first.
+  setTimeout(() => {
+    aiTurnPendingStart = false;
+    aiPlaybackInProgress = true;
+    aiTurnPerfStartMs = performance.now();
+    updateUI();
 
-  clearMovePathPreview();
-  const tPlanStart = performance.now();
-  state = prepareAiTurn(state);
+    clearMovePathPreview();
+    const tPlanStart = performance.now();
+    state = prepareAiTurn(state);
 
-  const aiResult = aiMovement(state);
-  perfLog('phase.aiPlanSync', performance.now() - tPlanStart);
-  state = aiResult.state;
-  const animSteps = aiResult.animSteps;
-  const animUnitsBefore = aiResult.animUnitsBefore;
-  const animUnitsAfter = aiResult.animUnitsAfter;
+    const aiResult = aiMovement(state);
+    perfLog('phase.aiPlanSync', performance.now() - tPlanStart);
+    state = aiResult.state;
+    const animSteps = aiResult.animSteps;
+    const animUnitsBefore = aiResult.animUnitsBefore;
+    const animUnitsAfter = aiResult.animUnitsAfter;
 
-  if (state.winner) {
-    isAnimating = false;
-    aiPlaybackInProgress = false;
-    render(); updateUI(); checkWinner();
-    if (aiTurnPerfStartMs !== null) {
-      perfLog('phase.aiTurnTotal', performance.now() - aiTurnPerfStartMs);
-      aiTurnPerfStartMs = null;
+    if (state.winner) {
+      isAnimating = false;
+      aiPlaybackInProgress = false;
+      render(); updateUI(); checkWinner();
+      if (aiTurnPerfStartMs !== null) {
+        perfLog('phase.aiTurnTotal', performance.now() - aiTurnPerfStartMs);
+        aiTurnPerfStartMs = null;
+      }
+      return;
     }
-    return;
-  }
 
-  if (animSteps.length === 0) {
-    const { state: next, healFloats } = endTurnAfterAi(state);
-    state = next;
-    applyImmediateAutoSkipProductionIfNeeded();
-    turnSnapshots.push(structuredClone(state));
-    scheduleSaveGameState();
-    playEndTurnHealFloats(healFloats, () => {
-      aiPlaybackInProgress = false;
-      render();
-      updateUI();
-      checkWinner();
-      maybeAutoEnd();
-      if (aiTurnPerfStartMs !== null) {
-        perfLog('phase.aiTurnTotal', performance.now() - aiTurnPerfStartMs);
-        aiTurnPerfStartMs = null;
-      }
-    });
-    return;
-  }
-
-  syncDamageFloatCssDuration();
-  const boardArea = COLS * ROWS;
-  const aiAnimScale =
-    boardArea >= 1600 ? 0.25 :
-    boardArea >= 900 ? 0.4 :
-    boardArea >= 400 ? 0.6 :
-    1;
-  const aiMoveDuration = Math.max(80, Math.round(config.unitMoveSpeed * aiAnimScale));
-  const aiStrikeDuration = Math.max(90, Math.round(config.strikeReturnSpeedMs * aiAnimScale));
-  const aiFloatDuration = Math.max(180, Math.round(config.damageFloatDurationMs * aiAnimScale));
-
-  const finishAi = (): void => {
-    humanMoveAnimCancel = null;
-    const { state: next, healFloats } = endTurnAfterAi(state);
-    state = next;
-    applyImmediateAutoSkipProductionIfNeeded();
-    turnSnapshots.push(structuredClone(state));
-    scheduleSaveGameState();
-    playEndTurnHealFloats(healFloats, () => {
-      aiPlaybackInProgress = false;
-      render();
-      updateUI();
-      checkWinner();
-      maybeAutoEnd();
-      if (aiTurnPerfStartMs !== null) {
-        perfLog('phase.aiTurnTotal', performance.now() - aiTurnPerfStartMs);
-        aiTurnPerfStartMs = null;
-      }
-    });
-  };
-
-  const playOneCombatVfx = (
-    vfx: CombatVfxPayload,
-    unitsBefore: Unit[],
-    unitsAfter: Unit[],
-    onDone: () => void,
-  ): void => {
-    const floats = vfx.damageFloats;
-    const sr = vfx.strikeReturn;
-
-    /**
-     * After strike: board already showed the exchange — use unitsAfter for floats.
-     * No strike (e.g. attacker dies): show unitsBefore while floats play so casualties
-     * do not vanish before the damage labels; then snap to unitsAfter.
-     */
-    const runFloats = (afterStrike: boolean): void => {
-      const initial = cloneUnits(afterStrike ? unitsAfter : unitsBefore);
-      renderState(svg, state, null, new Set(), localPlayer, initial);
-      updateUI();
-      if (floats.length === 0) {
-        renderState(svg, state, null, new Set(), localPlayer, cloneUnits(unitsAfter));
+    if (animSteps.length === 0) {
+      const { state: next, healFloats } = endTurnAfterAi(state);
+      state = next;
+      applyImmediateAutoSkipProductionIfNeeded();
+      turnSnapshots.push(structuredClone(state));
+      scheduleSaveGameState();
+      playEndTurnHealFloats(healFloats, () => {
+        aiPlaybackInProgress = false;
+        render();
         updateUI();
-        onDone();
-        return;
-      }
-      const afterDamageFloats = (): void => {
-        renderState(svg, state, null, new Set(), localPlayer, cloneUnits(unitsAfter));
+        checkWinner();
+        maybeAutoEnd();
+        if (aiTurnPerfStartMs !== null) {
+          perfLog('phase.aiTurnTotal', performance.now() - aiTurnPerfStartMs);
+          aiTurnPerfStartMs = null;
+        }
+      });
+      return;
+    }
+
+    syncDamageFloatCssDuration();
+    const boardArea = COLS * ROWS;
+    const aiAnimScale =
+      boardArea >= 1600 ? 0.25 :
+      boardArea >= 900 ? 0.4 :
+      boardArea >= 400 ? 0.6 :
+      1;
+    const aiMoveDuration = Math.max(80, Math.round(config.unitMoveSpeed * aiAnimScale));
+    const aiStrikeDuration = Math.max(90, Math.round(config.strikeReturnSpeedMs * aiAnimScale));
+    const aiFloatDuration = Math.max(180, Math.round(config.damageFloatDurationMs * aiAnimScale));
+
+    const finishAi = (): void => {
+      humanMoveAnimCancel = null;
+      const { state: next, healFloats } = endTurnAfterAi(state);
+      state = next;
+      applyImmediateAutoSkipProductionIfNeeded();
+      turnSnapshots.push(structuredClone(state));
+      scheduleSaveGameState();
+      playEndTurnHealFloats(healFloats, () => {
+        aiPlaybackInProgress = false;
+        render();
         updateUI();
-        onDone();
+        checkWinner();
+        maybeAutoEnd();
+        if (aiTurnPerfStartMs !== null) {
+          perfLog('phase.aiTurnTotal', performance.now() - aiTurnPerfStartMs);
+          aiTurnPerfStartMs = null;
+        }
+      });
+    };
+
+    const playOneCombatVfx = (
+      vfx: CombatVfxPayload,
+      unitsBefore: Unit[],
+      unitsAfter: Unit[],
+      onDone: () => void,
+    ): void => {
+      const floats = vfx.damageFloats;
+      const sr = vfx.strikeReturn;
+
+      /**
+       * After strike: board already showed the exchange — use unitsAfter for floats.
+       * No strike (e.g. attacker dies): show unitsBefore while floats play so casualties
+       * do not vanish before the damage labels; then snap to unitsAfter.
+       */
+      const runFloats = (afterStrike: boolean): void => {
+        const initial = cloneUnits(afterStrike ? unitsAfter : unitsBefore);
+        renderState(svg, state, null, new Set(), localPlayer, initial);
+        updateUI();
+        if (floats.length === 0) {
+          renderState(svg, state, null, new Set(), localPlayer, cloneUnits(unitsAfter));
+          updateUI();
+          onDone();
+          return;
+        }
+        const afterDamageFloats = (): void => {
+          renderState(svg, state, null, new Set(), localPlayer, cloneUnits(unitsAfter));
+          updateUI();
+          onDone();
+        };
+        const playDamageFloats = (): void => {
+          const { cancel } = showDamageFloats(svg, floats, aiFloatDuration, afterDamageFloats);
+          humanMoveAnimCancel = combineAnimCancels(cancel);
+        };
+        if (vfx.ranged) {
+          const d = floats[0]!;
+          const { cancel } = playRangedArtilleryHexBarrageVfx(svg, d.col, d.row, playDamageFloats);
+          humanMoveAnimCancel = combineAnimCancels(cancel);
+        } else {
+          playDamageFloats();
+        }
       };
-      const playDamageFloats = (): void => {
-        const { cancel } = showDamageFloats(svg, floats, aiFloatDuration, afterDamageFloats);
-        humanMoveAnimCancel = combineAnimCancels(cancel);
-      };
-      if (vfx.ranged) {
-        const d = floats[0]!;
-        const { cancel } = playRangedArtilleryHexBarrageVfx(svg, d.col, d.row, playDamageFloats);
+
+      if (sr) {
+        const u =
+          getUnitById(state, sr.attackerId) ??
+          unitsBefore.find(x => x.id === sr.attackerId);
+        if (!u) {
+          runFloats(false);
+          return;
+        }
+        const ub = cloneUnits(unitsBefore);
+        renderState(svg, state, null, new Set([sr.attackerId]), localPlayer, ub);
+        updateUI();
+        const { cancel } = animateStrikeAndReturn(
+          svg,
+          {
+            unit: { ...u },
+            fromCol: sr.fromCol,
+            fromRow: sr.fromRow,
+            enemyCol: sr.enemyCol,
+            enemyRow: sr.enemyRow,
+            durationMs: aiStrikeDuration,
+          },
+          () => runFloats(true),
+          aiReplayState(state, ub),
+        );
         humanMoveAnimCancel = combineAnimCancels(cancel);
       } else {
-        playDamageFloats();
+        runFloats(false);
       }
     };
 
-    if (sr) {
-      const u =
-        getUnitById(state, sr.attackerId) ??
-        unitsBefore.find(x => x.id === sr.attackerId);
-      if (!u) {
-        runFloats(false);
+    const runStep = (index: number): void => {
+      if (index >= animSteps.length) {
+        finishAi();
         return;
       }
-      const ub = cloneUnits(unitsBefore);
-      renderState(svg, state, null, new Set([sr.attackerId]), localPlayer, ub);
-      updateUI();
-      const { cancel } = animateStrikeAndReturn(
-        svg,
-        {
-          unit: { ...u },
-          fromCol: sr.fromCol,
-          fromRow: sr.fromRow,
-          enemyCol: sr.enemyCol,
-          enemyRow: sr.enemyRow,
-          durationMs: aiStrikeDuration,
-        },
-        () => runFloats(true),
-        aiReplayState(state, ub),
-      );
-      humanMoveAnimCancel = combineAnimCancels(cancel);
-    } else {
-      runFloats(false);
-    }
-  };
+      const step = animSteps[index]!;
+      const before = cloneUnits(animUnitsBefore[index]!);
+      if (step.type === 'move') {
+        const a = step.anim;
+        renderState(svg, state, null, new Set([a.unit.id]), localPlayer, before);
+        updateUI();
+        const { cancel } = animateMoves(
+          svg,
+          [a],
+          aiMoveDuration,
+          () => runStep(index + 1),
+          aiReplayState(state, before),
+        );
+        humanMoveAnimCancel = combineAnimCancels(cancel);
+      } else {
+        playOneCombatVfx(step.vfx, before, animUnitsAfter[index]!, () => runStep(index + 1));
+      }
+    };
 
-  const runStep = (index: number): void => {
-    if (index >= animSteps.length) {
-      finishAi();
-      return;
-    }
-    const step = animSteps[index]!;
-    const before = cloneUnits(animUnitsBefore[index]!);
-    if (step.type === 'move') {
-      const a = step.anim;
-      renderState(svg, state, null, new Set([a.unit.id]), localPlayer, before);
-      updateUI();
-      const { cancel } = animateMoves(
-        svg,
-        [a],
-        aiMoveDuration,
-        () => runStep(index + 1),
-        aiReplayState(state, before),
-      );
-      humanMoveAnimCancel = combineAnimCancels(cancel);
-    } else {
-      playOneCombatVfx(step.vfx, before, animUnitsAfter[index]!, () => runStep(index + 1));
-    }
-  };
-
-  runStep(0);
+    runStep(0);
+  }, 0);
 }
 
 function leaveEndGameToMainMenu(): void {
@@ -2018,9 +2027,17 @@ function updateUI(): void {
     `linear-gradient(to right, ${localColor} ${leftPct}%, ${opponentColor} ${leftPct}%)`;
 
   const isMyTurn = state.activePlayer === localPlayer;
+  const showAiWaitingStatus = gameMode === 'vsAI' && aiTurnPendingStart;
+  const showAiPlanningStatus = gameMode === 'vsAI' && aiPlaybackInProgress;
   if (hidingTransientAutoSkippedProduction) {
     endMoveBtn.style.display = 'none';
     phaseLabelEl.textContent = '';
+  } else if (showAiWaitingStatus) {
+    endMoveBtn.style.display = 'none';
+    phaseLabelEl.textContent = 'Waiting for AI..';
+  } else if (showAiPlanningStatus) {
+    endMoveBtn.style.display = 'none';
+    phaseLabelEl.textContent = 'AI is planning';
   } else
   if ((state.phase === 'production' || state.phase === 'movement') && isMyTurn) {
     endMoveBtn.style.display = 'flex';
