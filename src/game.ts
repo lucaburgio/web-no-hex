@@ -216,7 +216,18 @@ function pickBreakthroughSectorControlPoint(sectorKeys: string[], cols: number, 
 
 // ── Hex territory ─────────────────────────────────────────────────────────────
 
+/** Breakthrough: sector politically captured by the attacker — defender cannot change hex ownership there. */
+function breakthroughHexLockedToAttacker(state: GameState, col: number, row: number): boolean {
+  if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return false;
+  const sid = state.sectorIndexByHex[`${col},${row}`];
+  if (sid === undefined) return false;
+  return state.sectorOwners[sid] === PLAYER;
+}
+
 function conquerHex(state: GameState, col: number, row: number, owner: Owner): void {
+  if (state.gameMode === 'breakthrough' && owner === AI && breakthroughHexLockedToAttacker(state, col, row)) {
+    owner = PLAYER;
+  }
   const key = `${col},${row}`;
   if ((state.mountainHexes ?? []).includes(key)) return;
   const existing = state.hexStates[key];
@@ -912,6 +923,25 @@ function applyConquestEndOfRound(state: GameState): void {
   checkVictory(state);
 }
 
+/** Breakthrough: when a sector is captured, every playable hex in it becomes attacker territory. */
+function breakthroughAssignCapturedSectorHexes(state: GameState, sectorIndex: number): void {
+  const keys = state.sectorHexes[sectorIndex];
+  if (!keys?.length) return;
+  const mountains = new Set(state.mountainHexes ?? []);
+  for (const key of keys) {
+    if (mountains.has(key)) continue;
+    const [c, r] = key.split(',').map(Number);
+    const existing = state.hexStates[key];
+    if (existing) {
+      existing.owner = PLAYER;
+      existing.stableFor = 0;
+      existing.isProduction = false;
+    } else {
+      state.hexStates[key] = { owner: PLAYER, stableFor: 0, isProduction: false };
+    }
+  }
+}
+
 /** Breakthrough: after a full round, advance CP occupation; capture sectors after two consecutive rounds. */
 function applyBreakthroughEndOfRound(state: GameState): void {
   if (state.gameMode !== 'breakthrough' || !state.sectorControlPointHex?.length) return;
@@ -925,7 +955,11 @@ function applyBreakthroughEndOfRound(state: GameState): void {
       if (state.breakthroughCpOccupation[i] >= 2) {
         state.sectorOwners[i] = PLAYER;
         state.breakthroughCpOccupation[i] = 0;
-        log(state, `Breakthrough: sector ${i + 1} captured — control point held for two full rounds.`);
+        breakthroughAssignCapturedSectorHexes(state, i);
+        log(
+          state,
+          `Breakthrough: sector ${i + 1} captured — all hexes in the sector are attacker territory; defender cannot take them back.`,
+        );
       }
     } else {
       state.breakthroughCpOccupation[i] = 0;

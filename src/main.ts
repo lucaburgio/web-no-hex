@@ -798,8 +798,9 @@ function buildRulesContent(): string {
         Reaching the opponent&rsquo;s home row alone does <strong>not</strong> end the match.
         If both sides hit 0 Conquer Points in the same tick, or both are totally eliminated from the map at once, the <strong>northern</strong> player wins the tie.</li>
       <li><strong>Breakthrough:</strong> the map is split into <strong>${config.breakthroughSectorCount}</strong> sectors (configurable, south to north). The <strong>southern attacker</strong> starts with <strong>${config.breakthroughAttackerStartingPP} PP</strong> and earns <strong>no further PP</strong>; the <strong>northern defender</strong> earns the usual per-turn PP plus territory bonus.
-        Each sector has a <strong>control point</strong>. Hexes are conquered as usual; to capture a sector, the attacker must keep a unit on that sector&rsquo;s control point for <strong>two full rounds</strong> (checked after both sides move). Once a sector is captured, it <strong>never</strong> flips back to the defender even if they retake the hex.
-        <strong>Northern units</strong> standing in a sector the attacker has captured fight at <strong>${Math.round(config.breakthroughEnemySectorStrengthMult * 100)}%</strong> strength (configurable).
+        Each sector has a <strong>control point</strong>. To capture a sector, the attacker must keep a unit on that sector&rsquo;s control point for <strong>two full rounds</strong> (checked after both sides move). When a sector is captured, <strong>every hex in that sector</strong> immediately becomes attacker territory.
+        After that, the defender <strong>cannot regain those hexes</strong> — they may still fight and move there, but hex ownership stays with the attacker. The sector itself also <strong>never</strong> flips back politically.
+        <strong>Northern units</strong> in a captured sector fight at <strong>${Math.round(config.breakthroughEnemySectorStrengthMult * 100)}%</strong> strength (configurable).
         <strong>Attacker wins</strong> by holding every sector; <strong>defender wins</strong> if the attacker has no units left.</li>
     </ul>
   `;
