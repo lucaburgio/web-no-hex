@@ -141,6 +141,8 @@ export interface GameConfig {
   breakthroughSectorCount: number;
   /** Breakthrough: defender strength multiplier while in a sector controlled by the attacker. */
   breakthroughEnemySectorStrengthMult: number;
+  /** Breakthrough: PP granted to the attacker when they capture a sector (control point removed). */
+  breakthroughSectorCaptureBonusPP: number;
 
   boardCols: number;
   boardRows: number;

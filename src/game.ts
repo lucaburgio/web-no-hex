@@ -923,6 +923,14 @@ function applyConquestEndOfRound(state: GameState): void {
   checkVictory(state);
 }
 
+/** Breakthrough: remove the sector control point marker from play once the sector is captured. */
+function breakthroughRemoveSectorControlPoint(state: GameState, sectorIndex: number): void {
+  const cp = state.sectorControlPointHex[sectorIndex];
+  if (!cp) return;
+  state.controlPointHexes = state.controlPointHexes.filter(k => k !== cp);
+  state.sectorControlPointHex[sectorIndex] = '';
+}
+
 /** Breakthrough: when a sector is captured, every playable hex in it becomes attacker territory. */
 function breakthroughAssignCapturedSectorHexes(state: GameState, sectorIndex: number): void {
   const keys = state.sectorHexes[sectorIndex];
@@ -948,7 +956,8 @@ function applyBreakthroughEndOfRound(state: GameState): void {
   const n = state.sectorControlPointHex.length;
   for (let i = 0; i < n; i++) {
     if (state.sectorOwners[i] === PLAYER) continue;
-    const cp = state.sectorControlPointHex[i]!;
+    const cp = state.sectorControlPointHex[i];
+    if (!cp) continue;
     const attackerOnCp = state.units.some(u => u.owner === PLAYER && `${u.col},${u.row}` === cp);
     if (attackerOnCp) {
       state.breakthroughCpOccupation[i] = (state.breakthroughCpOccupation[i] ?? 0) + 1;
@@ -956,9 +965,16 @@ function applyBreakthroughEndOfRound(state: GameState): void {
         state.sectorOwners[i] = PLAYER;
         state.breakthroughCpOccupation[i] = 0;
         breakthroughAssignCapturedSectorHexes(state, i);
+        breakthroughRemoveSectorControlPoint(state, i);
+        const bonus = config.breakthroughSectorCaptureBonusPP;
+        if (bonus > 0) {
+          state.productionPoints[PLAYER] += bonus;
+        }
         log(
           state,
-          `Breakthrough: sector ${i + 1} captured — all hexes in the sector are attacker territory; defender cannot take them back.`,
+          bonus > 0
+            ? `Breakthrough: sector ${i + 1} captured — attacker territory locked; control point cleared. +${bonus} PP.`
+            : `Breakthrough: sector ${i + 1} captured — attacker territory locked; control point cleared.`,
         );
       }
     } else {

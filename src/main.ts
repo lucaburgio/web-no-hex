@@ -108,9 +108,15 @@ rulesOverlayEl.addEventListener('click', e => { if (e.target === rulesOverlayEl)
 ppInfoEl.addEventListener('mouseenter', () => {
   if (state.gameMode === 'breakthrough') {
     if (localPlayer === PLAYER) {
+      const cap = config.breakthroughSectorCaptureBonusPP;
+      const bonusLine =
+        cap > 0
+          ? `<div class="pp-tt-row"><span>Sector capture</span><span>+${cap} PP each</span></div>`
+          : '';
       ppTooltipEl.innerHTML = `
         <div class="pp-tt-row"><span>Attacker (south)</span><span>No PP income</span></div>
-        <div class="pp-tt-next">Spend your starting pool only; territory does not add PP.</div>`;
+        ${bonusLine}
+        <div class="pp-tt-next">Spend your starting pool only; territory does not add PP per turn.</div>`;
     } else {
       const ownedHexes = Object.values(state.hexStates).filter(h => h.owner === localPlayer).length;
       const quotas = Math.floor(ownedHexes / config.territoryQuota);
@@ -499,6 +505,7 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
   ['cfg-breakthroughAttackerStartingPP', 'breakthroughAttackerStartingPP', 1],
   ['cfg-breakthroughSectorCount', 'breakthroughSectorCount', 1],
   ['cfg-breakthroughEnemySectorStrengthMult', 'breakthroughEnemySectorStrengthMult', 100],
+  ['cfg-breakthroughSectorCaptureBonusPP', 'breakthroughSectorCaptureBonusPP', 1],
   ['cfg-boardCols',               'boardCols',               1],
   ['cfg-boardRows',               'boardRows',               1],
   ['cfg-startingUnits',           'startingUnits',           1],
@@ -527,6 +534,7 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
 declare const _cfgNumProxy: {
   controlPointCount: number; conquestPointsPlayer: number; conquestPointsAi: number;
   breakthroughAttackerStartingPP: number; breakthroughSectorCount: number; breakthroughEnemySectorStrengthMult: number;
+  breakthroughSectorCaptureBonusPP: number;
   boardCols: number; boardRows: number; startingUnits: number;
   productionPointsPerTurn: number; infantryCost: number;
   territoryQuota: number; pointsPerQuota: number;
@@ -558,6 +566,7 @@ function populateSettings(): void {
     breakthroughAttackerStartingPP: config.breakthroughAttackerStartingPP,
     breakthroughSectorCount: config.breakthroughSectorCount,
     breakthroughEnemySectorStrengthMult: config.breakthroughEnemySectorStrengthMult,
+    breakthroughSectorCaptureBonusPP: config.breakthroughSectorCaptureBonusPP,
     boardCols: config.boardCols, boardRows: config.boardRows,
     startingUnits: config.startingUnits,
     productionPointsPerTurn: config.productionPointsPerTurn,
@@ -798,7 +807,7 @@ function buildRulesContent(): string {
         Reaching the opponent&rsquo;s home row alone does <strong>not</strong> end the match.
         If both sides hit 0 Conquer Points in the same tick, or both are totally eliminated from the map at once, the <strong>northern</strong> player wins the tie.</li>
       <li><strong>Breakthrough:</strong> the map is split into <strong>${config.breakthroughSectorCount}</strong> sectors (configurable, south to north). The <strong>southern attacker</strong> starts with <strong>${config.breakthroughAttackerStartingPP} PP</strong> and earns <strong>no further PP</strong>; the <strong>northern defender</strong> earns the usual per-turn PP plus territory bonus.
-        Each sector has a <strong>control point</strong>. To capture a sector, the attacker must keep a unit on that sector&rsquo;s control point for <strong>two full rounds</strong> (checked after both sides move). When a sector is captured, <strong>every hex in that sector</strong> immediately becomes attacker territory.
+        Each sector has a <strong>control point</strong> until captured. To capture a sector, the attacker must keep a unit on that control point for <strong>two full rounds</strong> (checked after both sides move). When a sector is captured, the marker is removed, <strong>every hex in that sector</strong> becomes attacker territory, and the attacker gains <strong>+${config.breakthroughSectorCaptureBonusPP} PP</strong> (configurable; 0 to disable).
         After that, the defender <strong>cannot regain those hexes</strong> — they may still fight and move there, but hex ownership stays with the attacker. The sector itself also <strong>never</strong> flips back politically.
         <strong>Northern units</strong> in a captured sector fight at <strong>${Math.round(config.breakthroughEnemySectorStrengthMult * 100)}%</strong> strength (configurable).
         <strong>Attacker wins</strong> by holding every sector; <strong>defender wins</strong> if the attacker has no units left.</li>
