@@ -225,6 +225,37 @@ function pickBreakthroughSectorControlPoint(sectorKeys: string[], cols: number, 
   return best;
 }
 
+/** Breakthrough: defender sector currently on the border with attacker-held sectors (frontline objective). */
+function breakthroughActiveFrontlineSectorIndex(state: GameState): number | null {
+  if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return null;
+  const att = getBreakthroughAttackerOwner(state);
+  const n = state.sectorOwners.length;
+  if (n === 0) return null;
+
+  if (att === PLAYER) {
+    for (let i = 0; i < n; i++) {
+      if (state.sectorOwners[i] !== att) return i;
+    }
+    return null;
+  }
+  for (let i = n - 1; i >= 0; i--) {
+    if (state.sectorOwners[i] !== att) return i;
+  }
+  return null;
+}
+
+/** Breakthrough: only show the current frontline control point. */
+function breakthroughRefreshActiveControlPoint(state: GameState): void {
+  if (state.gameMode !== 'breakthrough') return;
+  const sid = breakthroughActiveFrontlineSectorIndex(state);
+  if (sid === null) {
+    state.controlPointHexes = [];
+    return;
+  }
+  const cp = state.sectorControlPointHex[sid];
+  state.controlPointHexes = cp ? [cp] : [];
+}
+
 // ── Hex territory ─────────────────────────────────────────────────────────────
 
 /** Breakthrough: sector politically captured by the attacker — defender cannot change hex ownership there. */
@@ -552,14 +583,15 @@ function aiConquestUnitPriority(state: GameState, u: Unit): number {
 function aiBreakthroughUnitPriority(state: GameState, u: Unit): number {
   const def = getBreakthroughDefenderOwner(state);
   let best = 999;
-  const n = state.sectorControlPointHex?.length ?? 0;
-  for (let i = 0; i < n; i++) {
-    if (state.sectorOwners[i] !== def) continue;
-    const cp = state.sectorControlPointHex[i]!;
-    const [cc, cr] = cp.split(',').map(Number);
-    const dist = bfsDistance(state, u.col, u.row, cc, cr);
-    const pd = minPlayerBfsToHex(state, cc, cr);
-    best = Math.min(best, dist - Math.min(pd, 6) * 2.5);
+  const sid = breakthroughActiveFrontlineSectorIndex(state);
+  if (sid !== null && state.sectorOwners[sid] === def) {
+    const cp = state.sectorControlPointHex[sid];
+    if (cp) {
+      const [cc, cr] = cp.split(',').map(Number);
+      const dist = bfsDistance(state, u.col, u.row, cc, cr);
+      const pd = minPlayerBfsToHex(state, cc, cr);
+      best = Math.min(best, dist - Math.min(pd, 6) * 2.5);
+    }
   }
   const thr = criticalThreatPlayerUnit(state);
   if (thr) best = Math.min(best, bfsDistance(state, u.col, u.row, thr.col, thr.row));
@@ -971,34 +1003,35 @@ function breakthroughAssignCapturedSectorHexes(state: GameState, sectorIndex: nu
 function applyBreakthroughEndOfRound(state: GameState): void {
   if (state.gameMode !== 'breakthrough' || !state.sectorControlPointHex?.length) return;
   const att = getBreakthroughAttackerOwner(state);
-  const n = state.sectorControlPointHex.length;
-  for (let i = 0; i < n; i++) {
-    if (state.sectorOwners[i] === att) continue;
+  const i = breakthroughActiveFrontlineSectorIndex(state);
+  if (i !== null) {
     const cp = state.sectorControlPointHex[i];
-    if (!cp) continue;
-    const attackerOnCp = state.units.some(u => u.owner === att && `${u.col},${u.row}` === cp);
-    if (attackerOnCp) {
-      state.breakthroughCpOccupation[i] = (state.breakthroughCpOccupation[i] ?? 0) + 1;
-      if (state.breakthroughCpOccupation[i] >= 2) {
-        state.sectorOwners[i] = att;
-        state.breakthroughCpOccupation[i] = 0;
-        breakthroughAssignCapturedSectorHexes(state, i);
-        breakthroughRemoveSectorControlPoint(state, i);
-        const bonus = config.breakthroughSectorCaptureBonusPP;
-        if (bonus > 0) {
-          state.productionPoints[att] += bonus;
+    if (cp) {
+      const attackerOnCp = state.units.some(u => u.owner === att && `${u.col},${u.row}` === cp);
+      if (attackerOnCp) {
+        state.breakthroughCpOccupation[i] = (state.breakthroughCpOccupation[i] ?? 0) + 1;
+        if (state.breakthroughCpOccupation[i] >= 2) {
+          state.sectorOwners[i] = att;
+          state.breakthroughCpOccupation[i] = 0;
+          breakthroughAssignCapturedSectorHexes(state, i);
+          breakthroughRemoveSectorControlPoint(state, i);
+          const bonus = config.breakthroughSectorCaptureBonusPP;
+          if (bonus > 0) {
+            state.productionPoints[att] += bonus;
+          }
+          log(
+            state,
+            bonus > 0
+              ? `Breakthrough: sector ${i + 1} captured — attacker territory locked; control point cleared. +${bonus} PP.`
+              : `Breakthrough: sector ${i + 1} captured — attacker territory locked; control point cleared.`,
+          );
         }
-        log(
-          state,
-          bonus > 0
-            ? `Breakthrough: sector ${i + 1} captured — attacker territory locked; control point cleared. +${bonus} PP.`
-            : `Breakthrough: sector ${i + 1} captured — attacker territory locked; control point cleared.`,
-        );
+      } else {
+        state.breakthroughCpOccupation[i] = 0;
       }
-    } else {
-      state.breakthroughCpOccupation[i] = 0;
     }
   }
+  breakthroughRefreshActiveControlPoint(state);
   checkVictory(state);
 }
 
@@ -1113,15 +1146,26 @@ export function createInitialState(): GameState {
       }
     }
     sectorControlPointHex = sectorHexes.map(keys => pickBreakthroughSectorControlPoint(keys, COLS, ROWS));
-    controlPointHexes = [...sectorControlPointHex];
+    controlPointHexes = [];
     breakthroughCpOccupation = Array(sectorHexes.length).fill(0);
     // Attacker's home sector (south if attacker is PLAYER, north if attacker is AI) has no CP marker.
     const homeIdx = att === PLAYER ? 0 : nSec - 1;
     const cpHome = sectorControlPointHex[homeIdx];
     if (cpHome) {
       sectorControlPointHex[homeIdx] = '';
-      controlPointHexes = controlPointHexes.filter(k => k !== cpHome);
     }
+    const frontlineIdx = att === PLAYER
+      ? sectorOwners.findIndex(o => o !== att)
+      : (() => {
+          for (let i = sectorOwners.length - 1; i >= 0; i--) {
+            if (sectorOwners[i] !== att) return i;
+          }
+          return -1;
+        })();
+    controlPointHexes =
+      frontlineIdx >= 0 && sectorControlPointHex[frontlineIdx]
+        ? [sectorControlPointHex[frontlineIdx]!]
+        : [];
   } else if (gm === 'conquest' && config.controlPointCount > 0 && cpCandidates.length > 0) {
     controlPointHexes = pickControlPointHexes(cpCandidates, config.controlPointCount, COLS, ROWS);
   }
