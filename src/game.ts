@@ -332,6 +332,26 @@ function updateHexStability(state: GameState): void {
   }
 }
 
+function primeInitialBreakthroughProductionHexes(
+  hexStates: Record<string, HexState>,
+  mountainHexes: string[],
+): void {
+  const mountains = new Set(mountainHexes);
+  for (const [key, hex] of Object.entries(hexStates)) {
+    if (hex.owner === null) continue;
+    const [col, row] = key.split(',').map(Number);
+    const nearby = getHexesWithinDistance(col, row, config.productionSafeDistance, COLS, ROWS);
+    const isStable = nearby.every(([nc, nr]) => {
+      const nk = `${nc},${nr}`;
+      if (mountains.has(nk)) return true;
+      const nhex = hexStates[nk];
+      return nhex && nhex.owner === hex.owner;
+    });
+    hex.stableFor = isStable ? config.productionTurns : 0;
+    hex.isProduction = isStable;
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 export function getUnit(state: GameState, col: number, row: number): Unit | null {
@@ -1166,6 +1186,7 @@ export function createInitialState(): GameState {
       frontlineIdx >= 0 && sectorControlPointHex[frontlineIdx]
         ? [sectorControlPointHex[frontlineIdx]!]
         : [];
+    primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
   } else if (gm === 'conquest' && config.controlPointCount > 0 && cpCandidates.length > 0) {
     controlPointHexes = pickControlPointHexes(cpCandidates, config.controlPointCount, COLS, ROWS);
   }
