@@ -345,6 +345,47 @@ function buildBoundaryPath(hexSet: Set<string>): string {
   return d;
 }
 
+/** Lexicographic order on (row, col) so edge dedup works for col ≥ 10. */
+function hexKeyLess(a: string, b: string): boolean {
+  const [ac, ar] = a.split(',').map(Number);
+  const [bc, br] = b.split(',').map(Number);
+  if (ar !== br) return ar < br;
+  return ac < bc;
+}
+
+/** Edges shared by two hexes in different sectors only (no outer map rim, no duplicate strokes). */
+function buildInterSectorBoundaryPath(
+  sectorIndexByHex: Record<string, number>,
+  cols: number,
+  rows: number,
+): string {
+  let d = '';
+  for (const key of Object.keys(sectorIndexByHex)) {
+    const sid = sectorIndexByHex[key]!;
+    const [c, r] = key.split(',').map(Number);
+    const { x, y } = hexToPixel(c, r);
+    const dirs = r % 2 === 0 ? DIRS_EVEN : DIRS_ODD;
+    for (let i = 0; i < 6; i++) {
+      const [dc, dr] = dirs[i]!;
+      const nc = c + dc;
+      const nr = r + dr;
+      if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+      const nk = `${nc},${nr}`;
+      const nid = sectorIndexByHex[nk];
+      if (nid === undefined || nid === sid) continue;
+      if (!hexKeyLess(key, nk)) continue;
+      const a1 = (Math.PI / 180) * (60 * i - 30);
+      const a2 = (Math.PI / 180) * (60 * (i + 1) - 30);
+      const x1 = (x + HEX_SIZE * Math.cos(a1)).toFixed(2);
+      const y1 = (y + HEX_SIZE * Math.sin(a1)).toFixed(2);
+      const x2 = (x + HEX_SIZE * Math.cos(a2)).toFixed(2);
+      const y2 = (y + HEX_SIZE * Math.sin(a2)).toFixed(2);
+      d += `M${x1},${y1}L${x2},${y2}`;
+    }
+  }
+  return d;
+}
+
 function svgEl<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K] {
   return document.createElementNS('http://www.w3.org/2000/svg', tag);
 }
@@ -716,21 +757,18 @@ export function renderState(
   const sectorOutlineLayerEl = svgElement.querySelector('#sector-outline-layer') as SVGGElement | null;
   if (sectorOutlineLayerEl) {
     sectorOutlineLayerEl.innerHTML = '';
-    if (state.gameMode === 'breakthrough' && state.sectorHexes?.length) {
-      for (let sid = 0; sid < state.sectorHexes.length; sid++) {
-        const set = new Set(state.sectorHexes[sid]);
-        const d = buildBoundaryPath(set);
-        if (!d) continue;
+    if (state.gameMode === 'breakthrough' && state.sectorIndexByHex && Object.keys(state.sectorIndexByHex).length > 0) {
+      const d = buildInterSectorBoundaryPath(state.sectorIndexByHex, COLS, ROWS);
+      if (d) {
         const path = svgEl('path');
         path.setAttribute('d', d);
         path.setAttribute('fill', 'none');
-        const owner = state.sectorOwners[sid];
-        path.setAttribute('stroke', owner === PLAYER ? c.player : c.ai);
-        path.setAttribute('stroke-width', '4');
+        path.setAttribute('stroke', 'rgba(15,15,18,0.72)');
+        path.setAttribute('stroke-width', '3.5');
         path.setAttribute('stroke-linejoin', 'round');
         path.setAttribute('stroke-linecap', 'round');
         path.setAttribute('pointer-events', 'none');
-        path.setAttribute('class', 'sector-outline');
+        path.setAttribute('class', 'sector-outline sector-outline-between');
         sectorOutlineLayerEl.appendChild(path);
       }
     }
