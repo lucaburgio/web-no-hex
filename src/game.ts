@@ -165,6 +165,55 @@ function pickControlPointHexes(cpCandidates: string[], want: number, cols: numbe
   return chosen.slice(0, n);
 }
 
+/** Breakthrough: sort south → north, split into `sectorCount` contiguous chunks of ~equal size. */
+function partitionBreakthroughSectors(assignableKeys: string[], sectorCount: number): string[][] {
+  const sorted = [...assignableKeys].sort((a, b) => {
+    const [ac, ar] = a.split(',').map(Number);
+    const [bc, br] = b.split(',').map(Number);
+    if (br !== ar) return br - ar;
+    return ac - bc;
+  });
+  if (sorted.length === 0) return [];
+  const n = Math.min(sectorCount, sorted.length);
+  const base = Math.floor(sorted.length / n);
+  const rem = sorted.length % n;
+  const out: string[][] = [];
+  let idx = 0;
+  for (let s = 0; s < n; s++) {
+    const size = base + (s < rem ? 1 : 0);
+    out.push(sorted.slice(idx, idx + size));
+    idx += size;
+  }
+  return out;
+}
+
+function pickBreakthroughSectorControlPoint(sectorKeys: string[], cols: number, rows: number): string {
+  if (sectorKeys.length === 1) return sectorKeys[0]!;
+  let sumC = 0;
+  let sumR = 0;
+  for (const k of sectorKeys) {
+    const [c, r] = k.split(',').map(Number);
+    sumC += c;
+    sumR += r;
+  }
+  const tc = Math.round(sumC / sectorKeys.length);
+  const tr = Math.round(sumR / sectorKeys.length);
+  let best = sectorKeys[0]!;
+  let bestD = Infinity;
+  for (const k of sectorKeys) {
+    const [c, r] = k.split(',').map(Number);
+    const d = hexDistance(c, r, tc, tr, cols, rows);
+    if (d < bestD) {
+      bestD = d;
+      best = k;
+    } else if (d === bestD) {
+      const [bc, br] = best.split(',').map(Number);
+      if (r < br || (r === br && c < bc)) best = k;
+    }
+  }
+  return best;
+}
+
 // ── Hex territory ─────────────────────────────────────────────────────────────
 
 function conquerHex(state: GameState, col: number, row: number, owner: Owner): void {
@@ -475,6 +524,23 @@ function aiConquestUnitPriority(state: GameState, u: Unit): number {
   return Math.min(toCapture, defend);
 }
 
+/** Breakthrough: lower = act earlier — defend CPs in sectors still owned by the defender, then react to threats. */
+function aiBreakthroughUnitPriority(state: GameState, u: Unit): number {
+  let best = 999;
+  const n = state.sectorControlPointHex?.length ?? 0;
+  for (let i = 0; i < n; i++) {
+    if (state.sectorOwners[i] !== AI) continue;
+    const cp = state.sectorControlPointHex[i]!;
+    const [cc, cr] = cp.split(',').map(Number);
+    const dist = bfsDistance(state, u.col, u.row, cc, cr);
+    const pd = minPlayerBfsToHex(state, cc, cr);
+    best = Math.min(best, dist - Math.min(pd, 6) * 2.5);
+  }
+  const thr = criticalThreatPlayerUnit(state);
+  if (thr) best = Math.min(best, bfsDistance(state, u.col, u.row, thr.col, thr.row));
+  return best;
+}
+
 function removeUnit(state: GameState, id: number): void {
   state.units = state.units.filter(u => u.id !== id);
 }
@@ -519,11 +585,27 @@ function analyzeFlanking(state: GameState, attacker: Unit, defender: Unit): {
   return { count, extraSum, extraFlankingFrom };
 }
 
-function effectiveCS(unit: Unit, flankingCount: number = 0, extraFlankingSum: number = 0): number {
+/** Breakthrough: northern (defender) units in a sector already captured by the attacker fight at reduced strength. */
+function breakthroughStrengthMult(state: GameState, unit: Unit): number {
+  if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return 1;
+  const sid = state.sectorIndexByHex[`${unit.col},${unit.row}`];
+  if (sid === undefined) return 1;
+  if (state.sectorOwners[sid] !== PLAYER) return 1;
+  if (unit.owner !== AI) return 1;
+  return config.breakthroughEnemySectorStrengthMult;
+}
+
+function effectiveCS(
+  state: GameState,
+  unit: Unit,
+  flankingCount: number = 0,
+  extraFlankingSum: number = 0,
+): number {
   const hpRatio = unit.hp / unit.maxHp;
   const woundedMult = 0.5 + 0.5 * hpRatio;
   const flankMult = 1 + flankingCount * config.flankingBonus + extraFlankingSum;
-  return unit.strength * woundedMult * flankMult;
+  const brMult = breakthroughStrengthMult(state, unit);
+  return unit.strength * brMult * woundedMult * flankMult;
 }
 
 /** True when limit-artillery mode blocks ranged fire (any enemy adjacent to this ranged unit). */
@@ -577,8 +659,8 @@ export interface CombatResolveResult {
 function resolveCombat(state: GameState, attacker: Unit, defender: Unit): CombatResolveResult {
   const ranged = isRangedCombat(state, attacker, defender);
   const { count: flanking, extraSum } = analyzeFlanking(state, attacker, defender);
-  const csA = effectiveCS(attacker, flanking, extraSum);
-  const csD = effectiveCS(defender, 0);
+  const csA = effectiveCS(state, attacker, flanking, extraSum);
+  const csD = effectiveCS(state, defender, 0);
   const delta = csA - csD;
   const scale = config.combatStrengthScale;
   const base  = config.combatDamageBase;
@@ -709,8 +791,8 @@ function combatVfxFromResolve(
 export function forecastCombat(state: GameState, attacker: Unit, defender: Unit): CombatForecast {
   const ranged = isRangedCombat(state, attacker, defender);
   const { count: flanking, extraSum, extraFlankingFrom } = analyzeFlanking(state, attacker, defender);
-  const csA = effectiveCS(attacker, flanking, extraSum);
-  const csD = effectiveCS(defender, 0);
+  const csA = effectiveCS(state, attacker, flanking, extraSum);
+  const csD = effectiveCS(state, defender, 0);
   const delta = csA - csD;
   const scale = config.combatStrengthScale;
   const base  = config.combatDamageBase;
@@ -733,6 +815,8 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
     extraFlankingFrom,
     attackerConditionPct: Math.round((0.5 + 0.5 * (attacker.hp / attacker.maxHp)) * 100),
     defenderConditionPct: Math.round((0.5 + 0.5 * (defender.hp / defender.maxHp)) * 100),
+    breakthroughDefenderMalus:
+      state.gameMode === 'breakthrough' && breakthroughStrengthMult(state, defender) < 1 ? true : undefined,
   };
 }
 
@@ -749,6 +833,20 @@ function sideFullyEliminated(state: GameState, owner: Owner): boolean {
 
 function checkVictory(state: GameState): void {
   if (state.winner) return;
+
+  if (state.gameMode === 'breakthrough' && state.sectorOwners && state.sectorOwners.length > 0) {
+    if (!state.units.some(u => u.owner === PLAYER)) {
+      state.winner = AI;
+      log(state, 'Breakthrough: attacker eliminated — defender wins.');
+      return;
+    }
+    if (state.sectorOwners.length > 0 && state.sectorOwners.every(o => o === PLAYER)) {
+      state.winner = PLAYER;
+      log(state, 'Breakthrough: all sectors captured — attacker wins.');
+      return;
+    }
+    return;
+  }
 
   if (state.gameMode === 'conquest') {
     const cp = state.conquestPoints;
@@ -814,6 +912,28 @@ function applyConquestEndOfRound(state: GameState): void {
   checkVictory(state);
 }
 
+/** Breakthrough: after a full round, advance CP occupation; capture sectors after two consecutive rounds. */
+function applyBreakthroughEndOfRound(state: GameState): void {
+  if (state.gameMode !== 'breakthrough' || !state.sectorControlPointHex?.length) return;
+  const n = state.sectorControlPointHex.length;
+  for (let i = 0; i < n; i++) {
+    if (state.sectorOwners[i] === PLAYER) continue;
+    const cp = state.sectorControlPointHex[i]!;
+    const attackerOnCp = state.units.some(u => u.owner === PLAYER && `${u.col},${u.row}` === cp);
+    if (attackerOnCp) {
+      state.breakthroughCpOccupation[i] = (state.breakthroughCpOccupation[i] ?? 0) + 1;
+      if (state.breakthroughCpOccupation[i] >= 2) {
+        state.sectorOwners[i] = PLAYER;
+        state.breakthroughCpOccupation[i] = 0;
+        log(state, `Breakthrough: sector ${i + 1} captured — control point held for two full rounds.`);
+      }
+    } else {
+      state.breakthroughCpOccupation[i] = 0;
+    }
+  }
+  checkVictory(state);
+}
+
 // ── Healing ───────────────────────────────────────────────────────────────────
 
 /** Positive HP amounts for floating heal badges (units that did not fight this turn). */
@@ -852,7 +972,7 @@ export function createInitialState(): GameState {
   for (const c of startingCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
   for (const c of startingCols) units.push(makeUnit(AI, c, 0));
 
-  const hexStates: Record<string, HexState> = {};
+  let hexStates: Record<string, HexState> = {};
   for (const u of units) {
     hexStates[`${u.col},${u.row}`] = { owner: u.owner, stableFor: 0, isProduction: false };
   }
@@ -882,8 +1002,41 @@ export function createInitialState(): GameState {
     }
   }
   const gm = config.gameMode as GameMode;
+
+  let sectorHexes: string[][] = [];
+  let sectorOwners: Owner[] = [];
+  let sectorControlPointHex: string[] = [];
+  let breakthroughCpOccupation: number[] = [];
+  let sectorIndexByHex: Record<string, number> = {};
+
   let controlPointHexes: string[] = [];
-  if (gm === 'conquest' && config.controlPointCount > 0 && cpCandidates.length > 0) {
+  if (gm === 'breakthrough') {
+    const assignable: string[] = [];
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const key = `${c},${r}`;
+        if (!mountainSet.has(key)) assignable.push(key);
+      }
+    }
+    const wantSectors = Math.max(2, config.breakthroughSectorCount);
+    const nSectors = Math.min(wantSectors, Math.max(2, assignable.length));
+    sectorHexes = partitionBreakthroughSectors(assignable, nSectors);
+    sectorOwners = sectorHexes.map((_, i) => (i === 0 ? PLAYER : AI));
+    sectorIndexByHex = {};
+    sectorHexes.forEach((keys, sid) => {
+      for (const k of keys) sectorIndexByHex[k] = sid;
+    });
+    hexStates = {};
+    for (let s = 0; s < sectorHexes.length; s++) {
+      const owner = sectorOwners[s]!;
+      for (const k of sectorHexes[s]!) {
+        hexStates[k] = { owner, stableFor: 0, isProduction: false };
+      }
+    }
+    sectorControlPointHex = sectorHexes.map(keys => pickBreakthroughSectorControlPoint(keys, COLS, ROWS));
+    controlPointHexes = [...sectorControlPointHex];
+    breakthroughCpOccupation = Array(sectorHexes.length).fill(0);
+  } else if (gm === 'conquest' && config.controlPointCount > 0 && cpCandidates.length > 0) {
     controlPointHexes = pickControlPointHexes(cpCandidates, config.controlPointCount, COLS, ROWS);
   }
 
@@ -895,6 +1048,26 @@ export function createInitialState(): GameState {
         } as Record<Owner, number>)
       : null;
 
+  const playerHexes = Object.values(hexStates).filter(h => h.owner === PLAYER).length;
+  const aiHexes = Object.values(hexStates).filter(h => h.owner === AI).length;
+  const playerBonus = Math.floor(playerHexes / config.territoryQuota) * config.pointsPerQuota;
+  const aiBonus = Math.floor(aiHexes / config.territoryQuota) * config.pointsPerQuota;
+
+  let ppPlayer: number;
+  let ppAi: number;
+  if (gm === 'breakthrough') {
+    ppPlayer = config.breakthroughAttackerStartingPP;
+    ppAi = config.productionPointsPerTurn + aiBonus;
+  } else {
+    ppPlayer = config.productionPointsPerTurn;
+    ppAi = config.productionPointsPerTurn;
+  }
+
+  const logMsg =
+    gm === 'breakthrough'
+      ? 'Game started — Breakthrough. Your turn — Production phase.'
+      : 'Game started. Your turn — Production phase.';
+
   return {
     units,
     hexStates,
@@ -902,15 +1075,20 @@ export function createInitialState(): GameState {
     gameMode: gm,
     controlPointHexes,
     conquestPoints,
+    sectorHexes,
+    sectorOwners,
+    sectorControlPointHex,
+    breakthroughCpOccupation,
+    sectorIndexByHex,
     turn: 1,
     phase: 'production',
     activePlayer: PLAYER,
     selectedUnit: null,
     productionPoints: {
-      [PLAYER]: config.productionPointsPerTurn,
-      [AI]:     config.productionPointsPerTurn,
+      [PLAYER]: ppPlayer,
+      [AI]: ppAi,
     } as Record<Owner, number>,
-    log: ['Game started. Your turn — Production phase.'],
+    log: [logMsg],
     winner: null,
   };
 }
@@ -1300,6 +1478,13 @@ function pickBestRangedTarget(state: GameState, attacker: Unit, targets: Unit[],
       const k = `${t.col},${t.row}`;
       if ((state.controlPointHexes ?? []).includes(k)) s += 220;
     }
+    if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
+      const k = `${t.col},${t.row}`;
+      if ((state.controlPointHexes ?? []).includes(k)) {
+        const sid = state.sectorIndexByHex[k];
+        if (sid !== undefined && state.sectorOwners[sid] === AI) s += 210;
+      }
+    }
     if (s > bestScore) {
       bestScore = s;
       best = t;
@@ -1328,6 +1513,13 @@ function scoreMeleeAttack(state: GameState, attacker: Unit, defender: Unit, pres
   if (!favorable) s -= 85 * (1 - pressure * 0.35);
   if (state.gameMode === 'conquest' && state.conquestPoints && defenderOnPlayerControlPoint(state, defender)) {
     s += 190;
+  }
+  if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
+    const dk = `${defender.col},${defender.row}`;
+    if ((state.controlPointHexes ?? []).includes(dk)) {
+      const sid = state.sectorIndexByHex[dk];
+      if (sid !== undefined && state.sectorOwners[sid] === AI) s += 175;
+    }
   }
   return s;
 }
@@ -1375,6 +1567,25 @@ function scoreEmptyMove(
       s += (distBefore - distAfter) * (28 + (6 - Math.min(pd, 6)) * 12);
     }
   }
+  if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
+    const beforeC = minBfsToCpWhere(state, unit.col, unit.row, key => {
+      const sid = state.sectorIndexByHex[key];
+      return sid !== undefined && state.sectorOwners[sid] === AI;
+    });
+    const afterC = minBfsToCpWhere(state, toCol, toRow, key => {
+      const sid = state.sectorIndexByHex[key];
+      return sid !== undefined && state.sectorOwners[sid] === AI;
+    });
+    s += (beforeC - afterC) * 40;
+    const tk = `${toCol},${toRow}`;
+    if ((state.controlPointHexes ?? []).includes(tk)) {
+      const sid = state.sectorIndexByHex[tk];
+      if (sid !== undefined && state.sectorOwners[sid] === AI) {
+        const hx = state.hexStates[tk];
+        if (!hx || hx.owner !== AI) s += 240;
+      }
+    }
+  }
   return s;
 }
 
@@ -1408,6 +1619,11 @@ export function aiMovement(state: GameState): {
     if (state.gameMode === 'conquest' && state.conquestPoints) {
       const pa = aiConquestUnitPriority(state, a);
       const pb = aiConquestUnitPriority(state, b);
+      if (pa !== pb) return pa - pb;
+    }
+    if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
+      const pa = aiBreakthroughUnitPriority(state, a);
+      const pb = aiBreakthroughUnitPriority(state, b);
       if (pa !== pb) return pa - pb;
     }
     if (pressure > 0.12 && threat) {
@@ -1613,10 +1829,19 @@ export function endTurnAfterAi(state: GameState): { state: GameState; healFloats
   const aiHexes     = Object.values(state.hexStates).filter(h => h.owner === AI).length;
   const playerBonus = Math.floor(playerHexes / config.territoryQuota) * config.pointsPerQuota;
   const aiBonus     = Math.floor(aiHexes     / config.territoryQuota) * config.pointsPerQuota;
-  state.productionPoints[PLAYER] += config.productionPointsPerTurn + playerBonus;
-  state.productionPoints[AI]     += config.productionPointsPerTurn + aiBonus;
-  log(state, `Turn ${state.turn} — Production phase. PP: ${state.productionPoints[PLAYER]} (+${playerBonus} from territory).`);
+  if (state.gameMode === 'breakthrough') {
+    state.productionPoints[AI] += config.productionPointsPerTurn + aiBonus;
+    log(
+      state,
+      `Turn ${state.turn} — Production phase. Attacker PP: ${state.productionPoints[PLAYER]} (no income). Defender: ${state.productionPoints[AI]} PP (+${aiBonus} territory).`,
+    );
+  } else {
+    state.productionPoints[PLAYER] += config.productionPointsPerTurn + playerBonus;
+    state.productionPoints[AI]     += config.productionPointsPerTurn + aiBonus;
+    log(state, `Turn ${state.turn} — Production phase. PP: ${state.productionPoints[PLAYER]} (+${playerBonus} from territory).`);
+  }
   applyConquestEndOfRound(state);
+  if (state.gameMode === 'breakthrough') applyBreakthroughEndOfRound(state);
   return { state, healFloats };
 }
 

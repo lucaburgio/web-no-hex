@@ -106,7 +106,22 @@
           <select class="settings-input settings-select" id="cfg-gameMode">
             <option value="domination">Domination</option>
             <option value="conquest">Conquest</option>
+            <option value="breakthrough">Breakthrough</option>
           </select>
+        </div>
+        <div id="settings-breakthrough-only" class="hidden">
+          <div class="settings-row">
+            <label class="settings-label" for="cfg-breakthroughAttackerStartingPP">Attacker starting PP (south)</label>
+            <input class="settings-input" type="number" id="cfg-breakthroughAttackerStartingPP" min="1" max="9999" step="1" />
+          </div>
+          <div class="settings-row">
+            <label class="settings-label" for="cfg-breakthroughSectorCount">Sectors (map split)</label>
+            <input class="settings-input" type="number" id="cfg-breakthroughSectorCount" min="2" max="48" step="1" />
+          </div>
+          <div class="settings-row">
+            <label class="settings-label" for="cfg-breakthroughEnemySectorStrengthMult">Defender strength in captured sector (%)</label>
+            <input class="settings-input" type="number" id="cfg-breakthroughEnemySectorStrengthMult" min="1" max="100" step="1" />
+          </div>
         </div>
         <div id="settings-conquest-only" class="hidden">
           <div class="settings-row">

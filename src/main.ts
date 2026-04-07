@@ -106,6 +106,31 @@ rulesOverlayEl.addEventListener('click', e => { if (e.target === rulesOverlayEl)
 // ── PP tooltip ────────────────────────────────────────────────────────────────
 
 ppInfoEl.addEventListener('mouseenter', () => {
+  if (state.gameMode === 'breakthrough') {
+    if (localPlayer === PLAYER) {
+      ppTooltipEl.innerHTML = `
+        <div class="pp-tt-row"><span>Attacker (south)</span><span>No PP income</span></div>
+        <div class="pp-tt-next">Spend your starting pool only; territory does not add PP.</div>`;
+    } else {
+      const ownedHexes = Object.values(state.hexStates).filter(h => h.owner === localPlayer).length;
+      const quotas = Math.floor(ownedHexes / config.territoryQuota);
+      const territoryBonus = quotas * config.pointsPerQuota;
+      const total = config.productionPointsPerTurn + territoryBonus;
+      const hexesIntoQuota = ownedHexes % config.territoryQuota;
+      const hexesToNext = config.territoryQuota - hexesIntoQuota;
+      const nextLine = hexesIntoQuota === 0 && ownedHexes === 0
+        ? `Own ${config.territoryQuota} hexes to earn +${config.pointsPerQuota} PP`
+        : `Next +${config.pointsPerQuota} PP in ${hexesToNext} more hex${hexesToNext === 1 ? '' : 'es'}`;
+      ppTooltipEl.innerHTML = `
+        <div class="pp-tt-row"><span>Base</span><span>+${config.productionPointsPerTurn} PP</span></div>
+        <div class="pp-tt-row"><span>Territory (${ownedHexes} hexes)</span><span>+${territoryBonus} PP</span></div>
+        <div class="pp-tt-row total"><span>Next production</span><span>+${total} PP</span></div>
+        <div class="pp-tt-next">${nextLine}</div>`;
+    }
+    positionFixedTooltipBelow(ppTooltipEl, ppInfoEl.getBoundingClientRect());
+    return;
+  }
+
   const ownedHexes = Object.values(state.hexStates).filter(h => h.owner === localPlayer).length;
   const quotas = Math.floor(ownedHexes / config.territoryQuota);
   const territoryBonus = quotas * config.pointsPerQuota;
@@ -471,6 +496,9 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
   ['cfg-controlPointCount',       'controlPointCount',       1],
   ['cfg-conquestPointsPlayer',    'conquestPointsPlayer',    1],
   ['cfg-conquestPointsAi',        'conquestPointsAi',        1],
+  ['cfg-breakthroughAttackerStartingPP', 'breakthroughAttackerStartingPP', 1],
+  ['cfg-breakthroughSectorCount', 'breakthroughSectorCount', 1],
+  ['cfg-breakthroughEnemySectorStrengthMult', 'breakthroughEnemySectorStrengthMult', 100],
   ['cfg-boardCols',               'boardCols',               1],
   ['cfg-boardRows',               'boardRows',               1],
   ['cfg-startingUnits',           'startingUnits',           1],
@@ -498,6 +526,7 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
 // Proxy type for key checking only — never instantiated
 declare const _cfgNumProxy: {
   controlPointCount: number; conquestPointsPlayer: number; conquestPointsAi: number;
+  breakthroughAttackerStartingPP: number; breakthroughSectorCount: number; breakthroughEnemySectorStrengthMult: number;
   boardCols: number; boardRows: number; startingUnits: number;
   productionPointsPerTurn: number; infantryCost: number;
   territoryQuota: number; pointsPerQuota: number;
@@ -526,6 +555,9 @@ function populateSettings(): void {
     controlPointCount: config.controlPointCount,
     conquestPointsPlayer: config.conquestPointsPlayer,
     conquestPointsAi: config.conquestPointsAi,
+    breakthroughAttackerStartingPP: config.breakthroughAttackerStartingPP,
+    breakthroughSectorCount: config.breakthroughSectorCount,
+    breakthroughEnemySectorStrengthMult: config.breakthroughEnemySectorStrengthMult,
     boardCols: config.boardCols, boardRows: config.boardRows,
     startingUnits: config.startingUnits,
     productionPointsPerTurn: config.productionPointsPerTurn,
@@ -553,13 +585,16 @@ function populateSettings(): void {
   }
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   gameModeEl.value = config.gameMode;
-  updateConquestSettingsVisibility();
+  updateModeSpecificSettingsVisibility();
 }
 
-function updateConquestSettingsVisibility(): void {
+function updateModeSpecificSettingsVisibility(): void {
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
-  const wrap = document.getElementById('settings-conquest-only') as HTMLDivElement;
-  wrap.classList.toggle('hidden', gameModeEl.value !== 'conquest');
+  const v = gameModeEl.value;
+  const conquestWrap = document.getElementById('settings-conquest-only') as HTMLDivElement;
+  const breakthroughWrap = document.getElementById('settings-breakthrough-only') as HTMLDivElement;
+  conquestWrap.classList.toggle('hidden', v !== 'conquest');
+  breakthroughWrap.classList.toggle('hidden', v !== 'breakthrough');
 }
 
 function collectSettings(): Parameters<typeof updateConfig>[0] {
@@ -587,7 +622,7 @@ for (const [id] of TOGGLE_FIELDS) {
   });
 }
 
-document.getElementById('cfg-gameMode')!.addEventListener('change', updateConquestSettingsVisibility);
+document.getElementById('cfg-gameMode')!.addEventListener('change', updateModeSpecificSettingsVisibility);
 
 let settingsOnStart: (() => void) | null = null;
 
@@ -705,6 +740,7 @@ function buildRulesContent(): string {
     <h3>Production</h3>
     <ul>
       <li>Each turn you earn <strong>${config.productionPointsPerTurn} PP</strong> (production points).</li>
+      <li><strong>Breakthrough:</strong> the <strong>southern attacker</strong> does not receive PP after the match starts (only the configured starting pool). The <strong>northern defender</strong> earns PP each turn as above.</li>
       <li><strong>Territory bonus:</strong> +${config.pointsPerQuota} PP for every ${config.territoryQuota} hexes you own.</li>
       <li>Available units: ${unitList}.</li>
       <li>Valid placement: your <strong>home row</strong> (bottom), or any owned <strong>production hex</strong>.
@@ -733,6 +769,7 @@ function buildRulesContent(): string {
       <li><strong>Artillery ranged (2+ hexes):</strong> only the defender takes damage (no return fire). Destroying a unit with a ranged attack does <strong>not</strong> move the artillery or conquer that hex.</li>
       <li><strong>Limit Artillery</strong> (optional game setting): when enabled, if <strong>any</strong> enemy is adjacent to your artillery, it cannot use ranged attacks against other hexes until no adjacent enemies remain — use adjacent combat (move to attack) first.</li>
       <li><strong>CS</strong> = unit type&rsquo;s base strength × condition (50–100% of current max HP) × flanking bonus.</li>
+      <li><strong>Breakthrough:</strong> northern (defender) units in a <strong>sector already captured</strong> by the attacker use reduced effective strength in combat (see game settings for the percentage).</li>
       <li><strong>Flanking:</strong> +${Math.round(config.flankingBonus * 100)}% CS per adjacent friendly
         (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%), in fixed neighbor order.
         Some unit types add <strong>extra flanking</strong> when they are among those adjacent flankers.</li>
@@ -760,6 +797,10 @@ function buildRulesContent(): string {
         You also lose immediately if you have <strong>no units</strong> and <strong>no owned territory</strong> (even if your Conquer Points are still above 0).
         Reaching the opponent&rsquo;s home row alone does <strong>not</strong> end the match.
         If both sides hit 0 Conquer Points in the same tick, or both are totally eliminated from the map at once, the <strong>northern</strong> player wins the tie.</li>
+      <li><strong>Breakthrough:</strong> the map is split into <strong>${config.breakthroughSectorCount}</strong> sectors (configurable, south to north). The <strong>southern attacker</strong> starts with <strong>${config.breakthroughAttackerStartingPP} PP</strong> and earns <strong>no further PP</strong>; the <strong>northern defender</strong> earns the usual per-turn PP plus territory bonus.
+        Each sector has a <strong>control point</strong>. Hexes are conquered as usual; to capture a sector, the attacker must keep a unit on that sector&rsquo;s control point for <strong>two full rounds</strong> (checked after both sides move). Once a sector is captured, it <strong>never</strong> flips back to the defender even if they retake the hex.
+        <strong>Northern units</strong> standing in a sector the attacker has captured fight at <strong>${Math.round(config.breakthroughEnemySectorStrengthMult * 100)}%</strong> strength (configurable).
+        <strong>Attacker wins</strong> by holding every sector; <strong>defender wins</strong> if the attacker has no units left.</li>
     </ul>
   `;
 }
@@ -1762,12 +1803,25 @@ function updateUI(): void {
   ppDisplay.textContent = String(state.productionPoints[localPlayer]);
 
   const isConquest = state.gameMode === 'conquest' && state.conquestPoints;
+  const isBreakthrough = state.gameMode === 'breakthrough' && state.sectorOwners && state.sectorOwners.length > 0;
 
-  // Update conquer header — territory % (Domination) or Conquer Points split (Conquest)
+  // Update conquer header — territory % (Domination), Conquer Points (Conquest), or sectors (Breakthrough)
   let localPct: number;
   let opponentPct: number;
   let leftPct: number;
-  if (isConquest) {
+  if (isBreakthrough) {
+    const att = state.sectorOwners!.filter(o => o === PLAYER).length;
+    const def = state.sectorOwners!.length - att;
+    const youAreAttacker = localPlayer === PLAYER;
+    const youSectors = youAreAttacker ? att : def;
+    const oppSectors = youAreAttacker ? def : att;
+    playerConquerPctEl.textContent = String(youSectors);
+    aiConquerPctEl.textContent = String(oppSectors);
+    localPct = youSectors;
+    opponentPct = oppSectors;
+    const sum = youSectors + oppSectors;
+    leftPct = sum > 0 ? Math.round((youSectors / sum) * 100) : 50;
+  } else if (isConquest) {
     const cp = state.conquestPoints!;
     const youCp = localPlayer === PLAYER ? cp[PLAYER] : cp[AI];
     const oppCp = localPlayer === PLAYER ? cp[AI] : cp[PLAYER];
@@ -1793,7 +1847,12 @@ function updateUI(): void {
 
   playerConquerPctEl.classList.remove('conquest-cp-leader');
   aiConquerPctEl.classList.remove('conquest-cp-leader');
-  if (isConquest) {
+  if (isBreakthrough) {
+    const youLead = localPct > opponentPct;
+    if (localPct !== opponentPct) {
+      (youLead ? playerConquerPctEl : aiConquerPctEl).classList.add('conquest-cp-leader');
+    }
+  } else if (isConquest) {
     const cpKeys = state.controlPointHexes ?? [];
     let playerOwned = 0;
     let aiOwned = 0;
@@ -1946,6 +2005,7 @@ function showCombatTooltip(attacker: Unit, defender: Unit, pageX: number, pageY:
       ${buildSideHTML(attacker, fc.dmgToAttacker, fc.attackerHpAfter, attackerLabel, 'attacker', attackerFactors)}
       ${buildSideHTML(defender, fc.dmgToDefender, fc.defenderHpAfter, defenderLabel, 'defender', defenderFactors)}
     </div>
+    ${fc.breakthroughDefenderMalus ? '<div class="tt-breakthrough-note">Defender in captured sector: reduced CS.</div>' : ''}
     <hr class="tt-divider">
     <div class="tt-outcome ${outcomeClass}">→ ${outcomeText}</div>`;
 

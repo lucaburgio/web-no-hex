@@ -37,6 +37,10 @@ const config: GameConfig = {
   conquestPointsPlayer: 14,
   conquestPointsAi: 14,
 
+  breakthroughAttackerStartingPP: 120,
+  breakthroughSectorCount: 5,
+  breakthroughEnemySectorStrengthMult: 0.5,
+
   // Board dimensions (number of hexes)
   boardCols: 8,
   boardRows: 8,

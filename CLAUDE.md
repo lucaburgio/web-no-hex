@@ -62,6 +62,7 @@ web-strategic/
 ### Game modes
 - **Domination** (default): move a unit onto the **opponent's home row**, or **eliminate all enemy units**.
 - **Conquest:** control **control point** hexes on the map; each side has **Conquer Points**. After each full round, the opponent loses 1 Conquer Point per control point you own (stacking). First side to **0** Conquer Points loses. A side also loses if they have **no units** and **no owned territory** (full map elimination). Reaching the opponent’s home row alone does not end the match. If both hit 0 in the same tick, or both are fully eliminated from the map in the same check, the **northern** player wins the tie. Settings: `gameMode`, `controlPointCount`, `conquestPointsPlayer`, `conquestPointsAi` in `gameconfig.ts`.
+- **Breakthrough:** south = attacker (fixed PP pool, no further income); north = defender (normal PP + territory). Map split into **sectors** with per-sector **control points**; attacker captures a sector by holding its CP for **two full rounds** (irreversible). Northern units in attacker-held sectors fight at reduced CS. Attacker wins by owning all sectors; defender wins if the attacker has no units. Settings include `breakthroughAttackerStartingPP`, `breakthroughSectorCount`, `breakthroughEnemySectorStrengthMult`.
 
 ## Coordinate System
 Axial hex coordinates (q, r). Offset display via `axialToPixel()`.
@@ -70,7 +71,7 @@ Row = r, Col = q offset per row parity.
 ## Dev Notes
 - No frameworks, no bundler — just `<script type="module">` imports
 - SVG for rendering (scalable, easy hit-testing)
-- AI uses greedy heuristics in `game.ts`: **Domination** — pressure toward the player home row and threats; **Conquest** — prioritize capturing neutral/enemy control points, defending AI-owned CPs when player units are close, and prefer ranged/melee targets on CP hexes.
+- AI uses greedy heuristics in `game.ts`: **Domination** — pressure toward the player home row and threats; **Conquest** — prioritize capturing neutral/enemy control points, defending AI-owned CPs when player units are close, and prefer ranged/melee targets on CP hexes; **Breakthrough** — defend CPs in sectors still owned by the north, pressure threats toward southern units.
 
 ## Workflow
 - After completing a concrete task with no errors, commit automatically without asking.

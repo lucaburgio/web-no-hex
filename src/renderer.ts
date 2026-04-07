@@ -420,6 +420,11 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   hexLayer.id = 'hex-layer';
   boardViewRoot.appendChild(hexLayer);
 
+  const sectorOutlineLayer = svgEl('g');
+  sectorOutlineLayer.id = 'sector-outline-layer';
+  sectorOutlineLayer.setAttribute('pointer-events', 'none');
+  boardViewRoot.appendChild(sectorOutlineLayer);
+
   const unitLayer = svgEl('g');
   unitLayer.id = 'unit-layer';
   unitLayer.setAttribute('pointer-events', 'none');
@@ -708,6 +713,29 @@ export function renderState(
     }
   }
 
+  const sectorOutlineLayerEl = svgElement.querySelector('#sector-outline-layer') as SVGGElement | null;
+  if (sectorOutlineLayerEl) {
+    sectorOutlineLayerEl.innerHTML = '';
+    if (state.gameMode === 'breakthrough' && state.sectorHexes?.length) {
+      for (let sid = 0; sid < state.sectorHexes.length; sid++) {
+        const set = new Set(state.sectorHexes[sid]);
+        const d = buildBoundaryPath(set);
+        if (!d) continue;
+        const path = svgEl('path');
+        path.setAttribute('d', d);
+        path.setAttribute('fill', 'none');
+        const owner = state.sectorOwners[sid];
+        path.setAttribute('stroke', owner === PLAYER ? c.player : c.ai);
+        path.setAttribute('stroke-width', '4');
+        path.setAttribute('stroke-linejoin', 'round');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('pointer-events', 'none');
+        path.setAttribute('class', 'sector-outline');
+        sectorOutlineLayerEl.appendChild(path);
+      }
+    }
+  }
+
   const controlPointLayer = svgElement.querySelector('#control-point-layer') as SVGGElement | null;
   if (controlPointLayer) {
     controlPointLayer.innerHTML = '';
@@ -721,8 +749,15 @@ export function renderState(
       const ring = svgEl('polygon');
       ring.setAttribute('points', hexPoints(x, y));
       ring.setAttribute('fill', 'none');
-      ring.setAttribute('stroke', '#6B6B6B');
-      ring.setAttribute('stroke-width', '2.5');
+      let ringStroke = '#6B6B6B';
+      if (state.gameMode === 'breakthrough' && state.sectorOwners?.length && state.sectorIndexByHex) {
+        const sid = state.sectorIndexByHex[key];
+        if (sid !== undefined && state.sectorOwners[sid] !== undefined) {
+          ringStroke = state.sectorOwners[sid] === PLAYER ? c.player : c.ai;
+        }
+      }
+      ring.setAttribute('stroke', ringStroke);
+      ring.setAttribute('stroke-width', state.gameMode === 'breakthrough' ? '3.5' : '2.5');
       ring.setAttribute('stroke-linejoin', 'round');
       ring.setAttribute('pointer-events', 'none');
       ring.setAttribute('class', 'control-point-ring');

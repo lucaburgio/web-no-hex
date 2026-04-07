@@ -25,6 +25,14 @@ export function loadGameState(): GameState | null {
     if (!state.mountainHexes) state.mountainHexes = [];
     if (state.gameMode == null) state.gameMode = 'domination';
     if (!state.controlPointHexes) state.controlPointHexes = [];
+    if (!state.sectorHexes) state.sectorHexes = [];
+    if (!state.sectorOwners) state.sectorOwners = [];
+    if (!state.sectorControlPointHex) state.sectorControlPointHex = [];
+    if (!state.breakthroughCpOccupation) state.breakthroughCpOccupation = [];
+    if (!state.sectorIndexByHex) state.sectorIndexByHex = {};
+    if (state.gameMode === 'breakthrough' && state.sectorOwners.length === 0) {
+      state.gameMode = 'domination';
+    }
     if (state.gameMode !== 'conquest') {
       state.conquestPoints = null;
     } else if (state.conquestPoints == null) {

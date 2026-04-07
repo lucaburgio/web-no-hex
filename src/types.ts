@@ -4,7 +4,7 @@ export type Owner = 1 | 2;
 export type Phase = 'production' | 'movement';
 
 /** Match rules: core gameplay is shared; each mode tweaks victory and scoring. */
-export type GameMode = 'domination' | 'conquest';
+export type GameMode = 'domination' | 'conquest' | 'breakthrough';
 
 export interface Unit {
   id: number;
@@ -36,6 +36,16 @@ export interface GameState {
   controlPointHexes: string[];
   /** Remaining Conquer Points per side (Conquest only; null in Domination). */
   conquestPoints: Record<Owner, number> | null;
+  /** Breakthrough: hex keys per sector (south → north). Empty / absent in other modes. */
+  sectorHexes: string[][];
+  /** Breakthrough: who politically controls each sector (irreversible from AI → Player). */
+  sectorOwners: Owner[];
+  /** Breakthrough: one control point hex per sector (same order as sectorHexes). */
+  sectorControlPointHex: string[];
+  /** Breakthrough: full-round occupation counts toward capturing that sector’s CP. */
+  breakthroughCpOccupation: number[];
+  /** Breakthrough: O(1) `col,row` → sector index. */
+  sectorIndexByHex: Record<string, number>;
   turn: number;
   phase: Phase;
   activePlayer: Owner;
@@ -97,6 +107,8 @@ export interface CombatForecast {
   extraFlankingFrom: { name: string; bonusPct: number }[];
   attackerConditionPct: number;
   defenderConditionPct: number;
+  /** Breakthrough: defender has strength malus in attacker-held sector. */
+  breakthroughDefenderMalus?: boolean;
 }
 
 export interface UnitType {
@@ -122,6 +134,13 @@ export interface GameConfig {
   conquestPointsPlayer: number;
   /** Starting Conquer Points for the northern player (owner 2). */
   conquestPointsAi: number;
+
+  /** Breakthrough: attacker (south) starts with this PP pool only (no further income). */
+  breakthroughAttackerStartingPP: number;
+  /** Breakthrough: number of sectors (≥2); map is split south → north. */
+  breakthroughSectorCount: number;
+  /** Breakthrough: defender strength multiplier while in a sector controlled by the attacker. */
+  breakthroughEnemySectorStrengthMult: number;
 
   boardCols: number;
   boardRows: number;
