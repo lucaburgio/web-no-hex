@@ -11,12 +11,15 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+.hidden { display: none !important; }
+
 :root {
 
   --color-white: #FFF;
   --color-yellow-500: #FFC13A;
   --color-gray-500: #9E9E9E;
   --color-gray-400: #B0B0B0;
+  --color-beige-600: #9a908c;
   --color-beige-500: #b2a8a5;
   --color-beige-400: #c4bab7;
   --color-beige-300: #d3cbc9;
@@ -26,10 +29,11 @@
   --color-green-500: #81e2a0;
   --color-green-700: #345B41;
 
-
+  --color-primary: var(--color-dark);
   --color-input: var(--color-beige-300);
   --color-input-hover: var(--color-beige-400);
   --color-input-focus: var(--color-beige-500);
+  --color-input-placeholder: var(--color-beige-600);
 
     /* ── Background ─────────────────────────────────────────────────────────── */
     --color-bg: #E1D9D6;
@@ -153,10 +157,8 @@ body {
 .button:disabled,
 .button-primary:disabled,
 .button-disabled,#end-move-btn:disabled {
-  background-color: #ccc;
-  color: #666;
-  border-color: #ccc;
-  opacity: 0.6;
+  background-color: red;
+  color: var(--color-beige-500);
 }
 
 .button:disabled:hover,
@@ -1122,6 +1124,33 @@ body {
   background: var(--color-input-focus);
 }
 
+.settings-input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  padding: 0;
+  border-radius: 0;
+  background: var(--color-input);
+  display: inline-grid;
+  place-content: center;
+  vertical-align: middle;
+}
+
+.settings-input[type="checkbox"]::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: var(--color-primary);
+  transform: scale(0);
+  transition: transform 0.12s ease-in-out;
+}
+
+.settings-input[type="checkbox"]:checked::after {
+  transform: scale(1);
+}
+
 select.settings-input.settings-select {
   width: auto;
   min-width: 11rem;
@@ -1134,16 +1163,113 @@ select.settings-input.settings-select option {
   background: #111;
 }
 
-.settings-toggle {
+.settings-select-native-hidden {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+}
+
+.settings-custom-select {
+  position: relative;
+  min-width: 11rem;
+}
+
+.settings-custom-select-button {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-dark);
+  background: var(--color-input);
+  border: none;
+  outline: none;
+  width: 100%;
+  text-align: left;
+  padding: 10px 28px 10px 10px;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
+  position: relative;
+}
+
+.settings-custom-select-button::after {
+  content: '▼';
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.62rem;
+  color: #222;
+  pointer-events: none;
+}
+
+.settings-custom-select-button:hover {
+  background: var(--color-input-hover);
+}
+
+.settings-custom-select-button:focus {
+  background: var(--color-input-focus);
+}
+
+.settings-custom-select-button:disabled {
+  opacity: 0.55;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
+}
+
+.settings-custom-select-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: #111;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  overflow: hidden;
+}
+
+.settings-custom-select-list.hidden {
+  display: none;
+}
+
+.settings-custom-select-option {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 0;
+  background: #111;
+  color: #fff;
+  text-align: left;
+  padding: 10px;
   font-family: 'Disket Mono', monospace;
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
+}
+
+.settings-custom-select-option:hover,
+.settings-custom-select-option:focus {
+  background: #1c1c1c;
+  outline: none;
+}
+
+.settings-custom-select-option.is-selected {
+  background: #272727;
+}
+
+.settings-toggle {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
   letter-spacing: 0.1em;
-  padding: 4px 14px;
-  border: 1px solid var(--color-dark);
-  background: var(--color-dark);
-  color: var(--color-bg);
+  padding: 11px 14px;
+  border: 0;
+  background: var(--color-input);
+  color: var(--color-beige-500);
   cursor: url('/icons/pointer.svg') 13 14, pointer;
   transition: all 0.15s ease;
   width: 64px;
@@ -1151,9 +1277,13 @@ select.settings-input.settings-select option {
 }
 
 .settings-toggle[data-value="false"] {
-  background: transparent;
-  color: var(--color-gray-500);
-  border-color: var(--color-gray-500);
+  background: var(--color-input);
+  color: var(--color-beige-500);
+}
+
+.settings-toggle[data-value="true"] {
+  background: var(--color-dark);
+  color: var(--color-white);
 }
 
 /* ── New game confirm modal ────────────────────────────────────────────────── */
@@ -1271,38 +1401,43 @@ select.settings-input.settings-select option {
 #lobby-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.88);
+  background: rgba(0,0,0,0.18);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 30;
+  align-items: stretch;
+  justify-content: flex-end;
+  z-index: 42;
 }
 #lobby-overlay.hidden { display: none; }
 
 #lobby-modal {
-  background: #0e160e;
-  border: 1px solid #2a4a2a;
-  padding: 40px 48px;
-  min-width: 280px;
+  background: var(--color-bg);
+  border-left: 1px solid rgba(0,0,0,0.12);
+  padding: 48px;
+  width: min(520px, 100vw);
+  height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 24px;
+  align-items: stretch;
+  gap: 20px;
+  overflow-y: auto;
 }
 
 #lobby-title {
-  font-size: 0.88rem;
-  font-weight: bold;
-  color: #6aaa6a;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-dark);
   text-transform: uppercase;
-  letter-spacing: 0.35em;
+  letter-spacing: 0.1em;
+}
+
+#lobby-sheet-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 #lobby-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
+  display: none;
 }
 
 .lobby-btn {
@@ -1330,52 +1465,73 @@ select.settings-input.settings-select option {
 #lobby-join-form {
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
 }
 
+#lobby-modal .settings-group,
+#lobby-modal .settings-group-title {
+  width: 100%;
+}
+
+#lobby-join-confirm,
+#lobby-cancel-join-btn,
+#lobby-cancel-btn {
+  text-align: center;
+}
+
 .lobby-label {
-  font-size: 0.62rem;
+  font-size: 0.7rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: #5a8a5a;
+  letter-spacing: 0.1em;
+  color: var(--color-dark);
 }
 
 #lobby-code {
   font-size: 2rem;
-  font-weight: bold;
-  color: #aaddaa;
-  letter-spacing: 0.5em;
+  font-weight: 700;
+  color: var(--color-dark);
+  letter-spacing: 0.4em;
   padding-left: 0.5em; /* compensate letter-spacing on last char */
 }
 
 .lobby-hint {
-  font-size: 0.62rem;
-  color: #4a6a4a;
-  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--color-gray-500);
+  text-align: left;
+  line-height: 1.5;
 }
 
 #lobby-code-input {
   width: 100%;
-  padding: 10px;
-  background: #0a120a;
-  border: 1px solid #3a5a3a;
-  color: #aaddaa;
-  font-family: inherit;
-  font-size: 1.1rem;
+  max-width: 100%;
+  padding: 24px 16px;
+  background: var(--color-input);
+  border: none;
+  color: var(--color-dark);
+  font-family: 'Disket Mono', monospace;
+  font-size: 40px;
+  font-weight: 700;
   text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.35em;
+  text-transform: uppercase;  
+  letter-spacing: 0.28em;
   outline: none;
 }
-#lobby-code-input:focus { border-color: #5a9a5a; }
-#lobby-code-input::placeholder { color: #2a4a2a; letter-spacing: 0.2em; }
+#lobby-code-input:hover { background: var(--color-input-hover); }
+#lobby-code-input:focus { background: var(--color-input-focus); }
+#lobby-code-input::placeholder { color: var(--color-input-placeholder); letter-spacing: 0.16em; }
 
 #lobby-error {
-  font-size: 0.68rem;
-  color: #cc7744;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-red-700);
   text-align: center;
+  line-height: 1.5;
+  margin-top: 4px;
 }
 #lobby-error.hidden { display: none; }
 

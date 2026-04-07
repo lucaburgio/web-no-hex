@@ -124,6 +124,29 @@ rulesOverlayEl.addEventListener('click', e => { if (e.target === rulesOverlayEl)
 
 // ── PP tooltip ────────────────────────────────────────────────────────────────
 
+function calcTerritoryIncomePreview(ownedHexes: number): {
+  territoryBonus: number;
+  total: number;
+  nextLine: string;
+} {
+  if (config.territoryQuota <= 0 || config.pointsPerQuota <= 0) {
+    return {
+      territoryBonus: 0,
+      total: config.productionPointsPerTurn,
+      nextLine: 'Territory bonus is disabled for this mode.',
+    };
+  }
+  const quotas = Math.floor(ownedHexes / config.territoryQuota);
+  const territoryBonus = quotas * config.pointsPerQuota;
+  const total = config.productionPointsPerTurn + territoryBonus;
+  const hexesIntoQuota = ownedHexes % config.territoryQuota;
+  const hexesToNext = config.territoryQuota - hexesIntoQuota;
+  const nextLine = hexesIntoQuota === 0 && ownedHexes === 0
+    ? `Own ${config.territoryQuota} hexes to earn +${config.pointsPerQuota} PP`
+    : `Next +${config.pointsPerQuota} PP in ${hexesToNext} more hex${hexesToNext === 1 ? '' : 'es'}`;
+  return { territoryBonus, total, nextLine };
+}
+
 ppInfoEl.addEventListener('mouseenter', () => {
   if (state.gameMode === 'breakthrough') {
     const youAreAttacker = localPlayer === getBreakthroughAttackerOwner(state);
@@ -139,14 +162,7 @@ ppInfoEl.addEventListener('mouseenter', () => {
         <div class="pp-tt-next">Spend your starting pool only; territory does not add PP per turn.</div>`;
     } else {
       const ownedHexes = Object.values(state.hexStates).filter(h => h.owner === localPlayer).length;
-      const quotas = Math.floor(ownedHexes / config.territoryQuota);
-      const territoryBonus = quotas * config.pointsPerQuota;
-      const total = config.productionPointsPerTurn + territoryBonus;
-      const hexesIntoQuota = ownedHexes % config.territoryQuota;
-      const hexesToNext = config.territoryQuota - hexesIntoQuota;
-      const nextLine = hexesIntoQuota === 0 && ownedHexes === 0
-        ? `Own ${config.territoryQuota} hexes to earn +${config.pointsPerQuota} PP`
-        : `Next +${config.pointsPerQuota} PP in ${hexesToNext} more hex${hexesToNext === 1 ? '' : 'es'}`;
+      const { territoryBonus, total, nextLine } = calcTerritoryIncomePreview(ownedHexes);
       ppTooltipEl.innerHTML = `
         <div class="pp-tt-row"><span>Base</span><span>+${config.productionPointsPerTurn} PP</span></div>
         <div class="pp-tt-row"><span>Territory (${ownedHexes} hexes)</span><span>+${territoryBonus} PP</span></div>
@@ -158,15 +174,7 @@ ppInfoEl.addEventListener('mouseenter', () => {
   }
 
   const ownedHexes = Object.values(state.hexStates).filter(h => h.owner === localPlayer).length;
-  const quotas = Math.floor(ownedHexes / config.territoryQuota);
-  const territoryBonus = quotas * config.pointsPerQuota;
-  const total = config.productionPointsPerTurn + territoryBonus;
-  const hexesIntoQuota = ownedHexes % config.territoryQuota;
-  const hexesToNext = config.territoryQuota - hexesIntoQuota;
-
-  const nextLine = hexesIntoQuota === 0 && ownedHexes === 0
-    ? `Own ${config.territoryQuota} hexes to earn +${config.pointsPerQuota} PP`
-    : `Next +${config.pointsPerQuota} PP in ${hexesToNext} more hex${hexesToNext === 1 ? '' : 'es'}`;
+  const { territoryBonus, total, nextLine } = calcTerritoryIncomePreview(ownedHexes);
 
   ppTooltipEl.innerHTML = `
     <div class="pp-tt-row"><span>Base</span><span>+${config.productionPointsPerTurn} PP</span></div>
@@ -213,6 +221,7 @@ const introContinueBtn     = document.getElementById('intro-continue-btn') as HT
 // ── Lobby DOM refs ────────────────────────────────────────────────────────────
 
 const lobbyOverlayEl    = document.getElementById('lobby-overlay') as HTMLDivElement;
+const lobbyTitleEl      = document.getElementById('lobby-title') as HTMLDivElement;
 const lobbyMenuEl       = document.getElementById('lobby-menu') as HTMLDivElement;
 const lobbyHostWaitEl   = document.getElementById('lobby-host-wait') as HTMLDivElement;
 const lobbyJoinFormEl   = document.getElementById('lobby-join-form') as HTMLDivElement;
@@ -499,7 +508,7 @@ menuHostBtn.addEventListener('click', () => {
   gameMode = 'vsHuman';
   localPlayer = PLAYER;
   state = createInitialState();
-  hideMainMenu();
+  lobbyTitleEl.textContent = 'HOST GAME';
   lobbyOverlayEl.classList.remove('hidden');
   lobbyMenuEl.classList.add('hidden');
   lobbyJoinFormEl.classList.add('hidden');
@@ -514,7 +523,7 @@ menuHostBtn.addEventListener('click', () => {
 menuJoinBtn.addEventListener('click', () => {
   gameMode = 'vsHuman';
   localPlayer = AI;
-  hideMainMenu();
+  lobbyTitleEl.textContent = 'JOIN GAME';
   lobbyOverlayEl.classList.remove('hidden');
   lobbyMenuEl.classList.add('hidden');
   lobbyHostWaitEl.classList.add('hidden');
@@ -578,6 +587,35 @@ const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'limitArtillery' | 'autoEn
   ['cfg-autoEndMovement',    'autoEndMovement'],
 ];
 
+class SettingsOnOffToggle {
+  private readonly buttonEl: HTMLButtonElement;
+
+  constructor(buttonEl: HTMLButtonElement) {
+    this.buttonEl = buttonEl;
+    this.buttonEl.type = 'button';
+    this.syncFromDom();
+    this.buttonEl.addEventListener('click', () => {
+      this.setValue(!this.getValue());
+    });
+  }
+
+  getValue(): boolean {
+    return this.buttonEl.dataset.value === 'true';
+  }
+
+  setValue(next: boolean): void {
+    this.buttonEl.dataset.value = String(next);
+    this.buttonEl.textContent = next ? 'ON' : 'OFF';
+    this.buttonEl.setAttribute('aria-pressed', String(next));
+  }
+
+  private syncFromDom(): void {
+    this.setValue(this.getValue());
+  }
+}
+
+const settingsOnOffToggles = new Map<string, SettingsOnOffToggle>();
+
 function populateSettings(): void {
   const vals: Record<string, number> = {
     controlPointCount: config.controlPointCount,
@@ -604,10 +642,10 @@ function populateSettings(): void {
     el.value = String(Math.round(vals[key] * scale));
   }
   for (const [id, key] of TOGGLE_FIELDS) {
-    const el = document.getElementById(id) as HTMLButtonElement;
+    const el = settingsOnOffToggles.get(id);
+    if (!el) continue;
     const val = config[key] as boolean;
-    el.dataset.value = String(val);
-    el.textContent = val ? 'ON' : 'OFF';
+    el.setValue(val);
   }
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   gameModeEl.value = config.gameMode;
@@ -624,6 +662,7 @@ function syncBreakthroughRoleControls(): void {
   const roleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement | null;
   if (!randEl || !roleEl) return;
   roleEl.disabled = randEl.checked;
+  roleEl.dispatchEvent(new Event('settings-select-sync'));
 }
 
 function updateModeSpecificSettingsVisibility(): void {
@@ -663,6 +702,83 @@ function clampNumericInputToBounds(el: HTMLInputElement): number {
   return clamped;
 }
 
+function initCustomSettingsSelect(selectId: string): void {
+  const selectEl = document.getElementById(selectId) as HTMLSelectElement | null;
+  if (!selectEl) return;
+
+  const wrapperEl = document.createElement('div');
+  wrapperEl.className = 'settings-custom-select';
+
+  const buttonEl = document.createElement('button');
+  buttonEl.type = 'button';
+  buttonEl.className = 'settings-custom-select-button';
+  buttonEl.setAttribute('aria-haspopup', 'listbox');
+  buttonEl.setAttribute('aria-expanded', 'false');
+
+  const listEl = document.createElement('ul');
+  listEl.className = 'settings-custom-select-list hidden';
+  listEl.setAttribute('role', 'listbox');
+
+  const syncFromSelect = (): void => {
+    const selectedOption = selectEl.selectedOptions[0];
+    buttonEl.textContent = selectedOption ? selectedOption.textContent ?? '' : '';
+    buttonEl.disabled = selectEl.disabled;
+    for (const node of listEl.querySelectorAll('.settings-custom-select-option')) {
+      node.classList.remove('is-selected');
+      if ((node as HTMLButtonElement).dataset.value === selectEl.value) {
+        node.classList.add('is-selected');
+      }
+    }
+  };
+
+  const closeList = (): void => {
+    listEl.classList.add('hidden');
+    buttonEl.setAttribute('aria-expanded', 'false');
+  };
+
+  for (const optionEl of Array.from(selectEl.options)) {
+    const liEl = document.createElement('li');
+    const itemButtonEl = document.createElement('button');
+    itemButtonEl.type = 'button';
+    itemButtonEl.className = 'settings-custom-select-option';
+    itemButtonEl.dataset.value = optionEl.value;
+    itemButtonEl.textContent = optionEl.textContent;
+    itemButtonEl.addEventListener('click', () => {
+      selectEl.value = optionEl.value;
+      selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+      syncFromSelect();
+      closeList();
+    });
+    liEl.appendChild(itemButtonEl);
+    listEl.appendChild(liEl);
+  }
+
+  buttonEl.addEventListener('click', () => {
+    const isOpen = !listEl.classList.contains('hidden');
+    if (isOpen) {
+      closeList();
+      return;
+    }
+    listEl.classList.remove('hidden');
+    buttonEl.setAttribute('aria-expanded', 'true');
+  });
+
+  document.addEventListener('click', (event) => {
+    const target = event.target as Node | null;
+    if (!target) return;
+    if (!wrapperEl.contains(target)) closeList();
+  });
+
+  selectEl.classList.add('settings-select-native-hidden');
+  selectEl.insertAdjacentElement('afterend', wrapperEl);
+  wrapperEl.appendChild(buttonEl);
+  wrapperEl.appendChild(listEl);
+
+  selectEl.addEventListener('change', syncFromSelect);
+  selectEl.addEventListener('settings-select-sync', syncFromSelect as EventListener);
+  syncFromSelect();
+}
+
 function collectSettings(): Parameters<typeof updateConfig>[0] {
   const out: Partial<Parameters<typeof updateConfig>[0]> = {};
   for (const [id, key, scale] of NUM_FIELDS) {
@@ -670,8 +786,9 @@ function collectSettings(): Parameters<typeof updateConfig>[0] {
     out[key] = clampNumericInputToBounds(el) / scale;
   }
   for (const [id, key] of TOGGLE_FIELDS) {
-    const el = document.getElementById(id) as HTMLButtonElement;
-    out[key] = el.dataset.value === 'true';
+    const toggle = settingsOnOffToggles.get(id);
+    if (!toggle) continue;
+    out[key] = toggle.getValue();
   }
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   out.gameMode = gameModeEl.value as GameMode;
@@ -695,14 +812,11 @@ function collectSettings(): Parameters<typeof updateConfig>[0] {
   return out as Parameters<typeof updateConfig>[0];
 }
 
-// Wire toggle buttons
+// Wire settings ON/OFF toggle components
 for (const [id] of TOGGLE_FIELDS) {
-  const el = document.getElementById(id) as HTMLButtonElement;
-  el.addEventListener('click', () => {
-    const next = el.dataset.value !== 'true';
-    el.dataset.value = String(next);
-    el.textContent = next ? 'ON' : 'OFF';
-  });
+  const buttonEl = document.getElementById(id) as HTMLButtonElement | null;
+  if (!buttonEl) continue;
+  settingsOnOffToggles.set(id, new SettingsOnOffToggle(buttonEl));
 }
 
 for (const [id] of NUM_FIELDS) {
@@ -720,6 +834,8 @@ for (const [id] of NUM_FIELDS) {
   });
 }
 
+initCustomSettingsSelect('cfg-gameMode');
+initCustomSettingsSelect('cfg-breakthroughPlayer1Role');
 document.getElementById('cfg-gameMode')!.addEventListener('change', updateModeSpecificSettingsVisibility);
 document.getElementById('cfg-breakthroughRandomRoles')?.addEventListener('change', syncBreakthroughRoleControls);
 
@@ -749,9 +865,9 @@ pointsPerQuotaLabelEl?.addEventListener('mouseenter', () => {
 });
 pointsPerQuotaLabelEl?.addEventListener('mouseleave', hideSettingsTooltip);
 
-let settingsOnStart: (() => void) | null = null;
+let settingsOnStart: ((settings: Parameters<typeof updateConfig>[0]) => void) | null = null;
 
-function showSettings(onStart: () => void): void {
+function showSettings(onStart: (settings: Parameters<typeof updateConfig>[0]) => void): void {
   populateSettings();
   settingsOnStart = onStart;
   settingsOverlayEl.classList.remove('hidden');
@@ -768,7 +884,7 @@ settingsStartBtn.addEventListener('click', () => {
   syncDimensions();
   const cb = settingsOnStart;
   hideSettings();
-  cb?.();
+  cb?.(settings);
 });
 
 settingsBackBtn.addEventListener('click', () => {
@@ -975,7 +1091,6 @@ function connectWs(onOpen: (socket: WebSocket) => void): void {
   ws = socket;
 
   socket.onerror = () => {
-    showLobbyMenu();
     showLobbyError('Cannot connect to server.');
     ws = null;
   };
@@ -1004,9 +1119,10 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
   } else if (msg.type === 'guest-joined') {
     // Host: guest arrived — show settings, then start
     hideLobby();
-    showSettings(() => {
+    hideMainMenu();
+    showSettings((settings) => {
       state = createInitialState();
-      if (ws) ws.send(JSON.stringify({ type: 'game-start', state }));
+      if (ws) ws.send(JSON.stringify({ type: 'game-start', state, settings }));
       startGame(state);
     });
   } else if (msg.type === 'joined') {
@@ -1020,9 +1136,15 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     (document.getElementById('lobby-modal') as HTMLDivElement).appendChild(waitEl);
   } else if (msg.type === 'game-start') {
     // Guest receives initial state from host
+    const syncedSettings = msg.settings as Parameters<typeof updateConfig>[0] | undefined;
+    if (syncedSettings) {
+      updateConfig(syncedSettings);
+      syncDimensions();
+    }
     state = msg.state as GameState;
     syncUnitIdCounter(state);
     hideLobby();
+    hideMainMenu();
     startGame(state);
   } else if (msg.type === 'state-after-host-move') {
     if (localPlayer !== AI) return; // should be guest (AI owner side)
@@ -1072,7 +1194,6 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
       }
     }
   } else if (msg.type === 'error') {
-    showLobbyMenu();
     showLobbyError((msg.message as string) ?? 'Error.');
   } else if (msg.type === 'opponent-disconnected') {
     showDisconnected();
@@ -1124,13 +1245,11 @@ joinBtn.addEventListener('click', () => {
 lobbyCancelBtn.addEventListener('click', () => {
   closeLobbyWs();
   lobbyOverlayEl.classList.add('hidden');
-  showMainMenu();
 });
 
 lobbyCancelJoinBtn.addEventListener('click', () => {
   closeLobbyWs();
   lobbyOverlayEl.classList.add('hidden');
-  showMainMenu();
 });
 
 lobbyJoinConfirm.addEventListener('click', () => {
@@ -1147,6 +1266,12 @@ lobbyJoinConfirm.addEventListener('click', () => {
 
 lobbyCodeInputEl.addEventListener('keydown', (e: KeyboardEvent) => {
   if (e.key === 'Enter') lobbyJoinConfirm.click();
+});
+
+lobbyOverlayEl.addEventListener('click', (e: MouseEvent) => {
+  if (e.target !== lobbyOverlayEl) return;
+  closeLobbyWs();
+  hideLobby();
 });
 
 // ── Game start ────────────────────────────────────────────────────────────────

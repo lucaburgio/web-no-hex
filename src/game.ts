@@ -253,6 +253,12 @@ function pickBreakthroughSectorControlPoint(sectorKeys: string[], cols: number, 
   return best;
 }
 
+function territoryBonusForHexCount(hexCount: number): number {
+  // Breakthrough can disable territory income (quota/points set to 0).
+  if (config.territoryQuota <= 0 || config.pointsPerQuota <= 0) return 0;
+  return Math.floor(hexCount / config.territoryQuota) * config.pointsPerQuota;
+}
+
 /** Breakthrough: defender sector currently on the border with attacker-held sectors (frontline objective). */
 function breakthroughActiveFrontlineSectorIndex(state: GameState): number | null {
   if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return null;
@@ -1265,8 +1271,8 @@ export function createInitialState(): GameState {
 
   const playerHexes = Object.values(hexStates).filter(h => h.owner === PLAYER).length;
   const aiHexes = Object.values(hexStates).filter(h => h.owner === AI).length;
-  const playerBonus = Math.floor(playerHexes / config.territoryQuota) * config.pointsPerQuota;
-  const aiBonus = Math.floor(aiHexes / config.territoryQuota) * config.pointsPerQuota;
+  const playerBonus = territoryBonusForHexCount(playerHexes);
+  const aiBonus = territoryBonusForHexCount(aiHexes);
 
   let ppPlayer: number;
   let ppAi: number;
@@ -1274,7 +1280,7 @@ export function createInitialState(): GameState {
     const att = breakthroughAttackerOwnerForState;
     const def: Owner = att === PLAYER ? AI : PLAYER;
     const defHexCount = Object.values(hexStates).filter(h => h.owner === def).length;
-    const defBonus = Math.floor(defHexCount / config.territoryQuota) * config.pointsPerQuota;
+    const defBonus = territoryBonusForHexCount(defHexCount);
     const defPP = config.productionPointsPerTurn + defBonus;
     const attPP = config.breakthroughAttackerStartingPP;
     ppPlayer = att === PLAYER ? attPP : defPP;
@@ -2169,13 +2175,13 @@ export function endTurnAfterAi(state: GameState): { state: GameState; healFloats
   state.selectedUnit = null;
   const playerHexes = Object.values(state.hexStates).filter(h => h.owner === PLAYER).length;
   const aiHexes     = Object.values(state.hexStates).filter(h => h.owner === AI).length;
-  const playerBonus = Math.floor(playerHexes / config.territoryQuota) * config.pointsPerQuota;
-  const aiBonus     = Math.floor(aiHexes     / config.territoryQuota) * config.pointsPerQuota;
+  const playerBonus = territoryBonusForHexCount(playerHexes);
+  const aiBonus     = territoryBonusForHexCount(aiHexes);
   if (state.gameMode === 'breakthrough') {
     const att = getBreakthroughAttackerOwner(state);
     const def = getBreakthroughDefenderOwner(state);
     const defHexes = Object.values(state.hexStates).filter(h => h.owner === def).length;
-    const defBonus = Math.floor(defHexes / config.territoryQuota) * config.pointsPerQuota;
+    const defBonus = territoryBonusForHexCount(defHexes);
     state.productionPoints[def] += config.productionPointsPerTurn + defBonus;
     log(
       state,
