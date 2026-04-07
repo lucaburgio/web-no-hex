@@ -38,9 +38,9 @@ const config: GameConfig = {
   conquestPointsAi: 14,
 
   breakthroughAttackerStartingPP: 120,
-  breakthroughSectorCount: 5,
+  breakthroughSectorCount: 3,
   breakthroughEnemySectorStrengthMult: 0.5,
-  breakthroughSectorCaptureBonusPP: 25,
+  breakthroughSectorCaptureBonusPP: 120,
   breakthroughPlayer1Role: 'attacker',
   breakthroughRandomRoles: false,
 
@@ -98,7 +98,7 @@ const config: GameConfig = {
       cost: 34,
       movement: 1,
       maxHp: 10,
-      strength: 10,
+      strength: 9,
       range: 3,
       icon: 'icons/artillery.svg',
     },
