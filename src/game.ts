@@ -632,14 +632,19 @@ function defenderOnPlayerControlPoint(state: GameState, defender: Unit): boolean
 }
 
 /** Lower = higher priority (act earlier). */
-function aiConquestUnitPriority(state: GameState, u: Unit): number {
-  const toCapture = minBfsToCpWhere(state, u.col, u.row, key => cpNotOwnedByAi(state, key));
+function aiConquestUnitPriority(
+  state: GameState,
+  u: Unit,
+  minBfsToCpWhereFn: (col: number, row: number, pred: (key: string) => boolean) => number,
+  minPlayerBfsToHexFn: (tcol: number, trow: number) => number,
+): number {
+  const toCapture = minBfsToCpWhereFn(u.col, u.row, key => cpNotOwnedByAi(state, key));
   let defend = 999;
   for (const key of state.controlPointHexes ?? []) {
     const hx = state.hexStates[key];
     if (hx?.owner !== AI) continue;
     const [cc, cr] = key.split(',').map(Number);
-    const pd = minPlayerBfsToHex(state, cc, cr);
+    const pd = minPlayerBfsToHexFn(cc, cr);
     if (pd > 5) continue;
     const dist = bfsDistance(state, u.col, u.row, cc, cr);
     defend = Math.min(defend, dist - pd * 2.5);
@@ -648,7 +653,11 @@ function aiConquestUnitPriority(state: GameState, u: Unit): number {
 }
 
 /** Breakthrough: lower = act earlier — defend CPs in sectors still owned by the defender, then react to threats. */
-function aiBreakthroughUnitPriority(state: GameState, u: Unit): number {
+function aiBreakthroughUnitPriority(
+  state: GameState,
+  u: Unit,
+  minPlayerBfsToHexFn: (tcol: number, trow: number) => number,
+): number {
   const def = getBreakthroughDefenderOwner(state);
   let best = 999;
   const sid = breakthroughActiveFrontlineSectorIndex(state);
@@ -657,7 +666,7 @@ function aiBreakthroughUnitPriority(state: GameState, u: Unit): number {
     if (cp) {
       const [cc, cr] = cp.split(',').map(Number);
       const dist = bfsDistance(state, u.col, u.row, cc, cr);
-      const pd = minPlayerBfsToHex(state, cc, cr);
+      const pd = minPlayerBfsToHexFn(cc, cr);
       best = Math.min(best, dist - Math.min(pd, 6) * 2.5);
     }
   }
@@ -1723,7 +1732,13 @@ export function syncUnitIdCounter(state: GameState): void {
 
 const AI_MOVE_TYPE_ORDER: Record<string, number> = { artillery: 0, tank: 1, infantry: 2 };
 
-function pickBestRangedTarget(state: GameState, attacker: Unit, targets: Unit[], pressure: number): Unit {
+function pickBestRangedTarget(
+  state: GameState,
+  attacker: Unit,
+  targets: Unit[],
+  pressure: number,
+  minHomeStepsFn: (col: number, row: number, mover: Owner) => number,
+): Unit {
   let best = targets[0]!;
   let bestScore = -Infinity;
   for (const t of targets) {
@@ -1731,11 +1746,11 @@ function pickBestRangedTarget(state: GameState, attacker: Unit, targets: Unit[],
     let s = 0;
     if (fc.defenderDies) s += 520;
     else s += fc.dmgToDefender * 3;
-    const threatSteps = minHexStepsToOpponentHomeRow(state, t.col, t.row, PLAYER);
+    const threatSteps = minHomeStepsFn(t.col, t.row, PLAYER);
     s += pressure * (8 - Math.min(threatSteps, 8)) * 42;
     // Frontline enemies (further south) matter more when not in a defensive crisis
     s += t.row * 22 * (1 - pressure * 0.85);
-    const distGoal = minHexStepsToOpponentHomeRow(state, t.col, t.row, AI);
+    const distGoal = minHomeStepsFn(t.col, t.row, AI);
     s -= distGoal * 2 * (1 - pressure * 0.7);
     if (state.gameMode === 'conquest' && state.conquestPoints) {
       const k = `${t.col},${t.row}`;
@@ -1757,18 +1772,24 @@ function pickBestRangedTarget(state: GameState, attacker: Unit, targets: Unit[],
   return best;
 }
 
-function scoreMeleeAttack(state: GameState, attacker: Unit, defender: Unit, pressure: number): number {
+function scoreMeleeAttack(
+  state: GameState,
+  attacker: Unit,
+  defender: Unit,
+  pressure: number,
+  minHomeStepsFn: (col: number, row: number, mover: Owner) => number,
+): number {
   const fc = forecastCombat(state, attacker, defender);
   let s = 0;
   if (fc.defenderDies && !fc.attackerDies) s += 480;
   else if (fc.defenderDies && fc.attackerDies) s += 120;
   else s += fc.dmgToDefender * 2 - fc.dmgToAttacker * 2.2;
-  const threatSteps = minHexStepsToOpponentHomeRow(state, defender.col, defender.row, PLAYER);
+  const threatSteps = minHomeStepsFn(defender.col, defender.row, PLAYER);
   s += pressure * (8 - Math.min(threatSteps, 8)) * 38;
   s += defender.row * 18 * (1 - pressure * 0.65);
   s += pressure * (ROWS - 1 - defender.row) * 20;
   if (fc.defenderDies && !fc.attackerDies) {
-    const afterGoal = minHexStepsToOpponentHomeRow(state, defender.col, defender.row, AI);
+    const afterGoal = minHomeStepsFn(defender.col, defender.row, AI);
     s -= afterGoal * 8 * (1 - pressure * 0.5);
   }
   const favorable =
@@ -1796,11 +1817,15 @@ function scoreEmptyMove(
   toRow: number,
   stepsCost: number,
   pressure: number,
-  threat: Unit | null
+  threat: Unit | null,
+  minHomeStepsFn: (col: number, row: number, mover: Owner) => number,
+  minBfsToCpWhereFn: (col: number, row: number, pred: (key: string) => boolean) => number,
+  minPlayerBfsToHexFn: (tcol: number, trow: number) => number,
+  bfsFn: (fromCol: number, fromRow: number, toCol: number, toRow: number) => number,
 ): number {
   if (unit.movesUsed + stepsCost > unit.movement) return -Infinity;
-  const before = minHexStepsToOpponentHomeRow(state, unit.col, unit.row, AI);
-  const after = minHexStepsToOpponentHomeRow(state, toCol, toRow, AI);
+  const before = minHomeStepsFn(unit.col, unit.row, AI);
+  const after = minHomeStepsFn(toCol, toRow, AI);
   let s = (before - after) * 28 * (1 - pressure * 0.82);
   const hex = state.hexStates[`${toCol},${toRow}`];
   const terr = !hex || hex.owner !== AI ? 14 : 0;
@@ -1808,13 +1833,13 @@ function scoreEmptyMove(
   s += toRow * 1.5 * (1 - pressure * 0.65);
   s += pressure * (ROWS - 1 - toRow) * 10;
   if (threat && pressure > 0) {
-    const beforeT = bfsDistance(state, unit.col, unit.row, threat.col, threat.row);
-    const afterT = bfsDistance(state, toCol, toRow, threat.col, threat.row);
+    const beforeT = bfsFn(unit.col, unit.row, threat.col, threat.row);
+    const afterT = bfsFn(toCol, toRow, threat.col, threat.row);
     s += (beforeT - afterT) * 52 * pressure;
   }
   if (state.gameMode === 'conquest' && state.conquestPoints) {
-    const beforeC = minBfsToCpWhere(state, unit.col, unit.row, key => cpNotOwnedByAi(state, key));
-    const afterC = minBfsToCpWhere(state, toCol, toRow, key => cpNotOwnedByAi(state, key));
+    const beforeC = minBfsToCpWhereFn(unit.col, unit.row, key => cpNotOwnedByAi(state, key));
+    const afterC = minBfsToCpWhereFn(toCol, toRow, key => cpNotOwnedByAi(state, key));
     s += (beforeC - afterC) * 44;
     const tk = `${toCol},${toRow}`;
     if ((state.controlPointHexes ?? []).includes(tk)) {
@@ -1825,20 +1850,20 @@ function scoreEmptyMove(
       const hx = state.hexStates[key];
       if (hx?.owner !== AI) continue;
       const [cc, cr] = key.split(',').map(Number);
-      const pd = minPlayerBfsToHex(state, cc, cr);
+      const pd = minPlayerBfsToHexFn(cc, cr);
       if (pd > 5) continue;
-      const distBefore = bfsDistance(state, unit.col, unit.row, cc, cr);
-      const distAfter = bfsDistance(state, toCol, toRow, cc, cr);
+      const distBefore = bfsFn(unit.col, unit.row, cc, cr);
+      const distAfter = bfsFn(toCol, toRow, cc, cr);
       s += (distBefore - distAfter) * (28 + (6 - Math.min(pd, 6)) * 12);
     }
   }
   if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
     const defOw = getBreakthroughDefenderOwner(state);
-    const beforeC = minBfsToCpWhere(state, unit.col, unit.row, key => {
+    const beforeC = minBfsToCpWhereFn(unit.col, unit.row, key => {
       const sid = state.sectorIndexByHex[key];
       return sid !== undefined && state.sectorOwners[sid] === defOw;
     });
-    const afterC = minBfsToCpWhere(state, toCol, toRow, key => {
+    const afterC = minBfsToCpWhereFn(toCol, toRow, key => {
       const sid = state.sectorIndexByHex[key];
       return sid !== undefined && state.sectorOwners[sid] === defOw;
     });
@@ -1882,20 +1907,57 @@ export function aiMovement(state: GameState): {
   const animUnitsAfter: Unit[][] = [];
   const pressure = aiDefensivePressure(state);
   const threat = criticalThreatPlayerUnit(state);
+  const localBfsCache = new Map<string, number>();
+  const localMinHomeCache = new Map<string, number>();
+  const localMinCpCache = new Map<string, number>();
+  const localMinPlayerHexCache = new Map<string, number>();
+  const bfsFn = (fromCol: number, fromRow: number, toCol: number, toRow: number): number => {
+    const k = `${fromCol},${fromRow}|${toCol},${toRow}`;
+    const v = localBfsCache.get(k);
+    if (v !== undefined) return v;
+    const d = bfsDistance(state, fromCol, fromRow, toCol, toRow);
+    localBfsCache.set(k, d);
+    return d;
+  };
+  const minHomeStepsFn = (col: number, row: number, mover: Owner): number => {
+    const k = `${mover}|${col},${row}`;
+    const v = localMinHomeCache.get(k);
+    if (v !== undefined) return v;
+    const d = minHexStepsToOpponentHomeRow(state, col, row, mover);
+    localMinHomeCache.set(k, d);
+    return d;
+  };
+  const minBfsToCpWhereFn = (col: number, row: number, pred: (key: string) => boolean): number => {
+    const cpKeys = (state.controlPointHexes ?? []).filter(pred).join('|');
+    const k = `${col},${row}|${cpKeys}`;
+    const v = localMinCpCache.get(k);
+    if (v !== undefined) return v;
+    const d = minBfsToCpWhere(state, col, row, pred);
+    localMinCpCache.set(k, d);
+    return d;
+  };
+  const minPlayerBfsToHexFn = (tcol: number, trow: number): number => {
+    const k = `${tcol},${trow}`;
+    const v = localMinPlayerHexCache.get(k);
+    if (v !== undefined) return v;
+    const d = minPlayerBfsToHex(state, tcol, trow);
+    localMinPlayerHexCache.set(k, d);
+    return d;
+  };
   const aiUnits = state.units.filter(u => u.owner === AI).sort((a, b) => {
     if (state.gameMode === 'conquest' && state.conquestPoints) {
-      const pa = aiConquestUnitPriority(state, a);
-      const pb = aiConquestUnitPriority(state, b);
+      const pa = aiConquestUnitPriority(state, a, minBfsToCpWhereFn, minPlayerBfsToHexFn);
+      const pb = aiConquestUnitPriority(state, b, minBfsToCpWhereFn, minPlayerBfsToHexFn);
       if (pa !== pb) return pa - pb;
     }
     if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
-      const pa = aiBreakthroughUnitPriority(state, a);
-      const pb = aiBreakthroughUnitPriority(state, b);
+      const pa = aiBreakthroughUnitPriority(state, a, minPlayerBfsToHexFn);
+      const pb = aiBreakthroughUnitPriority(state, b, minPlayerBfsToHexFn);
       if (pa !== pb) return pa - pb;
     }
     if (pressure > 0.12 && threat) {
-      const da = bfsDistance(state, a.col, a.row, threat.col, threat.row);
-      const db = bfsDistance(state, b.col, b.row, threat.col, threat.row);
+      const da = bfsFn(a.col, a.row, threat.col, threat.row);
+      const db = bfsFn(b.col, b.row, threat.col, threat.row);
       if (da !== db) return da - db;
     }
     const oa = AI_MOVE_TYPE_ORDER[a.unitTypeId] ?? 9;
@@ -1911,7 +1973,7 @@ export function aiMovement(state: GameState): {
     while (unit.movesUsed < unit.movement && !state.winner) {
       const rangedTargets = getRangedAttackTargets(state, unit);
       if (rangedTargets.length > 0) {
-        const target = pickBestRangedTarget(state, unit, rangedTargets, pressure);
+        const target = pickBestRangedTarget(state, unit, rangedTargets, pressure, minHomeStepsFn);
         unit.movesUsed = unit.movement;
         const attackerId = unit.id;
         const atkCol = unit.col;
@@ -1940,12 +2002,24 @@ export function aiMovement(state: GameState): {
       for (const [nc, nr] of validMoves) {
         const occupant = getUnit(state, nc, nr);
         if (occupant && occupant.owner === PLAYER) {
-          const s = scoreMeleeAttack(state, unit, occupant, pressure);
+          const s = scoreMeleeAttack(state, unit, occupant, pressure, minHomeStepsFn);
           if (!best || s > best.score) best = { kind: 'attack', col: nc, row: nr, score: s };
         } else {
           const path = getMovePath(state, unit, nc, nr);
           const stepsCost = path.length > 0 ? path.length - 1 : 0;
-          const s = scoreEmptyMove(state, unit, nc, nr, stepsCost, pressure, threat);
+          const s = scoreEmptyMove(
+            state,
+            unit,
+            nc,
+            nr,
+            stepsCost,
+            pressure,
+            threat,
+            minHomeStepsFn,
+            minBfsToCpWhereFn,
+            minPlayerBfsToHexFn,
+            bfsFn,
+          );
           if (s === -Infinity) continue;
           if (!best || s > best.score) best = { kind: 'move', col: nc, row: nr, score: s, stepsCost };
         }
