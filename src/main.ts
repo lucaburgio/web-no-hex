@@ -606,11 +606,22 @@ function updateModeSpecificSettingsVisibility(): void {
   domConqWrap.classList.toggle('hidden', v !== 'domination' && v !== 'conquest');
 }
 
+function clampNumericInputToBounds(el: HTMLInputElement): number {
+  const raw = parseFloat(el.value);
+  const min = el.min === '' ? -Infinity : Number(el.min);
+  const max = el.max === '' ? Infinity : Number(el.max);
+  const fallback = Number.isFinite(min) ? min : 0;
+  const parsed = Number.isFinite(raw) ? raw : fallback;
+  const clamped = Math.max(min, Math.min(max, parsed));
+  if (String(clamped) !== el.value) el.value = String(clamped);
+  return clamped;
+}
+
 function collectSettings(): Parameters<typeof updateConfig>[0] {
   const out: Partial<Parameters<typeof updateConfig>[0]> = {};
   for (const [id, key, scale] of NUM_FIELDS) {
     const el = document.getElementById(id) as HTMLInputElement;
-    out[key] = parseFloat(el.value) / scale;
+    out[key] = clampNumericInputToBounds(el) / scale;
   }
   for (const [id, key] of TOGGLE_FIELDS) {
     const el = document.getElementById(id) as HTMLButtonElement;
@@ -641,6 +652,21 @@ for (const [id] of TOGGLE_FIELDS) {
     const next = el.dataset.value !== 'true';
     el.dataset.value = String(next);
     el.textContent = next ? 'ON' : 'OFF';
+  });
+}
+
+for (const [id] of NUM_FIELDS) {
+  const el = document.getElementById(id) as HTMLInputElement;
+  el.addEventListener('input', () => {
+    if (el.max === '') return;
+    const v = parseFloat(el.value);
+    const max = Number(el.max);
+    if (Number.isFinite(v) && Number.isFinite(max) && v > max) {
+      el.value = String(max);
+    }
+  });
+  el.addEventListener('blur', () => {
+    clampNumericInputToBounds(el);
   });
 }
 
