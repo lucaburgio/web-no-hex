@@ -111,6 +111,14 @@
         </div>
         <div id="settings-breakthrough-only" class="hidden">
           <div class="settings-row">
+            <label class="settings-label" for="cfg-startingUnitsDefender">Starting units Defender</label>
+            <input class="settings-input" type="number" id="cfg-startingUnitsDefender" min="1" max="12" step="1" />
+          </div>
+          <div class="settings-row">
+            <label class="settings-label" for="cfg-startingUnitsAttacker">Starting units Attacker</label>
+            <input class="settings-input" type="number" id="cfg-startingUnitsAttacker" min="1" max="12" step="1" />
+          </div>
+          <div class="settings-row">
             <label class="settings-label" for="cfg-breakthroughPlayer1Role">Player 1 role (south / host)</label>
             <select class="settings-input settings-select" id="cfg-breakthroughPlayer1Role">
               <option value="attacker">Attacker</option>
@@ -152,6 +160,16 @@
             <input class="settings-input" type="number" id="cfg-conquestPointsAi" min="1" max="999" step="1" />
           </div>
         </div>
+        <div id="settings-domination-conquest-only">
+          <div class="settings-row">
+            <label class="settings-label" for="cfg-startingUnitsPlayer1">Starting units Player 1</label>
+            <input class="settings-input" type="number" id="cfg-startingUnitsPlayer1" min="1" max="12" step="1" />
+          </div>
+          <div class="settings-row">
+            <label class="settings-label" for="cfg-startingUnitsPlayer2">Starting units Player 2</label>
+            <input class="settings-input" type="number" id="cfg-startingUnitsPlayer2" min="1" max="12" step="1" />
+          </div>
+        </div>
       </div>
 
       <div class="settings-group">
@@ -163,10 +181,6 @@
         <div class="settings-row">
           <label class="settings-label" for="cfg-boardRows">Height</label>
           <input class="settings-input" type="number" id="cfg-boardRows" min="2" max="24" step="1" />
-        </div>
-        <div class="settings-row">
-          <label class="settings-label" for="cfg-startingUnits">Starting units per side</label>
-          <input class="settings-input" type="number" id="cfg-startingUnits" min="1" max="12" step="1" />
         </div>
         <div class="settings-row">
           <label class="settings-label" for="cfg-mountainPct">Mountain hexes (%)</label>
@@ -251,14 +265,6 @@
         <div class="settings-row">
           <label class="settings-label" for="cfg-healOwnTerritory">HP/turn on own territory</label>
           <input class="settings-input" type="number" id="cfg-healOwnTerritory" min="0" max="10" step="1" />
-        </div>
-        <div class="settings-row">
-          <label class="settings-label" for="cfg-healNeutral">HP/turn on neutral</label>
-          <input class="settings-input" type="number" id="cfg-healNeutral" min="0" max="10" step="1" />
-        </div>
-        <div class="settings-row">
-          <label class="settings-label" for="cfg-healEnemyTerritory">HP/turn on enemy territory</label>
-          <input class="settings-input" type="number" id="cfg-healEnemyTerritory" min="0" max="10" step="1" />
         </div>
       </div>
 

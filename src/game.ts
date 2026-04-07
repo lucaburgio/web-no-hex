@@ -1067,11 +1067,7 @@ function healUnits(state: GameState): { col: number; row: number; amount: number
     }
     const hexState = state.hexStates[`${unit.col},${unit.row}`];
     const owner: Owner | null = hexState ? hexState.owner : null;
-    const heal = owner === unit.owner
-      ? config.healOwnTerritory
-      : owner === null
-        ? config.healNeutral
-        : config.healEnemyTerritory;
+    const heal = owner === unit.owner ? config.healOwnTerritory : 0;
     const before = unit.hp;
     unit.hp = Math.min(unit.maxHp, unit.hp + heal);
     const gained = unit.hp - before;
@@ -1087,11 +1083,31 @@ function healUnits(state: GameState): { col: number; row: number; amount: number
 
 export function createInitialState(): GameState {
   unitIdCounter = 0;
-  const units: Unit[] = [];
-  const startingCols = spreadCols(config.startingUnits, COLS);
+  const gm = config.gameMode as GameMode;
+  const breakthroughAttackerOwnerForState: Owner | undefined =
+    gm === 'breakthrough'
+      ? (
+          config.breakthroughRandomRoles
+            ? (Math.random() < 0.5 ? PLAYER : AI)
+            : config.breakthroughPlayer1Role === 'attacker'
+              ? PLAYER
+              : AI
+        )
+      : undefined;
 
-  for (const c of startingCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
-  for (const c of startingCols) units.push(makeUnit(AI, c, 0));
+  const units: Unit[] = [];
+  let playerStartingUnits = config.startingUnitsPlayer1;
+  let aiStartingUnits = config.startingUnitsPlayer2;
+  if (gm === 'breakthrough' && breakthroughAttackerOwnerForState !== undefined) {
+    const att = breakthroughAttackerOwnerForState;
+    playerStartingUnits = att === PLAYER ? config.startingUnitsAttacker : config.startingUnitsDefender;
+    aiStartingUnits = att === AI ? config.startingUnitsAttacker : config.startingUnitsDefender;
+  }
+  const playerStartingCols = spreadCols(playerStartingUnits, COLS);
+  const aiStartingCols = spreadCols(aiStartingUnits, COLS);
+
+  for (const c of playerStartingCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
+  for (const c of aiStartingCols) units.push(makeUnit(AI, c, 0));
 
   let hexStates: Record<string, HexState> = {};
   for (const u of units) {
@@ -1122,8 +1138,6 @@ export function createInitialState(): GameState {
       if (!reservedKeys.has(key) && !mountainSet.has(key)) cpCandidates.push(key);
     }
   }
-  const gm = config.gameMode as GameMode;
-
   let sectorHexes: string[][] = [];
   let sectorOwners: Owner[] = [];
   let sectorControlPointHex: string[] = [];
@@ -1131,8 +1145,6 @@ export function createInitialState(): GameState {
   let sectorIndexByHex: Record<string, number> = {};
 
   let controlPointHexes: string[] = [];
-  /** Set only for Breakthrough — stored on game state for saves / MP. */
-  let breakthroughAttackerOwnerForState: Owner | undefined;
   if (gm === 'breakthrough') {
     const assignable: string[] = [];
     for (let r = 0; r < ROWS; r++) {
@@ -1144,12 +1156,7 @@ export function createInitialState(): GameState {
     const wantSectors = Math.max(2, config.breakthroughSectorCount);
     const nSectors = Math.min(wantSectors, Math.max(2, assignable.length));
     sectorHexes = partitionBreakthroughSectors(assignable, nSectors);
-    const att: Owner = config.breakthroughRandomRoles
-      ? (Math.random() < 0.5 ? PLAYER : AI)
-      : config.breakthroughPlayer1Role === 'attacker'
-        ? PLAYER
-        : AI;
-    breakthroughAttackerOwnerForState = att;
+    const att: Owner = breakthroughAttackerOwnerForState!;
     const nSec = sectorHexes.length;
     sectorOwners = sectorHexes.map((_, i) =>
       att === PLAYER ? (i === 0 ? PLAYER : AI) : i === nSec - 1 ? AI : PLAYER,

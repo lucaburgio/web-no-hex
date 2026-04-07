@@ -48,8 +48,13 @@ const config: GameConfig = {
   boardCols: 8,
   boardRows: 8,
 
-  // Number of units each side starts with
-  startingUnits: 3,
+  // Domination/Conquest: number of units each side starts with
+  startingUnitsPlayer1: 3,
+  startingUnitsPlayer2: 3,
+
+  // Breakthrough: number of units each role starts with
+  startingUnitsDefender: 3,
+  startingUnitsAttacker: 3,
 
   // Hexagon size (radius in pixels)
   hexSize: 40,
@@ -120,12 +125,6 @@ const config: GameConfig = {
 
   // HP recovered per turn when unit is on owned territory
   healOwnTerritory: 2,
-
-  // HP recovered per turn when unit is on neutral territory
-  healNeutral: 1,
-
-  // HP recovered per turn when unit is on enemy territory (0 = no healing)
-  healEnemyTerritory: 0,
 
   // Whether Zone of Control is active (blocks free movement past enemies)
   zoneOfControl: true,

@@ -1009,7 +1009,8 @@ body {
 
 /* Generic utility: hide mode-specific settings until that mode is selected */
 #settings-conquest-only.hidden,
-#settings-breakthrough-only.hidden {
+#settings-breakthrough-only.hidden,
+#settings-domination-conquest-only.hidden {
   display: none;
 }
 

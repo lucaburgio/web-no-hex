@@ -152,7 +152,14 @@ export interface GameConfig {
 
   boardCols: number;
   boardRows: number;
-  startingUnits: number;
+  /** Domination/Conquest: starting units for player 1 (south). */
+  startingUnitsPlayer1: number;
+  /** Domination/Conquest: starting units for player 2 (north). */
+  startingUnitsPlayer2: number;
+  /** Breakthrough: starting units for the defender role. */
+  startingUnitsDefender: number;
+  /** Breakthrough: starting units for the attacker role. */
+  startingUnitsAttacker: number;
   hexSize: number;
   productionTurns: number;
   productionSafeDistance: number;
@@ -165,8 +172,6 @@ export interface GameConfig {
   flankingBonus: number;
   maxFlankingUnits: number;
   healOwnTerritory: number;
-  healNeutral: number;
-  healEnemyTerritory: number;
   zoneOfControl: boolean;
   /** If true, artillery cannot use ranged fire while any enemy is adjacent; must clear adjacencies first. */
   limitArtillery: boolean;

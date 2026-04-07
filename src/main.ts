@@ -508,9 +508,12 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
   ['cfg-breakthroughSectorCount', 'breakthroughSectorCount', 1],
   ['cfg-breakthroughEnemySectorStrengthMult', 'breakthroughEnemySectorStrengthMult', 100],
   ['cfg-breakthroughSectorCaptureBonusPP', 'breakthroughSectorCaptureBonusPP', 1],
+  ['cfg-startingUnitsPlayer1',     'startingUnitsPlayer1',     1],
+  ['cfg-startingUnitsPlayer2',     'startingUnitsPlayer2',     1],
+  ['cfg-startingUnitsDefender',    'startingUnitsDefender',    1],
+  ['cfg-startingUnitsAttacker',    'startingUnitsAttacker',    1],
   ['cfg-boardCols',               'boardCols',               1],
   ['cfg-boardRows',               'boardRows',               1],
-  ['cfg-startingUnits',           'startingUnits',           1],
   ['cfg-productionPointsPerTurn', 'productionPointsPerTurn', 1],
   ['cfg-infantryCost',            'infantryCost',            1],
   ['cfg-territoryQuota',          'territoryQuota',          1],
@@ -526,8 +529,6 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
   ['cfg-flankingBonus',           'flankingBonus',           100],
   ['cfg-maxFlankingUnits',        'maxFlankingUnits',        1],
   ['cfg-healOwnTerritory',        'healOwnTerritory',        1],
-  ['cfg-healNeutral',             'healNeutral',             1],
-  ['cfg-healEnemyTerritory',      'healEnemyTerritory',      1],
   ['cfg-unitMoveSpeed',           'unitMoveSpeed',           1],
   ['cfg-mountainPct',             'mountainPct',             100],
 ];
@@ -537,7 +538,8 @@ declare const _cfgNumProxy: {
   controlPointCount: number; conquestPointsPlayer: number; conquestPointsAi: number;
   breakthroughAttackerStartingPP: number; breakthroughSectorCount: number; breakthroughEnemySectorStrengthMult: number;
   breakthroughSectorCaptureBonusPP: number;
-  boardCols: number; boardRows: number; startingUnits: number;
+  startingUnitsPlayer1: number; startingUnitsPlayer2: number; startingUnitsDefender: number; startingUnitsAttacker: number;
+  boardCols: number; boardRows: number;
   productionPointsPerTurn: number; infantryCost: number;
   territoryQuota: number; pointsPerQuota: number;
   productionTurns: number; productionSafeDistance: number;
@@ -545,7 +547,7 @@ declare const _cfgNumProxy: {
   tankMaxHp: number; tankStrength: number;
   combatDamageBase: number; combatStrengthScale: number;
   flankingBonus: number; maxFlankingUnits: number;
-  healOwnTerritory: number; healNeutral: number; healEnemyTerritory: number;
+  healOwnTerritory: number;
   unitMoveSpeed: number;
   mountainPct: number;
 };
@@ -569,8 +571,11 @@ function populateSettings(): void {
     breakthroughSectorCount: config.breakthroughSectorCount,
     breakthroughEnemySectorStrengthMult: config.breakthroughEnemySectorStrengthMult,
     breakthroughSectorCaptureBonusPP: config.breakthroughSectorCaptureBonusPP,
+    startingUnitsPlayer1: config.startingUnitsPlayer1,
+    startingUnitsPlayer2: config.startingUnitsPlayer2,
+    startingUnitsDefender: config.startingUnitsDefender,
+    startingUnitsAttacker: config.startingUnitsAttacker,
     boardCols: config.boardCols, boardRows: config.boardRows,
-    startingUnits: config.startingUnits,
     productionPointsPerTurn: config.productionPointsPerTurn,
     infantryCost,
     territoryQuota: config.territoryQuota, pointsPerQuota: config.pointsPerQuota,
@@ -579,8 +584,7 @@ function populateSettings(): void {
     tankMaxHp: tank.maxHp, tankStrength: tank.strength,
     combatDamageBase: config.combatDamageBase, combatStrengthScale: config.combatStrengthScale,
     flankingBonus: config.flankingBonus, maxFlankingUnits: config.maxFlankingUnits,
-    healOwnTerritory: config.healOwnTerritory, healNeutral: config.healNeutral,
-    healEnemyTerritory: config.healEnemyTerritory,
+    healOwnTerritory: config.healOwnTerritory,
     unitMoveSpeed: config.unitMoveSpeed,
     mountainPct: config.mountainPct,
   };
@@ -616,8 +620,10 @@ function updateModeSpecificSettingsVisibility(): void {
   const v = gameModeEl.value;
   const conquestWrap = document.getElementById('settings-conquest-only') as HTMLDivElement;
   const breakthroughWrap = document.getElementById('settings-breakthrough-only') as HTMLDivElement;
+  const domConqWrap = document.getElementById('settings-domination-conquest-only') as HTMLDivElement;
   conquestWrap.classList.toggle('hidden', v !== 'conquest');
   breakthroughWrap.classList.toggle('hidden', v !== 'breakthrough');
+  domConqWrap.classList.toggle('hidden', v !== 'domination' && v !== 'conquest');
 }
 
 function collectSettings(): Parameters<typeof updateConfig>[0] {
@@ -632,6 +638,15 @@ function collectSettings(): Parameters<typeof updateConfig>[0] {
   }
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   out.gameMode = gameModeEl.value as GameMode;
+  if (out.gameMode === 'breakthrough') {
+    // Ignore Player 1/2 starting-unit fields in Breakthrough mode.
+    out.startingUnitsPlayer1 = config.startingUnitsPlayer1;
+    out.startingUnitsPlayer2 = config.startingUnitsPlayer2;
+  } else {
+    // Ignore Defender/Attacker starting-unit fields outside Breakthrough mode.
+    out.startingUnitsDefender = config.startingUnitsDefender;
+    out.startingUnitsAttacker = config.startingUnitsAttacker;
+  }
   const breakthroughRoleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement;
   const breakthroughRandEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement;
   if (breakthroughRoleEl) out.breakthroughPlayer1Role = breakthroughRoleEl.value as 'attacker' | 'defender';
@@ -810,9 +825,7 @@ function buildRulesContent(): string {
     <h3>Healing</h3>
     <ul>
       <li>Units that did <strong>not</strong> fight this turn heal at end of turn.</li>
-      <li>+${config.healOwnTerritory} HP on <strong>own territory</strong> ·
-          +${config.healNeutral} HP on <strong>neutral</strong> ·
-          +${config.healEnemyTerritory} HP on <strong>enemy territory</strong>.</li>
+      <li>+${config.healOwnTerritory} HP on <strong>own territory</strong>.</li>
     </ul>
 
     <h3>Game modes</h3>
