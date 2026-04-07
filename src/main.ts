@@ -515,21 +515,13 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
   ['cfg-boardCols',               'boardCols',               1],
   ['cfg-boardRows',               'boardRows',               1],
   ['cfg-productionPointsPerTurn', 'productionPointsPerTurn', 1],
-  ['cfg-infantryCost',            'infantryCost',            1],
   ['cfg-territoryQuota',          'territoryQuota',          1],
   ['cfg-pointsPerQuota',          'pointsPerQuota',          1],
   ['cfg-productionTurns',         'productionTurns',         1],
   ['cfg-productionSafeDistance',  'productionSafeDistance',  1],
-  ['cfg-infantry-maxHp',          'infantryMaxHp',           1],
-  ['cfg-infantry-strength',       'infantryStrength',        1],
-  ['cfg-tank-maxHp',              'tankMaxHp',               1],
-  ['cfg-tank-strength',           'tankStrength',            1],
-  ['cfg-combatDamageBase',        'combatDamageBase',        1],
-  ['cfg-combatStrengthScale',     'combatStrengthScale',     1],
   ['cfg-flankingBonus',           'flankingBonus',           100],
   ['cfg-maxFlankingUnits',        'maxFlankingUnits',        1],
   ['cfg-healOwnTerritory',        'healOwnTerritory',        1],
-  ['cfg-unitMoveSpeed',           'unitMoveSpeed',           1],
   ['cfg-mountainPct',             'mountainPct',             100],
 ];
 
@@ -540,15 +532,11 @@ declare const _cfgNumProxy: {
   breakthroughSectorCaptureBonusPP: number;
   startingUnitsPlayer1: number; startingUnitsPlayer2: number; startingUnitsDefender: number; startingUnitsAttacker: number;
   boardCols: number; boardRows: number;
-  productionPointsPerTurn: number; infantryCost: number;
+  productionPointsPerTurn: number;
   territoryQuota: number; pointsPerQuota: number;
   productionTurns: number; productionSafeDistance: number;
-  infantryMaxHp: number; infantryStrength: number;
-  tankMaxHp: number; tankStrength: number;
-  combatDamageBase: number; combatStrengthScale: number;
   flankingBonus: number; maxFlankingUnits: number;
   healOwnTerritory: number;
-  unitMoveSpeed: number;
   mountainPct: number;
 };
 
@@ -560,9 +548,6 @@ const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'limitArtillery' | 'autoEn
 ];
 
 function populateSettings(): void {
-  const infantry = config.unitTypes.find(u => u.id === 'infantry') ?? config.unitTypes[0];
-  const tank = config.unitTypes.find(u => u.id === 'tank') ?? config.unitTypes[0];
-  const infantryCost = infantry.cost;
   const vals: Record<string, number> = {
     controlPointCount: config.controlPointCount,
     conquestPointsPlayer: config.conquestPointsPlayer,
@@ -577,15 +562,10 @@ function populateSettings(): void {
     startingUnitsAttacker: config.startingUnitsAttacker,
     boardCols: config.boardCols, boardRows: config.boardRows,
     productionPointsPerTurn: config.productionPointsPerTurn,
-    infantryCost,
     territoryQuota: config.territoryQuota, pointsPerQuota: config.pointsPerQuota,
     productionTurns: config.productionTurns, productionSafeDistance: config.productionSafeDistance,
-    infantryMaxHp: infantry.maxHp, infantryStrength: infantry.strength,
-    tankMaxHp: tank.maxHp, tankStrength: tank.strength,
-    combatDamageBase: config.combatDamageBase, combatStrengthScale: config.combatStrengthScale,
     flankingBonus: config.flankingBonus, maxFlankingUnits: config.maxFlankingUnits,
     healOwnTerritory: config.healOwnTerritory,
-    unitMoveSpeed: config.unitMoveSpeed,
     mountainPct: config.mountainPct,
   };
   for (const [id, key, scale] of NUM_FIELDS) {
