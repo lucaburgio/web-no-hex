@@ -1673,9 +1673,11 @@ function runAiTurnWithAnimation(): void {
   aiTurnPerfStartMs = performance.now();
 
   clearMovePathPreview();
+  const tPlanStart = performance.now();
   state = prepareAiTurn(state);
 
   const aiResult = aiMovement(state);
+  perfLog('phase.aiPlanSync', performance.now() - tPlanStart);
   state = aiResult.state;
   const animSteps = aiResult.animSteps;
   const animUnitsBefore = aiResult.animUnitsBefore;
@@ -1713,6 +1715,15 @@ function runAiTurnWithAnimation(): void {
   }
 
   syncDamageFloatCssDuration();
+  const boardArea = COLS * ROWS;
+  const aiAnimScale =
+    boardArea >= 1600 ? 0.25 :
+    boardArea >= 900 ? 0.4 :
+    boardArea >= 400 ? 0.6 :
+    1;
+  const aiMoveDuration = Math.max(80, Math.round(config.unitMoveSpeed * aiAnimScale));
+  const aiStrikeDuration = Math.max(90, Math.round(config.strikeReturnSpeedMs * aiAnimScale));
+  const aiFloatDuration = Math.max(180, Math.round(config.damageFloatDurationMs * aiAnimScale));
 
   const finishAi = (): void => {
     humanMoveAnimCancel = null;
@@ -1764,7 +1775,7 @@ function runAiTurnWithAnimation(): void {
         onDone();
       };
       const playDamageFloats = (): void => {
-        const { cancel } = showDamageFloats(svg, floats, config.damageFloatDurationMs, afterDamageFloats);
+        const { cancel } = showDamageFloats(svg, floats, aiFloatDuration, afterDamageFloats);
         humanMoveAnimCancel = combineAnimCancels(cancel);
       };
       if (vfx.ranged) {
@@ -1795,7 +1806,7 @@ function runAiTurnWithAnimation(): void {
           fromRow: sr.fromRow,
           enemyCol: sr.enemyCol,
           enemyRow: sr.enemyRow,
-          durationMs: config.strikeReturnSpeedMs,
+          durationMs: aiStrikeDuration,
         },
         () => runFloats(true),
         aiReplayState(state, ub),
@@ -1820,7 +1831,7 @@ function runAiTurnWithAnimation(): void {
       const { cancel } = animateMoves(
         svg,
         [a],
-        config.unitMoveSpeed,
+        aiMoveDuration,
         () => runStep(index + 1),
         aiReplayState(state, before),
       );

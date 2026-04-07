@@ -31,10 +31,19 @@ async function startNewGameAtSize(page, cols, rows) {
 
 async function runScenario(page, cols, rows) {
   await startNewGameAtSize(page, cols, rows);
+  const turnBeforeAi = await page.locator('#turn').textContent();
   await page.click('#end-move-btn');
   await sleep(1200);
   await page.click('#end-move-btn');
-  await sleep(3200);
+  await page.waitForFunction(
+    (prev) => {
+      const el = document.querySelector('#turn');
+      return !!el && el.textContent !== prev;
+    },
+    turnBeforeAi,
+    { timeout: 30000 },
+  );
+  await sleep(400);
 }
 
 function filterPerfLogs(allLogs) {
@@ -52,16 +61,18 @@ async function main() {
   await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#menu-new-game-btn', { timeout: 10000 });
 
+  const start24 = logs.length;
   await runScenario(page, 24, 24);
-  const logs24 = filterPerfLogs(logs);
+  const logs24 = filterPerfLogs(logs.slice(start24));
 
   await page.keyboard.press('Escape');
   await page.waitForSelector('#pause-overlay:not(.hidden)', { timeout: 5000 });
   await page.click('#pause-return-btn');
   await page.waitForSelector('#main-menu-overlay:not(.hidden)', { timeout: 10000 });
 
+  const start48 = logs.length;
   await runScenario(page, 48, 48);
-  const logs48 = filterPerfLogs(logs.slice(logs24.length));
+  const logs48 = filterPerfLogs(logs.slice(start48));
 
   console.log('--- PERF LOGS 24x24 ---');
   for (const l of logs24) console.log(l);

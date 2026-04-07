@@ -12,6 +12,17 @@ import type {
   GameMode,
 } from './types';
 
+function perfEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  const qs = new URLSearchParams(window.location.search);
+  return qs.get('perf') === '1';
+}
+
+function perfLog(section: string, ms: number): void {
+  if (!perfEnabled()) return;
+  console.log(`[perf] ${section}: ${ms.toFixed(2)}ms`);
+}
+
 export const PLAYER = 1 as const;
 export const AI     = 2 as const;
 
@@ -35,6 +46,23 @@ export function syncDimensions(): void {
 }
 
 let unitIdCounter = 0;
+const bfsDistanceCache = new Map<string, number>();
+const minHomeStepsCache = new Map<string, number>();
+const mountainKeyCache = new WeakMap<GameState, string>();
+const PATH_CACHE_LIMIT = 200000;
+
+function getMountainKey(state: GameState): string {
+  const cached = mountainKeyCache.get(state);
+  if (cached) return cached;
+  const key = (state.mountainHexes ?? []).slice().sort().join('|');
+  mountainKeyCache.set(state, key);
+  return key;
+}
+
+function maybeTrimPathCaches(): void {
+  if (bfsDistanceCache.size > PATH_CACHE_LIMIT) bfsDistanceCache.clear();
+  if (minHomeStepsCache.size > PATH_CACHE_LIMIT) minHomeStepsCache.clear();
+}
 
 function makeUnit(owner: Owner, col: number, row: number, unitTypeId = 'infantry'): Unit {
   const unitType = config.unitTypes.find(u => u.id === unitTypeId) ?? config.unitTypes[0];
@@ -513,6 +541,13 @@ function advanceAlongPathBeforeCombat(
 // BFS distance from (fromCol,fromRow) to (toCol,toRow), ignoring units/ZoC.
 // Used to count how many movement points a move actually costs.
 export function bfsDistance(state: GameState, fromCol: number, fromRow: number, toCol: number, toRow: number): number {
+  const mk = getMountainKey(state);
+  const a = `${fromCol},${fromRow}`;
+  const b = `${toCol},${toRow}`;
+  const pair = a < b ? `${a}|${b}` : `${b}|${a}`;
+  const cacheKey = `${mk}|${pair}`;
+  const cached = bfsDistanceCache.get(cacheKey);
+  if (cached !== undefined) return cached;
   const mountains = new Set(state.mountainHexes ?? []);
   const visited = new Set<string>([`${fromCol},${fromRow}`]);
   let frontier: [number, number][] = [[fromCol, fromRow]];
@@ -520,7 +555,11 @@ export function bfsDistance(state: GameState, fromCol: number, fromRow: number, 
   while (frontier.length > 0) {
     const next: [number, number][] = [];
     for (const [c, r] of frontier) {
-      if (c === toCol && r === toRow) return dist;
+      if (c === toCol && r === toRow) {
+        bfsDistanceCache.set(cacheKey, dist);
+        maybeTrimPathCaches();
+        return dist;
+      }
       for (const [nc, nr] of getNeighbors(c, r, COLS, ROWS)) {
         const key = `${nc},${nr}`;
         if (visited.has(key) || mountains.has(key)) continue;
@@ -531,11 +570,17 @@ export function bfsDistance(state: GameState, fromCol: number, fromRow: number, 
     dist++;
     frontier = next;
   }
+  bfsDistanceCache.set(cacheKey, dist);
+  maybeTrimPathCaches();
   return dist;
 }
 
 /** Minimum BFS steps through passable hexes (mountains only) to any cell on the opponent's home row. */
 export function minHexStepsToOpponentHomeRow(state: GameState, col: number, row: number, mover: Owner): number {
+  const mk = getMountainKey(state);
+  const cacheKey = `${mk}|${mover}|${col},${row}`;
+  const cached = minHomeStepsCache.get(cacheKey);
+  if (cached !== undefined) return cached;
   const goalRow = mover === AI ? ROWS - 1 : 0;
   const mountains = new Set(state.mountainHexes ?? []);
   let min = Infinity;
@@ -543,7 +588,10 @@ export function minHexStepsToOpponentHomeRow(state: GameState, col: number, row:
     if (mountains.has(`${c},${goalRow}`)) continue;
     min = Math.min(min, bfsDistance(state, col, row, c, goalRow));
   }
-  return Number.isFinite(min) ? min : 999;
+  const out = Number.isFinite(min) ? min : 999;
+  minHomeStepsCache.set(cacheKey, out);
+  maybeTrimPathCaches();
+  return out;
 }
 
 // ── AI helpers — Conquest (capture & defend control points) ───────────────────
@@ -1451,6 +1499,7 @@ function scoreAiProductionPlacement(
 }
 
 export function aiProduction(state: GameState): GameState {
+  const tStart = performance.now();
   let placed = 0;
   const pressure = aiDefensivePressure(state);
   const distToGoalMap = buildDistanceToOpponentHomeRowMap(state, AI);
@@ -1510,6 +1559,7 @@ export function aiProduction(state: GameState): GameState {
     placed++;
   }
 
+  perfLog('ai.production.total', performance.now() - tStart);
   return state;
 }
 
@@ -1825,6 +1875,7 @@ export function aiMovement(state: GameState): {
   /** Board state immediately after each step (same length as animSteps). */
   animUnitsAfter: Unit[][];
 } {
+  const tStart = performance.now();
   const combatVfx: CombatVfxPayload[] = [];
   const animSteps: AiAnimStep[] = [];
   const animUnitsBefore: Unit[][] = [];
@@ -2013,6 +2064,7 @@ export function aiMovement(state: GameState): {
     }
   }
   log(state, 'AI completed movement.');
+  perfLog('ai.movement.total', performance.now() - tStart);
   return { state, combatVfx, animSteps, animUnitsBefore, animUnitsAfter };
 }
 
