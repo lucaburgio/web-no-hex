@@ -353,7 +353,22 @@ function hexKeyLess(a: string, b: string): boolean {
   return ac < bc;
 }
 
-/** Edges between hexes whose sectors have different political owners (attacker vs defender only). */
+function appendHexEdgeToPath(
+  d: string,
+  x: number,
+  y: number,
+  edgeIndex: number,
+): string {
+  const a1 = (Math.PI / 180) * (60 * edgeIndex - 30);
+  const a2 = (Math.PI / 180) * (60 * (edgeIndex + 1) - 30);
+  const x1 = (x + HEX_SIZE * Math.cos(a1)).toFixed(2);
+  const y1 = (y + HEX_SIZE * Math.sin(a1)).toFixed(2);
+  const x2 = (x + HEX_SIZE * Math.cos(a2)).toFixed(2);
+  const y2 = (y + HEX_SIZE * Math.sin(a2)).toFixed(2);
+  return d + `M${x1},${y1}L${x2},${y2}`;
+}
+
+/** Edges between hexes whose sectors have different political owners (attacker vs defender). */
 function buildInterSectorBoundaryPath(
   sectorIndexByHex: Record<string, number>,
   sectorOwners: Owner[],
@@ -376,13 +391,36 @@ function buildInterSectorBoundaryPath(
       if (nid === undefined || nid === sid) continue;
       if (sectorOwners[sid] === sectorOwners[nid]) continue;
       if (!hexKeyLess(key, nk)) continue;
-      const a1 = (Math.PI / 180) * (60 * i - 30);
-      const a2 = (Math.PI / 180) * (60 * (i + 1) - 30);
-      const x1 = (x + HEX_SIZE * Math.cos(a1)).toFixed(2);
-      const y1 = (y + HEX_SIZE * Math.sin(a1)).toFixed(2);
-      const x2 = (x + HEX_SIZE * Math.cos(a2)).toFixed(2);
-      const y2 = (y + HEX_SIZE * Math.sin(a2)).toFixed(2);
-      d += `M${x1},${y1}L${x2},${y2}`;
+      d = appendHexEdgeToPath(d, x, y, i);
+    }
+  }
+  return d;
+}
+
+/** Edges between two different sectors both still held by the defender (north). */
+function buildDefenderOnlySectorBoundaryPath(
+  sectorIndexByHex: Record<string, number>,
+  sectorOwners: Owner[],
+  cols: number,
+  rows: number,
+): string {
+  let d = '';
+  for (const key of Object.keys(sectorIndexByHex)) {
+    const sid = sectorIndexByHex[key]!;
+    const [c, r] = key.split(',').map(Number);
+    const { x, y } = hexToPixel(c, r);
+    const dirs = r % 2 === 0 ? DIRS_EVEN : DIRS_ODD;
+    for (let i = 0; i < 6; i++) {
+      const [dc, dr] = dirs[i]!;
+      const nc = c + dc;
+      const nr = r + dr;
+      if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+      const nk = `${nc},${nr}`;
+      const nid = sectorIndexByHex[nk];
+      if (nid === undefined || nid === sid) continue;
+      if (sectorOwners[sid] !== AI || sectorOwners[nid] !== AI) continue;
+      if (!hexKeyLess(key, nk)) continue;
+      d = appendHexEdgeToPath(d, x, y, i);
     }
   }
   return d;
@@ -765,6 +803,20 @@ export function renderState(
       Object.keys(state.sectorIndexByHex).length > 0 &&
       state.sectorOwners?.length
     ) {
+      const dDef = buildDefenderOnlySectorBoundaryPath(state.sectorIndexByHex, state.sectorOwners, COLS, ROWS);
+      if (dDef) {
+        const pDef = svgEl('path');
+        pDef.setAttribute('d', dDef);
+        pDef.setAttribute('fill', 'none');
+        pDef.setAttribute('stroke', '#000');
+        pDef.setAttribute('stroke-opacity', '0.1');
+        pDef.setAttribute('stroke-width', '3.5');
+        pDef.setAttribute('stroke-linejoin', 'round');
+        pDef.setAttribute('stroke-linecap', 'round');
+        pDef.setAttribute('pointer-events', 'none');
+        pDef.setAttribute('class', 'sector-outline sector-outline-defender-internal');
+        sectorOutlineLayerEl.appendChild(pDef);
+      }
       const d = buildInterSectorBoundaryPath(state.sectorIndexByHex, state.sectorOwners, COLS, ROWS);
       if (d) {
         const path = svgEl('path');
