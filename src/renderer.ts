@@ -353,9 +353,10 @@ function hexKeyLess(a: string, b: string): boolean {
   return ac < bc;
 }
 
-/** Edges shared by two hexes in different sectors only (no outer map rim, no duplicate strokes). */
+/** Edges between hexes whose sectors have different political owners (attacker vs defender only). */
 function buildInterSectorBoundaryPath(
   sectorIndexByHex: Record<string, number>,
+  sectorOwners: Owner[],
   cols: number,
   rows: number,
 ): string {
@@ -373,6 +374,7 @@ function buildInterSectorBoundaryPath(
       const nk = `${nc},${nr}`;
       const nid = sectorIndexByHex[nk];
       if (nid === undefined || nid === sid) continue;
+      if (sectorOwners[sid] === sectorOwners[nid]) continue;
       if (!hexKeyLess(key, nk)) continue;
       const a1 = (Math.PI / 180) * (60 * i - 30);
       const a2 = (Math.PI / 180) * (60 * (i + 1) - 30);
@@ -757,8 +759,13 @@ export function renderState(
   const sectorOutlineLayerEl = svgElement.querySelector('#sector-outline-layer') as SVGGElement | null;
   if (sectorOutlineLayerEl) {
     sectorOutlineLayerEl.innerHTML = '';
-    if (state.gameMode === 'breakthrough' && state.sectorIndexByHex && Object.keys(state.sectorIndexByHex).length > 0) {
-      const d = buildInterSectorBoundaryPath(state.sectorIndexByHex, COLS, ROWS);
+    if (
+      state.gameMode === 'breakthrough' &&
+      state.sectorIndexByHex &&
+      Object.keys(state.sectorIndexByHex).length > 0 &&
+      state.sectorOwners?.length
+    ) {
+      const d = buildInterSectorBoundaryPath(state.sectorIndexByHex, state.sectorOwners, COLS, ROWS);
       if (d) {
         const path = svgEl('path');
         path.setAttribute('d', d);
