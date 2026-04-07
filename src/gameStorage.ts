@@ -33,6 +33,9 @@ export function loadGameState(): GameState | null {
     if (state.gameMode === 'breakthrough' && state.sectorOwners.length === 0) {
       state.gameMode = 'domination';
     }
+    if (state.gameMode === 'breakthrough' && state.breakthroughAttackerOwner == null) {
+      state.breakthroughAttackerOwner = 1;
+    }
     if (state.gameMode !== 'conquest') {
       state.conquestPoints = null;
     } else if (state.conquestPoints == null) {

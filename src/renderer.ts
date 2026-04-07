@@ -2,7 +2,19 @@ import gsap from 'gsap';
 import { playDefenderHexBarrage } from './artilleryProjectileVfx';
 import type { ArtilleryProjectileHandle } from './artilleryProjectileVfx';
 import { hexToPixel, hexPoints, HEX_SIZE, getNeighbors } from './hex';
-import { COLS, ROWS, PLAYER, AI, getUnit, getUnitById, isValidProductionPlacement, getValidMoves, getRangedAttackTargets, isInEnemyZoC } from './game';
+import {
+  COLS,
+  ROWS,
+  PLAYER,
+  AI,
+  getUnit,
+  getUnitById,
+  isValidProductionPlacement,
+  getValidMoves,
+  getRangedAttackTargets,
+  isInEnemyZoC,
+  getBreakthroughDefenderOwner,
+} from './game';
 import type { Owner } from './types';
 import type { GameState, Unit } from './types';
 import config from './gameconfig';
@@ -397,12 +409,13 @@ function buildInterSectorBoundaryPath(
   return d;
 }
 
-/** Edges between two different sectors both still held by the defender (north). */
+/** Edges between two different sectors both still held by the defender. */
 function buildDefenderOnlySectorBoundaryPath(
   sectorIndexByHex: Record<string, number>,
   sectorOwners: Owner[],
   cols: number,
   rows: number,
+  defenderOwner: Owner,
 ): string {
   let d = '';
   for (const key of Object.keys(sectorIndexByHex)) {
@@ -418,7 +431,7 @@ function buildDefenderOnlySectorBoundaryPath(
       const nk = `${nc},${nr}`;
       const nid = sectorIndexByHex[nk];
       if (nid === undefined || nid === sid) continue;
-      if (sectorOwners[sid] !== AI || sectorOwners[nid] !== AI) continue;
+      if (sectorOwners[sid] !== defenderOwner || sectorOwners[nid] !== defenderOwner) continue;
       if (!hexKeyLess(key, nk)) continue;
       d = appendHexEdgeToPath(d, x, y, i);
     }
@@ -803,7 +816,13 @@ export function renderState(
       Object.keys(state.sectorIndexByHex).length > 0 &&
       state.sectorOwners?.length
     ) {
-      const dDef = buildDefenderOnlySectorBoundaryPath(state.sectorIndexByHex, state.sectorOwners, COLS, ROWS);
+      const dDef = buildDefenderOnlySectorBoundaryPath(
+        state.sectorIndexByHex,
+        state.sectorOwners,
+        COLS,
+        ROWS,
+        getBreakthroughDefenderOwner(state),
+      );
       if (dDef) {
         const pDef = svgEl('path');
         pDef.setAttribute('d', dDef);

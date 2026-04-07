@@ -41,6 +41,8 @@ const config: GameConfig = {
   breakthroughSectorCount: 5,
   breakthroughEnemySectorStrengthMult: 0.5,
   breakthroughSectorCaptureBonusPP: 25,
+  breakthroughPlayer1Role: 'attacker',
+  breakthroughRandomRoles: false,
 
   // Board dimensions (number of hexes)
   boardCols: 8,

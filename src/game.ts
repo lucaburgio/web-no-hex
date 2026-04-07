@@ -15,6 +15,17 @@ import type {
 export const PLAYER = 1 as const;
 export const AI     = 2 as const;
 
+/** Breakthrough: which side is the attacker this match (old saves omit → south / PLAYER). */
+export function getBreakthroughAttackerOwner(state: GameState): Owner {
+  if (state.gameMode !== 'breakthrough') return PLAYER;
+  return state.breakthroughAttackerOwner ?? PLAYER;
+}
+
+export function getBreakthroughDefenderOwner(state: GameState): Owner {
+  const a = getBreakthroughAttackerOwner(state);
+  return a === PLAYER ? AI : PLAYER;
+}
+
 export let COLS = config.boardCols;
 export let ROWS = config.boardRows;
 
@@ -221,12 +232,14 @@ function breakthroughHexLockedToAttacker(state: GameState, col: number, row: num
   if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return false;
   const sid = state.sectorIndexByHex[`${col},${row}`];
   if (sid === undefined) return false;
-  return state.sectorOwners[sid] === PLAYER;
+  return state.sectorOwners[sid] === getBreakthroughAttackerOwner(state);
 }
 
 function conquerHex(state: GameState, col: number, row: number, owner: Owner): void {
-  if (state.gameMode === 'breakthrough' && owner === AI && breakthroughHexLockedToAttacker(state, col, row)) {
-    owner = PLAYER;
+  const att = getBreakthroughAttackerOwner(state);
+  const def = getBreakthroughDefenderOwner(state);
+  if (state.gameMode === 'breakthrough' && owner === def && breakthroughHexLockedToAttacker(state, col, row)) {
+    owner = att;
   }
   const key = `${col},${row}`;
   if ((state.mountainHexes ?? []).includes(key)) return;
@@ -537,10 +550,11 @@ function aiConquestUnitPriority(state: GameState, u: Unit): number {
 
 /** Breakthrough: lower = act earlier — defend CPs in sectors still owned by the defender, then react to threats. */
 function aiBreakthroughUnitPriority(state: GameState, u: Unit): number {
+  const def = getBreakthroughDefenderOwner(state);
   let best = 999;
   const n = state.sectorControlPointHex?.length ?? 0;
   for (let i = 0; i < n; i++) {
-    if (state.sectorOwners[i] !== AI) continue;
+    if (state.sectorOwners[i] !== def) continue;
     const cp = state.sectorControlPointHex[i]!;
     const [cc, cr] = cp.split(',').map(Number);
     const dist = bfsDistance(state, u.col, u.row, cc, cr);
@@ -601,8 +615,9 @@ function breakthroughStrengthMult(state: GameState, unit: Unit): number {
   if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return 1;
   const sid = state.sectorIndexByHex[`${unit.col},${unit.row}`];
   if (sid === undefined) return 1;
-  if (state.sectorOwners[sid] !== PLAYER) return 1;
-  if (unit.owner !== AI) return 1;
+  const att = getBreakthroughAttackerOwner(state);
+  if (state.sectorOwners[sid] !== att) return 1;
+  if (unit.owner === att) return 1;
   return config.breakthroughEnemySectorStrengthMult;
 }
 
@@ -846,13 +861,15 @@ function checkVictory(state: GameState): void {
   if (state.winner) return;
 
   if (state.gameMode === 'breakthrough' && state.sectorOwners && state.sectorOwners.length > 0) {
-    if (!state.units.some(u => u.owner === PLAYER)) {
-      state.winner = AI;
+    const att = getBreakthroughAttackerOwner(state);
+    const def = getBreakthroughDefenderOwner(state);
+    if (!state.units.some(u => u.owner === att)) {
+      state.winner = def;
       log(state, 'Breakthrough: attacker eliminated — defender wins.');
       return;
     }
-    if (state.sectorOwners.length > 0 && state.sectorOwners.every(o => o === PLAYER)) {
-      state.winner = PLAYER;
+    if (state.sectorOwners.length > 0 && state.sectorOwners.every(o => o === att)) {
+      state.winner = att;
       log(state, 'Breakthrough: all sectors captured — attacker wins.');
       return;
     }
@@ -935,17 +952,17 @@ function breakthroughRemoveSectorControlPoint(state: GameState, sectorIndex: num
 function breakthroughAssignCapturedSectorHexes(state: GameState, sectorIndex: number): void {
   const keys = state.sectorHexes[sectorIndex];
   if (!keys?.length) return;
+  const att = getBreakthroughAttackerOwner(state);
   const mountains = new Set(state.mountainHexes ?? []);
   for (const key of keys) {
     if (mountains.has(key)) continue;
-    const [c, r] = key.split(',').map(Number);
     const existing = state.hexStates[key];
     if (existing) {
-      existing.owner = PLAYER;
+      existing.owner = att;
       existing.stableFor = 0;
       existing.isProduction = false;
     } else {
-      state.hexStates[key] = { owner: PLAYER, stableFor: 0, isProduction: false };
+      state.hexStates[key] = { owner: att, stableFor: 0, isProduction: false };
     }
   }
 }
@@ -953,22 +970,23 @@ function breakthroughAssignCapturedSectorHexes(state: GameState, sectorIndex: nu
 /** Breakthrough: after a full round, advance CP occupation; capture sectors after two consecutive rounds. */
 function applyBreakthroughEndOfRound(state: GameState): void {
   if (state.gameMode !== 'breakthrough' || !state.sectorControlPointHex?.length) return;
+  const att = getBreakthroughAttackerOwner(state);
   const n = state.sectorControlPointHex.length;
   for (let i = 0; i < n; i++) {
-    if (state.sectorOwners[i] === PLAYER) continue;
+    if (state.sectorOwners[i] === att) continue;
     const cp = state.sectorControlPointHex[i];
     if (!cp) continue;
-    const attackerOnCp = state.units.some(u => u.owner === PLAYER && `${u.col},${u.row}` === cp);
+    const attackerOnCp = state.units.some(u => u.owner === att && `${u.col},${u.row}` === cp);
     if (attackerOnCp) {
       state.breakthroughCpOccupation[i] = (state.breakthroughCpOccupation[i] ?? 0) + 1;
       if (state.breakthroughCpOccupation[i] >= 2) {
-        state.sectorOwners[i] = PLAYER;
+        state.sectorOwners[i] = att;
         state.breakthroughCpOccupation[i] = 0;
         breakthroughAssignCapturedSectorHexes(state, i);
         breakthroughRemoveSectorControlPoint(state, i);
         const bonus = config.breakthroughSectorCaptureBonusPP;
         if (bonus > 0) {
-          state.productionPoints[PLAYER] += bonus;
+          state.productionPoints[att] += bonus;
         }
         log(
           state,
@@ -1060,6 +1078,8 @@ export function createInitialState(): GameState {
   let sectorIndexByHex: Record<string, number> = {};
 
   let controlPointHexes: string[] = [];
+  /** Set only for Breakthrough — stored on game state for saves / MP. */
+  let breakthroughAttackerOwnerForState: Owner | undefined;
   if (gm === 'breakthrough') {
     const assignable: string[] = [];
     for (let r = 0; r < ROWS; r++) {
@@ -1071,7 +1091,16 @@ export function createInitialState(): GameState {
     const wantSectors = Math.max(2, config.breakthroughSectorCount);
     const nSectors = Math.min(wantSectors, Math.max(2, assignable.length));
     sectorHexes = partitionBreakthroughSectors(assignable, nSectors);
-    sectorOwners = sectorHexes.map((_, i) => (i === 0 ? PLAYER : AI));
+    const att: Owner = config.breakthroughRandomRoles
+      ? (Math.random() < 0.5 ? PLAYER : AI)
+      : config.breakthroughPlayer1Role === 'attacker'
+        ? PLAYER
+        : AI;
+    breakthroughAttackerOwnerForState = att;
+    const nSec = sectorHexes.length;
+    sectorOwners = sectorHexes.map((_, i) =>
+      att === PLAYER ? (i === 0 ? PLAYER : AI) : i === nSec - 1 ? AI : PLAYER,
+    );
     sectorIndexByHex = {};
     sectorHexes.forEach((keys, sid) => {
       for (const k of keys) sectorIndexByHex[k] = sid;
@@ -1086,11 +1115,12 @@ export function createInitialState(): GameState {
     sectorControlPointHex = sectorHexes.map(keys => pickBreakthroughSectorControlPoint(keys, COLS, ROWS));
     controlPointHexes = [...sectorControlPointHex];
     breakthroughCpOccupation = Array(sectorHexes.length).fill(0);
-    // South sector (0) is already attacker-controlled — no control point marker.
-    const cpSouth = sectorControlPointHex[0];
-    if (cpSouth) {
-      sectorControlPointHex[0] = '';
-      controlPointHexes = controlPointHexes.filter(k => k !== cpSouth);
+    // Attacker's home sector (south if attacker is PLAYER, north if attacker is AI) has no CP marker.
+    const homeIdx = att === PLAYER ? 0 : nSec - 1;
+    const cpHome = sectorControlPointHex[homeIdx];
+    if (cpHome) {
+      sectorControlPointHex[homeIdx] = '';
+      controlPointHexes = controlPointHexes.filter(k => k !== cpHome);
     }
   } else if (gm === 'conquest' && config.controlPointCount > 0 && cpCandidates.length > 0) {
     controlPointHexes = pickControlPointHexes(cpCandidates, config.controlPointCount, COLS, ROWS);
@@ -1111,9 +1141,15 @@ export function createInitialState(): GameState {
 
   let ppPlayer: number;
   let ppAi: number;
-  if (gm === 'breakthrough') {
-    ppPlayer = config.breakthroughAttackerStartingPP;
-    ppAi = config.productionPointsPerTurn + aiBonus;
+  if (gm === 'breakthrough' && breakthroughAttackerOwnerForState !== undefined) {
+    const att = breakthroughAttackerOwnerForState;
+    const def: Owner = att === PLAYER ? AI : PLAYER;
+    const defHexCount = Object.values(hexStates).filter(h => h.owner === def).length;
+    const defBonus = Math.floor(defHexCount / config.territoryQuota) * config.pointsPerQuota;
+    const defPP = config.productionPointsPerTurn + defBonus;
+    const attPP = config.breakthroughAttackerStartingPP;
+    ppPlayer = att === PLAYER ? attPP : defPP;
+    ppAi = att === AI ? attPP : defPP;
   } else {
     ppPlayer = config.productionPointsPerTurn;
     ppAi = config.productionPointsPerTurn;
@@ -1136,6 +1172,9 @@ export function createInitialState(): GameState {
     sectorControlPointHex,
     breakthroughCpOccupation,
     sectorIndexByHex,
+    ...(gm === 'breakthrough' && breakthroughAttackerOwnerForState !== undefined
+      ? { breakthroughAttackerOwner: breakthroughAttackerOwnerForState }
+      : {}),
     turn: 1,
     phase: 'production',
     activePlayer: PLAYER,
@@ -1538,7 +1577,8 @@ function pickBestRangedTarget(state: GameState, attacker: Unit, targets: Unit[],
       const k = `${t.col},${t.row}`;
       if ((state.controlPointHexes ?? []).includes(k)) {
         const sid = state.sectorIndexByHex[k];
-        if (sid !== undefined && state.sectorOwners[sid] === AI) s += 210;
+        const def = getBreakthroughDefenderOwner(state);
+        if (sid !== undefined && state.sectorOwners[sid] === def) s += 210;
       }
     }
     if (s > bestScore) {
@@ -1574,7 +1614,8 @@ function scoreMeleeAttack(state: GameState, attacker: Unit, defender: Unit, pres
     const dk = `${defender.col},${defender.row}`;
     if ((state.controlPointHexes ?? []).includes(dk)) {
       const sid = state.sectorIndexByHex[dk];
-      if (sid !== undefined && state.sectorOwners[sid] === AI) s += 175;
+      const defOw = getBreakthroughDefenderOwner(state);
+      if (sid !== undefined && state.sectorOwners[sid] === defOw) s += 175;
     }
   }
   return s;
@@ -1624,21 +1665,22 @@ function scoreEmptyMove(
     }
   }
   if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
+    const defOw = getBreakthroughDefenderOwner(state);
     const beforeC = minBfsToCpWhere(state, unit.col, unit.row, key => {
       const sid = state.sectorIndexByHex[key];
-      return sid !== undefined && state.sectorOwners[sid] === AI;
+      return sid !== undefined && state.sectorOwners[sid] === defOw;
     });
     const afterC = minBfsToCpWhere(state, toCol, toRow, key => {
       const sid = state.sectorIndexByHex[key];
-      return sid !== undefined && state.sectorOwners[sid] === AI;
+      return sid !== undefined && state.sectorOwners[sid] === defOw;
     });
     s += (beforeC - afterC) * 40;
     const tk = `${toCol},${toRow}`;
     if ((state.controlPointHexes ?? []).includes(tk)) {
       const sid = state.sectorIndexByHex[tk];
-      if (sid !== undefined && state.sectorOwners[sid] === AI) {
+      if (sid !== undefined && state.sectorOwners[sid] === defOw) {
         const hx = state.hexStates[tk];
-        if (!hx || hx.owner !== AI) s += 240;
+        if (!hx || hx.owner !== defOw) s += 240;
       }
     }
   }
@@ -1886,10 +1928,14 @@ export function endTurnAfterAi(state: GameState): { state: GameState; healFloats
   const playerBonus = Math.floor(playerHexes / config.territoryQuota) * config.pointsPerQuota;
   const aiBonus     = Math.floor(aiHexes     / config.territoryQuota) * config.pointsPerQuota;
   if (state.gameMode === 'breakthrough') {
-    state.productionPoints[AI] += config.productionPointsPerTurn + aiBonus;
+    const att = getBreakthroughAttackerOwner(state);
+    const def = getBreakthroughDefenderOwner(state);
+    const defHexes = Object.values(state.hexStates).filter(h => h.owner === def).length;
+    const defBonus = Math.floor(defHexes / config.territoryQuota) * config.pointsPerQuota;
+    state.productionPoints[def] += config.productionPointsPerTurn + defBonus;
     log(
       state,
-      `Turn ${state.turn} — Production phase. Attacker PP: ${state.productionPoints[PLAYER]} (no income). Defender: ${state.productionPoints[AI]} PP (+${aiBonus} territory).`,
+      `Turn ${state.turn} — Production phase. Attacker PP: ${state.productionPoints[att]} (no income). Defender: ${state.productionPoints[def]} PP (+${defBonus} territory).`,
     );
   } else {
     state.productionPoints[PLAYER] += config.productionPointsPerTurn + playerBonus;

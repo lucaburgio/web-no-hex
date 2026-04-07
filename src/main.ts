@@ -23,6 +23,7 @@ import {
   AI,
   COLS,
   ROWS,
+  getBreakthroughAttackerOwner,
 } from './game';
 import {
   initRenderer,
@@ -107,14 +108,15 @@ rulesOverlayEl.addEventListener('click', e => { if (e.target === rulesOverlayEl)
 
 ppInfoEl.addEventListener('mouseenter', () => {
   if (state.gameMode === 'breakthrough') {
-    if (localPlayer === PLAYER) {
+    const youAreAttacker = localPlayer === getBreakthroughAttackerOwner(state);
+    if (youAreAttacker) {
       const cap = config.breakthroughSectorCaptureBonusPP;
       const bonusLine =
         cap > 0
           ? `<div class="pp-tt-row"><span>Sector capture</span><span>+${cap} PP each</span></div>`
           : '';
       ppTooltipEl.innerHTML = `
-        <div class="pp-tt-row"><span>Attacker (south)</span><span>No PP income</span></div>
+        <div class="pp-tt-row"><span>Attacker</span><span>No PP income</span></div>
         ${bonusLine}
         <div class="pp-tt-next">Spend your starting pool only; territory does not add PP per turn.</div>`;
     } else {
@@ -594,7 +596,19 @@ function populateSettings(): void {
   }
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   gameModeEl.value = config.gameMode;
+  const breakthroughRoleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement;
+  if (breakthroughRoleEl) breakthroughRoleEl.value = config.breakthroughPlayer1Role;
+  const breakthroughRandEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement;
+  if (breakthroughRandEl) breakthroughRandEl.checked = config.breakthroughRandomRoles;
+  syncBreakthroughRoleControls();
   updateModeSpecificSettingsVisibility();
+}
+
+function syncBreakthroughRoleControls(): void {
+  const randEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement | null;
+  const roleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement | null;
+  if (!randEl || !roleEl) return;
+  roleEl.disabled = randEl.checked;
 }
 
 function updateModeSpecificSettingsVisibility(): void {
@@ -618,6 +632,10 @@ function collectSettings(): Parameters<typeof updateConfig>[0] {
   }
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   out.gameMode = gameModeEl.value as GameMode;
+  const breakthroughRoleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement;
+  const breakthroughRandEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement;
+  if (breakthroughRoleEl) out.breakthroughPlayer1Role = breakthroughRoleEl.value as 'attacker' | 'defender';
+  if (breakthroughRandEl) out.breakthroughRandomRoles = breakthroughRandEl.checked;
   return out as Parameters<typeof updateConfig>[0];
 }
 
@@ -632,6 +650,7 @@ for (const [id] of TOGGLE_FIELDS) {
 }
 
 document.getElementById('cfg-gameMode')!.addEventListener('change', updateModeSpecificSettingsVisibility);
+document.getElementById('cfg-breakthroughRandomRoles')?.addEventListener('change', syncBreakthroughRoleControls);
 
 let settingsOnStart: (() => void) | null = null;
 
@@ -806,10 +825,10 @@ function buildRulesContent(): string {
         You also lose immediately if you have <strong>no units</strong> and <strong>no owned territory</strong> (even if your Conquer Points are still above 0).
         Reaching the opponent&rsquo;s home row alone does <strong>not</strong> end the match.
         If both sides hit 0 Conquer Points in the same tick, or both are totally eliminated from the map at once, the <strong>northern</strong> player wins the tie.</li>
-      <li><strong>Breakthrough:</strong> the map is split into <strong>${config.breakthroughSectorCount}</strong> sectors (configurable, south to north). The <strong>southern attacker</strong> starts with <strong>${config.breakthroughAttackerStartingPP} PP</strong> and earns <strong>no further PP</strong>; the <strong>northern defender</strong> earns the usual per-turn PP plus territory bonus.
-        The <strong>southern</strong> sector (your starting zone) has no control point. Each other sector has a <strong>control point</strong> until captured. To capture a sector, the attacker must keep a unit on that control point for <strong>two full rounds</strong> (checked after both sides move). When a sector is captured, the marker is removed, <strong>every hex in that sector</strong> becomes attacker territory, and the attacker gains <strong>+${config.breakthroughSectorCaptureBonusPP} PP</strong> (configurable; 0 to disable).
+      <li><strong>Breakthrough:</strong> the map is split into <strong>${config.breakthroughSectorCount}</strong> sectors (configurable, south to north). In <strong>Game settings</strong> you can set whether <strong>player 1</strong> (south / host) is <strong>attacker</strong> or <strong>defender</strong>, or enable <strong>random role</strong> to pick at match start. The <strong>attacker</strong> starts with <strong>${config.breakthroughAttackerStartingPP} PP</strong> and earns <strong>no further PP</strong>; the <strong>defender</strong> earns the usual per-turn PP plus territory bonus.
+        The attacker&rsquo;s <strong>home sector</strong> (south if player 1 is attacker, north if player 1 is defender) has no control point. Each other sector has a <strong>control point</strong> until captured. To capture a sector, the attacker must keep a unit on that control point for <strong>two full rounds</strong> (checked after both sides move). When a sector is captured, the marker is removed, <strong>every hex in that sector</strong> becomes attacker territory, and the attacker gains <strong>+${config.breakthroughSectorCaptureBonusPP} PP</strong> (configurable; 0 to disable).
         After that, the defender <strong>cannot regain those hexes</strong> — they may still fight and move there, but hex ownership stays with the attacker. The sector itself also <strong>never</strong> flips back politically.
-        <strong>Northern units</strong> in a captured sector fight at <strong>${Math.round(config.breakthroughEnemySectorStrengthMult * 100)}%</strong> strength (configurable).
+        <strong>Defender units</strong> in a sector already captured by the attacker fight at <strong>${Math.round(config.breakthroughEnemySectorStrengthMult * 100)}%</strong> strength (configurable).
         <strong>Attacker wins</strong> by holding every sector; <strong>defender wins</strong> if the attacker has no units left.</li>
     </ul>
   `;
@@ -1820,9 +1839,10 @@ function updateUI(): void {
   let opponentPct: number;
   let leftPct: number;
   if (isBreakthrough) {
-    const att = state.sectorOwners!.filter(o => o === PLAYER).length;
+    const attOw = getBreakthroughAttackerOwner(state);
+    const att = state.sectorOwners!.filter(o => o === attOw).length;
     const def = state.sectorOwners!.length - att;
-    const youAreAttacker = localPlayer === PLAYER;
+    const youAreAttacker = localPlayer === attOw;
     const youSectors = youAreAttacker ? att : def;
     const oppSectors = youAreAttacker ? def : att;
     playerConquerPctEl.textContent = String(youSectors);

@@ -46,6 +46,8 @@ export interface GameState {
   breakthroughCpOccupation: number[];
   /** Breakthrough: O(1) `col,row` → sector index. */
   sectorIndexByHex: Record<string, number>;
+  /** Breakthrough: which owner is the attacker (fixed for the match). Omitted in other modes / old saves. */
+  breakthroughAttackerOwner?: Owner;
   turn: number;
   phase: Phase;
   activePlayer: Owner;
@@ -143,6 +145,10 @@ export interface GameConfig {
   breakthroughEnemySectorStrengthMult: number;
   /** Breakthrough: PP granted to the attacker when they capture a sector (control point removed). */
   breakthroughSectorCaptureBonusPP: number;
+  /** Breakthrough: player 1 (south / host) is attacker or defender when random roles is off. */
+  breakthroughPlayer1Role: 'attacker' | 'defender';
+  /** Breakthrough: ignore {@link breakthroughPlayer1Role} and assign attacker randomly at match start. */
+  breakthroughRandomRoles: boolean;
 
   boardCols: number;
   boardRows: number;

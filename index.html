@@ -111,7 +111,18 @@
         </div>
         <div id="settings-breakthrough-only" class="hidden">
           <div class="settings-row">
-            <label class="settings-label" for="cfg-breakthroughAttackerStartingPP">Attacker starting PP (south)</label>
+            <label class="settings-label" for="cfg-breakthroughPlayer1Role">Player 1 role (south / host)</label>
+            <select class="settings-input settings-select" id="cfg-breakthroughPlayer1Role">
+              <option value="attacker">Attacker</option>
+              <option value="defender">Defender</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label" for="cfg-breakthroughRandomRoles">Random role</label>
+            <input class="settings-input" type="checkbox" id="cfg-breakthroughRandomRoles" />
+          </div>
+          <div class="settings-row">
+            <label class="settings-label" for="cfg-breakthroughAttackerStartingPP">Attacker starting PP</label>
             <input class="settings-input" type="number" id="cfg-breakthroughAttackerStartingPP" min="1" max="9999" step="1" />
           </div>
           <div class="settings-row">
