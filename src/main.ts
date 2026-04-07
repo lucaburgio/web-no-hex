@@ -1787,12 +1787,19 @@ function hasAnyValidMove(): boolean {
     .some(u => getValidMoves(state, u).length > 0 || getRangedAttackTargets(state, u).length > 0);
 }
 
+function shouldAutoSkipProductionPhase(): boolean {
+  return (
+    state.phase === 'production' &&
+    state.activePlayer === localPlayer &&
+    autoEndProductionEl.checked &&
+    (!canAffordAnyUnit() || !hasHomeProductionAccess(state, localPlayer))
+  );
+}
+
 function maybeAutoEnd(): void {
   if (isAnimating || state.winner || state.activePlayer !== localPlayer) return;
   if (
-    state.phase === 'production' &&
-    autoEndProductionEl.checked &&
-    (!canAffordAnyUnit() || !hasHomeProductionAccess(state, localPlayer))
+    shouldAutoSkipProductionPhase()
   ) {
     if (gameMode === 'vsAI') {
       state = playerEndProduction(state);
@@ -1828,7 +1835,12 @@ function maybeAutoEnd(): void {
 
 function updateUI(): void {
   turnEl.textContent  = `Turn ${state.turn}`;
-  phaseEl.textContent = state.phase.charAt(0).toUpperCase() + state.phase.slice(1);
+  const hidingTransientAutoSkippedProduction = shouldAutoSkipProductionPhase();
+  const phaseForDisplay =
+    hidingTransientAutoSkippedProduction && state.phase === 'production'
+      ? 'movement'
+      : state.phase;
+  phaseEl.textContent = phaseForDisplay.charAt(0).toUpperCase() + phaseForDisplay.slice(1);
   ppDisplay.textContent = String(state.productionPoints[localPlayer]);
 
   const isConquest = state.gameMode === 'conquest' && state.conquestPoints;
@@ -1915,6 +1927,10 @@ function updateUI(): void {
     `linear-gradient(to right, ${localColor} ${leftPct}%, ${opponentColor} ${leftPct}%)`;
 
   const isMyTurn = state.activePlayer === localPlayer;
+  if (hidingTransientAutoSkippedProduction) {
+    endMoveBtn.style.display = 'none';
+    phaseLabelEl.textContent = '';
+  } else
   if ((state.phase === 'production' || state.phase === 'movement') && isMyTurn) {
     endMoveBtn.style.display = 'flex';
     phaseLabelEl.textContent = state.phase.toUpperCase();
