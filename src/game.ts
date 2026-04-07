@@ -1086,6 +1086,12 @@ export function createInitialState(): GameState {
     sectorControlPointHex = sectorHexes.map(keys => pickBreakthroughSectorControlPoint(keys, COLS, ROWS));
     controlPointHexes = [...sectorControlPointHex];
     breakthroughCpOccupation = Array(sectorHexes.length).fill(0);
+    // South sector (0) is already attacker-controlled — no control point marker.
+    const cpSouth = sectorControlPointHex[0];
+    if (cpSouth) {
+      sectorControlPointHex[0] = '';
+      controlPointHexes = controlPointHexes.filter(k => k !== cpSouth);
+    }
   } else if (gm === 'conquest' && config.controlPointCount > 0 && cpCandidates.length > 0) {
     controlPointHexes = pickControlPointHexes(cpCandidates, config.controlPointCount, COLS, ROWS);
   }
