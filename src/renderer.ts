@@ -9,7 +9,7 @@ import {
   AI,
   getUnit,
   getUnitById,
-  isValidProductionPlacement,
+  hasHomeProductionAccess,
   getValidMoves,
   getRangedAttackTargets,
   isInEnemyZoC,
@@ -69,6 +69,49 @@ let lastRenderedGameHp = new Map<number, number>();
 let hpBarAnim = new Map<number, { fromHp: number; toHp: number; maxHp: number; startMs: number }>();
 let boardRenderCallback: (() => void) | null = null;
 let hpBarRafScheduled = false;
+
+type PerfSection =
+  | 'render.total'
+  | 'render.productionEligibility'
+  | 'render.hexPass'
+  | 'render.unitsPass';
+
+interface PerfBucket {
+  count: number;
+  totalMs: number;
+  maxMs: number;
+}
+
+const perfBuckets = new Map<PerfSection, PerfBucket>();
+let perfLastFlushMs = 0;
+
+function perfEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  const qs = new URLSearchParams(window.location.search);
+  return qs.get('perf') === '1';
+}
+
+function perfRecord(section: PerfSection, ms: number): void {
+  if (!perfEnabled()) return;
+  const prev = perfBuckets.get(section) ?? { count: 0, totalMs: 0, maxMs: 0 };
+  prev.count += 1;
+  prev.totalMs += ms;
+  prev.maxMs = Math.max(prev.maxMs, ms);
+  perfBuckets.set(section, prev);
+}
+
+function perfMaybeFlush(): void {
+  if (!perfEnabled()) return;
+  const now = performance.now();
+  if (now - perfLastFlushMs < 2000) return;
+  perfLastFlushMs = now;
+  for (const [section, b] of perfBuckets) {
+    if (b.count === 0) continue;
+    const avg = b.totalMs / b.count;
+    console.log(`[perf] ${section}: avg=${avg.toFixed(2)}ms max=${b.maxMs.toFixed(2)}ms samples=${b.count}`);
+  }
+  perfBuckets.clear();
+}
 
 /** Wire the main board redraw (e.g. `() => render()`) so HP bars can tick after damage/healing. */
 export function setBoardRenderCallback(cb: (() => void) | null): void {
@@ -452,6 +495,20 @@ function svgUprightAt(x: number, y: number): SVGGElement {
 
 const DECOR_RINGS = 4;
 
+interface RenderDomCache {
+  hexPolys: SVGPolygonElement[][];
+  hexLayer: SVGGElement | null;
+  unitLayer: SVGGElement | null;
+  mountainLayer: SVGGElement | null;
+  controlPointLayer: SVGGElement | null;
+  prodStrokeLayer: SVGGElement | null;
+  sectorOutlineLayer: SVGGElement | null;
+  markerLayer: SVGGElement | null;
+  moveBoundary: SVGPathElement | null;
+}
+
+const renderDomCacheBySvg = new WeakMap<SVGSVGElement, RenderDomCache>();
+
 export interface InitRendererOptions {
   /** When true (vs-human guest), mirror the board vertically so local side appears at the bottom. */
   flipBoardY?: boolean;
@@ -524,7 +581,9 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   unitLayer.setAttribute('pointer-events', 'none');
   boardViewRoot.appendChild(unitLayer);
 
+  const hexPolys: SVGPolygonElement[][] = [];
   for (let r = 0; r < ROWS; r++) {
+    hexPolys[r] = [];
     for (let col = 0; col < COLS; col++) {
       const { x, y } = hexToPixel(col, r);
 
@@ -540,6 +599,7 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
       poly.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
       poly.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
       hexLayer.appendChild(poly);
+      hexPolys[r]![col] = poly;
 
     }
   }
@@ -554,6 +614,11 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   controlPointLayer.id = 'control-point-layer';
   controlPointLayer.setAttribute('pointer-events', 'none');
   hexLayer.appendChild(controlPointLayer);
+
+  const markerLayer = svgEl('g');
+  markerLayer.id = 'marker-layer';
+  markerLayer.setAttribute('pointer-events', 'none');
+  hexLayer.appendChild(markerLayer);
 
   // Production placement dashed stroke (above mountain art so corners aren’t clipped)
   const prodStrokeLayer = svgEl('g');
@@ -603,6 +668,18 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   }
   boardViewRoot.appendChild(hexHitLayer);
 
+  renderDomCacheBySvg.set(svgElement, {
+    hexPolys,
+    hexLayer,
+    unitLayer,
+    mountainLayer,
+    controlPointLayer,
+    prodStrokeLayer,
+    sectorOutlineLayer,
+    markerLayer,
+    moveBoundary: boundary,
+  });
+
   if (svgElement.id === 'board') clearHpBarAnimationState();
 }
 
@@ -618,15 +695,19 @@ export function renderState(
    */
   unitDrawOverride?: Unit[] | null,
 ): void {
+  const tRenderStart = performance.now();
   const trackHpBars = svgElement.id === 'board' && !unitDrawOverride;
   const now = performance.now();
   if (trackHpBars) syncHpBarAnimState(state, now);
 
   const c = colors();
-  const unitLayer = svgElement.querySelector('#unit-layer') as SVGGElement;
+  const domCache = renderDomCacheBySvg.get(svgElement);
+  const unitLayer = domCache?.unitLayer ?? (svgElement.querySelector('#unit-layer') as SVGGElement);
   unitLayer.innerHTML = '';
 
   const mountainSet = new Set(state.mountainHexes ?? []);
+  const unitByHex = new Map<string, Unit>();
+  for (const u of state.units) unitByHex.set(`${u.col},${u.row}`, u);
 
   let selectedUnit = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
   if (selectedUnit && selectedUnit.owner !== localPlayer) selectedUnit = null;
@@ -666,19 +747,35 @@ export function renderState(
   const productionFocusHexes = new Set<string>();
   const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
   if (state.phase === 'production' && state.activePlayer === localPlayer) {
+    const tProdStart = performance.now();
+    const hasHomeAccess = hasHomeProductionAccess(state, localPlayer);
+    const enemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
     for (let r = 0; r < ROWS; r++) {
       for (let col = 0; col < COLS; col++) {
-        if (isValidProductionPlacement(state, col, r, localPlayer)) canPlaceHexes.add(`${col},${r}`);
+        const key = `${col},${r}`;
+        const isMountain = mountainSet.has(key);
+        const occupied = unitByHex.has(key);
+        const hex = state.hexStates[key];
+        const placeable =
+          hasHomeAccess &&
+          !isMountain &&
+          !occupied &&
+          (
+            (r === homeRow && !(hex && hex.owner === enemy)) ||
+            !!(hex && hex.isProduction && hex.owner === localPlayer)
+          );
+        if (placeable) canPlaceHexes.add(key);
         if (r === homeRow) productionFocusHexes.add(`${col},${r}`);
       }
     }
     for (const [key, hex] of Object.entries(state.hexStates)) {
       if (hex.owner === localPlayer && hex.isProduction) productionFocusHexes.add(key);
     }
+    perfRecord('render.productionEligibility', performance.now() - tProdStart);
   }
 
   // Update move area perimeter outline
-  const boundary = svgElement.querySelector('#move-boundary') as SVGPathElement | null;
+  const boundary = domCache?.moveBoundary ?? (svgElement.querySelector('#move-boundary') as SVGPathElement | null);
   if (boundary) {
     if (moveAreaHexes.size > 0) {
       boundary.setAttribute('d', buildBoundaryPath(moveAreaHexes));
@@ -690,13 +787,16 @@ export function renderState(
     }
   }
 
-  const prodStrokeLayer = svgElement.querySelector('#prod-stroke-layer') as SVGGElement | null;
+  const prodStrokeLayer = domCache?.prodStrokeLayer ?? (svgElement.querySelector('#prod-stroke-layer') as SVGGElement | null);
   if (prodStrokeLayer) prodStrokeLayer.innerHTML = '';
+  const markerLayer = domCache?.markerLayer ?? (svgElement.querySelector('#marker-layer') as SVGGElement | null);
+  if (markerLayer) markerLayer.innerHTML = '';
 
+  const tHexStart = performance.now();
   // Update each hex polygon
   for (let r = 0; r < ROWS; r++) {
     for (let col = 0; col < COLS; col++) {
-      const poly = svgElement.querySelector(`#hex-${col}-${r}`) as SVGPolygonElement | null;
+      const poly = domCache?.hexPolys[r]?.[col] ?? (svgElement.querySelector(`#hex-${col}-${r}`) as SVGPolygonElement | null);
       if (!poly) continue;
 
       const key                = `${col},${r}`;
@@ -743,7 +843,7 @@ export function renderState(
       }
       if (prodOverlayStroke) stroke = 'transparent';
 
-      const hexOccupied = !!getUnit(state, col, r);
+      const hexOccupied = unitByHex.has(key);
       const hexDimmed = productionFocusHexes.size > 0 && isConquered && (!productionFocusHexes.has(key) || hexOccupied) && !isProdSelected;
       poly.setAttribute('fill', fill);
       poly.setAttribute('stroke', stroke);
@@ -763,8 +863,6 @@ export function renderState(
       }
       poly.style.cursor = "url('/icons/pointer.svg') 13 14, auto";
 
-      // Production marker
-      svgElement.querySelector(`#marker-${col}-${r}`)?.remove();
       if (hexState && hexState.isProduction && !isSelectedHex && !isValidMove) {
         const { x, y } = hexToPixel(col, r);
         const s = HEX_SIZE * 0.18;
@@ -774,15 +872,16 @@ export function renderState(
         diamond.setAttribute('opacity', hexDimmed ? '0.08' : '0.4');
         diamond.setAttribute('pointer-events', 'none');
         diamond.setAttribute('id', `marker-${col}-${r}`);
-        (svgElement.querySelector('#hex-layer') as SVGGElement).appendChild(diamond);
+        (markerLayer ?? domCache?.hexLayer ?? (svgElement.querySelector('#hex-layer') as SVGGElement)).appendChild(diamond);
       }
     }
   }
+  perfRecord('render.hexPass', performance.now() - tHexStart);
 
   const flipBoardY = svgElement.dataset.boardFlipY === '1';
 
   // Draw mountain icons
-  const mountainLayer = svgElement.querySelector('#mountain-layer') as SVGGElement | null;
+  const mountainLayer = domCache?.mountainLayer ?? (svgElement.querySelector('#mountain-layer') as SVGGElement | null);
   if (mountainLayer) {
     mountainLayer.innerHTML = '';
     const iw = HEX_SIZE * Math.sqrt(3);
@@ -807,7 +906,7 @@ export function renderState(
     }
   }
 
-  const sectorOutlineLayerEl = svgElement.querySelector('#sector-outline-layer') as SVGGElement | null;
+  const sectorOutlineLayerEl = domCache?.sectorOutlineLayer ?? (svgElement.querySelector('#sector-outline-layer') as SVGGElement | null);
   if (sectorOutlineLayerEl) {
     sectorOutlineLayerEl.innerHTML = '';
     if (
@@ -852,7 +951,7 @@ export function renderState(
     }
   }
 
-  const controlPointLayer = svgElement.querySelector('#control-point-layer') as SVGGElement | null;
+  const controlPointLayer = domCache?.controlPointLayer ?? (svgElement.querySelector('#control-point-layer') as SVGGElement | null);
   if (controlPointLayer) {
     controlPointLayer.innerHTML = '';
     const cpKeys = state.controlPointHexes ?? [];
@@ -911,6 +1010,7 @@ export function renderState(
     }
   }
 
+  const tUnitsStart = performance.now();
   // Draw units
   for (const unit of unitsToDraw) {
     if (hiddenUnitIds.has(unit.id)) continue;
@@ -988,6 +1088,9 @@ export function renderState(
       }
     }
   }
+  perfRecord('render.unitsPass', performance.now() - tUnitsStart);
+  perfRecord('render.total', performance.now() - tRenderStart);
+  perfMaybeFlush();
 }
 
 // Animate a list of unit moves in parallel, then call onDone once.

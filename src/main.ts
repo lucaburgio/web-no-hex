@@ -64,6 +64,23 @@ const svg        = document.getElementById('board') as unknown as SVGSVGElement;
 
 /** Last move-path preview key; redraw only when unit position or hovered destination changes. */
 let movePathPreviewKey: string | null = null;
+let aiTurnPerfStartMs: number | null = null;
+
+function perfEnabled(): boolean {
+  const qs = new URLSearchParams(window.location.search);
+  return qs.get('perf') === '1';
+}
+
+function perfLog(section: string, ms: number): void {
+  if (!perfEnabled()) return;
+  console.log(`[perf] ${section}: ${ms.toFixed(2)}ms`);
+}
+
+function maybeAutoEndDeferred(): void {
+  requestAnimationFrame(() => {
+    maybeAutoEnd();
+  });
+}
 
 function clearMovePathPreview(): void {
   if (movePathPreviewKey === null) return;
@@ -222,6 +239,17 @@ let aiPlaybackInProgress = false;
 /** Cancel function for the local player's in-flight move animation (allows selecting another unit mid-animation). */
 let humanMoveAnimCancel: (() => void) | null = null;
 let turnSnapshots: GameState[] = [];
+let saveStateTimer: number | null = null;
+
+function scheduleSaveGameState(): void {
+  if (gameMode !== 'vsAI') return;
+  if (saveStateTimer !== null) window.clearTimeout(saveStateTimer);
+  // Defer serialization to keep phase transitions responsive on large boards.
+  saveStateTimer = window.setTimeout(() => {
+    saveStateTimer = null;
+    saveGameState(state);
+  }, 0);
+}
 
 /** Multiplayer: full combat/move mirror (replaces legacy single {@link MoveAnimation} only). */
 interface WsAnimationPayload {
@@ -1221,7 +1249,7 @@ function showUnitPicker(col: number, row: number): void {
     if (canAfford) {
       card.addEventListener('click', () => {
         state = playerPlaceUnit(state, col, row, unitType.id, localPlayer);
-        if (gameMode === 'vsAI') saveGameState(state);
+        if (gameMode === 'vsAI') scheduleSaveGameState();
         hideUnitPicker();
         render();
         updateUI();
@@ -1258,7 +1286,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
         humanMoveAnimCancel();
         humanMoveAnimCancel = null;
         isAnimating = false;
-        if (gameMode === 'vsAI') saveGameState(state);
+        if (gameMode === 'vsAI') scheduleSaveGameState();
         render();
         checkWinner();
       }
@@ -1279,7 +1307,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
     humanMoveAnimCancel();
     humanMoveAnimCancel = null;
     isAnimating = false;
-    if (gameMode === 'vsAI') saveGameState(state);
+    if (gameMode === 'vsAI') scheduleSaveGameState();
     render();
     checkWinner();
   }
@@ -1321,7 +1349,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
             syncDamageFloatCssDuration();
             const { state: nextState, combatVfx } = playerRangedAttack(state, col, row, localPlayer);
             state = nextState;
-            if (gameMode === 'vsAI') saveGameState(state);
+            if (gameMode === 'vsAI') scheduleSaveGameState();
             checkWinner();
             if (combatVfx && combatVfx.damageFloats.length > 0) {
               isAnimating = true;
@@ -1333,7 +1361,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
               const afterFloats = (): void => {
                 humanMoveAnimCancel = null;
                 isAnimating = false;
-                if (gameMode === 'vsAI') saveGameState(state);
+                if (gameMode === 'vsAI') scheduleSaveGameState();
                 render();
                 updateUI();
                 maybeAutoEnd();
@@ -1419,7 +1447,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
         const finishHumanAnim = (): void => {
           humanMoveAnimCancel = null;
           isAnimating = false;
-          if (gameMode === 'vsAI') saveGameState(state);
+          if (gameMode === 'vsAI') scheduleSaveGameState();
           render();
           checkWinner();
           maybeAutoEnd();
@@ -1456,7 +1484,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
             );
             humanMoveAnimCancel = combineAnimCancels(cancel);
           } else {
-            if (gameMode === 'vsAI') saveGameState(state);
+            if (gameMode === 'vsAI') scheduleSaveGameState();
             render();
             updateUI();
             checkWinner();
@@ -1575,7 +1603,7 @@ document.body.addEventListener('click', (e: MouseEvent) => {
     humanMoveAnimCancel();
     humanMoveAnimCancel = null;
     isAnimating = false;
-    if (gameMode === 'vsAI') saveGameState(state);
+    if (gameMode === 'vsAI') scheduleSaveGameState();
     render();
     checkWinner();
   }
@@ -1593,20 +1621,23 @@ endMoveBtn.addEventListener('click', () => {
   if (isAnimating) return;
 
   if (state.phase === 'production' && state.activePlayer === localPlayer) {
+    const tPhaseStart = performance.now();
     if (gameMode === 'vsAI') {
       state = playerEndProduction(state);
-      saveGameState(state);
+      scheduleSaveGameState();
     } else {
       state = vsHumanEndProduction(state, localPlayer);
     }
     hideUnitPicker();
     render(); updateUI(); checkWinner();
     if (gameMode === 'vsAI') {
-      maybeAutoEnd();
+      // Let movement UI paint first on large boards before any auto-end heavy work runs.
+      maybeAutoEndDeferred();
     } else {
       sendStateUpdate();
-      maybeAutoEnd();
+      maybeAutoEndDeferred();
     }
+    perfLog('phase.productionToMovement', performance.now() - tPhaseStart);
   } else if (state.phase === 'movement' && state.activePlayer === localPlayer) {
     if (gameMode === 'vsAI') {
       runAiTurnWithAnimation();
@@ -1639,6 +1670,7 @@ function runAiTurnWithAnimation(): void {
   if (isAnimating) return;
   isAnimating = true;
   aiPlaybackInProgress = true;
+  aiTurnPerfStartMs = performance.now();
 
   clearMovePathPreview();
   state = prepareAiTurn(state);
@@ -1653,6 +1685,10 @@ function runAiTurnWithAnimation(): void {
     isAnimating = false;
     aiPlaybackInProgress = false;
     render(); updateUI(); checkWinner();
+    if (aiTurnPerfStartMs !== null) {
+      perfLog('phase.aiTurnTotal', performance.now() - aiTurnPerfStartMs);
+      aiTurnPerfStartMs = null;
+    }
     return;
   }
 
@@ -1661,13 +1697,17 @@ function runAiTurnWithAnimation(): void {
     state = next;
     applyImmediateAutoSkipProductionIfNeeded();
     turnSnapshots.push(structuredClone(state));
-    saveGameState(state);
+    scheduleSaveGameState();
     playEndTurnHealFloats(healFloats, () => {
       aiPlaybackInProgress = false;
       render();
       updateUI();
       checkWinner();
       maybeAutoEnd();
+      if (aiTurnPerfStartMs !== null) {
+        perfLog('phase.aiTurnTotal', performance.now() - aiTurnPerfStartMs);
+        aiTurnPerfStartMs = null;
+      }
     });
     return;
   }
@@ -1680,13 +1720,17 @@ function runAiTurnWithAnimation(): void {
     state = next;
     applyImmediateAutoSkipProductionIfNeeded();
     turnSnapshots.push(structuredClone(state));
-    saveGameState(state);
+    scheduleSaveGameState();
     playEndTurnHealFloats(healFloats, () => {
       aiPlaybackInProgress = false;
       render();
       updateUI();
       checkWinner();
       maybeAutoEnd();
+      if (aiTurnPerfStartMs !== null) {
+        perfLog('phase.aiTurnTotal', performance.now() - aiTurnPerfStartMs);
+        aiTurnPerfStartMs = null;
+      }
     });
   };
 

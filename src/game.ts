@@ -1295,15 +1295,15 @@ export function playerEndProduction(state: GameState): GameState {
   return advancePhase(state);
 }
 
-function collectAiProductionCandidates(state: GameState): [number, number][] {
+function collectAiProductionCandidates(state: GameState, occupied: Set<string>): [number, number][] {
   const candidates: [number, number][] = [];
   for (let c = 0; c < COLS; c++) {
-    if (!getUnit(state, c, 0)) candidates.push([c, 0]);
+    if (!occupied.has(`${c},0`)) candidates.push([c, 0]);
   }
   for (const [key, hex] of Object.entries(state.hexStates)) {
     if (hex.owner === AI && hex.isProduction) {
       const [c, r] = key.split(',').map(Number);
-      if (r !== 0 && !getUnit(state, c, r)) candidates.push([c, r]);
+      if (r !== 0 && !occupied.has(key)) candidates.push([c, r]);
     }
   }
   return candidates;
@@ -1359,19 +1359,49 @@ function aiUnitCountsByType(state: GameState): Record<string, number> {
   return counts;
 }
 
-function scoreAiProductionPlacement(state: GameState, ut: UnitType, col: number, row: number): number {
-  const pressure = aiDefensivePressure(state);
+function buildDistanceToOpponentHomeRowMap(state: GameState, mover: Owner): Map<string, number> {
+  const goalRow = mover === AI ? ROWS - 1 : 0;
+  const mountains = new Set(state.mountainHexes ?? []);
+  const dist = new Map<string, number>();
+  const q: [number, number][] = [];
+  for (let c = 0; c < COLS; c++) {
+    const key = `${c},${goalRow}`;
+    if (mountains.has(key)) continue;
+    dist.set(key, 0);
+    q.push([c, goalRow]);
+  }
+  for (let i = 0; i < q.length; i++) {
+    const [c, r] = q[i]!;
+    const base = dist.get(`${c},${r}`) ?? 0;
+    for (const [nc, nr] of getNeighbors(c, r, COLS, ROWS)) {
+      const nk = `${nc},${nr}`;
+      if (mountains.has(nk) || dist.has(nk)) continue;
+      dist.set(nk, base + 1);
+      q.push([nc, nr]);
+    }
+  }
+  return dist;
+}
+
+function scoreAiProductionPlacement(
+  state: GameState,
+  ut: UnitType,
+  col: number,
+  row: number,
+  pressure: number,
+  counts: Record<string, number>,
+  distToGoalMap: Map<string, number>,
+  occupiedByEnemy: Set<string>,
+): number {
   const neighbors = getNeighbors(col, row, COLS, ROWS);
   let adjacentEnemy = 0;
   let expandNeighbor = 0;
   for (const [nc, nr] of neighbors) {
-    const u = getUnit(state, nc, nr);
-    if (u && u.owner === PLAYER) adjacentEnemy++;
+    if (occupiedByEnemy.has(`${nc},${nr}`)) adjacentEnemy++;
     const hex = state.hexStates[`${nc},${nr}`];
     if (!hex || hex.owner === null || hex.owner !== AI) expandNeighbor++;
   }
-  const distToGoal = minHexStepsToOpponentHomeRow(state, col, row, AI);
-  const counts = aiUnitCountsByType(state);
+  const distToGoal = distToGoalMap.get(`${col},${row}`) ?? 999;
   const inf = counts.infantry ?? 0;
   const tn = counts.tank ?? 0;
   const ar = counts.artillery ?? 0;
@@ -1422,6 +1452,9 @@ function scoreAiProductionPlacement(state: GameState, ut: UnitType, col: number,
 
 export function aiProduction(state: GameState): GameState {
   let placed = 0;
+  const pressure = aiDefensivePressure(state);
+  const distToGoalMap = buildDistanceToOpponentHomeRowMap(state, AI);
+  const hasHomeAccess = hasHomeProductionAccess(state, AI);
   while (true) {
     const affordable = config.unitTypes.filter(t => state.productionPoints[AI] >= t.cost);
     if (affordable.length === 0) {
@@ -1429,22 +1462,35 @@ export function aiProduction(state: GameState): GameState {
       break;
     }
 
-    if (!hasHomeProductionAccess(state, AI)) {
+    if (!hasHomeAccess) {
       if (placed === 0) log(state, 'AI: cannot produce — no home border hex controlled.');
       break;
     }
 
-    const candidates = collectAiProductionCandidates(state);
+    const occupiedByAny = new Set<string>(state.units.map(u => `${u.col},${u.row}`));
+    const occupiedByEnemy = new Set<string>(
+      state.units.filter(u => u.owner === PLAYER).map(u => `${u.col},${u.row}`),
+    );
+    const candidates = collectAiProductionCandidates(state, occupiedByAny);
     if (candidates.length === 0) {
       if (placed === 0) log(state, 'AI: no space to place a unit.');
       break;
     }
+    const counts = aiUnitCountsByType(state);
 
     let best: { ut: UnitType; col: number; row: number; score: number } | null = null;
     for (const ut of affordable) {
       for (const [col, row] of candidates) {
-        if (!isValidProductionPlacement(state, col, row, AI)) continue;
-        const score = scoreAiProductionPlacement(state, ut, col, row);
+        const score = scoreAiProductionPlacement(
+          state,
+          ut,
+          col,
+          row,
+          pressure,
+          counts,
+          distToGoalMap,
+          occupiedByEnemy,
+        );
         if (
           !best ||
           score > best.score ||
