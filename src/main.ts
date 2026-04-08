@@ -530,16 +530,29 @@ function hideStoriesOverlay(): void {
 
 function buildStoriesList(): void {
   const progress = loadStoryProgress();
+
+  // Auto-unlock: walk stories in order and unlock any that should be reachable
+  // based on completed IDs (handles stories added after the player last played).
+  let computedReached = 0;
+  while (computedReached < STORIES.length && progress.completedIds.includes(STORIES[computedReached].id)) {
+    computedReached++;
+  }
+  if (computedReached > progress.reachedIndex) {
+    progress.reachedIndex = computedReached;
+    saveStoryProgress(progress);
+  }
+
   storiesListEl.innerHTML = '';
 
   STORIES.forEach((story, index) => {
-    if (index > progress.reachedIndex) return;
-
+    const isLocked = index > progress.reachedIndex;
     const isCompleted = progress.completedIds.includes(story.id);
     const hasSave = progress.activeStoryId === story.id && hasStoryGameState();
 
     const card = document.createElement('div');
-    card.className = 'story-card' + (isCompleted ? ' story-completed' : '');
+    card.className = 'story-card' +
+      (isCompleted ? ' story-completed' : '') +
+      (isLocked ? ' story-locked' : '');
 
     const info = document.createElement('div');
     info.className = 'story-card-info';
@@ -547,9 +560,12 @@ function buildStoriesList(): void {
     const titleRow = document.createElement('div');
     titleRow.className = 'story-card-title-row';
 
-    if (isCompleted || hasSave) {
-      const statusIcon = document.createElement('span');
-      statusIcon.className = 'story-status-icon';
+    const statusIcon = document.createElement('span');
+    statusIcon.className = 'story-status-icon';
+    if (isLocked) {
+      statusIcon.textContent = '🔒';
+      titleRow.appendChild(statusIcon);
+    } else if (isCompleted || hasSave) {
       statusIcon.textContent = isCompleted ? '✓' : '→';
       titleRow.appendChild(statusIcon);
     }
@@ -572,29 +588,33 @@ function buildStoriesList(): void {
       info.appendChild(badge);
     }
 
-    const playBtn = document.createElement('button');
-    playBtn.className = 'menu-btn story-play-btn';
-    playBtn.textContent = hasSave ? 'CONTINUE' : isCompleted ? 'REPLAY' : 'PLAY';
+    card.appendChild(info);
 
-    playBtn.addEventListener('click', () => {
-      if (hasSave) {
-        const savedState = loadStoryGameState();
-        if (savedState) {
-          startStory(index, savedState);
+    if (!isLocked) {
+      const playBtn = document.createElement('button');
+      playBtn.className = 'menu-btn story-play-btn';
+      playBtn.textContent = hasSave ? 'CONTINUE' : isCompleted ? 'REPLAY' : 'PLAY';
+
+      playBtn.addEventListener('click', () => {
+        if (hasSave) {
+          const savedState = loadStoryGameState();
+          if (savedState) {
+            startStory(index, savedState);
+            return;
+          }
+        }
+        // Starting fresh — confirm if another story's save would be overwritten
+        if (hasStoryGameState()) {
+          pendingStoryStartIndex = index;
+          storyStartConfirmOverlay.classList.remove('hidden');
           return;
         }
-      }
-      // Starting fresh — confirm if another story's save would be overwritten
-      if (hasStoryGameState()) {
-        pendingStoryStartIndex = index;
-        storyStartConfirmOverlay.classList.remove('hidden');
-        return;
-      }
-      startStory(index);
-    });
+        startStory(index);
+      });
 
-    card.appendChild(info);
-    card.appendChild(playBtn);
+      card.appendChild(playBtn);
+    }
+
     storiesListEl.appendChild(card);
   });
 }
