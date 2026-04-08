@@ -12,7 +12,11 @@
       "Bash(git rm:*)",
       "mcp__ide__getDiagnostics",
       "Bash(npx vite:*)",
-      "Bash(grep -E \"\\\\.\\(js|ts|html|json\\)$\")"
+      "Bash(grep -E \"\\\\.\\(js|ts|html|json\\)$\")",
+      "Bash(ls /Users/luca/Documents/Git/web-strategic/src/*.css)",
+      "Bash(ls /Users/luca/Documents/Git/web-strategic/*.css)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(ls -la /Users/luca/Documents/Git/web-strategic/src/*.ts)"
     ]
   }
 }

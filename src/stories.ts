@@ -18,7 +18,7 @@ export const STORIES: StoryDef[] = [
   },
   {
     id: 'my-map-3',
-    title: 'My Map',
+    title: 'My Map breakthrough',
     description: 'Description.',
     unitPackage: 'us-ww2',
     gameMode: 'breakthrough',
@@ -28,7 +28,7 @@ export const STORIES: StoryDef[] = [
       mountains: [],
       playerStart: [{ col: 3 }, { col: 4 }],
       aiStart: [{ col: 2, unitTypeId: 'tank' }, { col: 4, unitTypeId: 'tank' }, { col: 5, unitTypeId: 'tank' }],
-      controlPoints: ['3,5', '5,3'],
+      controlPoints: ['3,1', '5,3'],
     },
     productionPointsPerTurn: 20,
   },
