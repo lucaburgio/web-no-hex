@@ -1072,7 +1072,7 @@ export function renderState(
     uParent.appendChild(barFill);
 
     // Icon (shifted up inside shape)
-    const icon = unitIcon(unit.unitTypeId);
+    const icon = unit.icon ?? unitIcon(unit.unitTypeId);
     const iconColor = isRangedTarget ? '#ffffff' : c.unitIconColor;
     const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.34, HEX_SIZE * 0.4, iconColor, opacity);
     if (iconEl) uParent.appendChild(iconEl);
@@ -1179,7 +1179,7 @@ export function animateMoves(
     barFill.setAttribute('pointer-events', 'none');
     layer.appendChild(barFill);
 
-    const iconSrc = unitIcon(anim.unit.unitTypeId);
+    const iconSrc = anim.unit.icon ?? unitIcon(anim.unit.unitTypeId);
     const iconSize = HEX_SIZE * 0.4;
     // Place icon at (0,0) so its internal scale stays fixed; a wrapper <g> handles translation each frame.
     const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, c.unitIconColor, '1');
@@ -1338,7 +1338,7 @@ export function animateStrikeAndReturn(
   barFill.setAttribute('pointer-events', 'none');
   layer.appendChild(barFill);
 
-  const iconSrc = unitIcon(unit.unitTypeId);
+  const iconSrc = unit.icon ?? unitIcon(unit.unitTypeId);
   const iconSize = HEX_SIZE * 0.4;
   const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, c.unitIconColor, '1');
   const iconWrapper = svgEl('g');

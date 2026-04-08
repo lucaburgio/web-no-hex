@@ -66,11 +66,14 @@ function maybeTrimPathCaches(): void {
 }
 
 function makeUnit(owner: Owner, col: number, row: number, unitTypeId = 'infantry'): Unit {
-  const unitType = config.unitTypes.find(u => u.id === unitTypeId) ?? config.unitTypes[0];
+  const unitType = getAvailableUnitTypes(owner).find(u => u.id === unitTypeId)
+    ?? config.unitTypes.find(u => u.id === unitTypeId)
+    ?? config.unitTypes[0];
   return {
     id: unitIdCounter++,
     owner,
     unitTypeId,
+    icon: unitType.icon,
     col,
     row,
     movesUsed: 0,

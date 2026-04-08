@@ -10,6 +10,7 @@ export interface Unit {
   id: number;
   owner: Owner;
   unitTypeId: string;
+  icon?: string;
   col: number;
   row: number;
   movesUsed: number;
