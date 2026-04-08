@@ -55,8 +55,6 @@ import {
   saveStoryGameState,
   hasStoryGameState,
   clearStoryGameState,
-  setLastSessionType,
-  getLastSessionType,
 } from './storyStorage';
 import { syncDimensions } from './game';
 import {
@@ -492,7 +490,7 @@ function syncGuestIdentityColors(): void {
 function showMainMenu(): void {
   clearGuestIdentityColorOverrides();
   mainMenuOverlayEl.classList.remove('hidden');
-  if (hasSaveGame() || hasStoryGameState()) {
+  if (hasSaveGame()) {
     menuContinueBtn.classList.remove('hidden');
   } else {
     menuContinueBtn.classList.add('hidden');
@@ -630,7 +628,6 @@ function startStory(storyIndex: number, savedState?: GameState): void {
   const progress = loadStoryProgress();
   progress.activeStoryId = story.id;
   saveStoryProgress(progress);
-  setLastSessionType('story');
 
   const initialState = savedState ?? createStoryState(story);
 
@@ -650,26 +647,11 @@ storiesBackBtn.addEventListener('click', () => {
 });
 
 menuContinueBtn.addEventListener('click', () => {
-  const lastSession = getLastSessionType();
-  if (lastSession === 'story') {
-    const progress = loadStoryProgress();
-    const storyIdx = progress.activeStoryId
-      ? STORIES.findIndex(s => s.id === progress.activeStoryId)
-      : -1;
-    const savedStoryState = hasStoryGameState() ? loadStoryGameState() : null;
-    if (storyIdx >= 0 && savedStoryState) {
-      hideMainMenu();
-      startStory(storyIdx, savedStoryState);
-      return;
-    }
-  }
-  // Fall back to vsAI save
   const saved = loadGameState();
   if (!saved) { showMainMenu(); return; }
   hideMainMenu();
   gameMode = 'vsAI';
   localPlayer = PLAYER;
-  setLastSessionType('vsAI');
   startGame(saved);
 });
 
@@ -681,7 +663,6 @@ menuNewGameBtn.addEventListener('click', () => {
     showSettings(() => {
       gameMode = 'vsAI';
       localPlayer = PLAYER;
-      setLastSessionType('vsAI');
       startGame(createInitialState());
     });
   }
@@ -694,7 +675,6 @@ confirmNewGameBtn.addEventListener('click', () => {
   showSettings(() => {
     gameMode = 'vsAI';
     localPlayer = PLAYER;
-    setLastSessionType('vsAI');
     startGame(createInitialState());
   });
 });
@@ -1142,7 +1122,6 @@ introContinueBtn.addEventListener('click', () => {
     introOverlayEl.classList.add('hidden');
     gameMode = 'vsAI';
     localPlayer = PLAYER;
-    setLastSessionType('vsAI');
     startGame(createInitialState());
   }
 });
