@@ -144,8 +144,10 @@ export interface StoryDef {
   id: string;
   title: string;
   description: string;
-  /** Only unit types with this package are available. Undefined = all units. */
+  /** Only unit types with this package are available for player 1 (south). Undefined = all units. */
   unitPackage?: string;
+  /** Only unit types with this package are available for player 2 / AI (north). Undefined = same as unitPackage. */
+  unitPackagePlayer2?: string;
   gameMode: GameMode;
   map: StoryMapDef;
   conquestPointsPlayer?: number;

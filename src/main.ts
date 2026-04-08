@@ -47,7 +47,7 @@ import type { MoveAnimation } from './renderer';
 import config from './gameconfig';
 import type { GameState, Unit, CombatForecast, Owner, CombatVfxPayload, GameMode } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
-import { updateConfig, setActiveUnitPackage, getAvailableUnitTypes } from './gameconfig';
+import { updateConfig, setActiveUnitPackage, setActiveUnitPackagePlayer2, getAvailableUnitTypes } from './gameconfig';
 import { STORIES } from './stories';
 import {
   loadStoryProgress,
@@ -302,8 +302,10 @@ let activeStoryIndex: number | null = null;
 /** Story index awaiting start confirmation (overwriting existing save). */
 let pendingStoryStartIndex: number | null = null;
 
-/** Unit package selected in game settings; persists across opens. */
+/** Unit package selected in game settings for player 1 (south); persists across opens. */
 let settingsUnitPackage = 'standard';
+/** Unit package selected in game settings for player 2 / AI (north); persists across opens. */
+let settingsUnitPackagePlayer2 = 'standard';
 
 /** Config values to restore after leaving story mode. */
 const STORY_CONFIG_DEFAULTS = {
@@ -658,6 +660,7 @@ function restoreConfigAfterStory(): void {
   syncDimensions();
   storyConfigSnapshot = null;
   setActiveUnitPackage(null);
+  setActiveUnitPackagePlayer2(null);
   activeStoryIndex = null;
 }
 
@@ -704,6 +707,7 @@ function startStory(storyIndex: number, savedState?: GameState): void {
   });
   syncDimensions();
   setActiveUnitPackage(story.unitPackage ?? null);
+  setActiveUnitPackagePlayer2(story.unitPackagePlayer2 ?? null);
 
   activeStoryIndex = storyIndex;
 
@@ -940,6 +944,9 @@ function populateSettings(): void {
   const pkgEl = document.getElementById('cfg-unitPackage') as HTMLSelectElement;
   pkgEl.value = settingsUnitPackage;
   pkgEl.dispatchEvent(new Event('settings-select-sync'));
+  const pkgEl2 = document.getElementById('cfg-unitPackagePlayer2') as HTMLSelectElement;
+  pkgEl2.value = settingsUnitPackagePlayer2;
+  pkgEl2.dispatchEvent(new Event('settings-select-sync'));
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   gameModeEl.value = config.gameMode;
   const breakthroughRoleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement;
@@ -1085,6 +1092,8 @@ function collectSettings(): Parameters<typeof updateConfig>[0] {
   }
   const pkgEl2 = document.getElementById('cfg-unitPackage') as HTMLSelectElement;
   settingsUnitPackage = pkgEl2.value || 'standard';
+  const pkgEl2P2 = document.getElementById('cfg-unitPackagePlayer2') as HTMLSelectElement;
+  settingsUnitPackagePlayer2 = pkgEl2P2.value || 'standard';
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   out.gameMode = gameModeEl.value as GameMode;
   if (out.gameMode === 'breakthrough') {
@@ -1129,10 +1138,10 @@ for (const [id] of NUM_FIELDS) {
   });
 }
 
-// Populate unit package select from config and build custom widget
+// Populate unit package selects from config and build custom widgets
 (function () {
-  const pkgEl = document.getElementById('cfg-unitPackage') as HTMLSelectElement;
   const packages = [...new Set(config.unitTypes.map(u => u.package).filter((p): p is string => !!p))];
+  const pkgEl = document.getElementById('cfg-unitPackage') as HTMLSelectElement;
   for (const pkg of packages) {
     const opt = document.createElement('option');
     opt.value = pkg;
@@ -1140,8 +1149,17 @@ for (const [id] of NUM_FIELDS) {
     pkgEl.appendChild(opt);
   }
   pkgEl.value = 'standard';
+  const pkgEl2 = document.getElementById('cfg-unitPackagePlayer2') as HTMLSelectElement;
+  for (const pkg of packages) {
+    const opt = document.createElement('option');
+    opt.value = pkg;
+    opt.textContent = pkg;
+    pkgEl2.appendChild(opt);
+  }
+  pkgEl2.value = 'standard';
 })();
 initCustomSettingsSelect('cfg-unitPackage');
+initCustomSettingsSelect('cfg-unitPackagePlayer2');
 initCustomSettingsSelect('cfg-gameMode');
 initCustomSettingsSelect('cfg-breakthroughPlayer1Role');
 document.getElementById('cfg-gameMode')!.addEventListener('change', updateModeSpecificSettingsVisibility);
@@ -1191,6 +1209,7 @@ settingsStartBtn.addEventListener('click', () => {
   updateConfig(settings);
   syncDimensions();
   setActiveUnitPackage(settingsUnitPackage);
+  setActiveUnitPackagePlayer2(settingsUnitPackagePlayer2);
   const cb = settingsOnStart;
   hideSettings();
   cb?.(settings);
@@ -1431,7 +1450,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     hideMainMenu();
     showSettings((settings) => {
       state = createInitialState();
-      if (ws) ws.send(JSON.stringify({ type: 'game-start', state, settings: { ...settings, unitPackage: settingsUnitPackage } }));
+      if (ws) ws.send(JSON.stringify({ type: 'game-start', state, settings: { ...settings, unitPackage: settingsUnitPackage, unitPackagePlayer2: settingsUnitPackagePlayer2 } }));
       startGame(state);
     });
   } else if (msg.type === 'joined') {
@@ -1445,12 +1464,13 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     (document.getElementById('lobby-modal') as HTMLDivElement).appendChild(waitEl);
   } else if (msg.type === 'game-start') {
     // Guest receives initial state from host
-    const syncedSettings = msg.settings as (Parameters<typeof updateConfig>[0] & { unitPackage?: string }) | undefined;
+    const syncedSettings = msg.settings as (Parameters<typeof updateConfig>[0] & { unitPackage?: string; unitPackagePlayer2?: string }) | undefined;
     if (syncedSettings) {
-      const { unitPackage: pkg, ...rest } = syncedSettings as Record<string, unknown>;
+      const { unitPackage: pkg, unitPackagePlayer2: pkg2, ...rest } = syncedSettings as Record<string, unknown>;
       updateConfig(rest as Parameters<typeof updateConfig>[0]);
       syncDimensions();
       setActiveUnitPackage((typeof pkg === 'string' ? pkg : null) ?? 'standard');
+      setActiveUnitPackagePlayer2((typeof pkg2 === 'string' ? pkg2 : null) ?? 'standard');
     }
     state = msg.state as GameState;
     syncUnitIdCounter(state);
@@ -1619,7 +1639,7 @@ function showUnitPicker(col: number, row: number): void {
   const statIconStr = 'public/icons/strength.svg';
   const statIconHp = 'public/icons/hp.svg';
 
-  getAvailableUnitTypes().forEach((unitType, cardIndex) => {
+  getAvailableUnitTypes(localPlayer).forEach((unitType, cardIndex) => {
     const canAfford = state.productionPoints[localPlayer] >= unitType.cost;
 
     const card = document.createElement('div');
@@ -2353,6 +2373,7 @@ function leaveEndGameToMainMenu(): void {
     storiesOverlayEl.classList.remove('hidden');
   } else {
     setActiveUnitPackage(null);
+    setActiveUnitPackagePlayer2(null);
     showMainMenu();
   }
 }
@@ -2362,7 +2383,7 @@ gameEndRestartBtn.addEventListener('click', leaveEndGameToMainMenu);
 // ── Auto-end helpers ──────────────────────────────────────────────────────────
 
 function canAffordAnyUnit(): boolean {
-  return getAvailableUnitTypes().some(u => state.productionPoints[localPlayer] >= u.cost);
+  return getAvailableUnitTypes(localPlayer).some(u => state.productionPoints[localPlayer] >= u.cost);
 }
 
 function hasAnyValidMove(): boolean {
@@ -2776,6 +2797,7 @@ pauseReturnBtn.addEventListener('click', () => {
     storiesOverlayEl.classList.remove('hidden');
   } else {
     setActiveUnitPackage(null);
+    setActiveUnitPackagePlayer2(null);
     showMainMenu();
   }
 });

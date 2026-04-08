@@ -1692,7 +1692,7 @@ export function aiProduction(state: GameState): GameState {
   const distToGoalMap = buildDistanceToOpponentHomeRowMap(state, AI);
   const hasHomeAccess = hasHomeProductionAccess(state, AI);
   while (true) {
-    const affordable = getAvailableUnitTypes().filter(t => state.productionPoints[AI] >= t.cost);
+    const affordable = getAvailableUnitTypes(AI).filter(t => state.productionPoints[AI] >= t.cost);
     if (affordable.length === 0) {
       if (placed === 0) log(state, 'AI: not enough production points.');
       break;

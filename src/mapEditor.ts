@@ -46,6 +46,7 @@ interface EditorState {
   rows: number;
   gameMode: EditorGameMode;
   unitPackage: string;
+  unitPackagePlayer2: string;
   mountains: Set<string>;
   controlPoints: Set<string>;
   playerStart: Map<number, string>; // col -> unitTypeId
@@ -58,6 +59,7 @@ function mkState(): EditorState {
     cols: 8, rows: 8,
     gameMode: 'domination',
     unitPackage: '',
+    unitPackagePlayer2: '',
     mountains: new Set(),
     controlPoints: new Set(),
     playerStart: new Map(),
@@ -76,6 +78,7 @@ let colsInput: HTMLInputElement;
 let rowsInput: HTMLInputElement;
 let gameModeSelect: HTMLSelectElement;
 let unitPackageSelect: HTMLSelectElement;
+let unitPackagePlayer2Select: HTMLSelectElement;
 let toolbarEl: HTMLDivElement;
 let exportBtn: HTMLButtonElement;
 let loadModalOverlay: HTMLDivElement;
@@ -90,11 +93,12 @@ export function initMapEditor(onBack: () => void): void {
   colsInput        = document.getElementById('me-cols') as HTMLInputElement;
   rowsInput        = document.getElementById('me-rows') as HTMLInputElement;
   gameModeSelect   = document.getElementById('me-game-mode') as HTMLSelectElement;
-  unitPackageSelect = document.getElementById('me-unit-package') as HTMLSelectElement;
+  unitPackageSelect        = document.getElementById('me-unit-package') as HTMLSelectElement;
+  unitPackagePlayer2Select = document.getElementById('me-unit-package-player2') as HTMLSelectElement;
   toolbarEl        = document.getElementById('map-editor-toolbar') as HTMLDivElement;
   exportBtn        = document.getElementById('me-export-btn') as HTMLButtonElement;
 
-  // Populate unit package select
+  // Populate unit package selects
   const pkgs = [...new Set(
     config.unitTypes.map(u => u.package).filter((p): p is string => Boolean(p))
   )];
@@ -103,6 +107,10 @@ export function initMapEditor(onBack: () => void): void {
     opt.value = pkg;
     opt.textContent = pkg;
     unitPackageSelect.appendChild(opt);
+    const opt2 = document.createElement('option');
+    opt2.value = pkg;
+    opt2.textContent = pkg;
+    unitPackagePlayer2Select.appendChild(opt2);
   });
 
   colsInput.addEventListener('input', () => {
@@ -132,10 +140,15 @@ export function initMapEditor(onBack: () => void): void {
   unitPackageSelect.addEventListener('change', () => {
     edState.unitPackage = unitPackageSelect.value;
     edState.playerStart.clear();
+    if (edState.activeTool.startsWith('player:')) edState.activeTool = 'normal';
+    refreshToolbar();
+    renderBoard();
+  });
+
+  unitPackagePlayer2Select.addEventListener('change', () => {
+    edState.unitPackagePlayer2 = unitPackagePlayer2Select.value;
     edState.aiStart.clear();
-    if (edState.activeTool.startsWith('player:') || edState.activeTool.startsWith('ai:')) {
-      edState.activeTool = 'normal';
-    }
+    if (edState.activeTool.startsWith('ai:')) edState.activeTool = 'normal';
     refreshToolbar();
     renderBoard();
   });
@@ -202,16 +215,22 @@ function refreshToolbar(): void {
   }
   toolbarEl.appendChild(tg);
 
-  const pkg = edState.unitPackage;
-  if (pkg) {
-    const units = config.unitTypes.filter(u => u.package === pkg);
-    if (units.length > 0) {
+  const pkg1 = edState.unitPackage;
+  if (pkg1) {
+    const units1 = config.unitTypes.filter(u => u.package === pkg1);
+    if (units1.length > 0) {
       const { outer: pg, btns: pgBtns } = mkGroup('PLAYER START');
-      units.forEach(ut => pgBtns.appendChild(mkToolBtn(`player:${ut.id}`, ut.name, ut.icon)));
+      units1.forEach(ut => pgBtns.appendChild(mkToolBtn(`player:${ut.id}`, ut.name, ut.icon)));
       toolbarEl.appendChild(pg);
+    }
+  }
 
+  const pkg2 = edState.unitPackagePlayer2 || edState.unitPackage;
+  if (pkg2) {
+    const units2 = config.unitTypes.filter(u => u.package === pkg2);
+    if (units2.length > 0) {
       const { outer: ag, btns: agBtns } = mkGroup('AI START');
-      units.forEach(ut => agBtns.appendChild(mkToolBtn(`ai:${ut.id}`, ut.name, ut.icon)));
+      units2.forEach(ut => agBtns.appendChild(mkToolBtn(`ai:${ut.id}`, ut.name, ut.icon)));
       toolbarEl.appendChild(ag);
     }
   }
@@ -558,6 +577,10 @@ function applyLoadedCode(raw: string): string | null {
     edState.unitPackage = parsed.unitPackage;
     unitPackageSelect.value = edState.unitPackage;
   }
+  if (typeof parsed.unitPackagePlayer2 === 'string') {
+    edState.unitPackagePlayer2 = parsed.unitPackagePlayer2;
+    unitPackagePlayer2Select.value = edState.unitPackagePlayer2;
+  }
 
   colsInput.value = String(cols);
   rowsInput.value = String(rows);
@@ -571,7 +594,7 @@ function applyLoadedCode(raw: string): string | null {
 // ── Export ────────────────────────────────────────────────────────────────────
 
 function exportToClipboard(): void {
-  const { cols, rows, gameMode, mountains, controlPoints, playerStart, aiStart, unitPackage } = edState;
+  const { cols, rows, gameMode, mountains, controlPoints, playerStart, aiStart, unitPackage, unitPackagePlayer2 } = edState;
   const i = '  ';
 
   const mStr = [...mountains].sort().map(m => `'${m}'`).join(', ');
@@ -595,6 +618,7 @@ function exportToClipboard(): void {
   code += `${i}title: 'My Map',\n`;
   code += `${i}description: 'Description.',\n`;
   if (unitPackage) code += `${i}unitPackage: '${unitPackage}',\n`;
+  if (unitPackagePlayer2 && unitPackagePlayer2 !== unitPackage) code += `${i}unitPackagePlayer2: '${unitPackagePlayer2}',\n`;
   code += `${i}gameMode: '${gameMode}',\n`;
   code += `${i}map: {\n`;
   code += `${i}${i}cols: ${cols},\n`;

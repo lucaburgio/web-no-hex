@@ -129,9 +129,15 @@
       <div class="settings-group">
         <div class="settings-group-title">UNIT PACKAGE</div>
         <div class="settings-row">
-          <label class="settings-label" for="me-unit-package">Package</label>
+          <label class="settings-label" for="me-unit-package">Player 1 (South)</label>
           <select class="settings-input settings-select" id="me-unit-package">
             <option value="">None</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="me-unit-package-player2">Player 2 (AI/North)</label>
+          <select class="settings-input settings-select" id="me-unit-package-player2">
+            <option value="">Same as Player 1</option>
           </select>
         </div>
       </div>
@@ -194,8 +200,14 @@
       <div class="settings-group">
         <div class="settings-group-title">MATCH</div>
         <div class="settings-row">
-          <label class="settings-label" for="cfg-unitPackage">Unit package</label>
+          <label class="settings-label" for="cfg-unitPackage">Player 1 (South) package</label>
           <select class="settings-input settings-select" id="cfg-unitPackage">
+            <!-- Options populated dynamically by JS from config.unitTypes -->
+          </select>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-unitPackagePlayer2">Player 2 (AI/North) package</label>
+          <select class="settings-input settings-select" id="cfg-unitPackagePlayer2">
             <!-- Options populated dynamically by JS from config.unitTypes -->
           </select>
         </div>

@@ -1,15 +1,23 @@
 import type { GameConfig, GameMode, UnitType } from './types';
 
 let _activeUnitPackage: string | null = null;
+let _activeUnitPackagePlayer2: string | null = null;
 
-/** Set the active story unit package. Only units with this package will be available for production. Null = all units. */
+/** Set the active unit package for player 1 (south). Only units with this package will be available for production. Null = all units (defaults to 'standard'). */
 export function setActiveUnitPackage(pkg: string | null): void {
   _activeUnitPackage = pkg;
 }
 
-/** Returns unit types available for production. Filtered by active package (defaults to 'standard'). */
-export function getAvailableUnitTypes(): UnitType[] {
-  const pkg = _activeUnitPackage ?? 'standard';
+/** Set the active unit package for player 2 / AI (north). Null = fall back to player 1's package. */
+export function setActiveUnitPackagePlayer2(pkg: string | null): void {
+  _activeUnitPackagePlayer2 = pkg;
+}
+
+/** Returns unit types available for production for the given owner (1 = player/south, 2 = AI/north). Filtered by the owner's active package (falls back to player 1 package, then 'standard'). */
+export function getAvailableUnitTypes(owner: 1 | 2 = 1): UnitType[] {
+  const pkg = owner === 2
+    ? (_activeUnitPackagePlayer2 ?? _activeUnitPackage ?? 'standard')
+    : (_activeUnitPackage ?? 'standard');
   return config.unitTypes.filter(u => u.package === pkg);
 }
 
@@ -210,6 +218,46 @@ const config: GameConfig = {
       range: 3,
       icon: 'icons/units/artillery.svg',
       package: 'de-ww2',
+    },
+
+
+
+
+
+
+
+
+    {
+      id: 'infantry',
+      name: 'Conscript Squad',
+      cost: 20,
+      movement: 1,
+      maxHp: 10,
+      strength: 10,
+      icon: 'icons/units/infantry.svg',
+      package: 'ru-ww2',
+    },
+    {
+      id: 'tank',
+      name: 'T34 Tank',
+      cost: 40,
+      movement: 2,
+      maxHp: 14,
+      strength: 11,
+      extraFlanking: 0.05,
+      icon: 'icons/units/tank.svg',
+      package: 'ru-ww2',
+    },
+    {
+      id: 'artillery',
+      name: 'ML20 152mm Howitzer',
+      cost: 34,
+      movement: 1,
+      maxHp: 9,
+      strength: 8,
+      range: 3,
+      icon: 'icons/units/artillery.svg',
+      package: 'ru-ww2',
     }
   ],
 
