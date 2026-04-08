@@ -1341,13 +1341,96 @@ export function createStoryState(story: StoryDef): GameState {
     units.push(makeUnit(AI, pos.col, 0, pos.unitTypeId ?? 'infantry'));
   }
 
-  const hexStates: Record<string, HexState> = {};
+  let hexStates: Record<string, HexState> = {};
   for (const u of units) {
     hexStates[`${u.col},${u.row}`] = { owner: u.owner, stableFor: 0, isProduction: false };
   }
 
   const mountainHexes = [...story.map.mountains];
-  const controlPointHexes = story.map.controlPoints ? [...story.map.controlPoints] : [];
+  const mountainSet = new Set(mountainHexes);
+  let controlPointHexes = story.map.controlPoints ? [...story.map.controlPoints] : [];
+
+  let sectorHexes: string[][] = [];
+  let sectorOwners: Owner[] = [];
+  let sectorControlPointHex: string[] = [];
+  let breakthroughCpOccupation: number[] = [];
+  let sectorIndexByHex: Record<string, number> = {};
+  let breakthroughAttackerOwner: Owner | undefined;
+
+  if (story.gameMode === 'breakthrough') {
+    // Determine attacker owner
+    const randomRoles = story.breakthroughRandomRoles ?? config.breakthroughRandomRoles;
+    const player1Role = story.breakthroughPlayer1Role ?? config.breakthroughPlayer1Role;
+    breakthroughAttackerOwner = randomRoles
+      ? (Math.random() < 0.5 ? PLAYER : AI)
+      : player1Role === 'attacker' ? PLAYER : AI;
+    const att = breakthroughAttackerOwner;
+
+    // Build all assignable (non-mountain) hexes
+    const assignable: string[] = [];
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const key = `${c},${r}`;
+        if (!mountainSet.has(key)) assignable.push(key);
+      }
+    }
+
+    // Sector count: explicit override > derived from map CPs+1 > config default
+    const storyMapCps = story.map.controlPoints ?? [];
+    const wantSectors = story.breakthroughSectorCount
+      ?? (storyMapCps.length > 0 ? storyMapCps.length + 1 : config.breakthroughSectorCount);
+    const nSectors = Math.max(2, Math.min(wantSectors, assignable.length));
+
+    sectorHexes = partitionBreakthroughSectors(assignable, nSectors);
+    const nSec = sectorHexes.length;
+
+    sectorOwners = sectorHexes.map((_, i) =>
+      att === PLAYER ? (i === 0 ? PLAYER : AI) : i === nSec - 1 ? AI : PLAYER,
+    );
+
+    sectorIndexByHex = {};
+    sectorHexes.forEach((keys, sid) => {
+      for (const k of keys) sectorIndexByHex[k] = sid;
+    });
+
+    // All hexes owned by their sector's owner
+    hexStates = {};
+    for (let s = 0; s < sectorHexes.length; s++) {
+      const owner = sectorOwners[s]!;
+      for (const k of sectorHexes[s]!) {
+        hexStates[k] = { owner, stableFor: 0, isProduction: false };
+      }
+    }
+
+    // Assign CPs: use story's pre-defined positions if they fall within the sector, else centroid
+    const storyCpSet = new Set(storyMapCps);
+    sectorControlPointHex = sectorHexes.map(keys => {
+      const storyCP = keys.find(k => storyCpSet.has(k));
+      return storyCP ?? pickBreakthroughSectorControlPoint(keys, COLS, ROWS);
+    });
+
+    breakthroughCpOccupation = Array(nSec).fill(0);
+
+    // Attacker's home sector has no CP marker
+    const homeIdx = att === PLAYER ? 0 : nSec - 1;
+    sectorControlPointHex[homeIdx] = '';
+
+    // Expose only the frontline CP
+    const frontlineIdx = att === PLAYER
+      ? sectorOwners.findIndex(o => o !== att)
+      : (() => {
+          for (let i = sectorOwners.length - 1; i >= 0; i--) {
+            if (sectorOwners[i] !== att) return i;
+          }
+          return -1;
+        })();
+    controlPointHexes =
+      frontlineIdx >= 0 && sectorControlPointHex[frontlineIdx]
+        ? [sectorControlPointHex[frontlineIdx]!]
+        : [];
+
+    primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
+  }
 
   const conquestPoints =
     story.gameMode === 'conquest'
@@ -1357,11 +1440,28 @@ export function createStoryState(story: StoryDef): GameState {
         } as Record<Owner, number>)
       : null;
 
-  const ppTurn = story.productionPointsPerTurn ?? config.productionPointsPerTurn;
-  const playerHexCount = Object.values(hexStates).filter(h => h.owner === PLAYER).length;
-  const aiHexCount = Object.values(hexStates).filter(h => h.owner === AI).length;
-  const ppPlayer = ppTurn + territoryBonusForHexCount(playerHexCount);
-  const ppAi = ppTurn + territoryBonusForHexCount(aiHexCount);
+  let ppPlayer: number;
+  let ppAi: number;
+  if (story.gameMode === 'breakthrough' && breakthroughAttackerOwner !== undefined) {
+    const att = breakthroughAttackerOwner;
+    const def: Owner = att === PLAYER ? AI : PLAYER;
+    const defHexCount = Object.values(hexStates).filter(h => h.owner === def).length;
+    const defBonus = territoryBonusForHexCount(defHexCount);
+    const attPP = story.breakthroughAttackerStartingPP ?? config.breakthroughAttackerStartingPP;
+    const defPP = (story.productionPointsPerTurn ?? config.productionPointsPerTurn) + defBonus;
+    ppPlayer = att === PLAYER ? attPP : defPP;
+    ppAi = att === AI ? attPP : defPP;
+  } else {
+    const ppTurn = story.productionPointsPerTurn ?? config.productionPointsPerTurn;
+    const playerHexCount = Object.values(hexStates).filter(h => h.owner === PLAYER).length;
+    const aiHexCount = Object.values(hexStates).filter(h => h.owner === AI).length;
+    ppPlayer = ppTurn + territoryBonusForHexCount(playerHexCount);
+    ppAi = ppTurn + territoryBonusForHexCount(aiHexCount);
+  }
+
+  const logMsg = story.gameMode === 'breakthrough'
+    ? 'Story mission started — Breakthrough. Your turn — Production phase.'
+    : 'Story mission started. Your turn — Production phase.';
 
   return {
     units,
@@ -1370,17 +1470,20 @@ export function createStoryState(story: StoryDef): GameState {
     gameMode: story.gameMode,
     controlPointHexes,
     conquestPoints,
-    sectorHexes: [],
-    sectorOwners: [],
-    sectorControlPointHex: [],
-    breakthroughCpOccupation: [],
-    sectorIndexByHex: {},
+    sectorHexes,
+    sectorOwners,
+    sectorControlPointHex,
+    breakthroughCpOccupation,
+    sectorIndexByHex,
+    ...(story.gameMode === 'breakthrough' && breakthroughAttackerOwner !== undefined
+      ? { breakthroughAttackerOwner }
+      : {}),
     turn: 1,
     phase: 'production',
     activePlayer: PLAYER,
     selectedUnit: null,
     productionPoints: { [PLAYER]: ppPlayer, [AI]: ppAi } as Record<Owner, number>,
-    log: [`Story mission started. Your turn — Production phase.`],
+    log: [logMsg],
     winner: null,
   };
 }

@@ -152,6 +152,11 @@ export interface StoryDef {
   conquestPointsAi?: number;
   /** Override production points per turn for both sides. */
   productionPointsPerTurn?: number;
+  // Breakthrough-specific overrides
+  breakthroughSectorCount?: number;
+  breakthroughAttackerStartingPP?: number;
+  breakthroughPlayer1Role?: 'attacker' | 'defender';
+  breakthroughRandomRoles?: boolean;
 }
 
 export interface StoryProgress {

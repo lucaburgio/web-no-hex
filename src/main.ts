@@ -279,6 +279,10 @@ const STORY_CONFIG_DEFAULTS = {
   productionPointsPerTurn: config.productionPointsPerTurn,
   conquestPointsPlayer: config.conquestPointsPlayer,
   conquestPointsAi: config.conquestPointsAi,
+  breakthroughAttackerStartingPP: config.breakthroughAttackerStartingPP,
+  breakthroughSectorCount: config.breakthroughSectorCount,
+  breakthroughPlayer1Role: config.breakthroughPlayer1Role,
+  breakthroughRandomRoles: config.breakthroughRandomRoles,
 };
 let storyConfigSnapshot: typeof STORY_CONFIG_DEFAULTS | null = null;
 
@@ -628,6 +632,10 @@ function startStory(storyIndex: number, savedState?: GameState): void {
     productionPointsPerTurn: config.productionPointsPerTurn,
     conquestPointsPlayer: config.conquestPointsPlayer,
     conquestPointsAi: config.conquestPointsAi,
+    breakthroughAttackerStartingPP: config.breakthroughAttackerStartingPP,
+    breakthroughSectorCount: config.breakthroughSectorCount,
+    breakthroughPlayer1Role: config.breakthroughPlayer1Role,
+    breakthroughRandomRoles: config.breakthroughRandomRoles,
   };
 
   updateConfig({
@@ -636,6 +644,10 @@ function startStory(storyIndex: number, savedState?: GameState): void {
     ...(story.productionPointsPerTurn !== undefined ? { productionPointsPerTurn: story.productionPointsPerTurn } : {}),
     ...(story.conquestPointsPlayer !== undefined ? { conquestPointsPlayer: story.conquestPointsPlayer } : {}),
     ...(story.conquestPointsAi !== undefined ? { conquestPointsAi: story.conquestPointsAi } : {}),
+    ...(story.breakthroughAttackerStartingPP !== undefined ? { breakthroughAttackerStartingPP: story.breakthroughAttackerStartingPP } : {}),
+    ...(story.breakthroughSectorCount !== undefined ? { breakthroughSectorCount: story.breakthroughSectorCount } : {}),
+    ...(story.breakthroughPlayer1Role !== undefined ? { breakthroughPlayer1Role: story.breakthroughPlayer1Role } : {}),
+    ...(story.breakthroughRandomRoles !== undefined ? { breakthroughRandomRoles: story.breakthroughRandomRoles } : {}),
   });
   syncDimensions();
   setActiveUnitPackage(story.unitPackage ?? null);
