@@ -28,6 +28,7 @@ import {
 } from './game';
 import {
   initRenderer,
+  loadIconDefs,
   renderState,
   setBoardRenderCallback,
   animateMoves,
@@ -2821,4 +2822,5 @@ recapCloseBtn.addEventListener('click', () => {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
+loadIconDefs(config.unitTypes.map(t => t.icon).filter((i): i is string => !!i));
 showMainMenu();

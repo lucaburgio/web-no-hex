@@ -243,40 +243,40 @@ function unitIcon(unitTypeId: string): string | undefined {
 
 interface IconDef { viewBox: number; mode: 'stroke' | 'fill'; paths: string[]; }
 
-const SVG_ICON_DEFS: Record<string, IconDef> = {
-  'icons/units/sword.svg': {
-    viewBox: 24,
-    mode: 'stroke',
-    paths: ['m11 19-6-6', 'm5 21-2-2', 'm8 16-4 4', 'M9.5 17.5 21 6V3h-3L6.5 14.5'],
-  },
-  'icons/units/infantry.svg': {
-    viewBox: 48,
-    mode: 'fill',
-    paths: [
-      'M30.5384 17.7331C30.5399 17.7361 30.5472 17.747 30.5575 17.7665C30.5831 17.8143 30.633 17.9104 30.7102 18.0458C30.8655 18.3174 31.1216 18.7453 31.4766 19.2775C32.1945 20.3544 33.271 21.7882 34.6849 23.202C37.5522 26.0694 41.2976 28.387 46 28.387V43.0537C36.0357 43.0537 28.7811 38.0379 24.3151 33.5719C24.2078 33.4646 24.1047 33.3543 24 33.2473C23.8953 33.3543 23.7922 33.4646 23.6849 33.5719C19.2189 38.0379 11.9642 43.0537 2 43.0537V28.387C6.70245 28.387 10.4478 26.0694 13.3151 23.202C14.7289 21.7882 15.8055 20.3544 16.5234 19.2775C16.8783 18.7453 17.1345 18.3174 17.2897 18.0458C17.367 17.9104 17.417 17.8143 17.4425 17.7665L17.4568 17.7426L24 4.65625L30.5384 17.7331ZM17.4449 17.7641L17.4425 17.7665L17.4496 17.7569C17.4485 17.7593 17.4462 17.7614 17.4449 17.7641ZM30.5575 17.7665L30.555 17.7641C30.5538 17.7614 30.5516 17.7593 30.5504 17.7569L30.5575 17.7665Z',
-    ],
-  },
-  'icons/units/tank.svg': {
-    viewBox: 48,
-    mode: 'fill',
-    paths: [
-      'M41 25.7547C41 36.6814 33.5625 42.1448 24.7225 45.3135C24.2596 45.4748 23.7568 45.4671 23.2988 45.2917C14.4375 42.1448 7 36.6814 7 25.7547V10.4572C11.6263 8.37169 24 1.71484 24 1.71484C24 1.71484 36.3736 8.37209 41 10.4572V25.7547Z',
-    ],
-  },
-  'icons/units/artillery.svg': {
-    viewBox: 48,
-    mode: 'fill',
-    paths: [
-      'M18.5 15V4H29.5V15H35L24 26L13 15H18.5Z',
-      'M7.5 34V23H13L18.5 28.5V34H24L13 45L2 34H7.5Z',
-      'M40.5 34V23H35L29.5 28.5V34H24L35 45L46 34H40.5Z',
-    ],
-  },
-};
+const iconDefsCache: Record<string, IconDef> = {};
+
+export async function loadIconDefs(iconPaths: string[]): Promise<void> {
+  const unique = [...new Set(iconPaths.filter((p): p is string => !!p))];
+  await Promise.all(unique.map(async (iconPath) => {
+    if (iconDefsCache[iconPath]) return;
+    try {
+      const res = await fetch(`public/${iconPath}`);
+      const text = await res.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'image/svg+xml');
+      const svgRoot = doc.querySelector('svg');
+      if (!svgRoot) return;
+      const vb = svgRoot.getAttribute('viewBox')?.split(/[\s,]+/).map(Number) ?? [];
+      const viewBox = vb.length >= 3 ? vb[2] : 48;
+      const pathEls = Array.from(doc.querySelectorAll('path'));
+      const paths = pathEls.map(p => p.getAttribute('d')).filter((d): d is string => !!d);
+      const mode: 'fill' | 'stroke' = pathEls.some(p => {
+        const s = p.getAttribute('stroke');
+        return !!s && s !== 'none';
+      }) && !pathEls.some(p => {
+        const f = p.getAttribute('fill');
+        return !!f && f !== 'none';
+      }) ? 'stroke' : 'fill';
+      iconDefsCache[iconPath] = { viewBox, mode, paths };
+    } catch (e) {
+      console.warn(`[renderer] Failed to load icon: ${iconPath}`, e);
+    }
+  }));
+}
 
 function inlineIcon(iconSrc: string | undefined, x: number, y: number, size: number, color: string, opacity: string): SVGGElement | null {
   if (!iconSrc) return null;
-  const def = SVG_ICON_DEFS[iconSrc];
+  const def = iconDefsCache[iconSrc];
   if (!def) return null;
   const scale = size / def.viewBox;
   const g = svgEl('g');
