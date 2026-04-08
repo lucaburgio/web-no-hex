@@ -53,8 +53,8 @@ const config: GameConfig = {
   startingUnitsPlayer2: 3,
 
   // Breakthrough: number of units each role starts with
-  startingUnitsDefender: 3,
-  startingUnitsAttacker: 3,
+  startingUnitsDefender: 6,
+  startingUnitsAttacker: 6,
 
   // Hexagon size (radius in pixels)
   hexSize: 40,
@@ -102,8 +102,8 @@ const config: GameConfig = {
       name: 'Artillery',
       cost: 34,
       movement: 1,
-      maxHp: 10,
-      strength: 9,
+      maxHp: 9,
+      strength: 8,
       range: 3,
       icon: 'icons/artillery.svg',
     },

@@ -491,7 +491,7 @@ body {
 }
 .unit-card.disabled {
   opacity: 0.38;
-  cursor: not-allowed;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 
 .unit-card-header {
