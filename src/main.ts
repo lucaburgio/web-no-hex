@@ -2649,7 +2649,14 @@ pauseReturnBtn.addEventListener('click', () => {
   closeLobbyWs();
   hideGameEndScreen();
   hideUnitPicker();
-  showMainMenu();
+  if (activeStoryIndex !== null) {
+    restoreConfigAfterStory();
+    buildStoriesList();
+    storiesOverlayEl.classList.remove('hidden');
+  } else {
+    setActiveUnitPackage(null);
+    showMainMenu();
+  }
 });
 
 pauseContinueBtn.addEventListener('click', () => {
