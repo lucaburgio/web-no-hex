@@ -1,5 +1,5 @@
 import { getNeighbors, hexDistance } from './hex';
-import config from './gameconfig';
+import config, { getAvailableUnitTypes } from './gameconfig';
 import type {
   Unit,
   UnitType,
@@ -10,6 +10,7 @@ import type {
   Owner,
   AiAnimStep,
   GameMode,
+  StoryDef,
 } from './types';
 
 function perfEnabled(): boolean {
@@ -1323,6 +1324,67 @@ export function createInitialState(): GameState {
   };
 }
 
+// ── Story state ───────────────────────────────────────────────────────────────
+
+/**
+ * Creates a GameState from a story definition, using its fixed map layout.
+ * Call updateConfig + syncDimensions before this so COLS/ROWS are correct.
+ */
+export function createStoryState(story: StoryDef): GameState {
+  unitIdCounter = 0;
+  const units: Unit[] = [];
+
+  for (const pos of story.map.playerStart) {
+    units.push(makeUnit(PLAYER, pos.col, ROWS - 1, pos.unitTypeId ?? 'infantry'));
+  }
+  for (const pos of story.map.aiStart) {
+    units.push(makeUnit(AI, pos.col, 0, pos.unitTypeId ?? 'infantry'));
+  }
+
+  const hexStates: Record<string, HexState> = {};
+  for (const u of units) {
+    hexStates[`${u.col},${u.row}`] = { owner: u.owner, stableFor: 0, isProduction: false };
+  }
+
+  const mountainHexes = [...story.map.mountains];
+  const controlPointHexes = story.map.controlPoints ? [...story.map.controlPoints] : [];
+
+  const conquestPoints =
+    story.gameMode === 'conquest'
+      ? ({
+          [PLAYER]: story.conquestPointsPlayer ?? config.conquestPointsPlayer,
+          [AI]: story.conquestPointsAi ?? config.conquestPointsAi,
+        } as Record<Owner, number>)
+      : null;
+
+  const ppTurn = story.productionPointsPerTurn ?? config.productionPointsPerTurn;
+  const playerHexCount = Object.values(hexStates).filter(h => h.owner === PLAYER).length;
+  const aiHexCount = Object.values(hexStates).filter(h => h.owner === AI).length;
+  const ppPlayer = ppTurn + territoryBonusForHexCount(playerHexCount);
+  const ppAi = ppTurn + territoryBonusForHexCount(aiHexCount);
+
+  return {
+    units,
+    hexStates,
+    mountainHexes,
+    gameMode: story.gameMode,
+    controlPointHexes,
+    conquestPoints,
+    sectorHexes: [],
+    sectorOwners: [],
+    sectorControlPointHex: [],
+    breakthroughCpOccupation: [],
+    sectorIndexByHex: {},
+    turn: 1,
+    phase: 'production',
+    activePlayer: PLAYER,
+    selectedUnit: null,
+    productionPoints: { [PLAYER]: ppPlayer, [AI]: ppAi } as Record<Owner, number>,
+    log: [`Story mission started. Your turn — Production phase.`],
+    winner: null,
+  };
+}
+
 // ── Production ────────────────────────────────────────────────────────────────
 
 export function playerPlaceUnit(state: GameState, col: number, row: number, unitTypeId: string, localPlayer: Owner = PLAYER): GameState {
@@ -1520,7 +1582,7 @@ export function aiProduction(state: GameState): GameState {
   const distToGoalMap = buildDistanceToOpponentHomeRowMap(state, AI);
   const hasHomeAccess = hasHomeProductionAccess(state, AI);
   while (true) {
-    const affordable = config.unitTypes.filter(t => state.productionPoints[AI] >= t.cost);
+    const affordable = getAvailableUnitTypes().filter(t => state.productionPoints[AI] >= t.cost);
     if (affordable.length === 0) {
       if (placed === 0) log(state, 'AI: not enough production points.');
       break;

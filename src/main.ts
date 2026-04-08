@@ -1,5 +1,6 @@
 import {
   createInitialState,
+  createStoryState,
   playerPlaceUnit,
   playerEndProduction,
   playerSelectUnit,
@@ -45,7 +46,18 @@ import type { MoveAnimation } from './renderer';
 import config from './gameconfig';
 import type { GameState, Unit, CombatForecast, Owner, CombatVfxPayload, GameMode } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
-import { updateConfig } from './gameconfig';
+import { updateConfig, setActiveUnitPackage, getAvailableUnitTypes } from './gameconfig';
+import { STORIES } from './stories';
+import {
+  loadStoryProgress,
+  saveStoryProgress,
+  loadStoryGameState,
+  saveStoryGameState,
+  hasStoryGameState,
+  clearStoryGameState,
+  setLastSessionType,
+  getLastSessionType,
+} from './storyStorage';
 import { syncDimensions } from './game';
 import {
   hideGameEndScreen,
@@ -208,8 +220,15 @@ function positionFixedTooltipBelow(tooltip: HTMLElement, anchor: DOMRect): void 
 const mainMenuOverlayEl    = document.getElementById('main-menu-overlay') as HTMLDivElement;
 const menuContinueBtn      = document.getElementById('menu-continue-btn') as HTMLButtonElement;
 const menuNewGameBtn       = document.getElementById('menu-new-game-btn') as HTMLButtonElement;
+const menuStoriesBtn       = document.getElementById('menu-stories-btn') as HTMLButtonElement;
 const menuHostBtn          = document.getElementById('menu-host-btn') as HTMLButtonElement;
 const menuJoinBtn          = document.getElementById('menu-join-btn') as HTMLButtonElement;
+
+// ── Stories DOM refs ──────────────────────────────────────────────────────────
+
+const storiesOverlayEl = document.getElementById('stories-overlay') as HTMLDivElement;
+const storiesListEl    = document.getElementById('stories-list') as HTMLDivElement;
+const storiesBackBtn   = document.getElementById('stories-back-btn') as HTMLButtonElement;
 const newGameConfirmOverlay = document.getElementById('new-game-confirm-overlay') as HTMLDivElement;
 const confirmNewGameBtn    = document.getElementById('confirm-new-game-btn') as HTMLButtonElement;
 const cancelNewGameBtn     = document.getElementById('cancel-new-game-btn') as HTMLButtonElement;
@@ -241,6 +260,19 @@ let gameMode: 'vsAI' | 'vsHuman' = 'vsAI';
 let localPlayer: Owner = PLAYER;
 let ws: WebSocket | null = null;
 
+/** Index into STORIES array when playing a story, null otherwise. */
+let activeStoryIndex: number | null = null;
+
+/** Config values to restore after leaving story mode. */
+const STORY_CONFIG_DEFAULTS = {
+  boardCols: config.boardCols,
+  boardRows: config.boardRows,
+  productionPointsPerTurn: config.productionPointsPerTurn,
+  conquestPointsPlayer: config.conquestPointsPlayer,
+  conquestPointsAi: config.conquestPointsAi,
+};
+let storyConfigSnapshot: typeof STORY_CONFIG_DEFAULTS | null = null;
+
 let state: GameState = createInitialState();
 let pendingProductionHex: { col: number; row: number } | null = null;
 let isAnimating = false;
@@ -259,7 +291,11 @@ function scheduleSaveGameState(): void {
   // Defer serialization to keep phase transitions responsive on large boards.
   saveStateTimer = window.setTimeout(() => {
     saveStateTimer = null;
-    saveGameState(state);
+    if (activeStoryIndex !== null) {
+      saveStoryGameState(state);
+    } else {
+      saveGameState(state);
+    }
   }, 0);
 }
 
@@ -456,7 +492,7 @@ function syncGuestIdentityColors(): void {
 function showMainMenu(): void {
   clearGuestIdentityColorOverrides();
   mainMenuOverlayEl.classList.remove('hidden');
-  if (hasSaveGame()) {
+  if (hasSaveGame() || hasStoryGameState()) {
     menuContinueBtn.classList.remove('hidden');
   } else {
     menuContinueBtn.classList.add('hidden');
@@ -467,12 +503,173 @@ function hideMainMenu(): void {
   mainMenuOverlayEl.classList.add('hidden');
 }
 
+// ── Stories ───────────────────────────────────────────────────────────────────
+
+function showStoriesOverlay(): void {
+  hideMainMenu();
+  buildStoriesList();
+  storiesOverlayEl.classList.remove('hidden');
+}
+
+function hideStoriesOverlay(): void {
+  storiesOverlayEl.classList.add('hidden');
+}
+
+function buildStoriesList(): void {
+  const progress = loadStoryProgress();
+  storiesListEl.innerHTML = '';
+
+  STORIES.forEach((story, index) => {
+    if (index > progress.reachedIndex) return;
+
+    const isCompleted = progress.completedIds.includes(story.id);
+    const hasSave = progress.activeStoryId === story.id && hasStoryGameState();
+
+    const card = document.createElement('div');
+    card.className = 'story-card' + (isCompleted ? ' story-completed' : '');
+
+    const info = document.createElement('div');
+    info.className = 'story-card-info';
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'story-card-title-row';
+
+    if (isCompleted || hasSave) {
+      const statusIcon = document.createElement('span');
+      statusIcon.className = 'story-status-icon';
+      statusIcon.textContent = isCompleted ? '✓' : '→';
+      titleRow.appendChild(statusIcon);
+    }
+
+    const titleEl = document.createElement('span');
+    titleEl.className = 'story-card-title';
+    titleEl.textContent = story.title;
+    titleRow.appendChild(titleEl);
+    info.appendChild(titleRow);
+
+    const descEl = document.createElement('p');
+    descEl.className = 'story-card-desc';
+    descEl.textContent = story.description;
+    info.appendChild(descEl);
+
+    if (story.unitPackage) {
+      const badge = document.createElement('span');
+      badge.className = 'story-package-badge';
+      badge.textContent = story.unitPackage;
+      info.appendChild(badge);
+    }
+
+    const playBtn = document.createElement('button');
+    playBtn.className = 'menu-btn story-play-btn';
+    playBtn.textContent = hasSave ? 'CONTINUE' : isCompleted ? 'REPLAY' : 'PLAY';
+
+    playBtn.addEventListener('click', () => {
+      if (hasSave) {
+        const savedState = loadStoryGameState();
+        if (savedState) {
+          startStory(index, savedState);
+          return;
+        }
+      }
+      startStory(index);
+    });
+
+    card.appendChild(info);
+    card.appendChild(playBtn);
+    storiesListEl.appendChild(card);
+  });
+}
+
+function restoreConfigAfterStory(): void {
+  const snapshot = storyConfigSnapshot ?? STORY_CONFIG_DEFAULTS;
+  updateConfig(snapshot);
+  syncDimensions();
+  storyConfigSnapshot = null;
+  setActiveUnitPackage(null);
+  activeStoryIndex = null;
+}
+
+function handleStoryWin(): void {
+  const story = STORIES[activeStoryIndex!]!;
+  const progress = loadStoryProgress();
+  if (!progress.completedIds.includes(story.id)) {
+    progress.completedIds.push(story.id);
+  }
+  const nextIndex = activeStoryIndex! + 1;
+  if (nextIndex < STORIES.length && nextIndex > progress.reachedIndex) {
+    progress.reachedIndex = nextIndex;
+  }
+  progress.activeStoryId = null;
+  saveStoryProgress(progress);
+  clearStoryGameState();
+}
+
+function startStory(storyIndex: number, savedState?: GameState): void {
+  const story = STORIES[storyIndex]!;
+
+  storyConfigSnapshot = {
+    boardCols: config.boardCols,
+    boardRows: config.boardRows,
+    productionPointsPerTurn: config.productionPointsPerTurn,
+    conquestPointsPlayer: config.conquestPointsPlayer,
+    conquestPointsAi: config.conquestPointsAi,
+  };
+
+  updateConfig({
+    boardCols: story.map.cols,
+    boardRows: story.map.rows,
+    ...(story.productionPointsPerTurn !== undefined ? { productionPointsPerTurn: story.productionPointsPerTurn } : {}),
+    ...(story.conquestPointsPlayer !== undefined ? { conquestPointsPlayer: story.conquestPointsPlayer } : {}),
+    ...(story.conquestPointsAi !== undefined ? { conquestPointsAi: story.conquestPointsAi } : {}),
+  });
+  syncDimensions();
+  setActiveUnitPackage(story.unitPackage ?? null);
+
+  activeStoryIndex = storyIndex;
+
+  const progress = loadStoryProgress();
+  progress.activeStoryId = story.id;
+  saveStoryProgress(progress);
+  setLastSessionType('story');
+
+  const initialState = savedState ?? createStoryState(story);
+
+  gameMode = 'vsAI';
+  localPlayer = PLAYER;
+  hideStoriesOverlay();
+  startGame(initialState);
+}
+
+menuStoriesBtn.addEventListener('click', () => {
+  showStoriesOverlay();
+});
+
+storiesBackBtn.addEventListener('click', () => {
+  hideStoriesOverlay();
+  showMainMenu();
+});
+
 menuContinueBtn.addEventListener('click', () => {
+  const lastSession = getLastSessionType();
+  if (lastSession === 'story') {
+    const progress = loadStoryProgress();
+    const storyIdx = progress.activeStoryId
+      ? STORIES.findIndex(s => s.id === progress.activeStoryId)
+      : -1;
+    const savedStoryState = hasStoryGameState() ? loadStoryGameState() : null;
+    if (storyIdx >= 0 && savedStoryState) {
+      hideMainMenu();
+      startStory(storyIdx, savedStoryState);
+      return;
+    }
+  }
+  // Fall back to vsAI save
   const saved = loadGameState();
   if (!saved) { showMainMenu(); return; }
   hideMainMenu();
   gameMode = 'vsAI';
   localPlayer = PLAYER;
+  setLastSessionType('vsAI');
   startGame(saved);
 });
 
@@ -484,6 +681,7 @@ menuNewGameBtn.addEventListener('click', () => {
     showSettings(() => {
       gameMode = 'vsAI';
       localPlayer = PLAYER;
+      setLastSessionType('vsAI');
       startGame(createInitialState());
     });
   }
@@ -496,6 +694,7 @@ confirmNewGameBtn.addEventListener('click', () => {
   showSettings(() => {
     gameMode = 'vsAI';
     localPlayer = PLAYER;
+    setLastSessionType('vsAI');
     startGame(createInitialState());
   });
 });
@@ -943,6 +1142,7 @@ introContinueBtn.addEventListener('click', () => {
     introOverlayEl.classList.add('hidden');
     gameMode = 'vsAI';
     localPlayer = PLAYER;
+    setLastSessionType('vsAI');
     startGame(createInitialState());
   }
 });
@@ -1307,7 +1507,7 @@ function showUnitPicker(col: number, row: number): void {
   const statIconStr = 'public/icons/strength.svg';
   const statIconHp = 'public/icons/hp.svg';
 
-  config.unitTypes.forEach((unitType, cardIndex) => {
+  getAvailableUnitTypes().forEach((unitType, cardIndex) => {
     const canAfford = state.productionPoints[localPlayer] >= unitType.cost;
 
     const card = document.createElement('div');
@@ -2028,7 +2228,13 @@ function leaveEndGameToMainMenu(): void {
   closeLobbyWs();
   hideGameEndScreen();
   hideUnitPicker();
-  showMainMenu();
+  if (activeStoryIndex !== null) {
+    restoreConfigAfterStory();
+    buildStoriesList();
+    storiesOverlayEl.classList.remove('hidden');
+  } else {
+    showMainMenu();
+  }
 }
 
 gameEndRestartBtn.addEventListener('click', leaveEndGameToMainMenu);
@@ -2036,7 +2242,7 @@ gameEndRestartBtn.addEventListener('click', leaveEndGameToMainMenu);
 // ── Auto-end helpers ──────────────────────────────────────────────────────────
 
 function canAffordAnyUnit(): boolean {
-  return config.unitTypes.some(u => state.productionPoints[localPlayer] >= u.cost);
+  return getAvailableUnitTypes().some(u => state.productionPoints[localPlayer] >= u.cost);
 }
 
 function hasAnyValidMove(): boolean {
@@ -2232,6 +2438,9 @@ function updateUI(): void {
 function checkWinner(): void {
   if (!state.winner) return;
   showGameEndScreenForOutcome(state.winner === localPlayer);
+  if (activeStoryIndex !== null && state.winner === localPlayer) {
+    handleStoryWin();
+  }
 }
 
 // ── Combat forecast tooltip ───────────────────────────────────────────────────

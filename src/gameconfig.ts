@@ -1,5 +1,18 @@
 import type { GameConfig, GameMode, UnitType } from './types';
 
+let _activeUnitPackage: string | null = null;
+
+/** Set the active story unit package. Only units with this package will be available for production. Null = all units. */
+export function setActiveUnitPackage(pkg: string | null): void {
+  _activeUnitPackage = pkg;
+}
+
+/** Returns unit types available for production. Filtered by active story package if set. */
+export function getAvailableUnitTypes(): UnitType[] {
+  if (_activeUnitPackage === null) return config.unitTypes;
+  return config.unitTypes.filter(u => u.package === _activeUnitPackage);
+}
+
 type UnitTypePatches = {
   infantryCost?: number;
   infantryMaxHp?: number;
@@ -86,6 +99,7 @@ const config: GameConfig = {
       maxHp: 10,
       strength: 10,
       icon: 'icons/infantry.svg',
+      package: 'infantry',
     },
     {
       id: 'tank',
@@ -96,6 +110,7 @@ const config: GameConfig = {
       strength: 11,
       extraFlanking: 0.05,
       icon: 'icons/tank.svg',
+      package: 'armored',
     },
     {
       id: 'artillery',
@@ -106,6 +121,7 @@ const config: GameConfig = {
       strength: 8,
       range: 3,
       icon: 'icons/artillery.svg',
+      package: 'armored',
     },
   ],
 

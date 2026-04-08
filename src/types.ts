@@ -125,6 +125,42 @@ export interface UnitType {
   /** If set, unit may attack enemies at this hex distance (2..range) without moving (ranged). */
   range?: number;
   icon?: string;
+  /** Story unit package this unit belongs to. In story mode only units matching the story's unitPackage are available. */
+  package?: string;
+}
+
+export interface StoryMapDef {
+  cols: number;
+  rows: number;
+  /** Hex keys "col,row" that are impassable mountains. */
+  mountains: string[];
+  playerStart: Array<{ col: number; unitTypeId?: string }>;
+  aiStart: Array<{ col: number; unitTypeId?: string }>;
+  /** Hex keys "col,row" for conquest control points. */
+  controlPoints?: string[];
+}
+
+export interface StoryDef {
+  id: string;
+  title: string;
+  description: string;
+  /** Only unit types with this package are available. Undefined = all units. */
+  unitPackage?: string;
+  gameMode: GameMode;
+  map: StoryMapDef;
+  conquestPointsPlayer?: number;
+  conquestPointsAi?: number;
+  /** Override production points per turn for both sides. */
+  productionPointsPerTurn?: number;
+}
+
+export interface StoryProgress {
+  /** Highest story index unlocked (0 = first story available). */
+  reachedIndex: number;
+  /** IDs of completed stories. */
+  completedIds: string[];
+  /** ID of the story currently in progress (has a saved game state). */
+  activeStoryId: string | null;
 }
 
 export interface GameConfig {
