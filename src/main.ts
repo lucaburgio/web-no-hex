@@ -2432,8 +2432,12 @@ function updateUI(): void {
     const cp = state.conquestPoints!;
     const youCp = localPlayer === PLAYER ? cp[PLAYER] : cp[AI];
     const oppCp = localPlayer === PLAYER ? cp[AI] : cp[PLAYER];
-    playerConquerPctEl.textContent = String(youCp);
-    aiConquerPctEl.textContent     = String(oppCp);
+    const totalHexes = COLS * ROWS;
+    const oppOwner = localPlayer === PLAYER ? AI : PLAYER;
+    const localTerPct = Math.round(Object.values(state.hexStates).filter(h => h.owner === localPlayer).length / totalHexes * 100);
+    const oppTerPct   = Math.round(Object.values(state.hexStates).filter(h => h.owner === oppOwner).length / totalHexes * 100);
+    playerConquerPctEl.textContent = `(${localTerPct}%) ${youCp}`;
+    aiConquerPctEl.textContent     = `${oppCp} (${oppTerPct}%)`;
     const sum = youCp + oppCp;
     localPct = youCp;
     opponentPct = oppCp;

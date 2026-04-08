@@ -232,6 +232,7 @@ body {
   font-weight: bold;
   color: #23251E;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .conquer-pct.conquest-cp-leader {
