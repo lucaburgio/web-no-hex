@@ -1313,7 +1313,7 @@ function buildRulesContent(): string {
         The first side reduced to <strong>0</strong> Conquer Points loses.
         You also lose immediately if you have <strong>no units</strong> and <strong>no owned territory</strong> (even if your Conquer Points are still above 0).
         Reaching the opponent&rsquo;s home row alone does <strong>not</strong> end the match.
-        If both sides hit 0 Conquer Points in the same tick, or both are totally eliminated from the map at once, the <strong>northern</strong> player wins the tie.</li>
+        If both sides hit 0 Conquer Points in the same tick, the side with more <strong>owned hexes</strong> wins; if hex counts are also equal, the <strong>northern</strong> player wins the tie. Both sides totally eliminated from the map at once → northern player wins.</li>
       <li><strong>Breakthrough:</strong> the map is split into <strong>${config.breakthroughSectorCount}</strong> sectors (configurable, south to north). In <strong>Game settings</strong> you can set whether <strong>player 1</strong> (south / host) is <strong>attacker</strong> or <strong>defender</strong>, or enable <strong>random role</strong> to pick at match start. The <strong>attacker</strong> starts with <strong>${config.breakthroughAttackerStartingPP} PP</strong> and earns <strong>no further PP</strong>; the <strong>defender</strong> earns the usual per-turn PP plus territory bonus.
         The attacker&rsquo;s <strong>home sector</strong> (south if player 1 is attacker, north if player 1 is defender) has no control point. Only the <strong>frontline defender sector on the attacker-facing border</strong> shows a control point at a time. To capture that sector, the attacker must keep a unit on its control point for <strong>two full rounds</strong> (checked after both sides move). When a sector is captured, the marker is removed, <strong>every hex in that sector</strong> becomes attacker territory, and the next defender-border sector&rsquo;s control point appears. The attacker also gains <strong>+${config.breakthroughSectorCaptureBonusPP} PP</strong> (configurable; 0 to disable).
         After that, the defender <strong>cannot regain those hexes</strong> — they may still fight and move there, but hex ownership stays with the attacker. The sector itself also <strong>never</strong> flips back politically.
@@ -1446,6 +1446,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
       render();
       updateUI();
       checkWinner();
+      sendStateUpdate(); // sync post-cleanup state (conquest points, winner) to guest
       maybeAutoEnd();
     });
   } else if (msg.type === 'state-update') {

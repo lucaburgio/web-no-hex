@@ -1015,8 +1015,15 @@ function checkVictory(state: GameState): void {
     }
 
     if (cp[AI] <= 0 && cp[PLAYER] <= 0) {
-      state.winner = AI;
-      log(state, 'Both sides reached 0 Conquer Points — tie goes to the northern player.');
+      const playerHexes = Object.values(state.hexStates).filter(h => h.owner === PLAYER).length;
+      const aiHexes = Object.values(state.hexStates).filter(h => h.owner === AI).length;
+      if (playerHexes > aiHexes) {
+        state.winner = PLAYER;
+        log(state, `Both sides reached 0 Conquer Points — player wins on territory (${playerHexes} vs ${aiHexes} hexes).`);
+      } else {
+        state.winner = AI;
+        log(state, `Both sides reached 0 Conquer Points — northern player wins on territory (${aiHexes} vs ${playerHexes} hexes).`);
+      }
       return;
     }
     if (cp[AI] <= 0) state.winner = PLAYER;
