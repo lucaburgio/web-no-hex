@@ -3,6 +3,41 @@ import { hexPoints } from './hex';
 
 const EDITOR_HEX_SIZE = 34;
 
+// ── Sector helpers (breakthrough mode) ───────────────────────────────────────
+
+const SECTOR_COLORS: [number, number, number][] = [
+  [60,  100, 220],
+  [220, 150,  30],
+  [ 40, 170,  80],
+  [190,  60,  90],
+  [130,  50, 210],
+  [ 30, 160, 160],
+];
+
+function sectorTint(idx: number): string {
+  const [r, g, b] = SECTOR_COLORS[idx % SECTOR_COLORS.length];
+  return `rgba(${r},${g},${b},0.09)`;
+}
+
+function sectorLabelColor(idx: number): string {
+  const [r, g, b] = SECTOR_COLORS[idx % SECTOR_COLORS.length];
+  return `rgba(${r},${g},${b},0.65)`;
+}
+
+/** Returns the starting row index for each sector (sorted north-to-south, sector 0 = topmost). */
+function computeSectorStarts(rows: number, numSectors: number): number[] {
+  return Array.from({ length: numSectors }, (_, k) => Math.floor(k * rows / numSectors));
+}
+
+/** Returns which sector index (0 = topmost) a given row belongs to. */
+function getHexSector(row: number, sectorStarts: number[]): number {
+  let sector = 0;
+  for (let i = 1; i < sectorStarts.length; i++) {
+    if (row >= sectorStarts[i]) sector = i;
+  }
+  return sector;
+}
+
 type EditorGameMode = 'domination' | 'conquest' | 'breakthrough';
 type EditorTool = string; // 'normal' | 'mountain' | 'controlPoint' | 'player:TYPE' | 'ai:TYPE'
 
@@ -247,9 +282,17 @@ function renderBoard(): void {
   const totalW = cols * hexW + hexW * 0.5;
   const totalH = (rows - 1) * s * 1.5 + s * 2;
 
-  svgEl.setAttribute('width', String(Math.ceil(totalW + 2 * margin)));
+  // Sector computation — breakthrough mode only, requires at least one CP
+  const showSectors = edState.gameMode === 'breakthrough' && edState.controlPoints.size > 0;
+  const numSectors  = showSectors ? edState.controlPoints.size + 1 : 0;
+  const sectorStarts = showSectors ? computeSectorStarts(rows, numSectors) : [];
+
+  // Extra left margin to accommodate sector labels
+  const leftMargin = showSectors ? s * 2.8 : margin;
+
+  svgEl.setAttribute('width', String(Math.ceil(totalW + leftMargin + margin)));
   svgEl.setAttribute('height', String(Math.ceil(totalH + 2 * margin)));
-  svgEl.setAttribute('viewBox', `${-margin} ${-margin} ${totalW + 2 * margin} ${totalH + 2 * margin}`);
+  svgEl.setAttribute('viewBox', `${-leftMargin} ${-margin} ${totalW + leftMargin + margin} ${totalH + 2 * margin}`);
   svgEl.innerHTML = '';
 
   const hlPlayer = edState.activeTool.startsWith('player:');
@@ -292,6 +335,16 @@ function renderBoard(): void {
       poly.setAttribute('stroke-width', strokeW);
       g.appendChild(poly);
 
+      // Sector tint overlay (drawn on top of base fill, below labels)
+      if (showSectors) {
+        const sector = getHexSector(row, sectorStarts);
+        const tint = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        tint.setAttribute('points', hexPoints(x, y, s));
+        tint.setAttribute('fill', sectorTint(sector));
+        tint.style.pointerEvents = 'none';
+        g.appendChild(tint);
+      }
+
       if (isMtn) {
         addTxt(g, x, y, '▲', s * 0.42, '#fff');
       }
@@ -326,6 +379,56 @@ function renderBoard(): void {
 
       svgEl.appendChild(g);
     }
+  }
+
+  if (showSectors) {
+    renderSectorOverlay(rows, cols, sectorStarts, numSectors, s, leftMargin);
+  }
+}
+
+function renderSectorOverlay(
+  rows: number, cols: number,
+  sectorStarts: number[], numSectors: number,
+  hexSize: number, leftMargin: number,
+): void {
+  const hexW = hexSize * Math.sqrt(3);
+
+  // Dashed boundary lines between sectors
+  for (let k = 1; k < numSectors; k++) {
+    const bRow = sectorStarts[k];
+    const lineY = (hexToPixelLocal(0, bRow - 1).y + hexToPixelLocal(0, bRow).y) / 2;
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', String(-hexW * 0.5));
+    line.setAttribute('y1', String(lineY));
+    line.setAttribute('x2', String(cols * hexW + hexW * 0.5));
+    line.setAttribute('y2', String(lineY));
+    line.setAttribute('stroke', 'rgba(0,0,0,0.22)');
+    line.setAttribute('stroke-width', '1.5');
+    line.setAttribute('stroke-dasharray', '5 4');
+    line.style.pointerEvents = 'none';
+    svgEl.appendChild(line);
+  }
+
+  // Sector labels in the expanded left margin
+  for (let k = 0; k < numSectors; k++) {
+    const startRow = sectorStarts[k];
+    const endRow   = k < numSectors - 1 ? sectorStarts[k + 1] - 1 : rows - 1;
+    const midY     = (hexToPixelLocal(0, startRow).y + hexToPixelLocal(0, endRow).y) / 2;
+    const labelX   = -(leftMargin * 0.55);
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', String(labelX));
+    label.setAttribute('y', String(midY));
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('dominant-baseline', 'central');
+    label.setAttribute('fill', sectorLabelColor(k));
+    label.setAttribute('font-size', String(hexSize * 0.3));
+    label.setAttribute('font-family', 'Disket Mono, monospace');
+    label.setAttribute('font-weight', 'bold');
+    label.textContent = `S${k + 1}`;
+    label.style.pointerEvents = 'none';
+    svgEl.appendChild(label);
   }
 }
 
