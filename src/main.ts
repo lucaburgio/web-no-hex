@@ -230,6 +230,9 @@ const storiesBackBtn   = document.getElementById('stories-back-btn') as HTMLButt
 const newGameConfirmOverlay = document.getElementById('new-game-confirm-overlay') as HTMLDivElement;
 const confirmNewGameBtn    = document.getElementById('confirm-new-game-btn') as HTMLButtonElement;
 const cancelNewGameBtn     = document.getElementById('cancel-new-game-btn') as HTMLButtonElement;
+const storyStartConfirmOverlay = document.getElementById('story-start-confirm-overlay') as HTMLDivElement;
+const confirmStoryStartBtn     = document.getElementById('confirm-story-start-btn') as HTMLButtonElement;
+const cancelStoryStartBtn      = document.getElementById('cancel-story-start-btn') as HTMLButtonElement;
 const introOverlayEl       = document.getElementById('intro-overlay') as HTMLDivElement;
 const introTextEl          = document.getElementById('intro-text') as HTMLParagraphElement;
 const introCursorEl        = document.getElementById('intro-cursor') as HTMLSpanElement;
@@ -260,6 +263,9 @@ let ws: WebSocket | null = null;
 
 /** Index into STORIES array when playing a story, null otherwise. */
 let activeStoryIndex: number | null = null;
+
+/** Story index awaiting start confirmation (overwriting existing save). */
+let pendingStoryStartIndex: number | null = null;
 
 /** Unit package selected in game settings; persists across opens. */
 let settingsUnitPackage = 'standard';
@@ -572,6 +578,12 @@ function buildStoriesList(): void {
           return;
         }
       }
+      // Starting fresh — confirm if another story's save would be overwritten
+      if (hasStoryGameState()) {
+        pendingStoryStartIndex = index;
+        storyStartConfirmOverlay.classList.remove('hidden');
+        return;
+      }
       startStory(index);
     });
 
@@ -632,6 +644,10 @@ function startStory(storyIndex: number, savedState?: GameState): void {
   progress.activeStoryId = story.id;
   saveStoryProgress(progress);
 
+  if (!savedState) {
+    clearStoryGameState();
+  }
+
   const initialState = savedState ?? createStoryState(story);
 
   gameMode = 'vsAI';
@@ -684,6 +700,19 @@ confirmNewGameBtn.addEventListener('click', () => {
 
 cancelNewGameBtn.addEventListener('click', () => {
   newGameConfirmOverlay.classList.add('hidden');
+});
+
+confirmStoryStartBtn.addEventListener('click', () => {
+  storyStartConfirmOverlay.classList.add('hidden');
+  if (pendingStoryStartIndex !== null) {
+    startStory(pendingStoryStartIndex);
+    pendingStoryStartIndex = null;
+  }
+});
+
+cancelStoryStartBtn.addEventListener('click', () => {
+  storyStartConfirmOverlay.classList.add('hidden');
+  pendingStoryStartIndex = null;
 });
 
 menuHostBtn.addEventListener('click', () => {

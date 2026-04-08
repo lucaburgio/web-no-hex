@@ -1287,7 +1287,8 @@ select.settings-input.settings-select option {
 }
 
 /* ── New game confirm modal ────────────────────────────────────────────────── */
-#new-game-confirm-overlay {
+#new-game-confirm-overlay,
+#story-start-confirm-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.5);
@@ -1296,9 +1297,11 @@ select.settings-input.settings-select option {
   justify-content: center;
   z-index: 50;
 }
-#new-game-confirm-overlay.hidden { display: none; }
+#new-game-confirm-overlay.hidden,
+#story-start-confirm-overlay.hidden { display: none; }
 
-#new-game-confirm-modal {
+#new-game-confirm-modal,
+#story-start-confirm-modal {
   background: var(--color-bg);
   padding: 48px;
   display: flex;
