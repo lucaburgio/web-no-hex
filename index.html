@@ -74,6 +74,7 @@
       <button id="menu-stories-btn" class="menu-btn">STORIES</button>
       <button id="menu-host-btn" class="menu-btn">HOST GAME</button>
       <button id="menu-join-btn" class="menu-btn">JOIN GAME</button>
+      <button id="menu-map-editor-btn" class="menu-btn">MAP EDITOR</button>
       <p class="menu-version-text">v0.1 — BETA</p>
     </div>
   </div>
@@ -91,6 +92,56 @@
         <!-- Populated by JS -->
       </div>
     </div>
+  </div>
+
+  <!-- Map Editor overlay -->
+  <div id="map-editor-overlay" class="hidden">
+    <div id="map-editor-canvas-area">
+      <svg id="map-editor-board"></svg>
+    </div>
+    <div id="map-editor-right">
+      <div id="map-editor-title">MAP<br>EDITOR</div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">MAP SIZE</div>
+        <div class="settings-row">
+          <label class="settings-label" for="me-cols">Width</label>
+          <input class="settings-input" type="number" id="me-cols" min="2" max="24" value="8" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="me-rows">Height</label>
+          <input class="settings-input" type="number" id="me-rows" min="2" max="24" value="8" />
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">GAME MODE</div>
+        <div class="settings-row">
+          <label class="settings-label" for="me-game-mode">Mode</label>
+          <select class="settings-input settings-select" id="me-game-mode">
+            <option value="domination">Domination</option>
+            <option value="conquest">Conquest</option>
+            <option value="breakthrough">Breakthrough</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">UNIT PACKAGE</div>
+        <div class="settings-row">
+          <label class="settings-label" for="me-unit-package">Package</label>
+          <select class="settings-input settings-select" id="me-unit-package">
+            <option value="">None</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="map-editor-actions">
+        <button id="me-export-btn" class="menu-btn">COPY MAP CODE</button>
+        <button id="me-back-btn" class="menu-btn secondary">BACK</button>
+      </div>
+    </div>
+    <div id="map-editor-toolbar"></div>
   </div>
 
   <!-- Confirm new game (when a save exists) -->

@@ -1712,3 +1712,149 @@ select.settings-input.settings-select option {
   text-transform: none;
   letter-spacing: 0.02em;
 }
+
+/* ── Map Editor overlay ─────────────────────────────────────────────────────── */
+#map-editor-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  z-index: 40;
+  padding-bottom: 72px; /* leave room for floating toolbar */
+}
+#map-editor-overlay.hidden { display: none; }
+
+#map-editor-canvas-area {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px;
+}
+
+#map-editor-board {
+  display: block;
+  flex-shrink: 0;
+}
+
+#map-editor-right {
+  width: 280px;
+  flex-shrink: 0;
+  border-left: 1px solid rgba(0,0,0,0.1);
+  overflow-y: auto;
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+#map-editor-title {
+  font-family: 'Disket Mono', monospace;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--color-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+#map-editor-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: auto;
+}
+
+/* ── Map Editor toolbar ─────────────────────────────────────────────────────── */
+#map-editor-toolbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 72px;
+  background: var(--color-dark);
+  z-index: 41;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  padding: 0 4px;
+}
+#map-editor-toolbar::-webkit-scrollbar { display: none; }
+
+.me-tool-group {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(255,255,255,0.07);
+}
+.me-tool-group:last-child { border-right: none; }
+
+.me-tool-group-label {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.48rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.28);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+.me-tool-group-btns {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  align-items: center;
+}
+
+.me-tool-btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.58);
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 10px;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
+  white-space: nowrap;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+  height: 32px;
+  min-width: 48px;
+}
+.me-tool-btn:hover {
+  border-color: rgba(255,255,255,0.38);
+  color: rgba(255,255,255,0.88);
+}
+.me-tool-btn.me-tool-active {
+  background: var(--color-yellow-500);
+  border-color: var(--color-yellow-500);
+  color: var(--color-dark);
+}
+.me-tool-btn-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+.me-tool-btn.me-tool-active .me-tool-btn-icon {
+  filter: brightness(0);
+  opacity: 1;
+}

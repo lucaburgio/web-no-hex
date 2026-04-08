@@ -66,6 +66,7 @@ import {
   gameEndRestartBtn,
   gameEndRecapBtn,
 } from './gameEndScreen';
+import { initMapEditor, showMapEditor, hideMapEditor } from './mapEditor';
 
 const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
 const WS_URL = `${wsProtocol}//${location.hostname}:3001`;
@@ -221,6 +222,7 @@ const menuNewGameBtn       = document.getElementById('menu-new-game-btn') as HTM
 const menuStoriesBtn       = document.getElementById('menu-stories-btn') as HTMLButtonElement;
 const menuHostBtn          = document.getElementById('menu-host-btn') as HTMLButtonElement;
 const menuJoinBtn          = document.getElementById('menu-join-btn') as HTMLButtonElement;
+const menuMapEditorBtn     = document.getElementById('menu-map-editor-btn') as HTMLButtonElement;
 
 // ── Stories DOM refs ──────────────────────────────────────────────────────────
 
@@ -742,6 +744,18 @@ menuJoinBtn.addEventListener('click', () => {
   lobbyCodeInputEl.value = '';
   lobbyErrorEl.classList.add('hidden');
   lobbyCodeInputEl.focus();
+});
+
+// ── Map Editor ────────────────────────────────────────────────────────────────
+
+initMapEditor(() => {
+  hideMapEditor();
+  showMainMenu();
+});
+
+menuMapEditorBtn.addEventListener('click', () => {
+  hideMainMenu();
+  showMapEditor();
 });
 
 // ── Game settings ────────────────────────────────────────────────────────────
