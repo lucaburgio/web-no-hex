@@ -138,10 +138,24 @@
 
       <div id="map-editor-actions">
         <button id="me-export-btn" class="menu-btn">COPY MAP CODE</button>
+        <button id="me-load-btn" class="menu-btn secondary">LOAD MAP</button>
         <button id="me-back-btn" class="menu-btn secondary">BACK</button>
       </div>
     </div>
     <div id="map-editor-toolbar"></div>
+
+    <!-- Load Map modal -->
+    <div id="me-load-modal-overlay" class="hidden">
+      <div id="me-load-modal">
+        <p class="me-load-hint">Paste a story map definition:</p>
+        <textarea id="me-load-textarea" spellcheck="false" placeholder="{ id: 'my-map', gameMode: 'domination', map: { cols: 8, rows: 8, mountains: [], playerStart: [], aiStart: [] } }"></textarea>
+        <div id="me-load-error" class="hidden"></div>
+        <div class="me-load-actions">
+          <button id="me-load-confirm-btn" class="menu-btn">LOAD</button>
+          <button id="me-load-cancel-btn" class="menu-btn secondary">CANCEL</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Confirm new game (when a save exists) -->

@@ -43,6 +43,9 @@ let gameModeSelect: HTMLSelectElement;
 let unitPackageSelect: HTMLSelectElement;
 let toolbarEl: HTMLDivElement;
 let exportBtn: HTMLButtonElement;
+let loadModalOverlay: HTMLDivElement;
+let loadTextarea: HTMLTextAreaElement;
+let loadErrorEl: HTMLDivElement;
 
 export function initMapEditor(onBack: () => void): void {
   onBackCb = onBack;
@@ -102,7 +105,30 @@ export function initMapEditor(onBack: () => void): void {
     renderBoard();
   });
 
+  loadModalOverlay = document.getElementById('me-load-modal-overlay') as HTMLDivElement;
+  loadTextarea     = document.getElementById('me-load-textarea') as HTMLTextAreaElement;
+  loadErrorEl      = document.getElementById('me-load-error') as HTMLDivElement;
+
   document.getElementById('me-back-btn')!.addEventListener('click', () => onBackCb());
+  document.getElementById('me-load-btn')!.addEventListener('click', () => {
+    loadTextarea.value = '';
+    loadErrorEl.classList.add('hidden');
+    loadErrorEl.textContent = '';
+    loadModalOverlay.classList.remove('hidden');
+    loadTextarea.focus();
+  });
+  document.getElementById('me-load-cancel-btn')!.addEventListener('click', () => {
+    loadModalOverlay.classList.add('hidden');
+  });
+  document.getElementById('me-load-confirm-btn')!.addEventListener('click', () => {
+    const err = applyLoadedCode(loadTextarea.value);
+    if (err) {
+      loadErrorEl.textContent = err;
+      loadErrorEl.classList.remove('hidden');
+    } else {
+      loadModalOverlay.classList.add('hidden');
+    }
+  });
   exportBtn.addEventListener('click', exportToClipboard);
 
   // SVG drag-paint interaction
@@ -360,6 +386,83 @@ function applyTool(e: MouseEvent): void {
   }
 
   renderBoard();
+}
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+
+/** Parse pasted code and populate editor state. Returns an error string or null on success. */
+function applyLoadedCode(raw: string): string | null {
+  const code = raw.trim().replace(/,\s*$/, ''); // strip trailing comma
+  if (!code) return 'Nothing to load.';
+
+  let parsed: Record<string, unknown>;
+  try {
+    // eslint-disable-next-line no-new-func
+    parsed = new Function('return (' + code + ')')() as Record<string, unknown>;
+  } catch (err) {
+    return 'Parse error: ' + (err as Error).message;
+  }
+
+  if (!parsed || typeof parsed !== 'object') return 'Not a valid object.';
+
+  // Accept either a full StoryDef-like object or a bare StoryMapDef
+  const mapDef = (parsed.map && typeof parsed.map === 'object'
+    ? parsed.map
+    : parsed) as Record<string, unknown>;
+
+  const cols = Number(mapDef.cols);
+  const rows = Number(mapDef.rows);
+  if (!Number.isInteger(cols) || cols < 2 || cols > 24) return 'Invalid cols (must be 2–24).';
+  if (!Number.isInteger(rows) || rows < 2 || rows > 24) return 'Invalid rows (must be 2–24).';
+
+  const mountains = new Set<string>(
+    Array.isArray(mapDef.mountains) ? mapDef.mountains.map(String) : []
+  );
+  const controlPoints = new Set<string>(
+    Array.isArray(mapDef.controlPoints) ? mapDef.controlPoints.map(String) : []
+  );
+
+  const playerStart = new Map<number, string>();
+  if (Array.isArray(mapDef.playerStart)) {
+    for (const pos of mapDef.playerStart as Array<{ col?: unknown; unitTypeId?: unknown }>) {
+      if (pos && typeof pos.col === 'number') {
+        playerStart.set(pos.col, typeof pos.unitTypeId === 'string' ? pos.unitTypeId : 'infantry');
+      }
+    }
+  }
+  const aiStart = new Map<number, string>();
+  if (Array.isArray(mapDef.aiStart)) {
+    for (const pos of mapDef.aiStart as Array<{ col?: unknown; unitTypeId?: unknown }>) {
+      if (pos && typeof pos.col === 'number') {
+        aiStart.set(pos.col, typeof pos.unitTypeId === 'string' ? pos.unitTypeId : 'infantry');
+      }
+    }
+  }
+
+  // Commit to state
+  edState.cols = cols;
+  edState.rows = rows;
+  edState.mountains = mountains;
+  edState.controlPoints = controlPoints;
+  edState.playerStart = playerStart;
+  edState.aiStart = aiStart;
+
+  if (typeof parsed.gameMode === 'string') {
+    edState.gameMode = parsed.gameMode as EditorGameMode;
+    gameModeSelect.value = edState.gameMode;
+  }
+  if (typeof parsed.unitPackage === 'string') {
+    edState.unitPackage = parsed.unitPackage;
+    unitPackageSelect.value = edState.unitPackage;
+  }
+
+  colsInput.value = String(cols);
+  rowsInput.value = String(rows);
+
+  edState.activeTool = 'normal';
+  refreshToolbar();
+  renderBoard();
+  return null;
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
