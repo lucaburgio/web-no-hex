@@ -2697,6 +2697,7 @@ svg.addEventListener('mouseleave', () => {
 
 const pauseOverlayEl   = document.getElementById('pause-overlay') as HTMLDivElement;
 const pauseReturnBtn   = document.getElementById('pause-return-btn') as HTMLButtonElement;
+const pauseRestartBtn  = document.getElementById('pause-restart-btn') as HTMLButtonElement;
 const pauseContinueBtn = document.getElementById('pause-continue-btn') as HTMLButtonElement;
 
 pauseReturnBtn.addEventListener('click', () => {
@@ -2714,6 +2715,15 @@ pauseReturnBtn.addEventListener('click', () => {
   }
 });
 
+pauseRestartBtn.addEventListener('click', () => {
+  pauseOverlayEl.classList.add('hidden');
+  if (activeStoryIndex !== null) {
+    startStory(activeStoryIndex);
+  } else {
+    startGame(createInitialState());
+  }
+});
+
 pauseContinueBtn.addEventListener('click', () => {
   pauseOverlayEl.classList.add('hidden');
 });
@@ -2725,6 +2735,7 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
       && recapOverlayEl.classList.contains('hidden');
     if (!inGame) return;
     if (pauseOverlayEl.classList.contains('hidden')) {
+      pauseRestartBtn.hidden = gameMode === 'vsHuman';
       pauseOverlayEl.classList.remove('hidden');
     } else {
       pauseOverlayEl.classList.add('hidden');
