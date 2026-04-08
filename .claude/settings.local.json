@@ -16,7 +16,9 @@
       "Bash(ls /Users/luca/Documents/Git/web-strategic/src/*.css)",
       "Bash(ls /Users/luca/Documents/Git/web-strategic/*.css)",
       "Bash(echo \"exit: $?\")",
-      "Bash(ls -la /Users/luca/Documents/Git/web-strategic/src/*.ts)"
+      "Bash(ls -la /Users/luca/Documents/Git/web-strategic/src/*.ts)",
+      "Bash(grep:*)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

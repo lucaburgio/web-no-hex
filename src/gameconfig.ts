@@ -194,7 +194,7 @@ const config: GameConfig = {
       movement: 1,
       maxHp: 10,
       strength: 10,
-      icon: 'icons/units/infantry.svg',
+      icon: 'icons/units/de-infantry.svg',
       package: 'de-ww2',
     },
     {

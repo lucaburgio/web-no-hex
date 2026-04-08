@@ -129,13 +129,13 @@
       <div class="settings-group">
         <div class="settings-group-title">UNIT PACKAGE</div>
         <div class="settings-row">
-          <label class="settings-label" for="me-unit-package">Player 1 (South)</label>
+          <label class="settings-label" for="me-unit-package">Player 1 (Host)</label>
           <select class="settings-input settings-select" id="me-unit-package">
             <option value="">None</option>
           </select>
         </div>
         <div class="settings-row">
-          <label class="settings-label" for="me-unit-package-player2">Player 2 (AI/North)</label>
+          <label class="settings-label" for="me-unit-package-player2">Player 2 (AI/Guest)</label>
           <select class="settings-input settings-select" id="me-unit-package-player2">
             <option value="">Same as Player 1</option>
           </select>
@@ -200,13 +200,13 @@
       <div class="settings-group">
         <div class="settings-group-title">MATCH</div>
         <div class="settings-row">
-          <label class="settings-label" for="cfg-unitPackage">Player 1 (South) package</label>
+          <label class="settings-label" for="cfg-unitPackage">Player 1 (Host) package</label>
           <select class="settings-input settings-select" id="cfg-unitPackage">
             <!-- Options populated dynamically by JS from config.unitTypes -->
           </select>
         </div>
         <div class="settings-row">
-          <label class="settings-label" for="cfg-unitPackagePlayer2">Player 2 (AI/North) package</label>
+          <label class="settings-label" for="cfg-unitPackagePlayer2">Player 2 (AI/Guest) package</label>
           <select class="settings-input settings-select" id="cfg-unitPackagePlayer2">
             <!-- Options populated dynamically by JS from config.unitTypes -->
           </select>
@@ -229,7 +229,7 @@
             <input class="settings-input" type="number" id="cfg-startingUnitsAttacker" min="1" max="12" step="1" />
           </div>
           <div class="settings-row">
-            <label class="settings-label" for="cfg-breakthroughPlayer1Role">Player 1 role (south / host)</label>
+            <label class="settings-label" for="cfg-breakthroughPlayer1Role">Player 1 role (Host)</label>
             <select class="settings-input settings-select" id="cfg-breakthroughPlayer1Role">
               <option value="attacker">Attacker</option>
               <option value="defender">Defender</option>
@@ -262,21 +262,21 @@
             <input class="settings-input" type="number" id="cfg-controlPointCount" min="0" max="48" step="1" />
           </div>
           <div class="settings-row">
-            <label class="settings-label" for="cfg-conquestPointsPlayer">Starting Conquer Points (south)</label>
+            <label class="settings-label" for="cfg-conquestPointsPlayer">Starting Conquer Points (P1)</label>
             <input class="settings-input" type="number" id="cfg-conquestPointsPlayer" min="1" max="999" step="1" />
           </div>
           <div class="settings-row">
-            <label class="settings-label" for="cfg-conquestPointsAi">Starting Conquer Points (north)</label>
+            <label class="settings-label" for="cfg-conquestPointsAi">Starting Conquer Points (P2)</label>
             <input class="settings-input" type="number" id="cfg-conquestPointsAi" min="1" max="999" step="1" />
           </div>
         </div>
         <div id="settings-domination-conquest-only">
           <div class="settings-row">
-            <label class="settings-label" for="cfg-startingUnitsPlayer1">Starting units Player 1</label>
+            <label class="settings-label" for="cfg-startingUnitsPlayer1">Starting units (P1)</label>
             <input class="settings-input" type="number" id="cfg-startingUnitsPlayer1" min="1" max="12" step="1" />
           </div>
           <div class="settings-row">
-            <label class="settings-label" for="cfg-startingUnitsPlayer2">Starting units Player 2</label>
+            <label class="settings-label" for="cfg-startingUnitsPlayer2">Starting units (P2)</label>
             <input class="settings-input" type="number" id="cfg-startingUnitsPlayer2" min="1" max="12" step="1" />
           </div>
         </div>

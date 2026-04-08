@@ -6,6 +6,7 @@ export const STORIES: StoryDef[] = [
   title: 'Introduction',
   description: 'Description.',
   unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
   map: {
     cols: 4,
@@ -21,6 +22,7 @@ export const STORIES: StoryDef[] = [
   title: 'Introduction — Tanks',
   description: 'Description.',
   unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
   map: {
     cols: 4,
@@ -36,13 +38,14 @@ export const STORIES: StoryDef[] = [
   title: 'Introduction — Artillery',
   description: 'Description.',
   unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
   map: {
     cols: 4,
     rows: 5,
     mountains: ['0,1', '3,1', '3,2', '3,3'],
     playerStart: [{ col: 0, unitTypeId: 'artillery' }, { col: 2, unitTypeId: 'tank' }],
-    aiStart: [{ col: 1 }],
+    aiStart: [{ col: 1 }, { col: 2 }],
   },
   productionPointsPerTurn: 8,
 },
@@ -51,6 +54,7 @@ export const STORIES: StoryDef[] = [
   title: 'Citadel',
   description: 'Description.',
   unitPackage: 'de-ww2',
+  unitPackagePlayer2: 'us-ww2',
   gameMode: 'domination',
   map: {
     cols: 5,
@@ -65,7 +69,8 @@ export const STORIES: StoryDef[] = [
   id: 'ww2-02',
   title: 'Barbarossa',
   description: 'Description.',
-  unitPackage: 'us-ww2',
+  unitPackage: 'ru-ww2',
+  unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
   map: {
     cols: 5,
@@ -81,6 +86,7 @@ export const STORIES: StoryDef[] = [
   title: 'Bastion',
   description: 'Description.',
   unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
   map: {
     cols: 5,
@@ -96,6 +102,7 @@ export const STORIES: StoryDef[] = [
   title: 'Breakout',
   description: 'Description.',
   unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
   map: {
     cols: 5,
@@ -111,6 +118,7 @@ export const STORIES: StoryDef[] = [
   title: 'Crossroads',
   description: 'Description.',
   unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
   map: {
     cols: 5,
@@ -126,6 +134,7 @@ export const STORIES: StoryDef[] = [
   title: 'Ironwall',
   description: 'Description.',
   unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
   map: {
     cols: 5,
@@ -141,6 +150,7 @@ export const STORIES: StoryDef[] = [
   title: 'Anvil',
   description: 'Description.',
   unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
   map: {
     cols: 5,
