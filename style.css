@@ -1696,6 +1696,37 @@ select.settings-input.settings-select option {
   padding-top: 8px;
 }
 
+/* ── Conquest header tooltip ─────────────────────────────────────────────── */
+
+#conquest-tooltip {
+  min-width: 260px;
+}
+
+.cq-tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 10px;
+}
+.cq-tt-row span:first-child { color: rgba(255,255,255,0.6); }
+.cq-tt-row span:last-child  { color: var(--color-yellow-500); }
+
+.cq-tt-sep {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  margin-top: 10px;
+}
+
+.cq-tt-note {
+  margin-top: 8px;
+  color: rgba(255,255,255,0.6);
+}
+.cq-tt-note strong { color: #fff; }
+
+.cq-tt-hint {
+  margin-top: 8px;
+  color: var(--color-gray-500);
+}
+
 /* ── Unit card stat tooltip (production picker) ───────────────────────────── */
 
 #unit-stat-tooltip {

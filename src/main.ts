@@ -118,7 +118,9 @@ const conquerBarEl        = document.getElementById('conquer-bar-line') as HTMLE
 const ppTooltipEl         = document.getElementById('pp-tooltip') as HTMLDivElement;
 const unitStatTooltipEl   = document.getElementById('unit-stat-tooltip') as HTMLDivElement;
 const settingsTooltipEl   = document.getElementById('settings-tooltip') as HTMLDivElement;
+const conquestTooltipEl   = document.getElementById('conquest-tooltip') as HTMLDivElement;
 const ppInfoEl            = document.getElementById('pp-info') as HTMLDivElement;
+const headerTerritoryEl   = document.getElementById('header-territory') as HTMLDivElement;
 
 const autoEndProductionEl = document.getElementById('auto-end-production') as HTMLInputElement;
 const autoEndMovementEl   = document.getElementById('auto-end-movement') as HTMLInputElement;
@@ -198,6 +200,36 @@ ppInfoEl.addEventListener('mouseenter', () => {
 
 ppInfoEl.addEventListener('mouseleave', () => {
   ppTooltipEl.classList.add('hidden');
+});
+
+// ── Conquest header tooltip ────────────────────────────────────────────────────
+
+headerTerritoryEl.addEventListener('mouseenter', () => {
+  if (state.gameMode !== 'conquest' || !state.conquestPoints) return;
+  const cp = state.conquestPoints;
+  const youCp  = localPlayer === PLAYER ? cp[PLAYER] : cp[AI];
+  const oppCp  = localPlayer === PLAYER ? cp[AI] : cp[PLAYER];
+  const totalHexes = COLS * ROWS;
+  const oppOwner = localPlayer === PLAYER ? AI : PLAYER;
+  const localTerPct = Math.round(Object.values(state.hexStates).filter(h => h.owner === localPlayer).length / totalHexes * 100);
+  const oppTerPct   = Math.round(Object.values(state.hexStates).filter(h => h.owner === oppOwner).length / totalHexes * 100);
+  const cpKeys = state.controlPointHexes ?? [];
+  const youCpOwned  = cpKeys.filter(k => state.hexStates[k]?.owner === localPlayer).length;
+  const oppCpOwned  = cpKeys.filter(k => state.hexStates[k]?.owner === oppOwner).length;
+  conquestTooltipEl.innerHTML = `
+    <div class="tt-title">Conquest</div>
+    <div class="cq-tt-row"><span>You</span><span>${youCp} CP &nbsp;·&nbsp; ${localTerPct}% territory</span></div>
+    <div class="cq-tt-row"><span>Opponent</span><span>${oppCp} CP &nbsp;·&nbsp; ${oppTerPct}% territory</span></div>
+    <div class="cq-tt-sep"></div>
+    <div class="cq-tt-note">You own <strong>${youCpOwned}</strong> of ${cpKeys.length} control point${cpKeys.length !== 1 ? 's' : ''} — opponent loses ${youCpOwned} CP/round.</div>
+    <div class="cq-tt-note">Opponent owns <strong>${oppCpOwned}</strong> — you lose ${oppCpOwned} CP/round.</div>
+    <div class="cq-tt-sep"></div>
+    <div class="cq-tt-hint">First side to reach 0 CP loses.</div>`;
+  positionFixedTooltipBelow(conquestTooltipEl, headerTerritoryEl.getBoundingClientRect());
+});
+
+headerTerritoryEl.addEventListener('mouseleave', () => {
+  conquestTooltipEl.classList.add('hidden');
 });
 
 function positionFixedTooltipBelow(tooltip: HTMLElement, anchor: DOMRect): void {
