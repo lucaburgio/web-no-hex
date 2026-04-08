@@ -7,10 +7,10 @@ export function setActiveUnitPackage(pkg: string | null): void {
   _activeUnitPackage = pkg;
 }
 
-/** Returns unit types available for production. Filtered by active story package if set. */
+/** Returns unit types available for production. Filtered by active package (defaults to 'standard'). */
 export function getAvailableUnitTypes(): UnitType[] {
-  if (_activeUnitPackage === null) return config.unitTypes;
-  return config.unitTypes.filter(u => u.package === _activeUnitPackage);
+  const pkg = _activeUnitPackage ?? 'standard';
+  return config.unitTypes.filter(u => u.package === pkg);
 }
 
 type UnitTypePatches = {
@@ -99,7 +99,7 @@ const config: GameConfig = {
       maxHp: 10,
       strength: 10,
       icon: 'icons/infantry.svg',
-      package: 'infantry',
+      package: 'standard',
     },
     {
       id: 'tank',
@@ -110,7 +110,7 @@ const config: GameConfig = {
       strength: 11,
       extraFlanking: 0.05,
       icon: 'icons/tank.svg',
-      package: 'armored',
+      package: 'standard',
     },
     {
       id: 'artillery',
@@ -121,7 +121,32 @@ const config: GameConfig = {
       strength: 8,
       range: 3,
       icon: 'icons/artillery.svg',
-      package: 'armored',
+      package: 'standard',
+    },
+
+
+
+
+    {
+      id: 'infantry',
+      name: 'US Marines',
+      cost: 20,
+      movement: 1,
+      maxHp: 10,
+      strength: 10,
+      icon: 'icons/infantry.svg',
+      package: 'us-ww2',
+    },
+    {
+      id: 'tank',
+      name: 'Sherman Tank',
+      cost: 40,
+      movement: 2,
+      maxHp: 14,
+      strength: 11,
+      extraFlanking: 0.05,
+      icon: 'icons/tank.svg',
+      package: 'us-ww2',
     },
   ],
 

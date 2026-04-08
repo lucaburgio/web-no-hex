@@ -261,6 +261,9 @@ let ws: WebSocket | null = null;
 /** Index into STORIES array when playing a story, null otherwise. */
 let activeStoryIndex: number | null = null;
 
+/** Unit package selected in game settings; persists across opens. */
+let settingsUnitPackage = 'standard';
+
 /** Config values to restore after leaving story mode. */
 const STORY_CONFIG_DEFAULTS = {
   boardCols: config.boardCols,
@@ -826,6 +829,9 @@ function populateSettings(): void {
     const val = config[key] as boolean;
     el.setValue(val);
   }
+  const pkgEl = document.getElementById('cfg-unitPackage') as HTMLSelectElement;
+  pkgEl.value = settingsUnitPackage;
+  pkgEl.dispatchEvent(new Event('settings-select-sync'));
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   gameModeEl.value = config.gameMode;
   const breakthroughRoleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement;
@@ -969,6 +975,8 @@ function collectSettings(): Parameters<typeof updateConfig>[0] {
     if (!toggle) continue;
     out[key] = toggle.getValue();
   }
+  const pkgEl2 = document.getElementById('cfg-unitPackage') as HTMLSelectElement;
+  settingsUnitPackage = pkgEl2.value || 'standard';
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   out.gameMode = gameModeEl.value as GameMode;
   if (out.gameMode === 'breakthrough') {
@@ -1013,6 +1021,19 @@ for (const [id] of NUM_FIELDS) {
   });
 }
 
+// Populate unit package select from config and build custom widget
+(function () {
+  const pkgEl = document.getElementById('cfg-unitPackage') as HTMLSelectElement;
+  const packages = [...new Set(config.unitTypes.map(u => u.package).filter((p): p is string => !!p))];
+  for (const pkg of packages) {
+    const opt = document.createElement('option');
+    opt.value = pkg;
+    opt.textContent = pkg;
+    pkgEl.appendChild(opt);
+  }
+  pkgEl.value = 'standard';
+})();
+initCustomSettingsSelect('cfg-unitPackage');
 initCustomSettingsSelect('cfg-gameMode');
 initCustomSettingsSelect('cfg-breakthroughPlayer1Role');
 document.getElementById('cfg-gameMode')!.addEventListener('change', updateModeSpecificSettingsVisibility);
@@ -1061,6 +1082,7 @@ settingsStartBtn.addEventListener('click', () => {
   const settings = collectSettings();
   updateConfig(settings);
   syncDimensions();
+  setActiveUnitPackage(settingsUnitPackage);
   const cb = settingsOnStart;
   hideSettings();
   cb?.(settings);
@@ -1301,7 +1323,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     hideMainMenu();
     showSettings((settings) => {
       state = createInitialState();
-      if (ws) ws.send(JSON.stringify({ type: 'game-start', state, settings }));
+      if (ws) ws.send(JSON.stringify({ type: 'game-start', state, settings: { ...settings, unitPackage: settingsUnitPackage } }));
       startGame(state);
     });
   } else if (msg.type === 'joined') {
@@ -1315,10 +1337,12 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     (document.getElementById('lobby-modal') as HTMLDivElement).appendChild(waitEl);
   } else if (msg.type === 'game-start') {
     // Guest receives initial state from host
-    const syncedSettings = msg.settings as Parameters<typeof updateConfig>[0] | undefined;
+    const syncedSettings = msg.settings as (Parameters<typeof updateConfig>[0] & { unitPackage?: string }) | undefined;
     if (syncedSettings) {
-      updateConfig(syncedSettings);
+      const { unitPackage: pkg, ...rest } = syncedSettings as Record<string, unknown>;
+      updateConfig(rest as Parameters<typeof updateConfig>[0]);
       syncDimensions();
+      setActiveUnitPackage((typeof pkg === 'string' ? pkg : null) ?? 'standard');
     }
     state = msg.state as GameState;
     syncUnitIdCounter(state);
@@ -2212,6 +2236,7 @@ function leaveEndGameToMainMenu(): void {
     buildStoriesList();
     storiesOverlayEl.classList.remove('hidden');
   } else {
+    setActiveUnitPackage(null);
     showMainMenu();
   }
 }
