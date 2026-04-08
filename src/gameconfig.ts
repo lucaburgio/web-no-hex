@@ -98,7 +98,7 @@ const config: GameConfig = {
       movement: 1,
       maxHp: 10,
       strength: 10,
-      icon: 'icons/infantry.svg',
+      icon: 'icons/units/infantry.svg',
       package: 'standard',
     },
     {
@@ -109,7 +109,7 @@ const config: GameConfig = {
       maxHp: 14,
       strength: 11,
       extraFlanking: 0.05,
-      icon: 'icons/tank.svg',
+      icon: 'icons/units/tank.svg',
       package: 'standard',
     },
     {
@@ -120,7 +120,7 @@ const config: GameConfig = {
       maxHp: 9,
       strength: 8,
       range: 3,
-      icon: 'icons/artillery.svg',
+      icon: 'icons/units/artillery.svg',
       package: 'standard',
     },
 
@@ -134,7 +134,7 @@ const config: GameConfig = {
       movement: 1,
       maxHp: 10,
       strength: 10,
-      icon: 'icons/infantry.svg',
+      icon: 'icons/units/infantry.svg',
       package: 'us-ww2',
     },
     {
@@ -145,9 +145,72 @@ const config: GameConfig = {
       maxHp: 14,
       strength: 11,
       extraFlanking: 0.05,
-      icon: 'icons/tank.svg',
+      icon: 'icons/units/tank.svg',
       package: 'us-ww2',
     },
+    {
+      id: 'artillery',
+      name: 'M2 105mm Howitzer',
+      cost: 34,
+      movement: 1,
+      maxHp: 9,
+      strength: 8,
+      range: 3,
+      icon: 'icons/units/artillery.svg',
+      package: 'us-ww2',
+    },
+    {
+      id: 'artillery',
+      name: 'M1 155mm Long Tom',
+      cost: 46,
+      movement: 1,
+      maxHp: 7,
+      strength: 9,
+      range: 4,
+      icon: 'icons/units/artillery.svg',
+      package: 'us-ww2',
+    },
+
+
+
+
+
+
+
+
+
+    {
+      id: 'infantry',
+      name: 'Panzergrenadiers',
+      cost: 20,
+      movement: 1,
+      maxHp: 10,
+      strength: 10,
+      icon: 'icons/units/infantry.svg',
+      package: 'de-ww2',
+    },
+    {
+      id: 'tank',
+      name: 'Panzer IV',
+      cost: 40,
+      movement: 2,
+      maxHp: 14,
+      strength: 11,
+      extraFlanking: 0.05,
+      icon: 'icons/units/tank.svg',
+      package: 'de-ww2',
+    },
+    {
+      id: 'artillery',
+      name: 'LEFH 18',
+      cost: 34,
+      movement: 1,
+      maxHp: 9,
+      strength: 8,
+      range: 3,
+      icon: 'icons/units/artillery.svg',
+      package: 'de-ww2',
+    }
   ],
 
   // ── Combat ──────────────────────────────────────────────────────────────────
