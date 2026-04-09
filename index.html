@@ -11,7 +11,7 @@
       if (theme) {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = `public/themes/theme-${theme}.css`;
+        link.href = `themes/theme-${theme}.css`;
         document.currentScript.parentNode.appendChild(link);
       }
     })();
@@ -20,7 +20,7 @@
 <body>
   <header id="conquer-header">
     <div id="pp-info">
-      <img src="public/icons/points.svg" id="header-pp-icon" alt="PP" />
+      <img src="icons/points.svg" id="header-pp-icon" alt="PP" />
       <strong id="pp-display">0</strong>
     </div>
     <div id="header-territory">
@@ -76,6 +76,7 @@
       <button id="menu-join-btn" class="menu-btn">JOIN GAME</button>
       <button id="menu-map-editor-btn" class="menu-btn">MAP EDITOR</button>
       <p class="menu-version-text">v0.1 — BETA</p>
+      <button class="button-primary">dio cane</button>
     </div>
   </div>
 
@@ -197,9 +198,9 @@
       <div id="settings-title">START NEW GAME</div>
       <div id="mode-cards">
         <button class="mode-card active" data-mode="domination">
-          <div class="mode-card-img" style="background-image: url('public/images/modes/domination.png')"></div>
+          <div class="mode-card-img" style="background-image: url('images/modes/domination.png')"></div>
           <div class="mode-card-footer">
-            <img class="mode-card-icon" src="public/icons/grade.svg" alt="" />
+            <img class="mode-card-icon" src="icons/grade.svg" alt="" />
             <div class="mode-card-info">
               <div class="mode-card-name">DOMINATION</div>
               <div class="mode-card-desc">ADVANCE ON THE FIELD AND ANNIHILATE THE ENEMY</div>
@@ -207,9 +208,9 @@
           </div>
         </button>
         <button class="mode-card" data-mode="conquest">
-          <div class="mode-card-img" style="background-image: url('public/images/modes/conquest.png')"></div>
+          <div class="mode-card-img" style="background-image: url('images/modes/conquest.png')"></div>
           <div class="mode-card-footer">
-            <img class="mode-card-icon" src="public/icons/grade.svg" alt="" />
+            <img class="mode-card-icon" src="icons/grade.svg" alt="" />
             <div class="mode-card-info">
               <div class="mode-card-name">CONQUEST</div>
               <div class="mode-card-desc">RUN FOR CONTROL POINTS AND KEEP THEM TO OWN THE BATTLEFIELD</div>
@@ -217,9 +218,9 @@
           </div>
         </button>
         <button class="mode-card" data-mode="breakthrough">
-          <div class="mode-card-img" style="background-image: url('public/images/modes/breakthrough.png')"></div>
+          <div class="mode-card-img" style="background-image: url('images/modes/breakthrough.png')"></div>
           <div class="mode-card-footer">
-            <img class="mode-card-icon" src="public/icons/grade.svg" alt="" />
+            <img class="mode-card-icon" src="icons/grade.svg" alt="" />
             <div class="mode-card-info">
               <div class="mode-card-name">BREAKTHROUGH</div>
               <div class="mode-card-desc">PUSH THROUGH ENEMY LINES AND CAPTURE ALL SECTORS</div>
@@ -397,7 +398,7 @@
 
       </div><!-- end settings-right-scroll -->
       <div id="settings-right-footer">
-        <button id="settings-start-btn" class="menu-btn">START GAME</button>
+        <button id="settings-start-btn" class="button-primary sidebar">START GAME</button>
       </div>
     </div>
   </div>

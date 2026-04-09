@@ -1664,11 +1664,11 @@ function showUnitPicker(col: number, row: number): void {
   pendingProductionHex = { col, row };
   unitPickerList.innerHTML = '';
 
-  const statIconCost = 'public/icons/points.svg';
-  const statIconMove = 'public/icons/movement.svg';
-  const statIconRange = 'public/icons/range.svg';
-  const statIconStr = 'public/icons/strength.svg';
-  const statIconHp = 'public/icons/hp.svg';
+  const statIconCost = 'icons/points.svg';
+  const statIconMove = 'icons/movement.svg';
+  const statIconRange = 'icons/range.svg';
+  const statIconStr = 'icons/strength.svg';
+  const statIconHp = 'icons/hp.svg';
 
   getAvailableUnitTypes(localPlayer).forEach((unitType, cardIndex) => {
     const canAfford = state.productionPoints[localPlayer] >= unitType.cost;
@@ -1693,7 +1693,7 @@ function showUnitPicker(col: number, row: number): void {
     header.className = 'unit-card-header';
     const headerIcon = document.createElement('img');
     headerIcon.className = 'unit-card-header-icon';
-    headerIcon.src = unitType.icon ? `public/${unitType.icon}` : `public/icons/${unitType.id}.svg`;
+    headerIcon.src = unitType.icon ? `${unitType.icon}` : `icons/${unitType.id}.svg`;
     headerIcon.alt = '';
     header.appendChild(headerIcon);
 

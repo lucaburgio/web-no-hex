@@ -250,7 +250,7 @@ export async function loadIconDefs(iconPaths: string[]): Promise<void> {
   await Promise.all(unique.map(async (iconPath) => {
     if (iconDefsCache[iconPath]) return;
     try {
-      const res = await fetch(`public/${iconPath}`);
+      const res = await fetch(`${iconPath}`);
       const text = await res.text();
       const parser = new DOMParser();
       const doc = parser.parseFromString(text, 'image/svg+xml');
