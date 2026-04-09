@@ -48,6 +48,9 @@ import config from './gameconfig';
 import type { GameState, Unit, CombatForecast, Owner, CombatVfxPayload, GameMode } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
 import { updateConfig, setActiveUnitPackage, setActiveUnitPackagePlayer2, getAvailableUnitTypes } from './gameconfig';
+import modeImgDomination from '../public/images/modes/domination.png';
+import modeImgConquest from '../public/images/modes/conquest.png';
+import modeImgBreakthrough from '../public/images/modes/breakthrough.png';
 import { STORIES } from './stories';
 import {
   loadStoryProgress,
@@ -99,6 +102,10 @@ function clearMovePathPreview(): void {
   renderMovePath(svg, []);
   movePathPreviewKey = null;
 }
+(document.getElementById('mode-img-domination') as HTMLElement).style.backgroundImage = `url('${modeImgDomination}')`;
+(document.getElementById('mode-img-conquest') as HTMLElement).style.backgroundImage = `url('${modeImgConquest}')`;
+(document.getElementById('mode-img-breakthrough') as HTMLElement).style.backgroundImage = `url('${modeImgBreakthrough}')`;
+
 const logEl      = document.getElementById('log') as HTMLUListElement;
 const phaseEl    = document.getElementById('phase') as HTMLElement;
 const turnEl     = document.getElementById('turn') as HTMLElement;
