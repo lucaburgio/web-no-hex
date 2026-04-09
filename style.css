@@ -137,6 +137,7 @@ body {
   font-family: 'Disket Mono', 'Courier New', monospace;
   min-height: 100vh;
   font-size: 14px;
+  font-weight: 700;
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -144,10 +145,13 @@ body {
 }
 
 button, input, select, textarea { font: inherit; }
+button { cursor: url('/icons/pointer.svg') 13 14, pointer; }
 
 /* Buttons — pair base + variant: primary = dark CTA, secondary = gray (mission panel, modals, etc.) */
 .button-primary {
-  padding: 16px 8px;
+  text-rendering:geometricPrecision;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
+  padding: 16px;
   border: none;
   background: var(--color-dark);
   color: var(--color-light);
@@ -155,10 +159,15 @@ button, input, select, textarea { font: inherit; }
 .button-primary:hover {
   background: var(--color-gray-200);
   color: var(--color-dark);
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 .button-primary:disabled {
   background: var(--color-gray-100);
   color: var(--color-gray-600);
+}
+.button-primary.sidebar {
+  width: 92%;
+  margin: 4%;
 }
 
 .button,#end-move-btn {
