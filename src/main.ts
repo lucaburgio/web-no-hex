@@ -949,12 +949,14 @@ function populateSettings(): void {
   pkgEl2.dispatchEvent(new Event('settings-select-sync'));
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   gameModeEl.value = config.gameMode;
+  gameModeEl.dispatchEvent(new Event('settings-select-sync'));
   const breakthroughRoleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement;
   if (breakthroughRoleEl) breakthroughRoleEl.value = config.breakthroughPlayer1Role;
   const breakthroughRandEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement;
   if (breakthroughRandEl) breakthroughRandEl.checked = config.breakthroughRandomRoles;
   syncBreakthroughRoleControls();
   updateModeSpecificSettingsVisibility();
+  syncModeCards();
 }
 
 function syncBreakthroughRoleControls(): void {
@@ -1162,8 +1164,30 @@ initCustomSettingsSelect('cfg-unitPackage');
 initCustomSettingsSelect('cfg-unitPackagePlayer2');
 initCustomSettingsSelect('cfg-gameMode');
 initCustomSettingsSelect('cfg-breakthroughPlayer1Role');
-document.getElementById('cfg-gameMode')!.addEventListener('change', updateModeSpecificSettingsVisibility);
+document.getElementById('cfg-gameMode')!.addEventListener('change', () => {
+  updateModeSpecificSettingsVisibility();
+  syncModeCards();
+});
 document.getElementById('cfg-breakthroughRandomRoles')?.addEventListener('change', syncBreakthroughRoleControls);
+
+// Mode cards — visual game mode picker
+function syncModeCards(): void {
+  const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
+  document.querySelectorAll<HTMLElement>('.mode-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.mode === gameModeEl.value);
+  });
+}
+
+document.querySelectorAll<HTMLElement>('.mode-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
+    if (card.dataset.mode) {
+      gameModeEl.value = card.dataset.mode;
+      gameModeEl.dispatchEvent(new Event('settings-select-sync'));
+      gameModeEl.dispatchEvent(new Event('change'));
+    }
+  });
+});
 
 const territoryQuotaLabelEl = document.getElementById('cfg-territoryQuota-label') as HTMLLabelElement | null;
 const pointsPerQuotaLabelEl = document.getElementById('cfg-pointsPerQuota-label') as HTMLLabelElement | null;
@@ -1193,9 +1217,18 @@ pointsPerQuotaLabelEl?.addEventListener('mouseleave', hideSettingsTooltip);
 
 let settingsOnStart: ((settings: Parameters<typeof updateConfig>[0]) => void) | null = null;
 
-function showSettings(onStart: (settings: Parameters<typeof updateConfig>[0]) => void): void {
+function showSettings(onStart: (settings: Parameters<typeof updateConfig>[0]) => void, mpStatusText?: string): void {
   populateSettings();
   settingsOnStart = onStart;
+  const mpStatusEl = document.getElementById('settings-mp-status');
+  if (mpStatusEl) {
+    if (mpStatusText) {
+      mpStatusEl.textContent = `[${mpStatusText}]`;
+      mpStatusEl.classList.remove('hidden');
+    } else {
+      mpStatusEl.classList.add('hidden');
+    }
+  }
   settingsOverlayEl.classList.remove('hidden');
 }
 
@@ -1452,7 +1485,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
       state = createInitialState();
       if (ws) ws.send(JSON.stringify({ type: 'game-start', state, settings: { ...settings, unitPackage: settingsUnitPackage, unitPackagePlayer2: settingsUnitPackagePlayer2 } }));
       startGame(state);
-    });
+    }, 'PLAYER 2 CONNECTED');
   } else if (msg.type === 'joined') {
     // Guest: successfully joined, wait for game-start
     lobbyMenuEl.classList.add('hidden');

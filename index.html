@@ -189,13 +189,46 @@
   <!-- Game settings overlay -->
   <div id="settings-overlay" class="hidden">
     <div id="settings-left">
-      <div id="settings-title">GAME<br>SETTINGS</div>
-      <div id="settings-actions">
-        <button id="settings-start-btn" class="menu-btn">START GAME</button>
-        <button id="settings-back-btn" class="menu-btn secondary">BACK</button>
+      <div id="settings-top-bar">
+        <button id="settings-back-btn" class="settings-back-link">← BACK</button>
+        <span id="settings-mp-status" class="hidden"></span>
+      </div>
+      <div id="settings-title">START NEW GAME</div>
+      <div id="mode-cards">
+        <button class="mode-card active" data-mode="domination">
+          <div class="mode-card-img" style="background-image: url('public/images/modes/domination.png')"></div>
+          <div class="mode-card-footer">
+            <img class="mode-card-icon" src="public/icons/mountains.svg" alt="" />
+            <div class="mode-card-info">
+              <div class="mode-card-name">DOMINATION</div>
+              <div class="mode-card-desc">ADVANCE ON THE FIELD AND ANNIHILATE THE ENEMY</div>
+            </div>
+          </div>
+        </button>
+        <button class="mode-card" data-mode="conquest">
+          <div class="mode-card-img" style="background-image: url('public/images/modes/conquest.png')"></div>
+          <div class="mode-card-footer">
+            <img class="mode-card-icon" src="public/icons/mountains.svg" alt="" />
+            <div class="mode-card-info">
+              <div class="mode-card-name">CONQUEST</div>
+              <div class="mode-card-desc">RUN FOR CONTROL POINTS AND KEEP THEM TO OWN THE BATTLEFIELD</div>
+            </div>
+          </div>
+        </button>
+        <button class="mode-card" data-mode="breakthrough">
+          <div class="mode-card-img" style="background-image: url('public/images/modes/breakthrough.png')"></div>
+          <div class="mode-card-footer">
+            <img class="mode-card-icon" src="public/icons/mountains.svg" alt="" />
+            <div class="mode-card-info">
+              <div class="mode-card-name">BREAKTHROUGH</div>
+              <div class="mode-card-desc">PUSH THROUGH ENEMY LINES AND CAPTURE ALL SECTORS</div>
+            </div>
+          </div>
+        </button>
       </div>
     </div>
     <div id="settings-right">
+      <div id="settings-right-scroll">
 
       <div class="settings-group">
         <div class="settings-group-title">MATCH</div>
@@ -362,6 +395,10 @@
         </div>
       </div>
 
+      </div><!-- end settings-right-scroll -->
+      <div id="settings-right-footer">
+        <button id="settings-start-btn" class="menu-btn">START GAME</button>
+      </div>
     </div>
   </div>
 

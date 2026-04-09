@@ -16,49 +16,58 @@
 :root {
 
   --color-white: #FFF;
+  --color-light: #ECECEC;
+
+  --color-yellow-900: #9F5A15;
   --color-yellow-500: #FFC13A;
+
+  --color-gray-600: #797979;
+  --color-gray-300: #A5A5A5;
+  --color-gray-200: #C8C8C8;
+  --color-gray-100: #DCDCDC;
+
   --color-gray-500: #9E9E9E;
   --color-gray-400: #B0B0B0;
   --color-beige-600: #9a908c;
   --color-beige-500: #b2a8a5;
   --color-beige-400: #c4bab7;
   --color-beige-300: #d3cbc9;
-  --color-dark: #000100;
+  --color-dark: #000;
   --color-red-700: #BD4E4E;
   --color-red-500: #ff6b6b;
   --color-green-500: #81e2a0;
   --color-green-700: #345B41;
 
   --color-primary: var(--color-dark);
-  --color-input: var(--color-beige-300);
-  --color-input-hover: var(--color-beige-400);
-  --color-input-focus: var(--color-beige-500);
-  --color-input-placeholder: var(--color-beige-600);
+  --color-input: var(--color-gray-100);
+  --color-input-hover: var(--color-gray-200);
+  --color-input-focus: var(--color-gray-300);
+  --color-input-placeholder: var(--color-gray-300);
 
     /* ── Background ─────────────────────────────────────────────────────────── */
-    --color-bg: #E1D9D6;
+    --color-bg: var(--color-light);
 
     /* ── Player / AI identity colors ────────────────────────────────────────── */
-    --color-player: #000100;
-    --color-ai:     #838383;
+    --color-player: var(--color-dark);
+    --color-ai:     var(--color-gray-600);
   
     /* ── Unit states ────────────────────────────────────────────────────────── */
-    --color-unit-selected: #C77E00;
+    --color-unit-selected: var(--color-yellow-900);
   
     /* ── Hex fill states ─────────────────────────────────────────────────────── */
-    --color-hex-selected:      #FFBE00;
+    --color-hex-selected:      var(--color-yellow-500);
     --color-hex-valid-move:    #ECDBAA;
-    --color-hex-player:        #B5AEAB;
-    --color-hex-ai:            #D2CDCA;
-    --color-hex-can-place:     #bebcb2;
+    --color-hex-player:        var(--color-gray-200);
+    --color-hex-ai:            var(--color-gray-100);
+    --color-hex-can-place:     var(--color-gray-200);
     --color-hex-prod-selected: #e1c47c;
-    --color-hex-prod-stroke:   #e18a17;
+    --color-hex-prod-stroke:   var(--color-yellow-900);
     --color-hex-zoc:           #d58f8f;
-    --color-hex-neutral:       #E1D9D6;
-    --color-hex-stroke:        #000;
+    --color-hex-neutral:       var(--color-light);
+    --color-hex-stroke:        var(--color-dark);
   
     /* ── Movement area perimeter outline ────────────────────────────────────── */
-    --color-move-border: rgba(199, 126, 0, 1);
+    --color-move-border: var(--color-yellow-900);
   
     /* ── Unit icon & HP bar thresholds ──────────────────────────────────────── */
     --color-unit-icon: #FFF;
@@ -1026,15 +1035,48 @@ body {
 }
 
 #settings-left {
-  width: 70%;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: flex-end;
-  padding: 60px;
+  padding: 40px 48px 48px;
   border-right: 1px solid rgba(0,0,0,0.1);
+  overflow: hidden;
 }
+
+#settings-top-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.settings-back-link {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: none;
+  border: none;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+.settings-back-link:hover { opacity: 0.6; }
+
+#settings-mp-status {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--color-gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+#settings-mp-status.hidden { display: none; }
 
 #settings-title {
   font-family: 'Disket Mono', monospace;
@@ -1044,25 +1086,127 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.15em;
   line-height: 1.2;
-  margin-bottom: 3rem;
-  text-align: right;
+  margin-bottom: 2rem;
 }
 
-#settings-actions {
+#mode-cards {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.mode-card {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  align-items: flex-end;
-  width: 100%;
+  border: none;
+  padding: 0;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
+  overflow: hidden;
+  position: relative;
+  background: none;
+  min-height: 0;
+}
+
+.mode-card-img {
+  flex: 1;
+  min-height: 0;
+  background-size: cover;
+  background-position: center top;
+  filter: grayscale(1);
+  transition: filter 0.2s ease;
+}
+
+.mode-card.active .mode-card-img {
+  filter: grayscale(0);
+}
+
+.mode-card-footer {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--color-dark);
+  transition: background 0.2s ease;
+}
+
+.mode-card.active .mode-card-footer {
+  background: #e8b923;
+}
+
+.mode-card-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  filter: invert(1);
+  margin-top: 2px;
+}
+
+.mode-card.active .mode-card-icon {
+  filter: invert(0);
+}
+
+.mode-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mode-card-name {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+}
+
+.mode-card.active .mode-card-name {
+  color: var(--color-dark);
+}
+
+.mode-card-desc {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.65);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+}
+
+.mode-card.active .mode-card-desc {
+  color: rgba(0,0,0,0.55);
 }
 
 #settings-right {
+  width: 380px;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#settings-right-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 48px 60px;
+  padding: 48px 48px 32px;
   display: flex;
   flex-direction: column;
   gap: 2rem;
+}
+
+#settings-right-footer {
+  padding: 0;
+  flex-shrink: 0;
+}
+
+#settings-right-footer .menu-btn {
+  width: 100%;
+  border-radius: 0;
 }
 
 .settings-group {
