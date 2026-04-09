@@ -73,6 +73,13 @@ Row = r, Col = q offset per row parity.
 - SVG for rendering (scalable, easy hit-testing)
 - AI uses greedy heuristics in `game.ts`: **Domination** — pressure toward the player home row and threats; **Conquest** — prioritize capturing neutral/enemy control points, defending AI-owned CPs when player units are close, and prefer ranged/melee targets on CP hexes; **Breakthrough** — defend CPs in sectors still owned by the **defender**, pressure threats from the **attacker** (roles follow `breakthroughAttackerOwner`).
 
+## Tauri Asset Rules
+When working on the Tauri build, follow these rules to avoid broken assets:
+
+- **No `public/` prefix in asset paths.** Vite copies the contents of `public/` to the dist root, so `public/icons/x.svg` must be referenced as `icons/x.svg`. The `public/` directory does not exist in the built output.
+- **Never use CSS `background-image: url()` for images in the Tauri app.** WKWebView (macOS) fails to load images via the `tauri://` custom protocol when they are set through CSS `background-image`, even if the URL is correct. Always use `<img src>` tags with `object-fit: cover` instead.
+- **Always import images as ES modules.** Any image referenced in JS/TS or set dynamically must be imported at the top of the file (e.g. `import img from '../public/images/foo.png'`). This makes Vite hash and bundle it into `dist/assets/`, ensuring it is correctly resolved at runtime in Tauri.
+
 ## Workflow
 - After completing a concrete task with no errors, commit automatically without asking.
 - Never push to remote unless explicitly asked.
