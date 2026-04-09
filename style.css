@@ -141,7 +141,7 @@ body {
   overflow: auto;
   display: flex;
   flex-direction: column;
-  cursor: url('/icons/pointer.svg') 13 14, auto;
+  cursor: url('/icons/pointer.svg') 13 14, default;
 }
 
 button, input, select, textarea { font: inherit; }
