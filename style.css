@@ -1093,8 +1093,8 @@ body {
   display: flex;
   flex-direction: row;
   gap: 12px;
-  flex: 1;
-  min-height: 0;
+  height: 400px;
+  flex-shrink: 0;
 }
 
 .mode-card {
