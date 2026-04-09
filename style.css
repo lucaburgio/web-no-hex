@@ -1120,6 +1120,7 @@ body {
   aspect-ratio: 9 / 16;
   min-height: 280px;
   max-height: 520px;
+  max-width: 293px;
 }
 
 .mode-card-img {
