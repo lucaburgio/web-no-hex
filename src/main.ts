@@ -2593,7 +2593,7 @@ function updateUI(): void {
     phaseLabelEl.textContent = 'AI is planning';
   } else
   if ((state.phase === 'production' || state.phase === 'movement') && isMyTurn) {
-    endMoveBtn.style.display = 'flex';
+    endMoveBtn.style.display = 'block';
     phaseLabelEl.textContent = state.phase.toUpperCase();
   } else if (gameMode === 'vsHuman' && !isMyTurn) {
     endMoveBtn.style.display = 'none';

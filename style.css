@@ -15,7 +15,7 @@
   padding: 0;
   cursor: url('/icons/pointer.svg') 13 14, default;
 }
-
+html { cursor: url('/icons/pointer.svg') 13 14, default; }
 .hidden { display: none !important; }
 
 :root {
@@ -159,18 +159,22 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   border: none;
   background: var(--color-dark);
   color: var(--color-light);
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 .button-primary:hover {
   background: var(--color-gray-200);
   color: var(--color-dark);
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 .button-primary:disabled {
   background: var(--color-gray-100);
   color: var(--color-gray-600);
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 .button-primary.sidebar {
   width: 92%;
   margin: 4%;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 
 .button,#end-move-btn {
@@ -354,7 +358,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   align-items: center;
   justify-content: space-between;
   padding: 0 20px 0 20px;
-  z-index: 5;
+  z-index: 20;
 }
 
 #footer-left {
