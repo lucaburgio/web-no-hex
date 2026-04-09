@@ -102,9 +102,9 @@ function clearMovePathPreview(): void {
   renderMovePath(svg, []);
   movePathPreviewKey = null;
 }
-(document.getElementById('mode-img-domination') as HTMLElement).style.backgroundImage = `url('${modeImgDomination}')`;
-(document.getElementById('mode-img-conquest') as HTMLElement).style.backgroundImage = `url('${modeImgConquest}')`;
-(document.getElementById('mode-img-breakthrough') as HTMLElement).style.backgroundImage = `url('${modeImgBreakthrough}')`;
+(document.getElementById('mode-img-domination') as HTMLImageElement).src = modeImgDomination;
+(document.getElementById('mode-img-conquest') as HTMLImageElement).src = modeImgConquest;
+(document.getElementById('mode-img-breakthrough') as HTMLImageElement).src = modeImgBreakthrough;
 
 const logEl      = document.getElementById('log') as HTMLUListElement;
 const phaseEl    = document.getElementById('phase') as HTMLElement;
