@@ -949,7 +949,6 @@ function populateSettings(): void {
   pkgEl2.dispatchEvent(new Event('settings-select-sync'));
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   gameModeEl.value = config.gameMode;
-  gameModeEl.dispatchEvent(new Event('settings-select-sync'));
   const breakthroughRoleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement;
   if (breakthroughRoleEl) breakthroughRoleEl.value = config.breakthroughPlayer1Role;
   const breakthroughRandEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement;
@@ -1162,7 +1161,6 @@ for (const [id] of NUM_FIELDS) {
 })();
 initCustomSettingsSelect('cfg-unitPackage');
 initCustomSettingsSelect('cfg-unitPackagePlayer2');
-initCustomSettingsSelect('cfg-gameMode');
 initCustomSettingsSelect('cfg-breakthroughPlayer1Role');
 document.getElementById('cfg-gameMode')!.addEventListener('change', () => {
   updateModeSpecificSettingsVisibility();

@@ -198,7 +198,7 @@
         <button class="mode-card active" data-mode="domination">
           <div class="mode-card-img" style="background-image: url('public/images/modes/domination.png')"></div>
           <div class="mode-card-footer">
-            <img class="mode-card-icon" src="public/icons/mountains.svg" alt="" />
+            <img class="mode-card-icon" src="public/icons/grade.svg" alt="" />
             <div class="mode-card-info">
               <div class="mode-card-name">DOMINATION</div>
               <div class="mode-card-desc">ADVANCE ON THE FIELD AND ANNIHILATE THE ENEMY</div>
@@ -208,7 +208,7 @@
         <button class="mode-card" data-mode="conquest">
           <div class="mode-card-img" style="background-image: url('public/images/modes/conquest.png')"></div>
           <div class="mode-card-footer">
-            <img class="mode-card-icon" src="public/icons/mountains.svg" alt="" />
+            <img class="mode-card-icon" src="public/icons/grade.svg" alt="" />
             <div class="mode-card-info">
               <div class="mode-card-name">CONQUEST</div>
               <div class="mode-card-desc">RUN FOR CONTROL POINTS AND KEEP THEM TO OWN THE BATTLEFIELD</div>
@@ -218,7 +218,7 @@
         <button class="mode-card" data-mode="breakthrough">
           <div class="mode-card-img" style="background-image: url('public/images/modes/breakthrough.png')"></div>
           <div class="mode-card-footer">
-            <img class="mode-card-icon" src="public/icons/mountains.svg" alt="" />
+            <img class="mode-card-icon" src="public/icons/grade.svg" alt="" />
             <div class="mode-card-info">
               <div class="mode-card-name">BREAKTHROUGH</div>
               <div class="mode-card-desc">PUSH THROUGH ENEMY LINES AND CAPTURE ALL SECTORS</div>
@@ -228,28 +228,26 @@
       </div>
     </div>
     <div id="settings-right">
+      <!-- Hidden select — tracks game mode for JS; visual selection is via mode cards above -->
+      <select id="cfg-gameMode" style="display:none">
+        <option value="domination">Domination</option>
+        <option value="conquest">Conquest</option>
+        <option value="breakthrough">Breakthrough</option>
+      </select>
       <div id="settings-right-scroll">
 
       <div class="settings-group">
         <div class="settings-group-title">MATCH</div>
         <div class="settings-row">
-          <label class="settings-label" for="cfg-unitPackage">Player 1 (Host) package</label>
+          <label class="settings-label" for="cfg-unitPackage">Unit package P1</label>
           <select class="settings-input settings-select" id="cfg-unitPackage">
             <!-- Options populated dynamically by JS from config.unitTypes -->
           </select>
         </div>
         <div class="settings-row">
-          <label class="settings-label" for="cfg-unitPackagePlayer2">Player 2 (AI/Guest) package</label>
+          <label class="settings-label" for="cfg-unitPackagePlayer2">Unit package P2</label>
           <select class="settings-input settings-select" id="cfg-unitPackagePlayer2">
             <!-- Options populated dynamically by JS from config.unitTypes -->
-          </select>
-        </div>
-        <div class="settings-row">
-          <label class="settings-label" for="cfg-gameMode">Game mode</label>
-          <select class="settings-input settings-select" id="cfg-gameMode">
-            <option value="domination">Domination</option>
-            <option value="conquest">Conquest</option>
-            <option value="breakthrough">Breakthrough</option>
           </select>
         </div>
         <div id="settings-breakthrough-only" class="hidden">
