@@ -164,17 +164,14 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 .button-primary:hover {
   background: var(--color-gray-200);
   color: var(--color-dark);
-  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 .button-primary:disabled {
   background: var(--color-gray-100);
   color: var(--color-gray-600);
-  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 .button-primary.sidebar {
   width: 92%;
   margin: 4%;
-  cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 
 .button,#end-move-btn {
@@ -1107,6 +1104,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   gap: 0.4em;
 }
 .settings-back-link:hover { opacity: 0.6; }
+.back-arrow-icon { width: 1em; height: 1em; display: block; }
 
 #settings-mp-status {
   font-family: 'Disket Mono', monospace;
