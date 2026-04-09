@@ -1093,8 +1093,7 @@ body {
   display: flex;
   flex-direction: row;
   gap: 12px;
-  height: 400px;
-  flex-shrink: 0;
+  align-items: flex-start;
 }
 
 .mode-card {
@@ -1107,7 +1106,9 @@ body {
   overflow: hidden;
   position: relative;
   background: none;
-  min-height: 0;
+  aspect-ratio: 9 / 16;
+  min-height: 280px;
+  max-height: 520px;
 }
 
 .mode-card-img {
