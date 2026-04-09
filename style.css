@@ -1039,26 +1039,27 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  align-items: center;
   padding: 40px 48px 48px;
   border-right: 1px solid rgba(0,0,0,0.1);
   overflow: hidden;
 }
 
-#settings-mode-group {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  flex: 1;
-  min-height: 0;
-}
-
 #settings-top-bar {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 1.5rem;
   margin-bottom: 2rem;
+}
+
+#settings-mode-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
 }
 
 .settings-back-link {
@@ -1104,7 +1105,6 @@ body {
   flex-direction: row;
   gap: 12px;
   align-items: flex-start;
-  width: 100%;
 }
 
 .mode-card {
