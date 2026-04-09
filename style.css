@@ -1104,7 +1104,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   gap: 0.4em;
 }
 .settings-back-link:hover { opacity: 0.6; }
-.back-arrow-icon { width: 1em; height: 1em; display: block; }
+.back-arrow-icon { width: 2em; height: 2em; display: block; }
 
 #settings-mp-status {
   font-family: 'Disket Mono', monospace;
