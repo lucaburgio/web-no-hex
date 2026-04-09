@@ -143,9 +143,25 @@ body {
   cursor: url('/icons/pointer.svg') 13 14, auto;
 }
 
+button, input, select, textarea { font: inherit; }
+
 /* Buttons — pair base + variant: primary = dark CTA, secondary = gray (mission panel, modals, etc.) */
-.button,
-.button-primary,#end-move-btn {
+.button-primary {
+  padding: 16px 8px;
+  border: none;
+  background: var(--color-dark);
+  color: var(--color-light);
+}
+.button-primary:hover {
+  background: var(--color-gray-200);
+  color: var(--color-dark);
+}
+.button-primary:disabled {
+  background: var(--color-gray-100);
+  color: var(--color-gray-600);
+}
+
+.button,#end-move-btn {
   background-color: var(--color-dark);
   border: 2px solid var(--color-dark);
   color: var(--color-light);
@@ -157,21 +173,18 @@ body {
   transition: all 0.2s ease;
 }
 
-.button:hover,
-.button-primary:hover,#end-move-btn:hover {
+.button:hover,#end-move-btn:hover {
   background-color: var(--color-gray-200);
   color: var(--color-dark);
 }
 
 .button:disabled,
-.button-primary:disabled,
 .button-disabled,#end-move-btn:disabled {
   background-color: red;
   color: var(--color-beige-500);
 }
 
 .button:disabled:hover,
-.button-primary:disabled:hover,
 .button-disabled:hover,#end-move-btn:disabled:hover {
   background-color: #ccc;
   color: #666;
@@ -1098,6 +1111,7 @@ body {
   letter-spacing: 0.15em;
   line-height: 1.2;
   margin-bottom: 2rem;
+  width: 100%;
 }
 
 #mode-cards {
@@ -1121,6 +1135,7 @@ body {
   min-height: 280px;
   max-height: 520px;
   max-width: 293px;
+  text-rendering: geometricPrecision;
 }
 
 .mode-card-img {
@@ -1139,7 +1154,7 @@ body {
 .mode-card-footer {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 16px;
   padding: 14px 16px;
   background: var(--color-dark);
   transition: background 0.2s ease;
@@ -1163,12 +1178,13 @@ body {
 .mode-card-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  text-align: left;
 }
 
 .mode-card-name {
   font-family: 'Disket Mono', monospace;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: #fff;
   text-transform: uppercase;
@@ -1182,12 +1198,10 @@ body {
 
 .mode-card-desc {
   font-family: 'Disket Mono', monospace;
-  font-size: 0.55rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: rgba(255,255,255,0.65);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  line-height: 1.4;
 }
 
 .mode-card.active .mode-card-desc {
