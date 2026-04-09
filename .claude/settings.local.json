@@ -18,7 +18,15 @@
       "Bash(echo \"exit: $?\")",
       "Bash(ls -la /Users/luca/Documents/Git/web-strategic/src/*.ts)",
       "Bash(grep:*)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(cargo tauri:*)",
+      "Bash(npm list:*)",
+      "Bash(cargo --version)",
+      "Bash(rustup --version)",
+      "Bash(npx tauri:*)",
+      "Bash(cargo check:*)",
+      "Bash(bash:*)",
+      "Bash(create-dmg --version)"
     ]
   }
 }
