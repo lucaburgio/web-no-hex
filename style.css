@@ -1049,6 +1049,7 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   flex: 1;
   min-height: 0;
 }
@@ -1103,7 +1104,7 @@ body {
   flex-direction: row;
   gap: 12px;
   align-items: flex-start;
-  max-width: 700px;
+  width: 100%;
 }
 
 .mode-card {
