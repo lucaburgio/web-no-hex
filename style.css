@@ -1120,7 +1120,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   min-height: 0;
 }
 
-.settings-back-link {
+.back-link {
   font-family: 'Disket Mono', monospace;
   font-size: 0.75rem;
   font-weight: 700;
@@ -1135,7 +1135,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   align-items: center;
   gap: 0.4em;
 }
-.settings-back-link:hover { opacity: 0.6; }
+.back-link:hover { opacity: 0.6; }
 .back-arrow-icon { width: 2em; height: 2em; display: block; }
 
 #settings-mp-status {
@@ -1667,7 +1667,7 @@ select.settings-input.settings-select option {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 48px 0 48px;
+  justify-content: center;
   gap: 8px;
   border-right: 1px solid rgba(0,0,0,0.08);
 }
@@ -1695,33 +1695,18 @@ select.settings-input.settings-select option {
 
 /* Scenario detail panel */
 #stories-scenario-panel {
-  width: 340px;
+  width: 680px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 36px 32px 48px;
+  padding: 36px 48px 48px;
   border-right: 1px solid rgba(0,0,0,0.08);
   overflow-y: auto;
 }
 
-.stories-back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: 'Disket Mono', monospace;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--color-gray-500);
-  padding: 0;
+#stories-scenario-panel .back-link {
   margin-bottom: 32px;
-  transition: color 0.15s;
 }
-.stories-back-link:hover { color: var(--color-dark); }
 
 #stories-scenario-icon-large {
   margin-bottom: 16px;
