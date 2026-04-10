@@ -54,7 +54,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-01',
-  scenario: 'ww2',
+  scenario: 'ww2us',
   title: 'Citadel',
   description: 'Description.',
   unitPackage: 'de-ww2',
@@ -71,7 +71,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-02',
-  scenario: 'ww2',
+  scenario: 'ww2us',
   title: 'Barbarossa',
   description: 'Description.',
   unitPackage: 'ru-ww2',
@@ -88,7 +88,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-03',
-  scenario: 'ww2',
+  scenario: 'ww2us',
   title: 'Bastion',
   description: 'Description.',
   unitPackage: 'us-ww2',
@@ -105,7 +105,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-04',
-  scenario: 'ww2',
+  scenario: 'ww2us',
   title: 'Breakout',
   description: 'Description.',
   unitPackage: 'us-ww2',
@@ -122,7 +122,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-05',
-  scenario: 'ww2',
+  scenario: 'ww2us',
   title: 'Crossroads',
   description: 'Description.',
   unitPackage: 'us-ww2',
@@ -139,7 +139,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-06',
-  scenario: 'ww2',
+  scenario: 'ww2de',
   title: 'Ironwall',
   description: 'Description.',
   unitPackage: 'us-ww2',
@@ -156,7 +156,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-07',
-  scenario: 'ww2',
+  scenario: 'ww2de',
   title: 'Anvil',
   description: 'Description.',
   unitPackage: 'us-ww2',
