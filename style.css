@@ -1119,6 +1119,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   margin: auto;
   min-height: 0;
   width: 80%;
+  height: 70%;
 }
 
 .back-link {
@@ -1131,12 +1132,13 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   background: none;
   border: none;
   cursor: url('/icons/pointer.svg') 13 14, pointer;
-  padding: 0;
+  padding: 20px;
   display: flex;
   align-items: center;
   gap: 0.4em;
+  transition-duration: 200ms;
 }
-.back-link:hover { opacity: 0.6; }
+.back-link:hover { opacity: 0.6; transform: translateX(-6px);}
 .back-arrow-icon { width: 2em; height: 2em; display: block; }
 
 #settings-mp-status {
