@@ -1235,6 +1235,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   letter-spacing: 0.05em;
   line-height: 1.6;
   margin: 0;
+  max-width: 720px;
 }
 
 #settings-right {

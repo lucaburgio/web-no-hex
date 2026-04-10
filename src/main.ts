@@ -111,7 +111,7 @@ function clearMovePathPreview(): void {
 const MODE_DEFS = [
   { id: 'domination', name: 'DOMINATION', icon: modeIconDomination, image: modeImgDomination, desc: 'ADVANCE ON THE FIELD AND ANNIHILATE THE ENEMY' },
   { id: 'conquest', name: 'CONQUEST', icon: modeIconConquest, image: modeImgConquest, desc: 'RUN FOR CONTROL POINTS AND KEEP THEM TO OWN THE BATTLEFIELD' },
-  { id: 'breakthrough', name: 'BREAKTHROUGH', icon: modeIconBreakthrough, image: modeImgBreakthrough, desc: 'PUSH THROUGH ENEMY LINES AND CAPTURE ALL SECTORS' },
+  { id: 'breakthrough', name: 'BREAKTHROUGH', icon: modeIconBreakthrough, image: modeImgBreakthrough, desc: 'THE ATTACKER MUST PUSH THROUGH THE ENEMY LINES AND CAPTURE ALL SECTORS BUT HAS LIMITED RESOURCERS. THE DEFENDER MUST HOLD CONTROL AND RESIST.' },
 ] as const;
 const modeDisplayImgEl = document.getElementById('mode-display-img') as HTMLImageElement;
 const modeDisplayIconEl = document.getElementById('mode-display-icon') as HTMLImageElement;
