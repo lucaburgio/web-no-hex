@@ -210,39 +210,22 @@
         <span id="settings-mp-status" class="hidden"></span>
       </div>
       <div id="settings-mode-group">
-      <div id="settings-title">START NEW GAME</div>
-      <div id="mode-cards">
-        <button class="mode-card active" data-mode="domination">
-          <div class="mode-card-img"><img id="mode-img-domination" alt="" /></div>
-          <div class="mode-card-footer">
-            <img class="mode-card-icon" src="icons/modes/domination.svg" alt="" />
-            <div class="mode-card-info">
-              <div class="mode-card-name">DOMINATION</div>
-              <div class="mode-card-desc">ADVANCE ON THE FIELD AND ANNIHILATE THE ENEMY</div>
-            </div>
+        <div id="settings-title">START NEW GAME</div>
+        <div id="mode-pager">
+          <button class="mode-pager-btn active" data-mode="domination">DOMINATION</button>
+          <button class="mode-pager-btn" data-mode="conquest">CONQUEST</button>
+          <button class="mode-pager-btn" data-mode="breakthrough">BREAKTHROUGH</button>
+        </div>
+        <div id="mode-display">
+          <div id="mode-display-img-wrap">
+            <img id="mode-display-img" alt="" />
           </div>
-        </button>
-        <button class="mode-card" data-mode="conquest">
-          <div class="mode-card-img"><img id="mode-img-conquest" alt="" /></div>
-          <div class="mode-card-footer">
-            <img class="mode-card-icon" src="icons/modes/conquest.svg" alt="" />
-            <div class="mode-card-info">
-              <div class="mode-card-name">CONQUEST</div>
-              <div class="mode-card-desc">RUN FOR CONTROL POINTS AND KEEP THEM TO OWN THE BATTLEFIELD</div>
-            </div>
+          <div id="mode-display-footer">
+            <img id="mode-display-icon" alt="" />
+            <div id="mode-display-name">DOMINATION</div>
           </div>
-        </button>
-        <button class="mode-card" data-mode="breakthrough">
-          <div class="mode-card-img"><img id="mode-img-breakthrough" alt="" /></div>
-          <div class="mode-card-footer">
-            <img class="mode-card-icon" src="icons/modes/breakthrough.svg" alt="" />
-            <div class="mode-card-info">
-              <div class="mode-card-name">BREAKTHROUGH</div>
-              <div class="mode-card-desc">PUSH THROUGH ENEMY LINES AND CAPTURE ALL SECTORS</div>
-            </div>
-          </div>
-        </button>
-      </div>
+          <p id="mode-display-desc">ADVANCE ON THE FIELD AND ANNIHILATE THE ENEMY</p>
+        </div>
       </div><!-- end settings-mode-group -->
     </div>
     <div id="settings-right">

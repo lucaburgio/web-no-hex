@@ -52,6 +52,9 @@ import { updateConfig, setActiveUnitPackage, setActiveUnitPackagePlayer2, getAva
 import modeImgDomination from '../public/images/modes/domination.png';
 import modeImgConquest from '../public/images/modes/conquest.png';
 import modeImgBreakthrough from '../public/images/modes/breakthrough.png';
+import modeIconDomination from '../public/icons/modes/domination.svg';
+import modeIconConquest from '../public/icons/modes/conquest.svg';
+import modeIconBreakthrough from '../public/icons/modes/breakthrough.svg';
 import chevronFilledIcon from '../public/icons/chevron-filled.svg';
 import { STORIES } from './stories';
 import { SCENARIOS, getScenarioById } from './scenarios';
@@ -105,9 +108,15 @@ function clearMovePathPreview(): void {
   renderMovePath(svg, []);
   movePathPreviewKey = null;
 }
-(document.getElementById('mode-img-domination') as HTMLImageElement).src = modeImgDomination;
-(document.getElementById('mode-img-conquest') as HTMLImageElement).src = modeImgConquest;
-(document.getElementById('mode-img-breakthrough') as HTMLImageElement).src = modeImgBreakthrough;
+const MODE_DEFS = [
+  { id: 'domination', name: 'DOMINATION', icon: modeIconDomination, image: modeImgDomination, desc: 'ADVANCE ON THE FIELD AND ANNIHILATE THE ENEMY' },
+  { id: 'conquest', name: 'CONQUEST', icon: modeIconConquest, image: modeImgConquest, desc: 'RUN FOR CONTROL POINTS AND KEEP THEM TO OWN THE BATTLEFIELD' },
+  { id: 'breakthrough', name: 'BREAKTHROUGH', icon: modeIconBreakthrough, image: modeImgBreakthrough, desc: 'PUSH THROUGH ENEMY LINES AND CAPTURE ALL SECTORS' },
+] as const;
+const modeDisplayImgEl = document.getElementById('mode-display-img') as HTMLImageElement;
+const modeDisplayIconEl = document.getElementById('mode-display-icon') as HTMLImageElement;
+const modeDisplayNameEl = document.getElementById('mode-display-name') as HTMLElement;
+const modeDisplayDescEl = document.getElementById('mode-display-desc') as HTMLElement;
 
 const logEl      = document.getElementById('log') as HTMLUListElement;
 const phaseEl    = document.getElementById('phase') as HTMLElement;
@@ -1368,23 +1377,105 @@ document.getElementById('cfg-gameMode')!.addEventListener('change', () => {
 });
 document.getElementById('cfg-breakthroughRandomRoles')?.addEventListener('change', syncBreakthroughRoleControls);
 
-// Mode cards — visual game mode picker
+// Mode pager — visual game mode picker
 function syncModeCards(): void {
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
-  document.querySelectorAll<HTMLElement>('.mode-card').forEach(card => {
-    card.classList.toggle('active', card.dataset.mode === gameModeEl.value);
+  document.querySelectorAll<HTMLElement>('.mode-pager-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === gameModeEl.value);
   });
+  const modeDef = MODE_DEFS.find(m => m.id === gameModeEl.value);
+  if (modeDef) {
+    modeDisplayImgEl.src = modeDef.image;
+    modeDisplayIconEl.src = modeDef.icon;
+    modeDisplayNameEl.textContent = modeDef.name;
+    modeDisplayDescEl.textContent = modeDef.desc;
+  }
 }
 
-document.querySelectorAll<HTMLElement>('.mode-card').forEach(card => {
-  card.addEventListener('click', () => {
+function resetModeParallaxLayers(): void {
+  gsap.killTweensOf([modeDisplayImgEl, modeDisplayIconEl, modeDisplayNameEl, modeDisplayDescEl]);
+  gsap.set(modeDisplayImgEl, { y: 0, scale: 1 });
+  gsap.set(modeDisplayIconEl, { y: 0 });
+  gsap.set(modeDisplayNameEl, { y: 0, opacity: 1 });
+  gsap.set(modeDisplayDescEl, { y: 0, opacity: 1 });
+}
+
+function selectMode(modeId: string, options?: { animated?: boolean; direction?: 1 | -1 }): void {
+  const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
+  gameModeEl.value = modeId;
+  gameModeEl.dispatchEvent(new Event('settings-select-sync'));
+  gameModeEl.dispatchEvent(new Event('change'));
+
+  let animated = options?.animated ?? false;
+  if (animated && window.matchMedia('(prefers-reduced-motion: reduce)').matches) animated = false;
+  const dir = options?.direction ?? 1;
+
+  resetModeParallaxLayers();
+  if (!animated) return;
+
+  gsap
+    .timeline({ defaults: { ease: 'power2.out' } })
+    .add(
+      gsap.fromTo(
+        modeDisplayImgEl,
+        { y: dir * 48, scale: 1.07 },
+        { y: 0, scale: 1, duration: 0.55, ease: 'power3.out' },
+      ),
+      0,
+    )
+    .add(gsap.fromTo(modeDisplayIconEl, { y: dir * 8 }, { y: 0, duration: 0.45, ease: 'power3.out' }), 0)
+    .add(
+      gsap.fromTo(modeDisplayNameEl, { y: dir * 10 }, { y: 0, duration: 0.5, ease: 'power3.out' }),
+      0,
+    )
+    .add(
+      gsap.fromTo(
+        modeDisplayDescEl,
+        { y: dir * 14, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.48 },
+      ),
+      0.04,
+    );
+}
+
+document.querySelectorAll<HTMLElement>('.mode-pager-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
     const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
-    if (card.dataset.mode) {
-      gameModeEl.value = card.dataset.mode;
-      gameModeEl.dispatchEvent(new Event('settings-select-sync'));
-      gameModeEl.dispatchEvent(new Event('change'));
-    }
+    const currentMode = gameModeEl.value;
+    const newMode = btn.dataset.mode;
+    if (!newMode || newMode === currentMode) return;
+    const modeIds = MODE_DEFS.map(m => m.id);
+    const fromIdx = modeIds.indexOf(currentMode);
+    const toIdx = modeIds.indexOf(newMode);
+    const direction = toIdx > fromIdx ? 1 : -1;
+    selectMode(newMode, { animated: true, direction });
   });
+});
+
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (settingsOverlayEl.classList.contains('hidden')) return;
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const t = e.target as HTMLElement | null;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+
+  const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
+  const modeIds = MODE_DEFS.map(m => m.id);
+  const idx = modeIds.indexOf(gameModeEl.value);
+  if (idx < 0) return;
+
+  if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    const next = Math.min(idx + 1, modeIds.length - 1);
+    if (next === idx) return;
+    selectMode(modeIds[next]!, { animated: true, direction: 1 });
+    return;
+  }
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    const prev = Math.max(idx - 1, 0);
+    if (prev === idx) return;
+    selectMode(modeIds[prev]!, { animated: true, direction: -1 });
+  }
 });
 
 const territoryQuotaLabelEl = document.getElementById('cfg-territoryQuota-label') as HTMLLabelElement | null;
