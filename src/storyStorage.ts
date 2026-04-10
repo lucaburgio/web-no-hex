@@ -11,6 +11,7 @@ const DEFAULT_PROGRESS: StoryProgress = {
   reachedIndex: 0,
   completedIds: [],
   activeStoryId: null,
+  completedTurns: {},
 };
 
 export function loadStoryProgress(): StoryProgress {
@@ -22,6 +23,7 @@ export function loadStoryProgress(): StoryProgress {
       reachedIndex: p.reachedIndex ?? 0,
       completedIds: p.completedIds ?? [],
       activeStoryId: p.activeStoryId ?? null,
+      completedTurns: p.completedTurns ?? {},
     };
   } catch {
     return { ...DEFAULT_PROGRESS };

@@ -171,6 +171,20 @@ export interface StoryProgress {
   completedIds: string[];
   /** ID of the story currently in progress (has a saved game state). */
   activeStoryId: string | null;
+  /** Turn count recorded when each story was completed (storyId → turn). */
+  completedTurns: Record<string, number>;
+}
+
+export interface ScenarioDef {
+  /** Matches the `scenario` field on StoryDef entries. */
+  id: string;
+  /** Imported SVG string used as icon in the scenario rail. */
+  icon: string;
+  title: string;
+  /** Imported image URL shown in the scenario detail panel. */
+  image: string;
+  miniTitle: string;
+  description: string;
 }
 
 export interface GameConfig {

@@ -53,6 +53,7 @@ import modeImgConquest from '../public/images/modes/conquest.png';
 import modeImgBreakthrough from '../public/images/modes/breakthrough.png';
 import chevronFilledIcon from '../public/icons/chevron-filled.svg';
 import { STORIES } from './stories';
+import { SCENARIOS, getScenarioById } from './scenarios';
 import {
   loadStoryProgress,
   saveStoryProgress,
@@ -267,9 +268,16 @@ const menuMapEditorBtn     = document.getElementById('menu-map-editor-btn') as H
 
 // ── Stories DOM refs ──────────────────────────────────────────────────────────
 
-const storiesOverlayEl = document.getElementById('stories-overlay') as HTMLDivElement;
-const storiesListEl    = document.getElementById('stories-list') as HTMLDivElement;
-const storiesBackBtn   = document.getElementById('stories-back-btn') as HTMLButtonElement;
+const storiesOverlayEl       = document.getElementById('stories-overlay') as HTMLDivElement;
+const storiesListEl          = document.getElementById('stories-list') as HTMLDivElement;
+const storiesBackBtn         = document.getElementById('stories-back-btn') as HTMLButtonElement;
+const storiesScenarioRailEl  = document.getElementById('stories-scenario-rail') as HTMLDivElement;
+const storiesScenarioIconEl  = document.getElementById('stories-scenario-icon-large') as HTMLDivElement;
+const storiesScenarioTitleEl = document.getElementById('stories-scenario-title') as HTMLHeadingElement;
+const storiesScenarioImgEl   = document.getElementById('stories-scenario-image') as HTMLImageElement;
+const storiesScenarioMiniTitleEl = document.getElementById('stories-scenario-mini-title') as HTMLDivElement;
+const storiesScenarioDescEl  = document.getElementById('stories-scenario-description') as HTMLParagraphElement;
+const storiesScenarioProgressEl = document.getElementById('stories-scenario-progress') as HTMLDivElement;
 const newGameConfirmOverlay = document.getElementById('new-game-confirm-overlay') as HTMLDivElement;
 const confirmNewGameBtn    = document.getElementById('confirm-new-game-btn') as HTMLButtonElement;
 const cancelNewGameBtn     = document.getElementById('cancel-new-game-btn') as HTMLButtonElement;
@@ -309,6 +317,9 @@ let activeStoryIndex: number | null = null;
 
 /** Story index awaiting start confirmation (overwriting existing save). */
 let pendingStoryStartIndex: number | null = null;
+
+/** Currently selected scenario ID in the stories UI. */
+let activeScenarioId: string = SCENARIOS[0]?.id ?? '';
 
 /** Unit package selected in game settings for player 1 (south); persists across opens. */
 let settingsUnitPackage = 'standard';
@@ -563,7 +574,8 @@ function hideMainMenu(): void {
 
 function showStoriesOverlay(): void {
   hideMainMenu();
-  buildStoriesList();
+  buildScenarioRail();
+  selectScenario(activeScenarioId);
   storiesOverlayEl.classList.remove('hidden');
 }
 
@@ -571,7 +583,48 @@ function hideStoriesOverlay(): void {
   storiesOverlayEl.classList.add('hidden');
 }
 
-function buildStoriesList(): void {
+function buildScenarioRail(): void {
+  storiesScenarioRailEl.innerHTML = '';
+  for (const scenario of SCENARIOS) {
+    const btn = document.createElement('button');
+    btn.className = 'scenario-rail-btn' + (scenario.id === activeScenarioId ? ' active' : '');
+    btn.title = scenario.title;
+    const img = document.createElement('img');
+    img.src = scenario.icon;
+    img.alt = scenario.title;
+    btn.appendChild(img);
+    btn.addEventListener('click', () => selectScenario(scenario.id));
+    storiesScenarioRailEl.appendChild(btn);
+  }
+}
+
+function selectScenario(scenarioId: string): void {
+  activeScenarioId = scenarioId;
+
+  // Update rail active state
+  storiesScenarioRailEl.querySelectorAll<HTMLButtonElement>('.scenario-rail-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', SCENARIOS[i]?.id === scenarioId);
+  });
+
+  const scenario = getScenarioById(scenarioId);
+  if (!scenario) return;
+
+  // Update scenario detail panel
+  storiesScenarioIconEl.innerHTML = '';
+  const iconImg = document.createElement('img');
+  iconImg.src = scenario.icon;
+  iconImg.alt = scenario.title;
+  storiesScenarioIconEl.appendChild(iconImg);
+
+  storiesScenarioTitleEl.textContent = scenario.title;
+  storiesScenarioImgEl.src = scenario.image;
+  storiesScenarioMiniTitleEl.textContent = scenario.miniTitle;
+  storiesScenarioDescEl.textContent = scenario.description;
+
+  buildStoriesList(scenarioId);
+}
+
+function buildStoriesList(scenarioId: string): void {
   const progress = loadStoryProgress();
 
   // Auto-unlock: walk stories in order and unlock any that should be reachable
@@ -585,58 +638,69 @@ function buildStoriesList(): void {
     saveStoryProgress(progress);
   }
 
+  const scenarioStories = STORIES.filter(s => s.scenario === scenarioId);
+  const completedInScenario = scenarioStories.filter(s => progress.completedIds.includes(s.id)).length;
+
+  // Update progress indicator
+  storiesScenarioProgressEl.innerHTML = '';
+  const progressText = document.createElement('span');
+  progressText.textContent = `${completedInScenario} / ${scenarioStories.length}`;
+  const progressBar = document.createElement('div');
+  progressBar.className = 'stories-progress-bar';
+  const progressFill = document.createElement('div');
+  progressFill.className = 'stories-progress-bar-fill';
+  progressFill.style.width = scenarioStories.length > 0
+    ? `${(completedInScenario / scenarioStories.length) * 100}%`
+    : '0%';
+  progressBar.appendChild(progressFill);
+  storiesScenarioProgressEl.appendChild(progressText);
+  storiesScenarioProgressEl.appendChild(progressBar);
+
   storiesListEl.innerHTML = '';
 
-  STORIES.forEach((story, index) => {
+  scenarioStories.forEach(story => {
+    const index = STORIES.indexOf(story);
     const isLocked = index > progress.reachedIndex;
     const isCompleted = progress.completedIds.includes(story.id);
     const hasSave = progress.activeStoryId === story.id && hasStoryGameState();
 
     const card = document.createElement('div');
-    card.className = 'story-card' +
-      (isCompleted ? ' story-completed' : '') +
-      (isLocked ? ' story-locked' : '');
+    card.className = 'story-card' + (isLocked ? ' story-locked' : '');
+
+    // Dashed thumbnail
+    const thumb = document.createElement('div');
+    thumb.className = 'story-card-thumb';
+    card.appendChild(thumb);
 
     const info = document.createElement('div');
     info.className = 'story-card-info';
 
-    const titleRow = document.createElement('div');
-    titleRow.className = 'story-card-title-row';
-
-    const statusIcon = document.createElement('span');
-    statusIcon.className = 'story-status-icon';
-    if (isLocked) {
-      statusIcon.textContent = '🔒';
-      titleRow.appendChild(statusIcon);
-    } else if (isCompleted || hasSave) {
-      statusIcon.textContent = isCompleted ? '✓' : '→';
-      titleRow.appendChild(statusIcon);
-    }
-
-    const titleEl = document.createElement('span');
+    const titleEl = document.createElement('div');
     titleEl.className = 'story-card-title';
     titleEl.textContent = story.title;
-    titleRow.appendChild(titleEl);
-    info.appendChild(titleRow);
+    info.appendChild(titleEl);
 
-    const descEl = document.createElement('p');
-    descEl.className = 'story-card-desc';
-    descEl.textContent = story.description;
-    info.appendChild(descEl);
-
-    if (story.unitPackage) {
-      const badge = document.createElement('span');
-      badge.className = 'story-package-badge';
-      badge.textContent = story.unitPackage;
-      info.appendChild(badge);
+    const statusEl = document.createElement('div');
+    statusEl.className = 'story-card-status';
+    if (isLocked) {
+      statusEl.textContent = 'LOCKED';
+    } else if (hasSave) {
+      statusEl.textContent = 'IN PROGRESS';
+    } else if (isCompleted) {
+      const turns = progress.completedTurns[story.id];
+      statusEl.textContent = turns != null ? `COMPLETED IN ${turns} TURNS` : 'COMPLETED';
+    } else {
+      statusEl.textContent = 'TODO';
     }
+    info.appendChild(statusEl);
 
     card.appendChild(info);
 
     if (!isLocked) {
       const playBtn = document.createElement('button');
-      playBtn.className = 'menu-btn story-play-btn';
-      playBtn.textContent = hasSave ? 'CONTINUE' : isCompleted ? 'REPLAY' : 'PLAY';
+      const label = hasSave ? 'CONTINUE' : isCompleted ? 'REPLAY' : 'PLAY';
+      playBtn.className = `story-play-btn ${isCompleted || hasSave ? 'button-secondary' : 'button-primary'}`;
+      playBtn.textContent = label;
 
       playBtn.addEventListener('click', () => {
         if (hasSave) {
@@ -646,7 +710,6 @@ function buildStoriesList(): void {
             return;
           }
         }
-        // Starting fresh — confirm if another story's save would be overwritten
         if (hasStoryGameState()) {
           pendingStoryStartIndex = index;
           storyStartConfirmOverlay.classList.remove('hidden');
@@ -677,6 +740,7 @@ function handleStoryWin(): void {
   const progress = loadStoryProgress();
   if (!progress.completedIds.includes(story.id)) {
     progress.completedIds.push(story.id);
+    progress.completedTurns[story.id] = state.turn;
   }
   const nextIndex = activeStoryIndex! + 1;
   if (nextIndex < STORIES.length && nextIndex > progress.reachedIndex) {
@@ -2419,7 +2483,7 @@ function leaveEndGameToMainMenu(): void {
   hideUnitPicker();
   if (activeStoryIndex !== null) {
     restoreConfigAfterStory();
-    buildStoriesList();
+    buildStoriesList(activeScenarioId);
     storiesOverlayEl.classList.remove('hidden');
   } else {
     setActiveUnitPackage(null);
@@ -2843,7 +2907,7 @@ pauseReturnBtn.addEventListener('click', () => {
   hideUnitPicker();
   if (activeStoryIndex !== null) {
     restoreConfigAfterStory();
-    buildStoriesList();
+    buildStoriesList(activeScenarioId);
     storiesOverlayEl.classList.remove('hidden');
   } else {
     setActiveUnitPackage(null);
