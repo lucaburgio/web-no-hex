@@ -1167,6 +1167,10 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   max-height: 520px;
   max-width: 293px;
   text-rendering: geometricPrecision;
+  transition: transform 0.2s ease;
+}
+.mode-card:hover {
+  transform: scale(1.02);
 }
 
 .mode-card-img {
