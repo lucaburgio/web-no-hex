@@ -81,21 +81,26 @@
 
   <!-- Stories overlay -->
   <div id="stories-overlay" class="hidden">
-    <!-- Scenario icon rail (far left) -->
-    <div id="stories-scenario-rail">
-      <!-- Populated by JS -->
-    </div>
-    <!-- Scenario detail panel -->
-    <div id="stories-scenario-panel">
-      <button id="stories-back-btn" class="back-link"><img src="icons/back-arrow.svg" alt="" class="back-arrow-icon"> BACK</button>
-      <div id="stories-scenario-icon-large"></div>
-      <h2 id="stories-scenario-title"></h2>
-      <div id="stories-scenario-image-wrap">
-        <img id="stories-scenario-image" alt="" />
+    <!-- Left panel: back bar + rail + scenario detail -->
+    <div id="stories-left-panel">
+      <div id="stories-top-bar">
+        <button id="stories-back-btn" class="back-link"><img src="icons/back-arrow.svg" alt="" class="back-arrow-icon"> BACK</button>
       </div>
-      <div id="stories-scenario-mini-title"></div>
-      <p id="stories-scenario-description"></p>
-      <div id="stories-scenario-progress"></div>
+      <div id="stories-left-body">
+        <div id="stories-scenario-rail">
+          <!-- Populated by JS -->
+        </div>
+        <div id="stories-scenario-detail">
+          <div id="stories-scenario-icon-large"></div>
+          <h2 id="stories-scenario-title"></h2>
+          <div id="stories-scenario-image-wrap">
+            <img id="stories-scenario-image" alt="" />
+          </div>
+          <div id="stories-scenario-mini-title"></div>
+          <p id="stories-scenario-description"></p>
+          <div id="stories-scenario-progress"></div>
+        </div>
+      </div>
     </div>
     <!-- Story list -->
     <div id="stories-right">
