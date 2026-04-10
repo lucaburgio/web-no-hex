@@ -1662,7 +1662,7 @@ select.settings-input.settings-select option {
 
 /* Left panel (back bar + rail + scenario detail) */
 #stories-left-panel {
-  width: 680px;
+  width: 60%;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -1688,13 +1688,13 @@ select.settings-input.settings-select option {
 
 /* Scenario icon rail */
 #stories-scenario-rail {
-  width: 56px;
+  width: 120px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 40px;
 }
 
 .scenario-rail-btn {
@@ -1718,7 +1718,9 @@ select.settings-input.settings-select option {
 
 /* Scenario detail */
 #stories-scenario-detail {
+  margin: auto;
   flex: 1;
+  max-width: 700px;
   display: flex;
   flex-direction: column;
   padding: 0 48px 48px;

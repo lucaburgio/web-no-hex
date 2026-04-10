@@ -1,15 +1,15 @@
 import type { ScenarioDef } from './types';
 import trainingIcon from '../public/icons/scenarios/training.svg';
 import usWw2Icon from '../public/icons/scenarios/us-ww2.svg';
-import dominationImg from '../public/images/modes/domination.png';
-import conquestImg from '../public/images/modes/conquest.png';
+import trainingImg from '../public/images/scenarios/training.png';
+import usww2Img from '../public/images/scenarios/us-ww2.png';
 
 export const SCENARIOS: ScenarioDef[] = [
   {
     id: 'tutorial',
     icon: trainingIcon,
     title: 'BASIC TRAINING',
-    image: dominationImg,
+    image: trainingImg,
     miniTitle: 'TUTORIAL',
     description: 'Learn the fundamentals of hex-grid combat. Master infantry movement, tank breakthroughs, and artillery fire before heading to the front.',
   },
@@ -17,7 +17,7 @@ export const SCENARIOS: ScenarioDef[] = [
     id: 'ww2',
     icon: usWw2Icon,
     title: 'OUR SOLDIERS FRONTIER',
-    image: conquestImg,
+    image: usww2Img,
     miniTitle: 'SECOND WORLD WAR',
     description: 'The largest conflict in human history. Command Allied or Axis forces across a series of tactical engagements on the Western and Eastern fronts.',
   },
