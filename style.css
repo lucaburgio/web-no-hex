@@ -1821,24 +1821,12 @@ select.settings-input.settings-select option {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 14px 12px;
-  margin: 0 -12px;
+  padding: 14px 0;
   border-bottom: 1px solid rgba(0,0,0,0.07);
-  border-radius: 2px;
-  cursor: pointer;
-  transition: background 0.2s ease, box-shadow 0.25s ease;
 }
 .story-card:first-child { border-top: 1px solid rgba(0,0,0,0.07); }
 
-.story-card-focused {
-  background: rgba(0, 0, 0, 0.045);
-  box-shadow: inset 3px 0 0 0 var(--color-dark);
-}
-.story-card:not(.story-locked):hover {
-  background: rgba(0, 0, 0, 0.03);
-}
 .story-card.story-locked {
-  cursor: default;
   opacity: 0.35;
   pointer-events: none;
 }

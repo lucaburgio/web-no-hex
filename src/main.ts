@@ -46,7 +46,7 @@ import { isInEnemyZoC } from './game';
 import type { MoveAnimation } from './renderer';
 import config from './gameconfig';
 import gsap from 'gsap';
-import type { GameState, Unit, CombatForecast, Owner, CombatVfxPayload, GameMode, StoryDef } from './types';
+import type { GameState, Unit, CombatForecast, Owner, CombatVfxPayload, GameMode } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
 import { updateConfig, setActiveUnitPackage, setActiveUnitPackagePlayer2, getAvailableUnitTypes } from './gameconfig';
 import modeImgDomination from '../public/images/modes/domination.png';
@@ -322,11 +322,6 @@ let pendingStoryStartIndex: number | null = null;
 /** Currently selected scenario ID in the stories UI. */
 let activeScenarioId: string = SCENARIOS[0]?.id ?? '';
 
-/** Stories listed for the active scenario (stories overlay keyboard nav). */
-let storiesListScenarioStories: StoryDef[] = [];
-/** Focused row index within `storiesListScenarioStories`. */
-let storiesListFocusIndex = 0;
-
 /** Unit package selected in game settings for player 1 (south); persists across opens. */
 let settingsUnitPackage = 'standard';
 /** Unit package selected in game settings for player 2 / AI (north); persists across opens. */
@@ -591,68 +586,76 @@ function hideStoriesOverlay(): void {
 }
 
 function resetStoriesParallaxLayers(): void {
-  gsap.killTweensOf([storiesScenarioImgEl, storiesScenarioTitleEl, storiesScenarioMiniTitleEl, storiesScenarioDescEl]);
+  gsap.killTweensOf([
+    storiesScenarioIconEl,
+    storiesScenarioImgEl,
+    storiesScenarioTitleEl,
+    storiesScenarioMiniTitleEl,
+    storiesScenarioDescEl,
+  ]);
+  gsap.set(storiesScenarioIconEl, { y: 0 });
   gsap.set(storiesScenarioImgEl, { y: 0, scale: 1 });
   gsap.set(storiesScenarioTitleEl, { y: 0, opacity: 1 });
   gsap.set(storiesScenarioMiniTitleEl, { y: 0, opacity: 1 });
   gsap.set(storiesScenarioDescEl, { y: 0, opacity: 1 });
 }
 
-function handleStoryCardPlay(globalIndex: number): void {
-  const story = STORIES[globalIndex];
-  if (!story) return;
-  const progress = loadStoryProgress();
-  if (globalIndex > progress.reachedIndex) return;
-
-  const hasSave = progress.activeStoryId === story.id && hasStoryGameState();
-  if (hasSave) {
-    const savedState = loadStoryGameState();
-    if (savedState) {
-      startStory(globalIndex, savedState);
-      return;
-    }
+function buildScenarioRail(): void {
+  storiesScenarioRailEl.innerHTML = '';
+  for (const scenario of SCENARIOS) {
+    const btn = document.createElement('button');
+    btn.className = 'scenario-rail-btn' + (scenario.id === activeScenarioId ? ' active' : '');
+    btn.title = scenario.title;
+    const img = document.createElement('img');
+    img.src = scenario.icon;
+    img.alt = scenario.title;
+    btn.appendChild(img);
+    btn.addEventListener('click', () => selectScenario(scenario.id));
+    storiesScenarioRailEl.appendChild(btn);
   }
-  if (hasStoryGameState()) {
-    pendingStoryStartIndex = globalIndex;
-    storyStartConfirmOverlay.classList.remove('hidden');
-    return;
-  }
-  startStory(globalIndex);
 }
 
-function setStoriesListFocus(
-  newIndex: number,
+function selectScenario(
+  scenarioId: string,
   options?: { animated?: boolean; direction?: 1 | -1 },
 ): void {
-  if (storiesListScenarioStories.length === 0) return;
-  const clamped = Math.max(0, Math.min(newIndex, storiesListScenarioStories.length - 1));
-  let animated = options?.animated ?? true;
-  if (animated && typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  activeScenarioId = scenarioId;
+
+  // Update rail active state
+  storiesScenarioRailEl.querySelectorAll<HTMLButtonElement>('.scenario-rail-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', SCENARIOS[i]?.id === scenarioId);
+  });
+
+  const scenario = getScenarioById(scenarioId);
+  if (!scenario) return;
+
+  let animated = options?.animated ?? false;
+  if (
+    animated &&
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
     animated = false;
   }
-  const dir =
-    options?.direction ??
-    (clamped === storiesListFocusIndex ? 1 : clamped > storiesListFocusIndex ? 1 : -1);
+  const dir = options?.direction ?? 1;
 
-  if (animated && clamped === storiesListFocusIndex) return;
+  // Update scenario detail panel
+  storiesScenarioIconEl.innerHTML = '';
+  const iconImg = document.createElement('img');
+  iconImg.src = scenario.icon;
+  iconImg.alt = scenario.title;
+  storiesScenarioIconEl.appendChild(iconImg);
 
-  storiesListFocusIndex = clamped;
+  storiesScenarioTitleEl.textContent = scenario.title;
+  storiesScenarioImgEl.src = scenario.image;
+  storiesScenarioMiniTitleEl.textContent = scenario.miniTitle;
+  storiesScenarioDescEl.textContent = scenario.description;
 
-  const cards = storiesListEl.querySelectorAll('.story-card');
-  cards.forEach((card, i) => {
-    card.classList.toggle('story-card-focused', i === clamped);
-  });
+  buildStoriesList(scenarioId);
 
-  const story = storiesListScenarioStories[clamped];
-  if (story) {
-    storiesScenarioMiniTitleEl.textContent = story.title;
-    storiesScenarioDescEl.textContent = story.description;
-  }
-
-  (cards[clamped] as HTMLElement | undefined)?.scrollIntoView({
-    block: 'nearest',
-    behavior: animated ? 'smooth' : 'auto',
-  });
+  const railIdx = SCENARIOS.findIndex(s => s.id === scenarioId);
+  const railBtns = storiesScenarioRailEl.querySelectorAll<HTMLButtonElement>('.scenario-rail-btn');
+  railBtns[railIdx]?.scrollIntoView({ block: 'nearest', behavior: animated ? 'smooth' : 'auto' });
 
   if (!animated) {
     resetStoriesParallaxLayers();
@@ -661,6 +664,7 @@ function setStoriesListFocus(
 
   resetStoriesParallaxLayers();
 
+  const icon = storiesScenarioIconEl;
   const img = storiesScenarioImgEl;
   const title = storiesScenarioTitleEl;
   const mini = storiesScenarioMiniTitleEl;
@@ -676,6 +680,7 @@ function setStoriesListFocus(
       ),
       0,
     )
+    .add(gsap.fromTo(icon, { y: dir * 8 }, { y: 0, duration: 0.45, ease: 'power3.out' }), 0)
     .add(
       gsap.fromTo(title, { y: dir * 10 }, { y: 0, duration: 0.5, ease: 'power3.out' }),
       0,
@@ -698,47 +703,6 @@ function setStoriesListFocus(
     );
 }
 
-function buildScenarioRail(): void {
-  storiesScenarioRailEl.innerHTML = '';
-  for (const scenario of SCENARIOS) {
-    const btn = document.createElement('button');
-    btn.className = 'scenario-rail-btn' + (scenario.id === activeScenarioId ? ' active' : '');
-    btn.title = scenario.title;
-    const img = document.createElement('img');
-    img.src = scenario.icon;
-    img.alt = scenario.title;
-    btn.appendChild(img);
-    btn.addEventListener('click', () => selectScenario(scenario.id));
-    storiesScenarioRailEl.appendChild(btn);
-  }
-}
-
-function selectScenario(scenarioId: string): void {
-  activeScenarioId = scenarioId;
-
-  // Update rail active state
-  storiesScenarioRailEl.querySelectorAll<HTMLButtonElement>('.scenario-rail-btn').forEach((btn, i) => {
-    btn.classList.toggle('active', SCENARIOS[i]?.id === scenarioId);
-  });
-
-  const scenario = getScenarioById(scenarioId);
-  if (!scenario) return;
-
-  // Update scenario detail panel
-  storiesScenarioIconEl.innerHTML = '';
-  const iconImg = document.createElement('img');
-  iconImg.src = scenario.icon;
-  iconImg.alt = scenario.title;
-  storiesScenarioIconEl.appendChild(iconImg);
-
-  storiesScenarioTitleEl.textContent = scenario.title;
-  storiesScenarioImgEl.src = scenario.image;
-  storiesScenarioMiniTitleEl.textContent = scenario.miniTitle;
-  storiesScenarioDescEl.textContent = scenario.description;
-
-  buildStoriesList(scenarioId);
-}
-
 function buildStoriesList(scenarioId: string): void {
   const progress = loadStoryProgress();
 
@@ -754,7 +718,6 @@ function buildStoriesList(scenarioId: string): void {
   }
 
   const scenarioStories = STORIES.filter(s => s.scenario === scenarioId);
-  storiesListScenarioStories = scenarioStories;
   const completedInScenario = scenarioStories.filter(s => progress.completedIds.includes(s.id)).length;
 
   // Update progress indicator
@@ -820,25 +783,26 @@ function buildStoriesList(scenarioId: string): void {
       playBtn.textContent = label;
 
       playBtn.addEventListener('click', () => {
-        handleStoryCardPlay(index);
+        if (hasSave) {
+          const savedState = loadStoryGameState();
+          if (savedState) {
+            startStory(index, savedState);
+            return;
+          }
+        }
+        if (hasStoryGameState()) {
+          pendingStoryStartIndex = index;
+          storyStartConfirmOverlay.classList.remove('hidden');
+          return;
+        }
+        startStory(index);
       });
 
       card.appendChild(playBtn);
     }
 
-    const listIdx = scenarioStories.indexOf(story);
-    card.addEventListener('click', e => {
-      if ((e.target as HTMLElement).closest('.story-play-btn')) return;
-      setStoriesListFocus(listIdx, {
-        animated: true,
-        direction: listIdx > storiesListFocusIndex ? 1 : -1,
-      });
-    });
-
     storiesListEl.appendChild(card);
   });
-
-  setStoriesListFocus(0, { animated: false });
 }
 
 function restoreConfigAfterStory(): void {
@@ -926,7 +890,7 @@ storiesBackBtn.addEventListener('click', () => {
 
 document.addEventListener('keydown', (e: KeyboardEvent) => {
   if (storiesOverlayEl.classList.contains('hidden')) return;
-  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Enter') return;
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
 
   const t = e.target as HTMLElement | null;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) {
@@ -934,25 +898,24 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   }
 
   if (!storyStartConfirmOverlay.classList.contains('hidden')) return;
-  if (storiesListScenarioStories.length === 0) return;
+  if (SCENARIOS.length === 0) return;
 
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    const story = storiesListScenarioStories[storiesListFocusIndex];
-    if (!story) return;
-    handleStoryCardPlay(STORIES.indexOf(story));
-    return;
-  }
+  const idx = SCENARIOS.findIndex(s => s.id === activeScenarioId);
+  if (idx < 0) return;
 
   if (e.key === 'ArrowDown') {
     e.preventDefault();
-    setStoriesListFocus(storiesListFocusIndex + 1, { animated: true, direction: 1 });
+    const next = Math.min(idx + 1, SCENARIOS.length - 1);
+    if (next === idx) return;
+    selectScenario(SCENARIOS[next]!.id, { animated: true, direction: 1 });
     return;
   }
 
   if (e.key === 'ArrowUp') {
     e.preventDefault();
-    setStoriesListFocus(storiesListFocusIndex - 1, { animated: true, direction: -1 });
+    const prev = Math.max(idx - 1, 0);
+    if (prev === idx) return;
+    selectScenario(SCENARIOS[prev]!.id, { animated: true, direction: -1 });
   }
 });
 
