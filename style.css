@@ -1695,29 +1695,26 @@ select.settings-input.settings-select option {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-right: 1px solid rgba(0,0,0,0.08);
 }
 
 .scenario-rail-btn {
-  width: 36px;
-  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: none;
   border: none;
   cursor: pointer;
-  padding: 6px;
-  opacity: 0.35;
-  transition: opacity 0.15s;
+  padding: 0;
 }
 .scenario-rail-btn img {
-  width: 22px;
-  height: 22px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
+  filter: brightness(0) invert(1) brightness(0.65);
+  transition: filter 0.15s;
 }
-.scenario-rail-btn:hover { opacity: 0.7; }
-.scenario-rail-btn.active { opacity: 1; }
+.scenario-rail-btn:hover img { filter: brightness(0); }
+.scenario-rail-btn.active img { filter: brightness(0); }
 
 /* Scenario detail */
 #stories-scenario-detail {
@@ -1735,6 +1732,7 @@ select.settings-input.settings-select option {
   width: 32px;
   height: 32px;
   object-fit: contain;
+  filter: brightness(0);
 }
 
 #stories-scenario-title {
