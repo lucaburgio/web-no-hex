@@ -1116,8 +1116,9 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex: 1;
+  margin: auto;
   min-height: 0;
+  width: 80%;
 }
 
 .back-link {
@@ -1148,53 +1149,31 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 #settings-mp-status.hidden { display: none; }
 
-#settings-title {
-  font-family: 'Disket Mono', monospace;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--color-dark);
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  line-height: 1.2;
-  margin-bottom: 2rem;
-  width: 100%;
-}
-
 #mode-pager {
   display: flex;
   flex-direction: row;
   gap: 2rem;
   width: 100%;
-  margin-bottom: 1.5rem;
+  margin-bottom: 4rem;
 }
 
 .mode-pager-btn {
   font-family: 'Disket Mono', monospace;
-  font-size: 0.75rem;
+  text-rendering: geometricPrecision;
   font-weight: 700;
-  color: var(--color-gray-400);
+  color: var(--color-gray-300);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
   background: none;
   border: none;
-  padding: 0 0 4px;
   cursor: url('/icons/pointer.svg') 13 14, pointer;
   position: relative;
   transition: color 0.15s;
+  padding: 18px;
 }
 
 .mode-pager-btn.active {
   color: var(--color-dark);
-}
-
-.mode-pager-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--color-dark);
+  background: var(--color-gray-100);
 }
 
 #mode-display {
@@ -1206,11 +1185,10 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 #mode-display-img-wrap {
-  width: 100%;
+  max-width: 600px;
   overflow: hidden;
   aspect-ratio: 16 / 9;
-  background: var(--color-gray-100);
-  margin-bottom: 1.25rem;
+  margin-bottom: 40px;
   flex-shrink: 0;
 }
 
@@ -1231,15 +1209,15 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 #mode-display-icon {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   filter: brightness(0);
 }
 
 #mode-display-name {
   font-family: 'Disket Mono', monospace;
-  font-size: 1.6rem;
+  font-size: 1.45rem;
   font-weight: 700;
   color: var(--color-dark);
   text-transform: uppercase;
@@ -1259,7 +1237,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 #settings-right {
-  width: 380px;
+  width: 420px;
   flex-shrink: 0;
   overflow: hidden;
   display: flex;
@@ -1700,8 +1678,8 @@ select.settings-input.settings-select option {
   padding: 0;
 }
 .scenario-rail-btn img {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
   filter: brightness(0) invert(1) brightness(0.65);
   transition: filter 0.15s;
