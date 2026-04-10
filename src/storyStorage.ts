@@ -8,7 +8,7 @@ const LAST_SESSION_KEY = 'web-strategic-last-session';
 export type LastSessionType = 'vsAI' | 'story';
 
 const DEFAULT_PROGRESS: StoryProgress = {
-  reachedIndex: 0,
+  reachedScenarioIndex: {},
   completedIds: [],
   activeStoryId: null,
   completedTurns: {},
@@ -20,7 +20,7 @@ export function loadStoryProgress(): StoryProgress {
     if (!saved) return { ...DEFAULT_PROGRESS };
     const p = JSON.parse(saved) as Partial<StoryProgress>;
     return {
-      reachedIndex: p.reachedIndex ?? 0,
+      reachedScenarioIndex: p.reachedScenarioIndex ?? {},
       completedIds: p.completedIds ?? [],
       activeStoryId: p.activeStoryId ?? null,
       completedTurns: p.completedTurns ?? {},

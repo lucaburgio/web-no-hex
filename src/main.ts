@@ -721,18 +721,19 @@ function selectScenario(
 function buildStoriesList(scenarioId: string): void {
   const progress = loadStoryProgress();
 
-  // Auto-unlock: walk stories in order and unlock any that should be reachable
-  // based on completed IDs (handles stories added after the player last played).
+  const scenarioStories = STORIES.filter(s => s.scenario === scenarioId);
+
+  // Auto-unlock per scenario: walk this scenario's stories in order and advance
+  // reachedScenarioIndex based on completedIds (handles stories added after the player last played).
   let computedReached = 0;
-  while (computedReached < STORIES.length && progress.completedIds.includes(STORIES[computedReached].id)) {
+  while (computedReached < scenarioStories.length && progress.completedIds.includes(scenarioStories[computedReached].id)) {
     computedReached++;
   }
-  if (computedReached > progress.reachedIndex) {
-    progress.reachedIndex = computedReached;
+  const currentReached = progress.reachedScenarioIndex[scenarioId] ?? 0;
+  if (computedReached > currentReached) {
+    progress.reachedScenarioIndex[scenarioId] = computedReached;
     saveStoryProgress(progress);
   }
-
-  const scenarioStories = STORIES.filter(s => s.scenario === scenarioId);
   const completedInScenario = scenarioStories.filter(s => progress.completedIds.includes(s.id)).length;
 
   // Update progress indicator
@@ -754,7 +755,8 @@ function buildStoriesList(scenarioId: string): void {
 
   scenarioStories.forEach(story => {
     const index = STORIES.indexOf(story);
-    const isLocked = index > progress.reachedIndex;
+    const scenarioIndex = scenarioStories.indexOf(story);
+    const isLocked = scenarioIndex > (progress.reachedScenarioIndex[scenarioId] ?? 0);
     const isCompleted = progress.completedIds.includes(story.id);
     const hasSave = progress.activeStoryId === story.id && hasStoryGameState();
 
@@ -837,9 +839,13 @@ function handleStoryWin(): void {
     progress.completedIds.push(story.id);
     progress.completedTurns[story.id] = state.turn;
   }
-  const nextIndex = activeStoryIndex! + 1;
-  if (nextIndex < STORIES.length && nextIndex > progress.reachedIndex) {
-    progress.reachedIndex = nextIndex;
+  const scenarioId = story.scenario;
+  const scenarioStories = STORIES.filter(s => s.scenario === scenarioId);
+  const storyScenarioIndex = scenarioStories.indexOf(story);
+  const nextScenarioIndex = storyScenarioIndex + 1;
+  const currentReached = progress.reachedScenarioIndex[scenarioId] ?? 0;
+  if (nextScenarioIndex < scenarioStories.length && nextScenarioIndex > currentReached) {
+    progress.reachedScenarioIndex[scenarioId] = nextScenarioIndex;
   }
   progress.activeStoryId = null;
   saveStoryProgress(progress);

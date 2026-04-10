@@ -165,8 +165,8 @@ export interface StoryDef {
 }
 
 export interface StoryProgress {
-  /** Highest story index unlocked (0 = first story available). */
-  reachedIndex: number;
+  /** Per-scenario highest story index unlocked (scenarioId → index within that scenario, 0 = first story available). */
+  reachedScenarioIndex: Record<string, number>;
   /** IDs of completed stories. */
   completedIds: string[];
   /** ID of the story currently in progress (has a saved game state). */
