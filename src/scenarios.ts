@@ -1,13 +1,13 @@
 import type { ScenarioDef } from './types';
-import gradeIcon from '../public/icons/grade.svg';
-import mountainsIcon from '../public/icons/mountains.svg';
+import trainingIcon from '../public/icons/scenarios/training.svg';
+import usWw2Icon from '../public/icons/scenarios/us-ww2.svg';
 import dominationImg from '../public/images/modes/domination.png';
 import conquestImg from '../public/images/modes/conquest.png';
 
 export const SCENARIOS: ScenarioDef[] = [
   {
     id: 'tutorial',
-    icon: gradeIcon,
+    icon: trainingIcon,
     title: 'BASIC TRAINING',
     image: dominationImg,
     miniTitle: 'TUTORIAL',
@@ -15,7 +15,7 @@ export const SCENARIOS: ScenarioDef[] = [
   },
   {
     id: 'ww2',
-    icon: mountainsIcon,
+    icon: usWw2Icon,
     title: 'OUR SOLDIERS FRONTIER',
     image: conquestImg,
     miniTitle: 'SECOND WORLD WAR',
