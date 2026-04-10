@@ -1161,6 +1161,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   font-family: 'Disket Mono', monospace;
   text-rendering: geometricPrecision;
   font-weight: 700;
+  letter-spacing: 0.1em;
   color: var(--color-gray-300);
   text-transform: uppercase;
   background: none;
@@ -1185,9 +1186,9 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 #mode-display-img-wrap {
-  max-width: 600px;
+  max-width: 720px;
   overflow: hidden;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 20 / 10;
   margin-bottom: 40px;
   flex-shrink: 0;
 }
@@ -1237,7 +1238,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 #settings-right {
-  width: 420px;
+  width: 480px;
   flex-shrink: 0;
   overflow: hidden;
   display: flex;

@@ -785,7 +785,7 @@ function buildStoriesList(scenarioId: string): void {
       const turns = progress.completedTurns[story.id];
       statusEl.textContent = turns != null ? `COMPLETED IN ${turns} TURNS` : 'COMPLETED';
     } else {
-      statusEl.textContent = 'TODO';
+      statusEl.textContent = 'READY';
     }
     info.appendChild(statusEl);
 
