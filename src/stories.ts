@@ -3,6 +3,7 @@ import type { StoryDef } from './types';
 export const STORIES: StoryDef[] = [
   {
   id: 'tutorial-01',
+  scenario: 'tutorial',
   title: 'Introduction',
   description: 'Description.',
   unitPackage: 'us-ww2',
@@ -19,6 +20,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'tutorial-02',
+  scenario: 'tutorial',
   title: 'Introduction — Tanks',
   description: 'Description.',
   unitPackage: 'us-ww2',
@@ -35,6 +37,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'tutorial-03',
+  scenario: 'tutorial',
   title: 'Introduction — Artillery',
   description: 'Description.',
   unitPackage: 'us-ww2',
@@ -51,6 +54,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-01',
+  scenario: 'ww2',
   title: 'Citadel',
   description: 'Description.',
   unitPackage: 'de-ww2',
@@ -67,6 +71,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-02',
+  scenario: 'ww2',
   title: 'Barbarossa',
   description: 'Description.',
   unitPackage: 'ru-ww2',
@@ -83,6 +88,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-03',
+  scenario: 'ww2',
   title: 'Bastion',
   description: 'Description.',
   unitPackage: 'us-ww2',
@@ -99,6 +105,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-04',
+  scenario: 'ww2',
   title: 'Breakout',
   description: 'Description.',
   unitPackage: 'us-ww2',
@@ -115,6 +122,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-05',
+  scenario: 'ww2',
   title: 'Crossroads',
   description: 'Description.',
   unitPackage: 'us-ww2',
@@ -131,6 +139,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-06',
+  scenario: 'ww2',
   title: 'Ironwall',
   description: 'Description.',
   unitPackage: 'us-ww2',
@@ -147,6 +156,7 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'ww2-07',
+  scenario: 'ww2',
   title: 'Anvil',
   description: 'Description.',
   unitPackage: 'us-ww2',
