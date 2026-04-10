@@ -15,7 +15,25 @@
   padding: 0;
   cursor: url('/icons/pointer.svg') 13 14, default;
 }
-html { cursor: url('/icons/pointer.svg') 13 14, default; }
+html {
+  cursor: url('/icons/pointer.svg') 13 14, default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Allow normal selection in form fields */
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+img {
+  -webkit-user-drag: none;
+}
+
 .hidden { display: none !important; }
 
 :root {
