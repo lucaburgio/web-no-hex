@@ -51,6 +51,7 @@ import { updateConfig, setActiveUnitPackage, setActiveUnitPackagePlayer2, getAva
 import modeImgDomination from '../public/images/modes/domination.png';
 import modeImgConquest from '../public/images/modes/conquest.png';
 import modeImgBreakthrough from '../public/images/modes/breakthrough.png';
+import chevronFilledIcon from '../public/icons/chevron-filled.svg';
 import { STORIES } from './stories';
 import {
   loadStoryProgress,
@@ -1023,13 +1024,24 @@ function initCustomSettingsSelect(selectId: string): void {
   buttonEl.setAttribute('aria-haspopup', 'listbox');
   buttonEl.setAttribute('aria-expanded', 'false');
 
+  const labelEl = document.createElement('span');
+  labelEl.className = 'settings-custom-select-button-label';
+
+  const chevronEl = document.createElement('img');
+  chevronEl.className = 'settings-custom-select-chevron';
+  chevronEl.src = chevronFilledIcon;
+  chevronEl.alt = '';
+  chevronEl.setAttribute('aria-hidden', 'true');
+  buttonEl.appendChild(labelEl);
+  buttonEl.appendChild(chevronEl);
+
   const listEl = document.createElement('ul');
   listEl.className = 'settings-custom-select-list hidden';
   listEl.setAttribute('role', 'listbox');
 
   const syncFromSelect = (): void => {
     const selectedOption = selectEl.selectedOptions[0];
-    buttonEl.textContent = selectedOption ? selectedOption.textContent ?? '' : '';
+    labelEl.textContent = selectedOption ? selectedOption.textContent ?? '' : '';
     buttonEl.disabled = selectEl.disabled;
     for (const node of listEl.querySelectorAll('.settings-custom-select-option')) {
       node.classList.remove('is-selected');
