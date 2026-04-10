@@ -55,7 +55,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-01',
   scenario: 'ww2us',
-  title: 'Citadel',
+  title: 'Citadel (TBD)',
   description: 'Description.',
   unitPackage: 'de-ww2',
   unitPackagePlayer2: 'us-ww2',
@@ -72,7 +72,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-02',
   scenario: 'ww2us',
-  title: 'Barbarossa',
+  title: 'Barbarossa (TBD)',
   description: 'Description.',
   unitPackage: 'ru-ww2',
   unitPackagePlayer2: 'de-ww2',
@@ -89,7 +89,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-03',
   scenario: 'ww2us',
-  title: 'Bastion',
+  title: 'Bastion (TBD)',
   description: 'Description.',
   unitPackage: 'us-ww2',
   unitPackagePlayer2: 'de-ww2',
@@ -106,7 +106,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-04',
   scenario: 'ww2us',
-  title: 'Breakout',
+  title: 'Breakout (TBD)',
   description: 'Description.',
   unitPackage: 'us-ww2',
   unitPackagePlayer2: 'de-ww2',
@@ -123,7 +123,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-05',
   scenario: 'ww2us',
-  title: 'Crossroads',
+  title: 'Crossroads (TBD)',
   description: 'Description.',
   unitPackage: 'us-ww2',
   unitPackagePlayer2: 'de-ww2',
@@ -140,7 +140,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-06',
   scenario: 'ww2us',
-  title: 'Ironwall',
+  title: 'Ironwall (TBD)',
   description: 'Description.',
   unitPackage: 'us-ww2',
   unitPackagePlayer2: 'de-ww2',
@@ -157,7 +157,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-07',
   scenario: 'ww2us',
-  title: 'Anvil',
+  title: 'Anvil (TBD)',
   description: 'Description.',
   unitPackage: 'us-ww2',
   unitPackagePlayer2: 'de-ww2',
@@ -174,7 +174,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-08',
   scenario: 'ww2de',
-  title: 'Sturmwind',
+  title: 'Sturmwind (TBD)',
   description: 'Description.',
   unitPackage: 'de-ww2',
   unitPackagePlayer2: 'us-ww2',
@@ -191,7 +191,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-09',
   scenario: 'ww2de',
-  title: 'Dämmerung',
+  title: 'Dämmerung (TBD)',
   description: 'Description.',
   unitPackage: 'de-ww2',
   unitPackagePlayer2: 'us-ww2',
@@ -208,7 +208,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-10',
   scenario: 'ww2de',
-  title: 'Wacht',
+  title: 'Wacht (TBD)',
   description: 'Description.',
   unitPackage: 'de-ww2',
   unitPackagePlayer2: 'us-ww2',
@@ -225,7 +225,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-11',
   scenario: 'ww2de',
-  title: 'Nordlicht',
+  title: 'Nordlicht (TBD)',
   description: 'Description.',
   unitPackage: 'de-ww2',
   unitPackagePlayer2: 'us-ww2',
@@ -242,7 +242,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-12',
   scenario: 'ww2de',
-  title: 'Donnerschlag',
+  title: 'Donnerschlag (TBD)',
   description: 'Description.',
   unitPackage: 'de-ww2',
   unitPackagePlayer2: 'us-ww2',
@@ -259,7 +259,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-13',
   scenario: 'ww2de',
-  title: 'Abendstern',
+  title: 'Abendstern (TBD)',
   description: 'Description.',
   unitPackage: 'de-ww2',
   unitPackagePlayer2: 'us-ww2',
@@ -276,7 +276,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-14',
   scenario: 'ww2de',
-  title: 'Festung',
+  title: 'Festung (TBD)',
   description: 'Description.',
   unitPackage: 'de-ww2',
   unitPackagePlayer2: 'us-ww2',
@@ -293,7 +293,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-15',
   scenario: 'ww2de',
-  title: 'Nebelwerfer',
+  title: 'Nebelwerfer (TBD)',
   description: 'Description.',
   unitPackage: 'de-ww2',
   unitPackagePlayer2: 'us-ww2',
