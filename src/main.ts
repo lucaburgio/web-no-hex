@@ -610,7 +610,13 @@ function buildScenarioRail(): void {
     img.src = scenario.icon;
     img.alt = scenario.title;
     btn.appendChild(img);
-    btn.addEventListener('click', () => selectScenario(scenario.id));
+    btn.addEventListener('click', () => {
+      if (scenario.id === activeScenarioId) return;
+      const fromIdx = SCENARIOS.findIndex(s => s.id === activeScenarioId);
+      const toIdx = SCENARIOS.findIndex(s => s.id === scenario.id);
+      const direction = toIdx > fromIdx ? 1 : -1;
+      selectScenario(scenario.id, { animated: true, direction });
+    });
     storiesScenarioRailEl.appendChild(btn);
   }
 }
