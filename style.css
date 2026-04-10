@@ -1210,6 +1210,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   height: 22px;
   flex-shrink: 0;
   margin-top: 2px;
+  filter: brightness(0) invert(1);
 }
 
 .mode-card.active .mode-card-icon {
