@@ -466,13 +466,11 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #unit-picker-list {
   display: flex;
   flex-direction: row;
-  gap: 4px;
+  gap: 8px;
   align-items: flex-end;
   width: max-content;
   max-width: 100%;
   margin: 0 auto;
-  overflow-x: auto;
-  overflow-y: hidden;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 8px;
@@ -531,7 +529,6 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   flex: none;
   flex-grow: 0;
   background: #010101;
-  border: 4px solid #e1d8d6;
   overflow: hidden;
   cursor: url('/icons/pointer.svg') 13 14, pointer;
   user-select: none;
@@ -1344,7 +1341,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   outline: none;
   width: 64px;
   text-align: right;
-  padding: 10px 0;
+  padding: 10px;
   cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 
