@@ -667,9 +667,10 @@ function buildStoriesList(scenarioId: string): void {
     const card = document.createElement('div');
     card.className = 'story-card' + (isLocked ? ' story-locked' : '');
 
-    // Dashed thumbnail
+    // Dashed thumbnail with story number
     const thumb = document.createElement('div');
     thumb.className = 'story-card-thumb';
+    thumb.textContent = String(scenarioStories.indexOf(story) + 1);
     card.appendChild(thumb);
 
     const info = document.createElement('div');

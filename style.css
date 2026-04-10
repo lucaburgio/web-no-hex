@@ -1836,11 +1836,14 @@ select.settings-input.settings-select option {
   width: 44px;
   height: 44px;
   flex-shrink: 0;
-  border: 1px dashed rgba(0,0,0,0.25);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-dark);
 }
 .story-card-thumb::before,
 .story-card-thumb::after {
@@ -1848,7 +1851,7 @@ select.settings-input.settings-select option {
   position: absolute;
   width: 6px;
   height: 6px;
-  border-color: rgba(0,0,0,0.25);
+  border-color: var(--color-dark);
   border-style: solid;
 }
 .story-card-thumb::before {
