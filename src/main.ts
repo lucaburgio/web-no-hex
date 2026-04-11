@@ -843,12 +843,14 @@ function handleStoryWin(): void {
     progress.completedTurns[story.id] = state.turn;
   }
   const scenarioId = story.scenario;
-  const scenarioStories = STORIES.filter(s => s.scenario === scenarioId);
-  const storyScenarioIndex = scenarioStories.indexOf(story);
-  const nextScenarioIndex = storyScenarioIndex + 1;
-  const currentReached = progress.reachedScenarioIndex[scenarioId] ?? 0;
-  if (nextScenarioIndex < scenarioStories.length && nextScenarioIndex > currentReached) {
-    progress.reachedScenarioIndex[scenarioId] = nextScenarioIndex;
+  if (scenarioId !== undefined) {
+    const scenarioStories = STORIES.filter(s => s.scenario === scenarioId);
+    const storyScenarioIndex = scenarioStories.indexOf(story);
+    const nextScenarioIndex = storyScenarioIndex + 1;
+    const currentReached = progress.reachedScenarioIndex[scenarioId] ?? 0;
+    if (nextScenarioIndex < scenarioStories.length && nextScenarioIndex > currentReached) {
+      progress.reachedScenarioIndex[scenarioId] = nextScenarioIndex;
+    }
   }
   progress.activeStoryId = null;
   saveStoryProgress(progress);
@@ -1454,8 +1456,8 @@ document.querySelectorAll<HTMLElement>('.mode-pager-btn').forEach(btn => {
     const newMode = btn.dataset.mode;
     if (!newMode || newMode === currentMode) return;
     const modeIds = MODE_DEFS.map(m => m.id);
-    const fromIdx = modeIds.indexOf(currentMode);
-    const toIdx = modeIds.indexOf(newMode);
+    const fromIdx = modeIds.indexOf(currentMode as GameMode);
+    const toIdx = modeIds.indexOf(newMode as GameMode);
     const direction = toIdx > fromIdx ? 1 : -1;
     selectMode(newMode, { animated: true, direction });
   });
@@ -1469,7 +1471,7 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
 
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   const modeIds = MODE_DEFS.map(m => m.id);
-  const idx = modeIds.indexOf(gameModeEl.value);
+  const idx = modeIds.indexOf(gameModeEl.value as GameMode);
   if (idx < 0) return;
 
   if (e.key === 'ArrowRight') {
