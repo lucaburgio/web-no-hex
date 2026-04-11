@@ -55,7 +55,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'ww2-01',
   scenario: 'ww2us',
-  title: 'Citadel (-12 pp ai)',
+  title: 'Citadel',
   description: 'Description.',
   unitPackage: 'de-ww2',
   unitPackagePlayer2: 'us-ww2',
@@ -68,11 +68,12 @@ export const STORIES: StoryDef[] = [
     aiStart: [{ col: 0 }],
   },
   productionPointsPerTurn: 20,
+  productionPointsPerTurnAi: 8,
 },
 {
   id: 'ww2-02',
   scenario: 'ww2us',
-  title: 'Barbarossa (-5 pp ai)',
+  title: 'Barbarossa',
   description: 'Description.',
   unitPackage: 'us-ww2',
   unitPackagePlayer2: 'de-ww2',
@@ -86,6 +87,7 @@ export const STORIES: StoryDef[] = [
     aiStart: [{ col: 1 }, { col: 2 }],
   },
   productionPointsPerTurn: 20,
+  productionPointsPerTurnAi: 15,
 },
 {
   id: 'ww2-03',
@@ -105,72 +107,125 @@ export const STORIES: StoryDef[] = [
   productionPointsPerTurn: 20,
 },
 {
+  // Domination — 6×8 portrait
+  // Theme: Force through a central mountain chokepoint. Side walls funnel all
+  // combat into the two-hex gap in the middle of the map.
   id: 'ww2-04',
   scenario: 'ww2us',
-  title: 'Breakout (TBD)',
+  title: 'Breakout',
   description: 'Description.',
   unitPackage: 'us-ww2',
   unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
   map: {
-    cols: 5,
-    rows: 5,
-    mountains: ['0,3', '4,1', '4,2'],
-    playerStart: [{ col: 1 }, { col: 4 }],
-    aiStart: [{ col: 0 }, { col: 3 }],
+    cols: 6,
+    rows: 8,
+    //   col:  0  1  2  3  4  5
+    // row 0:  .  .  AI .  AI .
+    // row 1:  .  .  .  .  .  .
+    // row 2:  M  .  .  .  .  M
+    // row 3:  M  M  .  .  M  M   ← chokepoint: only cols 2-3 passable
+    // row 4:  M  .  .  .  .  M
+    // row 5:  .  .  .  .  .  .
+    // row 6:  .  .  .  .  .  .
+    // row 7:  .  .  P  P  .  .
+    mountains: ['0,2', '5,2', '0,3', '1,3', '4,3', '5,3', '0,4', '5,4'],
+    playerStart: [{ col: 2 }, { col: 3 }],
+    aiStart: [{ col: 1 }, { col: 4 }],
   },
   productionPointsPerTurn: 20,
 },
 {
+  // Conquest — 6×7 portrait
+  // Theme: Two control points mark the crossroads junction. Mountains on the
+  // flanks funnel both sides toward the contested centre.
   id: 'ww2-05',
   scenario: 'ww2us',
-  title: 'Crossroads (TBD)',
+  title: 'Crossroads',
   description: 'Description.',
   unitPackage: 'us-ww2',
   unitPackagePlayer2: 'de-ww2',
-  gameMode: 'domination',
+  gameMode: 'conquest',
   map: {
-    cols: 5,
-    rows: 5,
-    mountains: ['0,3', '4,1', '4,2'],
-    playerStart: [{ col: 1 }, { col: 4 }],
-    aiStart: [{ col: 0 }, { col: 3 }],
+    cols: 6,
+    rows: 7,
+    //   col:  0  1  2  3  4  5
+    // row 0:  .  .  AI AI .  .
+    // row 1:  .  M  .  .  M  .
+    // row 2:  .  .  .  .  .  .
+    // row 3:  M  .  CP CP .  M   ← crossroads control points
+    // row 4:  .  .  .  .  .  .
+    // row 5:  .  M  .  .  M  .
+    // row 6:  .  .  P  P  .  .
+    mountains: ['1,1', '4,1', '0,3', '5,3', '1,5', '4,5'],
+    controlPoints: ['2,3', '3,3'],
+    playerStart: [{ col: 2 }, { col: 3 }],
+    aiStart: [{ col: 2 }, { col: 3 }],
   },
+  conquestPointsPlayer: 10,
+  conquestPointsAi: 10,
   productionPointsPerTurn: 20,
 },
 {
+  // Domination — 7×7 square
+  // Theme: Crack a heavily fortified defensive line. Two parallel mountain
+  // ridges (rows 2 and 4) form the "iron wall"; only the flanks are open.
   id: 'ww2-06',
   scenario: 'ww2us',
-  title: 'Ironwall (TBD)',
+  title: 'Ironwall',
   description: 'Description.',
   unitPackage: 'us-ww2',
   unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
   map: {
-    cols: 5,
-    rows: 5,
-    mountains: ['0,3', '4,1', '4,2'],
-    playerStart: [{ col: 1 }, { col: 4 }],
-    aiStart: [{ col: 0 }, { col: 3 }],
+    cols: 7,
+    rows: 7,
+    //   col:  0  1  2  3  4  5  6
+    // row 0:  .  AI .  AI .  AI .
+    // row 1:  .  .  .  .  .  .  .
+    // row 2:  .  .  M  M  M  .  .   ← first ridge
+    // row 3:  M  .  .  .  .  .  M
+    // row 4:  .  .  M  M  M  .  .   ← second ridge
+    // row 5:  .  .  .  .  .  .  .
+    // row 6:  .  P  .  P  .  P  .
+    mountains: ['2,2', '3,2', '4,2', '0,3', '6,3', '2,4', '3,4', '4,4'],
+    playerStart: [{ col: 1 }, { col: 3 }, { col: 5 }],
+    aiStart: [{ col: 1 }, { col: 3 }, { col: 5 }],
   },
   productionPointsPerTurn: 20,
 },
 {
+  // Breakthrough — 6×8 portrait, player is attacker (south)
+  // Theme: The anvil falls — a hammer-blow assault through three sectors.
+  // Mountains guard the flanks; the attacker drives up the central corridor.
   id: 'ww2-07',
   scenario: 'ww2us',
-  title: 'Anvil (TBD)',
+  title: 'Anvil',
   description: 'Description.',
   unitPackage: 'us-ww2',
   unitPackagePlayer2: 'de-ww2',
-  gameMode: 'domination',
+  gameMode: 'breakthrough',
   map: {
-    cols: 5,
-    rows: 5,
-    mountains: ['0,3', '4,1', '4,2'],
-    playerStart: [{ col: 1 }, { col: 4 }],
-    aiStart: [{ col: 0 }, { col: 3 }],
+    cols: 6,
+    rows: 8,
+    //   col:  0  1  2  3  4  5
+    // row 0:  .  AI AI .  AI .   ← defender home
+    // row 1:  .  .  .  .  .  .
+    // row 2:  M  .  .  .  .  M
+    // row 3:  .  .  .  .  .  .
+    // row 4:  .  .  M  M  .  .   ← inner defensive ridge
+    // row 5:  .  .  .  .  .  .
+    // row 6:  .  .  .  .  .  .
+    // row 7:  .  P  P  .  P  .   ← attacker home
+    mountains: ['0,2', '5,2', '2,4', '3,4'],
+    playerStart: [{ col: 1 }, { col: 2 }, { col: 4 }],
+    aiStart: [{ col: 1 }, { col: 2 }, { col: 4 }],
   },
+  breakthroughPlayer1Role: 'attacker',
+  breakthroughSectorCount: 3,
+  breakthroughAttackerStartingPP: 180,
   productionPointsPerTurn: 20,
+  productionPointsPerTurnAi: 20,
 },
 {
   id: 'ww2-08',
@@ -307,6 +362,126 @@ export const STORIES: StoryDef[] = [
     aiStart: [{ col: 0 }, { col: 3 }],
   },
   productionPointsPerTurn: 20,
+},
+{
+  // Domination — 5×7 portrait
+  // Theme: Dense bocage terrain. Scattered mountains create a maze, forcing
+  // flanking and careful path-finding through the hedgerows.
+  id: 'ww2-16',
+  scenario: 'ww2us',
+  title: 'Hedgerow',
+  description: 'Description.',
+  unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
+  gameMode: 'domination',
+  map: {
+    cols: 5,
+    rows: 7,
+    //   col:  0  1  2  3  4
+    // row 0:  .  AI .  AI .
+    // row 1:  M  .  M  .  .
+    // row 2:  .  .  .  .  M
+    // row 3:  .  M  .  M  .
+    // row 4:  M  .  .  .  .
+    // row 5:  .  .  M  .  M
+    // row 6:  .  P  .  P  .
+    mountains: ['0,1', '2,1', '4,2', '1,3', '3,3', '0,4', '2,5', '4,5'],
+    playerStart: [{ col: 1 }, { col: 3 }],
+    aiStart: [{ col: 1 }, { col: 3 }],
+  },
+  productionPointsPerTurn: 20,
+},
+{
+  // Domination — 7×8 portrait
+  // Theme: Broad front liberation assault. A central mountain spine splits
+  // the battlefield into two corridors; corner fortifications anchor each flank.
+  id: 'ww2-17',
+  scenario: 'ww2us',
+  title: 'Liberation',
+  description: 'Description.',
+  unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
+  gameMode: 'domination',
+  map: {
+    cols: 7,
+    rows: 8,
+    //   col:  0  1  2  3  4  5  6
+    // row 0:  .  AI .  AI .  AI .
+    // row 1:  .  .  .  .  .  .  .
+    // row 2:  M  M  .  .  .  M  M
+    // row 3:  .  .  .  M  .  .  .
+    // row 4:  .  .  .  M  .  .  .
+    // row 5:  M  M  .  .  .  M  M
+    // row 6:  .  .  .  .  .  .  .
+    // row 7:  .  P  .  P  .  P  .
+    mountains: ['0,2', '1,2', '5,2', '6,2', '3,3', '3,4', '0,5', '1,5', '5,5', '6,5'],
+    playerStart: [{ col: 1 }, { col: 3 }, { col: 5 }],
+    aiStart: [{ col: 1 }, { col: 3 }, { col: 5 }],
+  },
+  productionPointsPerTurn: 20,
+},
+{
+  // Conquest — 6×6 square
+  // Theme: Seize a vital river bridgehead. Two control points mark the crossing
+  // zones; corner mountain spurs compress the battlefield toward the centre.
+  id: 'ww2-18',
+  scenario: 'ww2us',
+  title: 'Bridgehead',
+  description: 'Description.',
+  unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
+  gameMode: 'conquest',
+  map: {
+    cols: 6,
+    rows: 6,
+    //   col:  0  1  2  3  4  5
+    // row 0:  .  .  AI .  AI .
+    // row 1:  M  .  .  .  .  M
+    // row 2:  .  .  .  .  .  .
+    // row 3:  .  CP .  .  CP .   ← bridgehead control points
+    // row 4:  M  .  .  .  .  M
+    // row 5:  .  .  P  P  .  .
+    mountains: ['0,1', '5,1', '0,4', '5,4'],
+    controlPoints: ['1,3', '4,3'],
+    playerStart: [{ col: 2 }, { col: 3 }],
+    aiStart: [{ col: 2 }, { col: 3 }],
+  },
+  conquestPointsPlayer: 8,
+  conquestPointsAi: 8,
+  productionPointsPerTurn: 20,
+},
+{
+  // Breakthrough — 5×8 portrait, player is attacker (south)
+  // Theme: Concentrated armoured thrust. A narrow front forces the spearhead
+  // through successive defensive layers — speed is everything.
+  id: 'ww2-19',
+  scenario: 'ww2us',
+  title: 'Spearhead',
+  description: 'Description.',
+  unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
+  gameMode: 'breakthrough',
+  map: {
+    cols: 5,
+    rows: 8,
+    //   col:  0  1  2  3  4
+    // row 0:  .  AI AI AI .   ← defender home
+    // row 1:  .  .  .  .  .
+    // row 2:  M  .  .  .  M
+    // row 3:  .  .  M  .  .
+    // row 4:  .  .  .  .  .
+    // row 5:  M  .  .  .  M
+    // row 6:  .  .  .  .  .
+    // row 7:  .  P  P  P  .   ← attacker home
+    mountains: ['0,2', '4,2', '2,3', '0,5', '4,5'],
+    playerStart: [{ col: 1 }, { col: 2 }, { col: 3 }],
+    aiStart: [{ col: 1 }, { col: 2 }, { col: 3 }],
+  },
+  breakthroughPlayer1Role: 'attacker',
+  breakthroughSectorCount: 3,
+  breakthroughAttackerStartingPP: 160,
+  productionPointsPerTurn: 20,
+  productionPointsPerTurnAi: 20,
 }
 ];
 
