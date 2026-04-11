@@ -2000,14 +2000,7 @@ function showUnitPicker(col: number, row: number): void {
       const art = document.createElement('div');
       art.className = 'unit-card-art';
       art.setAttribute('aria-hidden', 'true');
-      const parallax = document.createElement('div');
-      parallax.className = 'unit-card-art-parallax';
-      const artImg = document.createElement('img');
-      artImg.className = 'unit-card-art-img';
-      artImg.src = unitType.image;
-      artImg.alt = '';
-      parallax.appendChild(artImg);
-      art.appendChild(parallax);
+      art.style.backgroundImage = `url(${JSON.stringify(unitType.image)})`;
       card.appendChild(art);
 
       const applyParallax = (e: MouseEvent): void => {
@@ -2015,12 +2008,12 @@ function showUnitPicker(col: number, row: number): void {
         const r = card.getBoundingClientRect();
         const nx = r.width > 0 ? (e.clientX - r.left) / r.width - 0.5 : 0;
         const ny = r.height > 0 ? (e.clientY - r.top) / r.height - 0.5 : 0;
-        parallax.style.setProperty('--unit-card-parallax-x', String(nx * 2));
-        parallax.style.setProperty('--unit-card-parallax-y', String(ny * 2));
+        art.style.setProperty('--unit-card-parallax-x', String(nx * 2));
+        art.style.setProperty('--unit-card-parallax-y', String(ny * 2));
       };
       const resetParallax = (): void => {
-        parallax.style.removeProperty('--unit-card-parallax-x');
-        parallax.style.removeProperty('--unit-card-parallax-y');
+        art.style.removeProperty('--unit-card-parallax-x');
+        art.style.removeProperty('--unit-card-parallax-y');
       };
       card.addEventListener('mousemove', applyParallax);
       card.addEventListener('mouseleave', resetParallax);
