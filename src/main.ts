@@ -779,16 +779,19 @@ function buildStoriesList(scenarioId: string): void {
 
     const statusEl = document.createElement('div');
     statusEl.className = 'story-card-status';
+    const modeLabel = story.gameMode.toUpperCase();
+    let statusLabel: string;
     if (isLocked) {
-      statusEl.textContent = 'LOCKED';
+      statusLabel = 'LOCKED';
     } else if (hasSave) {
-      statusEl.textContent = 'IN PROGRESS';
+      statusLabel = 'IN PROGRESS';
     } else if (isCompleted) {
       const turns = progress.completedTurns[story.id];
-      statusEl.textContent = turns != null ? `COMPLETED IN ${turns} TURNS` : 'COMPLETED';
+      statusLabel = turns != null ? `COMPLETED IN ${turns} TURNS` : 'COMPLETED';
     } else {
-      statusEl.textContent = 'READY';
+      statusLabel = 'READY';
     }
+    statusEl.textContent = `${modeLabel} - ${statusLabel}`;
     info.appendChild(statusEl);
 
     card.appendChild(info);
