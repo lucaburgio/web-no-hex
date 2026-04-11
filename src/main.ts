@@ -1996,7 +1996,7 @@ function showUnitPicker(col: number, row: number): void {
       { once: true }
     );
 
-    if (unitType.image) {
+    if (unitType.image && canAfford) {
       const art = document.createElement('div');
       art.className = 'unit-card-art';
       art.setAttribute('aria-hidden', 'true');
