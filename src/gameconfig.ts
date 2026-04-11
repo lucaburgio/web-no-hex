@@ -92,10 +92,10 @@ const config: GameConfig = {
   productionPointsPerTurn: 20,
 
   // Number of owned hexes required to form one quota
-  territoryQuota: 10,
+  territoryQuota: 8,
 
   // Bonus production points earned per quota owned each turn
-  pointsPerQuota: 2,
+  pointsPerQuota: 3,
 
   // Available unit types (id must be unique; cost is in production points)
   unitTypes: [

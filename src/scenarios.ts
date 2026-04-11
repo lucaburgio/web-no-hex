@@ -38,7 +38,7 @@ export const SCENARIOS: ScenarioDef[] = [
     icon: usvietnamIcon,
     title: 'FORTUNATE SON',
     image: usvietImg,
-    miniTitle: 'VIETNAM WAR - United States',
+    miniTitle: '(SOON ) VIETNAM WAR - United States',
     description: 'The largest conflict in human history. Command Axis forces across a series of tactical engagements on the Western and Eastern fronts.',
   }
 ];
