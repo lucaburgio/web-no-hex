@@ -456,10 +456,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   right: 12px;
   z-index: 10;
   box-sizing: border-box;
-  pointer-events: none;
-}
-
-#unit-picker > * {
+  /* Capture the full bottom band so the game board does not receive stray hovers/clicks beside or under the card strip. */
   pointer-events: auto;
 }
 
@@ -562,55 +559,42 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 
-/* Optional hover art (top of card; path from UnitType.image; background set in JS) */
+/* Optional hover art (top of card; inner background set in JS; slides up from below) */
 .unit-card-art {
-  --unit-card-parallax-x: 0;
-  --unit-card-parallax-y: 0;
   box-sizing: border-box;
   width: 100%;
   flex-shrink: 0;
   max-height: 0;
-  min-height: 0;
-  opacity: 0;
   overflow: hidden;
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  background-position: calc(50% + var(--unit-card-parallax-x, 0) * 6%)
-    calc(50% + var(--unit-card-parallax-y, 0) * 5%);
-  transition:
-    max-height 0.44s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.32s ease,
-    background-position 0.14s ease-out;
-  pointer-events: none;
+  transition: max-height 0.44s cubic-bezier(0.22, 1, 0.36, 1);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .unit-card:hover .unit-card-art {
   max-height: 160px;
-  min-height: 160px;
-  opacity: 1;
-  animation: unit-card-art-bg-in 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes unit-card-art-bg-in {
-  from {
-    opacity: 0.75;
-    transform: translateY(-22px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.unit-card-art-inner {
+  box-sizing: border-box;
+  width: 100%;
+  height: 160px;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-position: center;
+  transform: translateY(100%);
+  transition: transform 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.unit-card:hover .unit-card-art-inner {
+  transform: translateY(0);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .unit-card-art {
-    transition: max-height 0.2s ease, opacity 0.2s ease;
-    background-position: 50% 50%;
+    transition: max-height 0.2s ease;
   }
-  .unit-card:hover .unit-card-art {
-    animation: none;
-    opacity: 1;
+  .unit-card-art-inner {
+    transition: none;
     transform: none;
   }
 }

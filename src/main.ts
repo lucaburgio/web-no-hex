@@ -2000,23 +2000,11 @@ function showUnitPicker(col: number, row: number): void {
       const art = document.createElement('div');
       art.className = 'unit-card-art';
       art.setAttribute('aria-hidden', 'true');
-      art.style.backgroundImage = `url(${JSON.stringify(unitType.image)})`;
+      const artInner = document.createElement('div');
+      artInner.className = 'unit-card-art-inner';
+      artInner.style.backgroundImage = `url(${JSON.stringify(unitType.image)})`;
+      art.appendChild(artInner);
       card.appendChild(art);
-
-      const applyParallax = (e: MouseEvent): void => {
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-        const r = card.getBoundingClientRect();
-        const nx = r.width > 0 ? (e.clientX - r.left) / r.width - 0.5 : 0;
-        const ny = r.height > 0 ? (e.clientY - r.top) / r.height - 0.5 : 0;
-        art.style.setProperty('--unit-card-parallax-x', String(nx * 2));
-        art.style.setProperty('--unit-card-parallax-y', String(ny * 2));
-      };
-      const resetParallax = (): void => {
-        art.style.removeProperty('--unit-card-parallax-x');
-        art.style.removeProperty('--unit-card-parallax-y');
-      };
-      card.addEventListener('mousemove', applyParallax);
-      card.addEventListener('mouseleave', resetParallax);
     }
 
     const header = document.createElement('div');
