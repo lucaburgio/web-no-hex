@@ -984,11 +984,13 @@ function checkVictory(state: GameState): void {
     const def = getBreakthroughDefenderOwner(state);
     if (!state.units.some(u => u.owner === att)) {
       state.winner = def;
+      state.winReason = 'bt_attacker_wiped';
       log(state, 'Breakthrough: attacker eliminated — defender wins.');
       return;
     }
     if (state.sectorOwners.length > 0 && state.sectorOwners.every(o => o === att)) {
       state.winner = att;
+      state.winReason = 'bt_all_sectors';
       log(state, 'Breakthrough: all sectors captured — attacker wins.');
       return;
     }
@@ -1003,16 +1005,19 @@ function checkVictory(state: GameState): void {
     const aiGone = sideFullyEliminated(state, AI);
     if (playerGone && aiGone) {
       state.winner = AI;
+      state.winReason = 'cq_both_eliminated';
       log(state, 'Conquest: both sides wiped from the map — tie goes to the northern player.');
       return;
     }
     if (aiGone) {
       state.winner = PLAYER;
+      state.winReason = 'cq_elimination';
       log(state, 'Conquest: opponent has no units and no territory.');
       return;
     }
     if (playerGone) {
       state.winner = AI;
+      state.winReason = 'cq_elimination';
       log(state, 'Conquest: you have no units and no territory.');
       return;
     }
@@ -1022,15 +1027,17 @@ function checkVictory(state: GameState): void {
       const aiHexes = Object.values(state.hexStates).filter(h => h.owner === AI).length;
       if (playerHexes > aiHexes) {
         state.winner = PLAYER;
+        state.winReason = 'cq_both_cp_depleted';
         log(state, `Both sides reached 0 Conquer Points — player wins on territory (${playerHexes} vs ${aiHexes} hexes).`);
       } else {
         state.winner = AI;
+        state.winReason = 'cq_both_cp_depleted';
         log(state, `Both sides reached 0 Conquer Points — northern player wins on territory (${aiHexes} vs ${playerHexes} hexes).`);
       }
       return;
     }
-    if (cp[AI] <= 0) state.winner = PLAYER;
-    else if (cp[PLAYER] <= 0) state.winner = AI;
+    if (cp[AI] <= 0) { state.winner = PLAYER; state.winReason = 'cq_cp_depleted'; }
+    else if (cp[PLAYER] <= 0) { state.winner = AI; state.winReason = 'cq_cp_depleted'; }
     return;
   }
 
@@ -1039,8 +1046,10 @@ function checkVictory(state: GameState): void {
   const noHuman      = !state.units.some(u => u.owner === PLAYER);
   const noAI         = !state.units.some(u => u.owner === AI);
 
-  if (humanAtNorth || noAI) state.winner = PLAYER;
-  else if (aiAtSouth || noHuman) state.winner = AI;
+  if (humanAtNorth) { state.winner = PLAYER; state.winReason = 'dom_breakthrough'; }
+  else if (noAI)    { state.winner = PLAYER; state.winReason = 'dom_annihilation'; }
+  else if (aiAtSouth) { state.winner = AI; state.winReason = 'dom_breakthrough'; }
+  else if (noHuman)   { state.winner = AI; state.winReason = 'dom_annihilation'; }
 }
 
 /** Conquest: drain opponent Conquer Points for each control point they do not own. */

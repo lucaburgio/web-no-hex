@@ -2902,7 +2902,7 @@ function updateUI(): void {
 
 function checkWinner(): void {
   if (!state.winner) return;
-  showGameEndScreenForOutcome(state.winner === localPlayer);
+  showGameEndScreenForOutcome(state.winner === localPlayer, state.winReason);
   if (activeStoryIndex !== null && state.winner === localPlayer) {
     handleStoryWin();
   }

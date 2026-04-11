@@ -6,6 +6,17 @@ export type Phase = 'production' | 'movement';
 /** Match rules: core gameplay is shared; each mode tweaks victory and scoring. */
 export type GameMode = 'domination' | 'conquest' | 'breakthrough';
 
+/** Why the match ended — paired with the winner to produce a subtitle on the end screen. */
+export type WinReason =
+  | 'dom_breakthrough'       // a unit reached the opponent's home row
+  | 'dom_annihilation'       // all opponent units eliminated
+  | 'cq_elimination'         // one side fully wiped (no units + no territory)
+  | 'cq_both_eliminated'     // both sides wiped → northern tiebreaker
+  | 'cq_cp_depleted'         // one side's conquest points reached 0
+  | 'cq_both_cp_depleted'    // both hit 0 simultaneously → territory tiebreak
+  | 'bt_attacker_wiped'      // breakthrough: all attacker units eliminated → defender wins
+  | 'bt_all_sectors';        // breakthrough: attacker captured all sectors → attacker wins
+
 export interface Unit {
   id: number;
   owner: Owner;
@@ -56,6 +67,8 @@ export interface GameState {
   productionPoints: Record<Owner, number>;
   log: string[];
   winner: Owner | null;
+  /** Reason the match ended; set alongside {@link winner}. */
+  winReason?: WinReason;
 }
 
 /** One AI turn animation step, in chronological order (same order as aiMovement resolves). */

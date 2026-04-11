@@ -813,6 +813,20 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   margin: 0;
 }
 
+#game-end-subtitle {
+  font-family: 'Disket Mono', monospace;
+  font-size: clamp(0.7rem, 2vw, 0.95rem);
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  color: var(--color-dark);
+  opacity: 0.6;
+  margin: -1.75rem 0 0;
+}
+
+#game-end-subtitle:empty {
+  display: none;
+}
+
 #game-end-actions {
   display: flex;
   flex-wrap: wrap;
