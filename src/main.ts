@@ -843,14 +843,12 @@ function handleStoryWin(): void {
     progress.completedTurns[story.id] = state.turn;
   }
   const scenarioId = story.scenario;
-  if (scenarioId !== undefined) {
-    const scenarioStories = STORIES.filter(s => s.scenario === scenarioId);
-    const storyScenarioIndex = scenarioStories.indexOf(story);
-    const nextScenarioIndex = storyScenarioIndex + 1;
-    const currentReached = progress.reachedScenarioIndex[scenarioId] ?? 0;
-    if (nextScenarioIndex < scenarioStories.length && nextScenarioIndex > currentReached) {
-      progress.reachedScenarioIndex[scenarioId] = nextScenarioIndex;
-    }
+  const scenarioStories = STORIES.filter(s => s.scenario === scenarioId);
+  const storyScenarioIndex = scenarioStories.indexOf(story);
+  const nextScenarioIndex = storyScenarioIndex + 1;
+  const currentReached = progress.reachedScenarioIndex[scenarioId] ?? 0;
+  if (nextScenarioIndex < scenarioStories.length && nextScenarioIndex > currentReached) {
+    progress.reachedScenarioIndex[scenarioId] = nextScenarioIndex;
   }
   progress.activeStoryId = null;
   saveStoryProgress(progress);

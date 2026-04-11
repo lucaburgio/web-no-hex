@@ -146,7 +146,7 @@ export interface StoryDef {
   title: string;
   description: string;
   /** Groups stories into a named collection displayed together in the UI. */
-  scenario?: string;
+  scenario: string;
   /** Only unit types with this package are available for player 1 (south). Undefined = all units. */
   unitPackage?: string;
   /** Only unit types with this package are available for player 2 / AI (north). Undefined = same as unitPackage. */
