@@ -90,23 +90,6 @@ export const STORIES: StoryDef[] = [
   productionPointsPerTurnAi: 15,
 },
 {
-  id: 'ww2-03',
-  scenario: 'ww2us',
-  title: 'Bastion (TBD)',
-  description: 'Description.',
-  unitPackage: 'us-ww2',
-  unitPackagePlayer2: 'de-ww2',
-  gameMode: 'domination',
-  map: {
-    cols: 5,
-    rows: 5,
-    mountains: ['0,3', '4,1', '4,2'],
-    playerStart: [{ col: 1 }, { col: 4 }],
-    aiStart: [{ col: 0 }, { col: 3 }],
-  },
-  productionPointsPerTurn: 20,
-},
-{
   // Domination — 6×8 portrait
   // Theme: Force through a central mountain chokepoint. Side walls funnel all
   // combat into the two-hex gap in the middle of the map.
@@ -120,16 +103,7 @@ export const STORIES: StoryDef[] = [
   map: {
     cols: 6,
     rows: 8,
-    //   col:  0  1  2  3  4  5
-    // row 0:  .  .  AI .  AI .
-    // row 1:  .  .  .  .  .  .
-    // row 2:  M  .  .  .  .  M
-    // row 3:  M  M  .  .  M  M   ← chokepoint: only cols 2-3 passable
-    // row 4:  M  .  .  .  .  M
-    // row 5:  .  .  .  .  .  .
-    // row 6:  .  .  .  .  .  .
-    // row 7:  .  .  P  P  .  .
-    mountains: ['0,2', '5,2', '0,3', '1,3', '4,3', '5,3', '0,4', '5,4'],
+    mountains: ['0,2', '5,2', '0,3', '1,3', '4,3', '4,4', '5,3', '0,4', '5,4'],
     playerStart: [{ col: 2 }, { col: 3 }],
     aiStart: [{ col: 1 }, { col: 4 }],
   },
@@ -149,16 +123,8 @@ export const STORIES: StoryDef[] = [
   map: {
     cols: 6,
     rows: 7,
-    //   col:  0  1  2  3  4  5
-    // row 0:  .  .  AI AI .  .
-    // row 1:  .  M  .  .  M  .
-    // row 2:  .  .  .  .  .  .
-    // row 3:  M  .  CP CP .  M   ← crossroads control points
-    // row 4:  .  .  .  .  .  .
-    // row 5:  .  M  .  .  M  .
-    // row 6:  .  .  P  P  .  .
-    mountains: ['1,1', '4,1', '0,3', '5,3', '1,5', '4,5'],
-    controlPoints: ['2,3', '3,3'],
+    mountains: ['1,1', '4,1', '0,3', '5,3', '1,5', '0,5'],
+    controlPoints: ['3,3'],
     playerStart: [{ col: 2 }, { col: 3 }],
     aiStart: [{ col: 2 }, { col: 3 }],
   },
@@ -180,15 +146,7 @@ export const STORIES: StoryDef[] = [
   map: {
     cols: 7,
     rows: 7,
-    //   col:  0  1  2  3  4  5  6
-    // row 0:  .  AI .  AI .  AI .
-    // row 1:  .  .  .  .  .  .  .
-    // row 2:  .  .  M  M  M  .  .   ← first ridge
-    // row 3:  M  .  .  .  .  .  M
-    // row 4:  .  .  M  M  M  .  .   ← second ridge
-    // row 5:  .  .  .  .  .  .  .
-    // row 6:  .  P  .  P  .  P  .
-    mountains: ['2,2', '3,2', '4,2', '0,3', '6,3', '2,4', '3,4', '4,4'],
+    mountains: ['2,2', '3,2', '4,2', '0,3', '6,3', '2,4', '3,4', '3,3'],
     playerStart: [{ col: 1 }, { col: 3 }, { col: 5 }],
     aiStart: [{ col: 1 }, { col: 3 }, { col: 5 }],
   },
@@ -208,16 +166,7 @@ export const STORIES: StoryDef[] = [
   map: {
     cols: 6,
     rows: 8,
-    //   col:  0  1  2  3  4  5
-    // row 0:  .  AI AI .  AI .   ← defender home
-    // row 1:  .  .  .  .  .  .
-    // row 2:  M  .  .  .  .  M
-    // row 3:  .  .  .  .  .  .
-    // row 4:  .  .  M  M  .  .   ← inner defensive ridge
-    // row 5:  .  .  .  .  .  .
-    // row 6:  .  .  .  .  .  .
-    // row 7:  .  P  P  .  P  .   ← attacker home
-    mountains: ['0,2', '5,2', '2,4', '3,4'],
+    mountains: ['0,2', '5,2', '2,4', '3,4', '5,3'],
     playerStart: [{ col: 1 }, { col: 2 }, { col: 4 }],
     aiStart: [{ col: 1 }, { col: 2 }, { col: 4 }],
   },
@@ -377,15 +326,7 @@ export const STORIES: StoryDef[] = [
   map: {
     cols: 5,
     rows: 7,
-    //   col:  0  1  2  3  4
-    // row 0:  .  AI .  AI .
-    // row 1:  M  .  M  .  .
-    // row 2:  .  .  .  .  M
-    // row 3:  .  M  .  M  .
-    // row 4:  M  .  .  .  .
-    // row 5:  .  .  M  .  M
-    // row 6:  .  P  .  P  .
-    mountains: ['0,1', '2,1', '4,2', '1,3', '3,3', '0,4', '2,5', '4,5'],
+    mountains: ['0,1', '2,1', '4,2', '3,3', '0,4', '4,5'],
     playerStart: [{ col: 1 }, { col: 3 }],
     aiStart: [{ col: 1 }, { col: 3 }],
   },
@@ -405,16 +346,7 @@ export const STORIES: StoryDef[] = [
   map: {
     cols: 7,
     rows: 8,
-    //   col:  0  1  2  3  4  5  6
-    // row 0:  .  AI .  AI .  AI .
-    // row 1:  .  .  .  .  .  .  .
-    // row 2:  M  M  .  .  .  M  M
-    // row 3:  .  .  .  M  .  .  .
-    // row 4:  .  .  .  M  .  .  .
-    // row 5:  M  M  .  .  .  M  M
-    // row 6:  .  .  .  .  .  .  .
-    // row 7:  .  P  .  P  .  P  .
-    mountains: ['0,2', '1,2', '5,2', '6,2', '3,3', '3,4', '0,5', '1,5', '5,5', '6,5'],
+    mountains: ['0,2', '1,3', '6,2', '3,3', '3,4', '0,5', '1,5', '5,5', '6,5', '6,6'],
     playerStart: [{ col: 1 }, { col: 3 }, { col: 5 }],
     aiStart: [{ col: 1 }, { col: 3 }, { col: 5 }],
   },
@@ -434,15 +366,8 @@ export const STORIES: StoryDef[] = [
   map: {
     cols: 6,
     rows: 6,
-    //   col:  0  1  2  3  4  5
-    // row 0:  .  .  AI .  AI .
-    // row 1:  M  .  .  .  .  M
-    // row 2:  .  .  .  .  .  .
-    // row 3:  .  CP .  .  CP .   ← bridgehead control points
-    // row 4:  M  .  .  .  .  M
-    // row 5:  .  .  P  P  .  .
-    mountains: ['0,1', '5,1', '0,4', '5,4'],
-    controlPoints: ['1,3', '4,3'],
+    mountains: ['0,1', '1,1', '5,1', '0,4', '5,4'],
+    controlPoints: ['1,2', '4,3'],
     playerStart: [{ col: 2 }, { col: 3 }],
     aiStart: [{ col: 2 }, { col: 3 }],
   },
@@ -464,16 +389,7 @@ export const STORIES: StoryDef[] = [
   map: {
     cols: 5,
     rows: 8,
-    //   col:  0  1  2  3  4
-    // row 0:  .  AI AI AI .   ← defender home
-    // row 1:  .  .  .  .  .
-    // row 2:  M  .  .  .  M
-    // row 3:  .  .  M  .  .
-    // row 4:  .  .  .  .  .
-    // row 5:  M  .  .  .  M
-    // row 6:  .  .  .  .  .
-    // row 7:  .  P  P  P  .   ← attacker home
-    mountains: ['0,2', '4,2', '2,3', '0,5', '4,5'],
+    mountains: ['0,2', '4,2', '1,3', '0,5', '4,5'],
     playerStart: [{ col: 1 }, { col: 2 }, { col: 3 }],
     aiStart: [{ col: 1 }, { col: 2 }, { col: 3 }],
   },
