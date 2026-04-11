@@ -2533,12 +2533,6 @@ function runAiTurnWithAnimation(): void {
     const animUnitsAfter = aiResult.animUnitsAfter;
 
     if (animSteps.length === 0) {
-      if (state.winner) {
-        aiPlaybackInProgress = false;
-        render(); updateUI(); checkWinner();
-        if (aiTurnPerfStartMs !== null) { perfLog('phase.aiTurnTotal', performance.now() - aiTurnPerfStartMs); aiTurnPerfStartMs = null; }
-        return;
-      }
       const { state: next, healFloats } = endTurnAfterAi(state);
       state = next;
       applyImmediateAutoSkipProductionIfNeeded();
@@ -2571,18 +2565,6 @@ function runAiTurnWithAnimation(): void {
 
     const finishAi = (): void => {
       humanMoveAnimCancel = null;
-      if (state.winner) {
-        // Game ended during AI movement — skip turn housekeeping and show end screen directly.
-        aiPlaybackInProgress = false;
-        render();
-        updateUI();
-        checkWinner();
-        if (aiTurnPerfStartMs !== null) {
-          perfLog('phase.aiTurnTotal', performance.now() - aiTurnPerfStartMs);
-          aiTurnPerfStartMs = null;
-        }
-        return;
-      }
       const { state: next, healFloats } = endTurnAfterAi(state);
       state = next;
       applyImmediateAutoSkipProductionIfNeeded();
