@@ -792,7 +792,8 @@ function buildStoriesList(scenarioId: string): void {
     } else {
       statusLabel = 'READY';
     }
-    statusEl.textContent = `${modeLabel} - ${statusLabel}`;
+    const mapSize = `${story.map.cols}x${story.map.rows}`;
+    statusEl.textContent = `${modeLabel} - ${mapSize} - ${statusLabel}`;
     info.appendChild(statusEl);
 
     card.appendChild(info);
