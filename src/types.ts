@@ -157,6 +157,8 @@ export interface StoryDef {
   conquestPointsAi?: number;
   /** Override production points per turn for both sides. */
   productionPointsPerTurn?: number;
+  /** Override production points per turn for AI / player 2 only. */
+  productionPointsPerTurnAi?: number;
   // Breakthrough-specific overrides
   breakthroughSectorCount?: number;
   breakthroughAttackerStartingPP?: number;
@@ -224,6 +226,7 @@ export interface GameConfig {
   productionTurns: number;
   productionSafeDistance: number;
   productionPointsPerTurn: number;
+  productionPointsPerTurnAi: number;
   territoryQuota: number;
   pointsPerQuota: number;
   unitTypes: UnitType[];

@@ -341,6 +341,7 @@ const STORY_CONFIG_DEFAULTS = {
   boardCols: config.boardCols,
   boardRows: config.boardRows,
   productionPointsPerTurn: config.productionPointsPerTurn,
+  productionPointsPerTurnAi: config.productionPointsPerTurnAi,
   conquestPointsPlayer: config.conquestPointsPlayer,
   conquestPointsAi: config.conquestPointsAi,
   breakthroughAttackerStartingPP: config.breakthroughAttackerStartingPP,
@@ -862,6 +863,7 @@ function startStory(storyIndex: number, savedState?: GameState): void {
     boardCols: config.boardCols,
     boardRows: config.boardRows,
     productionPointsPerTurn: config.productionPointsPerTurn,
+    productionPointsPerTurnAi: config.productionPointsPerTurnAi,
     conquestPointsPlayer: config.conquestPointsPlayer,
     conquestPointsAi: config.conquestPointsAi,
     breakthroughAttackerStartingPP: config.breakthroughAttackerStartingPP,
@@ -874,6 +876,7 @@ function startStory(storyIndex: number, savedState?: GameState): void {
     boardCols: story.map.cols,
     boardRows: story.map.rows,
     ...(story.productionPointsPerTurn !== undefined ? { productionPointsPerTurn: story.productionPointsPerTurn } : {}),
+    ...(story.productionPointsPerTurnAi !== undefined ? { productionPointsPerTurnAi: story.productionPointsPerTurnAi } : {}),
     ...(story.conquestPointsPlayer !== undefined ? { conquestPointsPlayer: story.conquestPointsPlayer } : {}),
     ...(story.conquestPointsAi !== undefined ? { conquestPointsAi: story.conquestPointsAi } : {}),
     ...(story.breakthroughAttackerStartingPP !== undefined ? { breakthroughAttackerStartingPP: story.breakthroughAttackerStartingPP } : {}),
@@ -1055,7 +1058,8 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
   ['cfg-startingUnitsAttacker',    'startingUnitsAttacker',    1],
   ['cfg-boardCols',               'boardCols',               1],
   ['cfg-boardRows',               'boardRows',               1],
-  ['cfg-productionPointsPerTurn', 'productionPointsPerTurn', 1],
+  ['cfg-productionPointsPerTurn',   'productionPointsPerTurn',   1],
+  ['cfg-productionPointsPerTurnAi', 'productionPointsPerTurnAi', 1],
   ['cfg-territoryQuota',          'territoryQuota',          1],
   ['cfg-pointsPerQuota',          'pointsPerQuota',          1],
   ['cfg-productionTurns',         'productionTurns',         1],
@@ -1074,6 +1078,7 @@ declare const _cfgNumProxy: {
   startingUnitsPlayer1: number; startingUnitsPlayer2: number; startingUnitsDefender: number; startingUnitsAttacker: number;
   boardCols: number; boardRows: number;
   productionPointsPerTurn: number;
+  productionPointsPerTurnAi: number;
   territoryQuota: number; pointsPerQuota: number;
   productionTurns: number; productionSafeDistance: number;
   flankingBonus: number; maxFlankingUnits: number;
@@ -1132,6 +1137,7 @@ function populateSettings(): void {
     startingUnitsAttacker: config.startingUnitsAttacker,
     boardCols: config.boardCols, boardRows: config.boardRows,
     productionPointsPerTurn: config.productionPointsPerTurn,
+    productionPointsPerTurnAi: config.productionPointsPerTurnAi,
     territoryQuota: config.territoryQuota, pointsPerQuota: config.pointsPerQuota,
     productionTurns: config.productionTurns, productionSafeDistance: config.productionSafeDistance,
     flankingBonus: config.flankingBonus, maxFlankingUnits: config.maxFlankingUnits,

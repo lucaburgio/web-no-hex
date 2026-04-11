@@ -1292,13 +1292,14 @@ export function createInitialState(): GameState {
     const def: Owner = att === PLAYER ? AI : PLAYER;
     const defHexCount = Object.values(hexStates).filter(h => h.owner === def).length;
     const defBonus = territoryBonusForHexCount(defHexCount);
-    const defPP = config.productionPointsPerTurn + defBonus;
+    const defBasePP = def === AI ? config.productionPointsPerTurnAi : config.productionPointsPerTurn;
+    const defPP = defBasePP + defBonus;
     const attPP = config.breakthroughAttackerStartingPP;
     ppPlayer = att === PLAYER ? attPP : defPP;
     ppAi = att === AI ? attPP : defPP;
   } else {
     ppPlayer = config.productionPointsPerTurn;
-    ppAi = config.productionPointsPerTurn;
+    ppAi = config.productionPointsPerTurnAi;
   }
 
   const logMsg =
@@ -1458,15 +1459,19 @@ export function createStoryState(story: StoryDef): GameState {
     const defHexCount = Object.values(hexStates).filter(h => h.owner === def).length;
     const defBonus = territoryBonusForHexCount(defHexCount);
     const attPP = story.breakthroughAttackerStartingPP ?? config.breakthroughAttackerStartingPP;
-    const defPP = (story.productionPointsPerTurn ?? config.productionPointsPerTurn) + defBonus;
+    const defBasePP = def === AI
+      ? (story.productionPointsPerTurnAi ?? config.productionPointsPerTurnAi)
+      : (story.productionPointsPerTurn ?? config.productionPointsPerTurn);
+    const defPP = defBasePP + defBonus;
     ppPlayer = att === PLAYER ? attPP : defPP;
     ppAi = att === AI ? attPP : defPP;
   } else {
-    const ppTurn = story.productionPointsPerTurn ?? config.productionPointsPerTurn;
+    const ppTurnPlayer = story.productionPointsPerTurn ?? config.productionPointsPerTurn;
+    const ppTurnAi = story.productionPointsPerTurnAi ?? config.productionPointsPerTurnAi;
     const playerHexCount = Object.values(hexStates).filter(h => h.owner === PLAYER).length;
     const aiHexCount = Object.values(hexStates).filter(h => h.owner === AI).length;
-    ppPlayer = ppTurn + territoryBonusForHexCount(playerHexCount);
-    ppAi = ppTurn + territoryBonusForHexCount(aiHexCount);
+    ppPlayer = ppTurnPlayer + territoryBonusForHexCount(playerHexCount);
+    ppAi = ppTurnAi + territoryBonusForHexCount(aiHexCount);
   }
 
   const logMsg = story.gameMode === 'breakthrough'
@@ -2357,14 +2362,15 @@ export function endTurnAfterAi(state: GameState): { state: GameState; healFloats
     const def = getBreakthroughDefenderOwner(state);
     const defHexes = Object.values(state.hexStates).filter(h => h.owner === def).length;
     const defBonus = territoryBonusForHexCount(defHexes);
-    state.productionPoints[def] += config.productionPointsPerTurn + defBonus;
+    const defBasePP = def === AI ? config.productionPointsPerTurnAi : config.productionPointsPerTurn;
+    state.productionPoints[def] += defBasePP + defBonus;
     log(
       state,
       `Turn ${state.turn} — Production phase. Attacker PP: ${state.productionPoints[att]} (no income). Defender: ${state.productionPoints[def]} PP (+${defBonus} territory).`,
     );
   } else {
     state.productionPoints[PLAYER] += config.productionPointsPerTurn + playerBonus;
-    state.productionPoints[AI]     += config.productionPointsPerTurn + aiBonus;
+    state.productionPoints[AI]     += config.productionPointsPerTurnAi + aiBonus;
     log(state, `Turn ${state.turn} — Production phase. PP: ${state.productionPoints[PLAYER]} (+${playerBonus} from territory).`);
   }
   applyConquestEndOfRound(state);

@@ -88,8 +88,11 @@ const config: GameConfig = {
 
   // ── Production economy ───────────────────────────────────────────────────────
 
-  // Production points earned by each player at the start of every turn
+  // Production points earned by player 1 at the start of every turn
   productionPointsPerTurn: 20,
+
+  // Production points earned by AI / player 2 at the start of every turn
+  productionPointsPerTurnAi: 20,
 
   // Number of owned hexes required to form one quota
   territoryQuota: 8,
