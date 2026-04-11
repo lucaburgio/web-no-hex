@@ -562,6 +562,81 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 
+/* Optional hover art (top of card; path from UnitType.image) */
+.unit-card-art {
+  width: 100%;
+  flex-shrink: 0;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    max-height 0.44s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.32s ease;
+  pointer-events: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.unit-card:hover .unit-card-art {
+  max-height: 96px;
+  opacity: 1;
+}
+
+.unit-card-art-parallax {
+  --unit-card-parallax-x: 0;
+  --unit-card-parallax-y: 0;
+  height: 84px;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(
+    calc(var(--unit-card-parallax-x, 0) * 18px),
+    calc(var(--unit-card-parallax-y, 0) * 14px)
+  );
+  transition: transform 0.14s ease-out;
+}
+
+.unit-card-art-img {
+  width: 128%;
+  min-height: 100%;
+  object-fit: cover;
+  object-position: 50% 42%;
+  flex-shrink: 0;
+  transform: translateY(-20px);
+  opacity: 0.85;
+}
+
+.unit-card:hover .unit-card-art-img {
+  animation: unit-card-art-img-in 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes unit-card-art-img-in {
+  from {
+    opacity: 0.75;
+    transform: translateY(-22px) scale(1.04);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .unit-card-art {
+    transition: max-height 0.2s ease, opacity 0.2s ease;
+  }
+  .unit-card-art-parallax {
+    transition: none;
+    transform: none;
+  }
+  .unit-card:hover .unit-card-art-img {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .unit-card-header {
   flex: 0 0 40px;
   width: 100%;

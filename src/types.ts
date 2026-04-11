@@ -139,6 +139,8 @@ export interface UnitType {
   /** If set, unit may attack enemies at this hex distance (2..range) without moving (ranged). */
   range?: number;
   icon?: string;
+  /** Optional art shown at the top of the production unit card on hover (path under site root, e.g. cards/unit.png). */
+  image?: string;
   /** Story unit package this unit belongs to. In story mode only units matching the story's unitPackage are available. */
   package?: string;
 }
