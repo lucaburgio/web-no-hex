@@ -1,5 +1,6 @@
 import config from './gameconfig';
 import { hexPoints } from './hex';
+import { SCENARIOS } from './scenarios';
 
 const EDITOR_HEX_SIZE = 34;
 
@@ -45,6 +46,7 @@ interface EditorState {
   cols: number;
   rows: number;
   gameMode: EditorGameMode;
+  scenario: string;
   unitPackage: string;
   unitPackagePlayer2: string;
   mountains: Set<string>;
@@ -58,6 +60,7 @@ function mkState(): EditorState {
   return {
     cols: 8, rows: 8,
     gameMode: 'domination',
+    scenario: '',
     unitPackage: '',
     unitPackagePlayer2: '',
     mountains: new Set(),
@@ -77,6 +80,7 @@ let svgEl: SVGSVGElement;
 let colsInput: HTMLInputElement;
 let rowsInput: HTMLInputElement;
 let gameModeSelect: HTMLSelectElement;
+let scenarioSelect: HTMLSelectElement;
 let unitPackageSelect: HTMLSelectElement;
 let unitPackagePlayer2Select: HTMLSelectElement;
 let toolbarEl: HTMLDivElement;
@@ -93,10 +97,23 @@ export function initMapEditor(onBack: () => void): void {
   colsInput        = document.getElementById('me-cols') as HTMLInputElement;
   rowsInput        = document.getElementById('me-rows') as HTMLInputElement;
   gameModeSelect   = document.getElementById('me-game-mode') as HTMLSelectElement;
+  scenarioSelect   = document.getElementById('me-scenario') as HTMLSelectElement;
   unitPackageSelect        = document.getElementById('me-unit-package') as HTMLSelectElement;
   unitPackagePlayer2Select = document.getElementById('me-unit-package-player2') as HTMLSelectElement;
   toolbarEl        = document.getElementById('map-editor-toolbar') as HTMLDivElement;
   exportBtn        = document.getElementById('me-export-btn') as HTMLButtonElement;
+
+  // Populate scenario select
+  SCENARIOS.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.title;
+    scenarioSelect.appendChild(opt);
+  });
+
+  scenarioSelect.addEventListener('change', () => {
+    edState.scenario = scenarioSelect.value;
+  });
 
   // Populate unit package selects
   const pkgs = [...new Set(
@@ -573,6 +590,13 @@ function applyLoadedCode(raw: string): string | null {
     edState.gameMode = parsed.gameMode as EditorGameMode;
     gameModeSelect.value = edState.gameMode;
   }
+  if (typeof parsed.scenario === 'string') {
+    edState.scenario = parsed.scenario;
+    scenarioSelect.value = edState.scenario;
+  } else {
+    edState.scenario = '';
+    scenarioSelect.value = '';
+  }
   if (typeof parsed.unitPackage === 'string') {
     edState.unitPackage = parsed.unitPackage;
     unitPackageSelect.value = edState.unitPackage;
@@ -594,7 +618,7 @@ function applyLoadedCode(raw: string): string | null {
 // ── Export ────────────────────────────────────────────────────────────────────
 
 function exportToClipboard(): void {
-  const { cols, rows, gameMode, mountains, controlPoints, playerStart, aiStart, unitPackage, unitPackagePlayer2 } = edState;
+  const { cols, rows, gameMode, scenario, mountains, controlPoints, playerStart, aiStart, unitPackage, unitPackagePlayer2 } = edState;
   const i = '  ';
 
   const mStr = [...mountains].sort().map(m => `'${m}'`).join(', ');
@@ -617,6 +641,7 @@ function exportToClipboard(): void {
   code += `${i}id: 'my-map',\n`;
   code += `${i}title: 'My Map',\n`;
   code += `${i}description: 'Description.',\n`;
+  if (scenario) code += `${i}scenario: '${scenario}',\n`;
   if (unitPackage) code += `${i}unitPackage: '${unitPackage}',\n`;
   if (unitPackagePlayer2 && unitPackagePlayer2 !== unitPackage) code += `${i}unitPackagePlayer2: '${unitPackagePlayer2}',\n`;
   code += `${i}gameMode: '${gameMode}',\n`;
@@ -657,6 +682,7 @@ export function showMapEditor(): void {
   colsInput.value = '8';
   rowsInput.value = '8';
   gameModeSelect.value = 'domination';
+  scenarioSelect.value = '';
   unitPackageSelect.value = '';
   refreshToolbar();
   renderBoard();
