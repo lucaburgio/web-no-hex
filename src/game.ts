@@ -910,7 +910,18 @@ function combatVfxFromResolve(
     };
   }
   const { atk, def: defHex } = meleeDamageFloatHexes(atkCol, atkRow, defCol, defRow, res);
+  let attackerAnimAboveUnits = true;
+  if (res.attackerDied && !res.defenderDied) {
+    attackerAnimAboveUnits = false;
+  } else if (res.defenderDied && !res.attackerDied) {
+    attackerAnimAboveUnits = true;
+  } else if (res.mutualKill) {
+    attackerAnimAboveUnits = false;
+  } else if (res.meleeBothSurvived) {
+    attackerAnimAboveUnits = res.dmgToDefender > res.dmgToAttacker;
+  }
   const payload: CombatVfxPayload = {
+    attackerAnimAboveUnits,
     damageFloats: [
       { col: atk[0], row: atk[1], amount: -res.dmgToAttacker },
       { col: defHex[0], row: defHex[1], amount: -res.dmgToDefender },

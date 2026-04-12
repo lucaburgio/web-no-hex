@@ -42,6 +42,30 @@ function getBoardVfxParent(svg: SVGSVGElement): SVGElement {
   return getBoardViewRoot(svg) ?? svg;
 }
 
+/**
+ * SVG paint order: insert `#anim-layer` before `#unit-layer` so static units draw on top, or
+ * before `#hex-hit-layer` so the animated attacker draws above units but under invisible hits.
+ */
+function positionAnimLayer(svgElement: SVGSVGElement, aboveStaticUnits: boolean): SVGGElement {
+  const parent = getBoardVfxParent(svgElement);
+  let animLayer = svgElement.querySelector('#anim-layer') as SVGGElement | null;
+  if (!animLayer) {
+    animLayer = svgEl('g');
+    animLayer.id = 'anim-layer';
+    animLayer.setAttribute('pointer-events', 'none');
+  }
+  const unitLayer = parent.querySelector('#unit-layer');
+  const hexHitLayer = parent.querySelector('#hex-hit-layer');
+  if (aboveStaticUnits) {
+    if (hexHitLayer) parent.insertBefore(animLayer, hexHitLayer);
+    else parent.appendChild(animLayer);
+  } else {
+    if (unitLayer) parent.insertBefore(animLayer, unitLayer);
+    else parent.appendChild(animLayer);
+  }
+  return animLayer;
+}
+
 /** Hover move-path preview timeline; killed whenever the target hex changes or the path clears. */
 let movePathPreviewTl: gsap.core.Timeline | null = null;
 
@@ -1104,6 +1128,8 @@ export function animateMoves(
   onDone: () => void,
   /** When set, HP bar on the moving sprite uses live state + board HP tween each frame. */
   liveStateForHp?: GameState | null,
+  /** False = draw below `#unit-layer` (e.g. losing attacker); true = above units, under hex hits. */
+  stackAboveStaticUnits: boolean = true,
 ): { cancel: () => void } {
   const noopCancel = (): void => {};
 
@@ -1115,13 +1141,7 @@ export function animateMoves(
   const c = colors();
   const flipBoardY = svgElement.dataset.boardFlipY === '1';
 
-  let animLayer = svgElement.querySelector('#anim-layer') as SVGGElement | null;
-  if (!animLayer) {
-    animLayer = svgEl('g');
-    animLayer.id = 'anim-layer';
-    animLayer.setAttribute('pointer-events', 'none');
-    getBoardVfxParent(svgElement).appendChild(animLayer);
-  }
+  const animLayer = positionAnimLayer(svgElement, stackAboveStaticUnits);
   animLayer.setAttribute('pointer-events', 'none');
   animLayer.innerHTML = '';
 
@@ -1255,6 +1275,7 @@ export function animateStrikeAndReturn(
   onDone: () => void,
   /** When set, HP bar on the sprite uses live state + board HP tween each frame. */
   liveStateForHp?: GameState | null,
+  stackAboveStaticUnits: boolean = true,
 ): { cancel: () => void } {
   const noopCancel = (): void => {};
   const { unit, fromCol, fromRow, enemyCol, enemyRow, durationMs, onHit } = params;
@@ -1274,13 +1295,7 @@ export function animateStrikeAndReturn(
   const c = colors();
   const flipBoardY = svgElement.dataset.boardFlipY === '1';
 
-  let animLayer = svgElement.querySelector('#anim-layer') as SVGGElement | null;
-  if (!animLayer) {
-    animLayer = svgEl('g');
-    animLayer.id = 'anim-layer';
-    animLayer.setAttribute('pointer-events', 'none');
-    getBoardVfxParent(svgElement).appendChild(animLayer);
-  }
+  const animLayer = positionAnimLayer(svgElement, stackAboveStaticUnits);
   animLayer.setAttribute('pointer-events', 'none');
   animLayer.innerHTML = '';
 

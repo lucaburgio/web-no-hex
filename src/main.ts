@@ -390,6 +390,8 @@ interface WsAnimationPayload {
   damageFloats?: { col: number; row: number; amount: number }[];
   /** Ranged artillery: shell barrage on defender hex before damage floats. */
   ranged?: boolean;
+  /** Melee: match {@link CombatVfxPayload.attackerAnimAboveUnits} for layer order during moves/strike. */
+  attackerAnimAboveUnits?: boolean;
 }
 
 function isLegacySingleMoveAnimation(x: unknown): x is MoveAnimation {
@@ -454,6 +456,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
   const moves = payload.moves ?? [];
   const floats = payload.damageFloats ?? [];
   const sr = payload.strikeReturn;
+  const stackAboveUnits = payload.attackerAnimAboveUnits ?? true;
 
   const hidden = new Set<number>();
   for (const m of moves) hidden.add(m.unit.id);
@@ -497,6 +500,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
         },
         runFloats,
         state,
+        stackAboveUnits,
       );
       humanMoveAnimCancel = combineAnimCancels(cSt);
     } else {
@@ -508,7 +512,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
   updateUI();
 
   if (moves.length > 0) {
-    const { cancel } = animateMoves(svg, moves, config.unitMoveSpeed, runStrike, state);
+    const { cancel } = animateMoves(svg, moves, config.unitMoveSpeed, runStrike, state, stackAboveUnits);
     humanMoveAnimCancel = combineAnimCancels(cancel);
   } else {
     runStrike();
@@ -2298,6 +2302,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
         const needsMoveAnim = primaryMove !== null;
         const sr = combatVfx?.strikeReturn;
         const floats = combatVfx?.damageFloats ?? [];
+        const stackAboveUnits = combatVfx?.attackerAnimAboveUnits ?? true;
 
         const finishHumanAnim = (): void => {
           humanMoveAnimCancel = null;
@@ -2373,6 +2378,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
           }
           if (floats.length > 0) wsPayload.damageFloats = floats;
           if (combatVfx.ranged) wsPayload.ranged = true;
+          wsPayload.attackerAnimAboveUnits = stackAboveUnits;
           sendStateUpdate(wsPayload);
 
           if (needsMoveAnim && primaryMove) {
@@ -2399,6 +2405,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
                     },
                     runFloatsOnly,
                     state,
+                    stackAboveUnits,
                   );
                   humanMoveAnimCancel = combineAnimCancels(cSt);
                 } else {
@@ -2406,6 +2413,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
                 }
               },
               state,
+              stackAboveUnits,
             );
             humanMoveAnimCancel = combineAnimCancels(cancel);
           } else if (sr) {
@@ -2424,6 +2432,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
                 },
                 runFloatsOnly,
                 state,
+                stackAboveUnits,
               );
               humanMoveAnimCancel = combineAnimCancels(cancel);
             }
@@ -2659,6 +2668,7 @@ function runAiTurnWithAnimation(): void {
           },
           () => runFloats(true),
           aiReplayState(state, ub),
+          vfx.attackerAnimAboveUnits ?? true,
         );
         humanMoveAnimCancel = combineAnimCancels(cancel);
       } else {
@@ -2675,6 +2685,11 @@ function runAiTurnWithAnimation(): void {
       const before = cloneUnits(animUnitsBefore[index]!);
       if (step.type === 'move') {
         const a = step.anim;
+        let stackAbove = true;
+        const nextStep = animSteps[index + 1];
+        if (nextStep?.type === 'combat') {
+          stackAbove = nextStep.vfx.attackerAnimAboveUnits ?? true;
+        }
         renderState(svg, state, null, new Set([a.unit.id]), localPlayer, before);
         updateUI();
         const { cancel } = animateMoves(
@@ -2683,6 +2698,7 @@ function runAiTurnWithAnimation(): void {
           aiMoveDuration,
           () => runStep(index + 1),
           aiReplayState(state, before),
+          stackAbove,
         );
         humanMoveAnimCancel = combineAnimCancels(cancel);
       } else {

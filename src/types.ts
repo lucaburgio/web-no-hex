@@ -87,6 +87,11 @@ export type AiAnimStep =
 
 /** Visual-only combat feedback for animations (not part of saved game state). */
 export interface CombatVfxPayload {
+  /**
+   * Melee combat sprites: if true, the attacker animation draws above static units on the board;
+   * if false, below (e.g. defender stays visually on top when the attacker loses the exchange).
+   */
+  attackerAnimAboveUnits?: boolean;
   /** Melee only: both units survived — play strike onto enemy hex and return. */
   strikeReturn?: {
     attackerId: number;
