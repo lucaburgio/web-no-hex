@@ -147,6 +147,7 @@ export const STORIES: StoryDef[] = [
     aiStart: [{ col: 1 }, { col: 4 }],
   },
   productionPointsPerTurn: 20,
+  productionPointsPerTurnAi: 15,
 },
 {
   // Conquest — 6×7 portrait
