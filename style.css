@@ -350,13 +350,19 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   flex-shrink: 0;
 }
 
+/* Ghost dots ringing the grid (renderer #board-decor-layer). Delete this block to show them again. */
+#board #board-decor-layer,
+#recap-board #board-decor-layer {
+  display: none;
+}
+
 /* Playable board outer edge — path.board-perimeter-outline in renderer (hex boundary).
    Edit variables on #board / #recap-board to restyle the dashed stroke. */
 #board,
 #recap-board {
-  --board-perimeter-stroke: rgba(255, 255, 255, 0.42);
+  --board-perimeter-stroke: rgba(0, 0, 0, 0.2);
   --board-perimeter-stroke-width: 2px;
-  --board-perimeter-dasharray: 8 6;
+  --board-perimeter-dasharray: 6 4;
 }
 
 #board {
@@ -369,8 +375,8 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   stroke: var(--board-perimeter-stroke);
   stroke-width: var(--board-perimeter-stroke-width);
   stroke-dasharray: var(--board-perimeter-dasharray);
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  stroke-linecap: butt;
+  stroke-linejoin: butt;
   pointer-events: none;
 }
 

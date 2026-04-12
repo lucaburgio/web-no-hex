@@ -663,8 +663,9 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   svgElement.appendChild(boardOrigin);
 
   // Decorative hex layer — ghost hexes ringing the board, rendered first (below everything).
-  // Ghost dots ring the board; may extend past the viewBox.
+  // Ghost dots ring the board; may extend past the viewBox. Hidden via CSS (#board-decor-layer).
   const decorLayer = svgEl('g');
+  decorLayer.id = 'board-decor-layer';
   decorLayer.setAttribute('pointer-events', 'none');
   boardViewRoot.appendChild(decorLayer);
 
