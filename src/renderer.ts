@@ -607,8 +607,6 @@ function svgUprightAt(x: number, y: number): SVGGElement {
   return g;
 }
 
-const DECOR_RINGS = 4;
-
 interface RenderDomCache {
   hexPolys: SVGPolygonElement[][];
   hexLayer: SVGGElement | null;
@@ -635,7 +633,6 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   const c = colors();
 
   const boardMargin = BOARD_MARGIN;
-  // Width/height cover only the board — decor overflows visually without affecting scroll
   const W = COLS * HEX_SIZE * Math.sqrt(3) + boardMargin * 2;
   const H = 1.5 * HEX_SIZE * (ROWS - 1) + boardMargin * 2;
 
@@ -661,26 +658,6 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   }
   boardOrigin.appendChild(boardViewRoot);
   svgElement.appendChild(boardOrigin);
-
-  // Decorative hex layer — ghost hexes ringing the board, rendered first (below everything).
-  // Ghost dots ring the board; may extend past the viewBox. Hidden via CSS (#board-decor-layer).
-  const decorLayer = svgEl('g');
-  decorLayer.id = 'board-decor-layer';
-  decorLayer.setAttribute('pointer-events', 'none');
-  boardViewRoot.appendChild(decorLayer);
-
-  for (let r = -DECOR_RINGS; r < ROWS + DECOR_RINGS; r++) {
-    for (let col = -DECOR_RINGS; col < COLS + DECOR_RINGS; col++) {
-      if (col >= 0 && col < COLS && r >= 0 && r < ROWS) continue; // skip board hexes
-      const { x, y } = hexToPixel(col, r);
-      const dot = svgEl('circle');
-      dot.setAttribute('cx', String(x));
-      dot.setAttribute('cy', String(y));
-      dot.setAttribute('r', String(HEX_SIZE * 0.05));
-      dot.setAttribute('fill', 'rgba(0,0,0,0.18)');
-      decorLayer.appendChild(dot);
-    }
-  }
 
   const hexLayer = svgEl('g');
   hexLayer.id = 'hex-layer';
