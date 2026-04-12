@@ -337,15 +337,28 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 #game-area {
+  position: relative;
   display: flex;
   justify-content: center;
   min-width: max-content;
   flex: 1;
   align-items: center;
   padding: 40px 0 72px;
+  /* Distance outside the board bbox over which the line texture fades to transparent (see gameAreaBoardTexture.ts). */
+  --game-area-board-texture-fade: min(36vw, 320px);
+}
+
+#game-area-bg-texture {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
 }
 
 #board-wrap {
+  position: relative;
+  z-index: 1;
   overflow: visible;
   flex-shrink: 0;
 }

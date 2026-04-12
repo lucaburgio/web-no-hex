@@ -78,11 +78,16 @@ import {
   gameEndRecapBtn,
 } from './gameEndScreen';
 import { initMapEditor, showMapEditor, hideMapEditor } from './mapEditor';
+import { initGameAreaBoardTexture } from './gameAreaBoardTexture';
 
 const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
 const WS_URL = `${wsProtocol}//${location.hostname}:3001`;
 
 const svg        = document.getElementById('board') as unknown as SVGSVGElement;
+const gameAreaEl = document.getElementById('game-area') as HTMLElement | null;
+if (gameAreaEl) {
+  initGameAreaBoardTexture(gameAreaEl, svg as unknown as HTMLElement);
+}
 
 /** Last move-path preview key; redraw only when unit position or hovered destination changes. */
 let movePathPreviewKey: string | null = null;
