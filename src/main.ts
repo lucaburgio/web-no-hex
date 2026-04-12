@@ -539,6 +539,8 @@ const GUEST_IDENTITY_SWAP_PROPS = [
   '--color-ai',
   '--color-hex-player',
   '--color-hex-ai',
+  '--color-hex-player-dimmed',
+  '--color-hex-ai-dimmed',
 ] as const;
 
 function clearGuestIdentityColorOverrides(): void {
@@ -569,11 +571,15 @@ function syncGuestIdentityColors(): void {
   const ai = s.getPropertyValue('--color-ai').trim();
   const hexPlayer = s.getPropertyValue('--color-hex-player').trim();
   const hexAi = s.getPropertyValue('--color-hex-ai').trim();
+  const hexPlayerDimmed = s.getPropertyValue('--color-hex-player-dimmed').trim();
+  const hexAiDimmed = s.getPropertyValue('--color-hex-ai-dimmed').trim();
 
   root.style.setProperty('--color-player', ai);
   root.style.setProperty('--color-ai', player);
   root.style.setProperty('--color-hex-player', hexAi);
   root.style.setProperty('--color-hex-ai', hexPlayer);
+  root.style.setProperty('--color-hex-player-dimmed', hexAiDimmed);
+  root.style.setProperty('--color-hex-ai-dimmed', hexPlayerDimmed);
   invalidateColorsCache();
 }
 

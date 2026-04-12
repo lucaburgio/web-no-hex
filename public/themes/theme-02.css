@@ -14,6 +14,8 @@
   --color-hex-valid-move:    #ECDBAA;
   --color-hex-player:        #7e9fd8;
   --color-hex-ai:            #df8080;
+  --color-hex-player-dimmed: #5f7fb0;
+  --color-hex-ai-dimmed:     #c46868;
   --color-hex-can-place:     #bebcb2;
   --color-hex-prod-selected: #e1c47c;
   --color-hex-prod-stroke:   #e18a17;

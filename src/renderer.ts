@@ -346,6 +346,8 @@ interface Colors {
   hexMove: string;
   hexPlayer: string;
   hexAi: string;
+  hexPlayerDimmed: string;
+  hexAiDimmed: string;
   hexCanPlace: string;
   hexProdSelected: string;
   hexZoc: string;
@@ -380,6 +382,8 @@ function colors(): Colors {
     hexMove:         v('--color-hex-valid-move'),
     hexPlayer:       v('--color-hex-player'),
     hexAi:           v('--color-hex-ai'),
+    hexPlayerDimmed: v('--color-hex-player-dimmed'),
+    hexAiDimmed:     v('--color-hex-ai-dimmed'),
     hexCanPlace:     v('--color-hex-can-place'),
     hexProdSelected: v('--color-hex-prod-selected'),
     hexZoc:          v('--color-hex-zoc'),
@@ -947,9 +951,14 @@ export function renderState(
 
       const hexOccupied = unitByHex.has(key);
       const hexDimmed = productionFocusHexes.size > 0 && isConquered && (!productionFocusHexes.has(key) || hexOccupied) && !isProdSelected;
+      if (hexDimmed) {
+        if (fill === c.hexPlayer) fill = c.hexPlayerDimmed;
+        else if (fill === c.hexAi) fill = c.hexAiDimmed;
+      }
+      const opacityDimmed = hexDimmed && fill !== c.hexPlayerDimmed && fill !== c.hexAiDimmed;
       poly.setAttribute('fill', fill);
       poly.setAttribute('stroke', stroke);
-      poly.setAttribute('opacity', hexDimmed ? '0.2' : '1');
+      poly.setAttribute('opacity', opacityDimmed ? '0.2' : '1');
 
       if (prodOverlayStroke && prodStrokeLayer) {
         const overlay = svgEl('polygon');
