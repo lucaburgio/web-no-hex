@@ -987,7 +987,7 @@ export function renderState(
         diamond.setAttribute('id', `marker-${col}-${r}`);
         markerParent.appendChild(diamond);
 
-        if (state.phase === 'production') {
+        if (state.phase === 'production' && canPlace) {
           const iw = HEX_SIZE * 0.4;
           const prodPlus = svgEl('image');
           prodPlus.setAttribute('href', '/icons/plus.svg');
