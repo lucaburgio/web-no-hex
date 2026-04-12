@@ -977,7 +977,13 @@ export function renderState(
       const markerParent =
         markerLayer ?? domCache?.hexLayer ?? (svgElement.querySelector('#hex-layer') as SVGGElement);
 
-      if (hexState && hexState.isProduction && !isSelectedHex && !isValidMove) {
+      if (
+        hexState &&
+        hexState.isProduction &&
+        !isSelectedHex &&
+        !isValidMove &&
+        state.phase !== 'production'
+      ) {
         const { x, y } = hexToPixel(col, r);
         const s = HEX_SIZE * 0.18;
         const diamond = svgEl('polygon');
