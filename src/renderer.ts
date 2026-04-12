@@ -694,7 +694,7 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
       poly.setAttribute('id', `hex-${col}-${r}`);
       poly.setAttribute('data-col', String(col));
       poly.setAttribute('data-row', String(r));
-      poly.setAttribute('fill', c.bg);
+      poly.setAttribute('fill', c.hexNeutral);
       poly.setAttribute('stroke', 'transparent');
       poly.setAttribute('stroke-width', '2.5');
       poly.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);

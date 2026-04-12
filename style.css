@@ -86,7 +86,8 @@ img {
     --color-hex-prod-selected: #e1c47c;
     --color-hex-prod-stroke:   var(--color-yellow-900);
     --color-hex-zoc:           #d58f8f;
-    --color-hex-neutral:       var(--color-light);
+    /* Unconquered hexes: transparent so the game-area line texture shows through */
+    --color-hex-neutral:       transparent;
     --color-hex-stroke:        var(--color-dark);
   
     /* ── Movement area perimeter outline ────────────────────────────────────── */

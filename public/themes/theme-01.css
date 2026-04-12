@@ -18,7 +18,7 @@
   --color-hex-prod-selected: #e1c47c;
   --color-hex-prod-stroke:   #e18a17;
   --color-hex-zoc:           #d58f8f;
-  --color-hex-neutral:       #E1D9D6;
+  --color-hex-neutral:       transparent;
   --color-hex-stroke:        #000;
 
   /* ── Movement area perimeter outline ────────────────────────────────────── */

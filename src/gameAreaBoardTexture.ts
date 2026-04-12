@@ -76,9 +76,14 @@ export function initGameAreaBoardTexture(gameArea: HTMLElement, board: HTMLEleme
 
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const dist = distanceToRect(x + 0.5, y + 0.5, L, T, R, B);
-        let a = 0;
-        if (dist > 1e-6) {
+        const px = x + 0.5;
+        const py = y + 0.5;
+        let a: number;
+        // Full texture under the board so neutral hexes can stay transparent and show stripes.
+        if (px >= L && px <= R && py >= T && py <= B) {
+          a = 1;
+        } else {
+          const dist = distanceToRect(px, py, L, T, R, B);
           a = Math.max(0, Math.min(1, 1 - dist / fade));
         }
         const o = (y * w + x) * 4;
