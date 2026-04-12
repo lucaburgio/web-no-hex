@@ -976,14 +976,17 @@ export function renderState(
 
       if (hexState && hexState.isProduction && !isSelectedHex && !isValidMove) {
         const { x, y } = hexToPixel(col, r);
-        const s = HEX_SIZE * 0.18;
-        const diamond = svgEl('polygon');
-        diamond.setAttribute('points', `${x},${y - s} ${x + s},${y} ${x},${y + s} ${x - s},${y}`);
-        diamond.setAttribute('fill', hexState.owner === PLAYER ? c.player : c.ai);
-        diamond.setAttribute('opacity', hexDimmed ? '0.08' : '0.4');
-        diamond.setAttribute('pointer-events', 'none');
-        diamond.setAttribute('id', `marker-${col}-${r}`);
-        (markerLayer ?? domCache?.hexLayer ?? (svgElement.querySelector('#hex-layer') as SVGGElement)).appendChild(diamond);
+        const iw = HEX_SIZE * 0.48;
+        const prodPlus = svgEl('image');
+        prodPlus.setAttribute('href', '/icons/plus.svg');
+        prodPlus.setAttribute('x', String(x - iw / 2));
+        prodPlus.setAttribute('y', String(y - iw / 2));
+        prodPlus.setAttribute('width', String(iw));
+        prodPlus.setAttribute('height', String(iw));
+        prodPlus.setAttribute('opacity', hexDimmed ? '0.12' : '0.92');
+        prodPlus.setAttribute('pointer-events', 'none');
+        prodPlus.setAttribute('id', `marker-${col}-${r}`);
+        (markerLayer ?? domCache?.hexLayer ?? (svgElement.querySelector('#hex-layer') as SVGGElement)).appendChild(prodPlus);
       }
     }
   }
