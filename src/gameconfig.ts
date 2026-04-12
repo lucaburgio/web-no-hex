@@ -110,7 +110,6 @@ const config: GameConfig = {
       maxHp: 10,
       strength: 10,
       icon: 'icons/units/infantry.svg',
-      image: 'images/units/infantry.png',
       package: 'standard',
     },
     {
@@ -122,7 +121,6 @@ const config: GameConfig = {
       strength: 11,
       extraFlanking: 0.05,
       icon: 'icons/units/tank.svg',
-      image: 'images/units/tank.png',
       package: 'standard',
     },
     {
@@ -134,7 +132,6 @@ const config: GameConfig = {
       strength: 8,
       range: 3,
       icon: 'icons/units/artillery.svg',
-      image: 'images/units/artillery.png',
       package: 'standard',
     },
 
@@ -149,7 +146,6 @@ const config: GameConfig = {
       maxHp: 10,
       strength: 10,
       icon: 'icons/units/infantry.svg',
-      image: 'images/units/marines.png',
       package: 'us-ww2',
     },
     {
@@ -161,7 +157,6 @@ const config: GameConfig = {
       strength: 11,
       extraFlanking: 0.05,
       icon: 'icons/units/tank.svg',
-      image: 'images/units/sherman.png',
       package: 'us-ww2',
     },
     {
@@ -173,7 +168,6 @@ const config: GameConfig = {
       strength: 8,
       range: 3,
       icon: 'icons/units/artillery.svg',
-      image: 'images/units/m2-howitzer.png',
       package: 'us-ww2',
     },
     {
