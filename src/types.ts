@@ -109,6 +109,8 @@ export interface CombatVfxPayload {
     attackerId: number;
     pathHexes: [number, number][];
   };
+  /** Melee/ranged: attacker unit id (for same-hex paint order during combat VFX). */
+  meleeAttackerId?: number;
 }
 
 export interface CombatForecast {

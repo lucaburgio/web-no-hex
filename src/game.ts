@@ -906,6 +906,7 @@ function combatVfxFromResolve(
   if (res.ranged) {
     return {
       ranged: true,
+      meleeAttackerId: attackerId,
       damageFloats: [{ col: defCol, row: defRow, amount: -res.dmgToDefender }],
     };
   }
@@ -922,6 +923,7 @@ function combatVfxFromResolve(
   }
   const payload: CombatVfxPayload = {
     attackerAnimAboveUnits,
+    meleeAttackerId: attackerId,
     damageFloats: [
       { col: atk[0], row: atk[1], amount: -res.dmgToAttacker },
       { col: defHex[0], row: defHex[1], amount: -res.dmgToDefender },

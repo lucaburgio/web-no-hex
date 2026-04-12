@@ -40,6 +40,7 @@ import {
   clearCombatVfxLayers,
   playRangedArtilleryHexBarrageVfx,
   invalidateColorsCache,
+  paintBelowIdsForMeleeHexStack,
 } from './renderer';
 import { getNeighbors } from './hex';
 import { isInEnemyZoC } from './game';
@@ -392,6 +393,8 @@ interface WsAnimationPayload {
   ranged?: boolean;
   /** Melee: match {@link CombatVfxPayload.attackerAnimAboveUnits} for layer order during moves/strike. */
   attackerAnimAboveUnits?: boolean;
+  /** Melee/ranged: match {@link CombatVfxPayload.meleeAttackerId} for same-hex paint order after anims. */
+  meleeAttackerId?: number;
 }
 
 function isLegacySingleMoveAnimation(x: unknown): x is MoveAnimation {
@@ -468,7 +471,22 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
   };
 
   const runFloats = (): void => {
-    renderState(svg, state, null, new Set(), localPlayer);
+    const m0 = moves[0];
+    const aid = payload.meleeAttackerId;
+    const ghostNeeded =
+      aid != null &&
+      !getUnitById(state, aid) &&
+      m0 != null &&
+      !payload.strikeReturn;
+    const floatUnits =
+      ghostNeeded ? [...state.units, { ...m0.unit, col: m0.toCol, row: m0.toRow, hp: 0 }] : undefined;
+    const unitsForPaint = floatUnits ?? state.units;
+    const vfxLike = {
+      attackerAnimAboveUnits: payload.attackerAnimAboveUnits,
+      meleeAttackerId: payload.meleeAttackerId,
+    };
+    const paintBelow = paintBelowIdsForMeleeHexStack(vfxLike, unitsForPaint);
+    renderState(svg, state, null, new Set(), localPlayer, floatUnits, paintBelow);
     updateUI();
     if (floats.length === 0) finish();
     else {
@@ -2316,7 +2334,29 @@ svg.addEventListener('click', (e: MouseEvent) => {
         const runFloatsOnly = (): void => {
           // Strike/move anims hide units on the static layer; show them again before damage floats
           // so the attacker does not vanish until float playback ends.
-          renderState(svg, state, pendingProductionHex, new Set(), localPlayer);
+          const vfx = combatVfx!;
+          const destCol = primaryMove?.toCol ?? col;
+          const destRow = primaryMove?.toRow ?? row;
+          const attackerEliminated =
+            vfx.meleeAttackerId === movingUnitId && !getUnitById(state, movingUnitId);
+          const floatUnits =
+            attackerEliminated &&
+            !vfx.strikeReturn &&
+            !vfx.mutualKillLunge &&
+            vfx.meleeAttackerId !== undefined
+              ? [...state.units, { ...movingUnit, col: destCol, row: destRow, hp: 0 }]
+              : undefined;
+          const unitsForPaint = floatUnits ?? state.units;
+          const paintBelow = paintBelowIdsForMeleeHexStack(vfx, unitsForPaint);
+          renderState(
+            svg,
+            state,
+            pendingProductionHex,
+            new Set(),
+            localPlayer,
+            floatUnits,
+            paintBelow,
+          );
           updateUI();
           if (floats.length === 0) finishHumanAnim();
           else {
@@ -2379,6 +2419,9 @@ svg.addEventListener('click', (e: MouseEvent) => {
           if (floats.length > 0) wsPayload.damageFloats = floats;
           if (combatVfx.ranged) wsPayload.ranged = true;
           wsPayload.attackerAnimAboveUnits = stackAboveUnits;
+          if (combatVfx.meleeAttackerId !== undefined) {
+            wsPayload.meleeAttackerId = combatVfx.meleeAttackerId;
+          }
           sendStateUpdate(wsPayload);
 
           if (needsMoveAnim && primaryMove) {
@@ -2619,16 +2662,19 @@ function runAiTurnWithAnimation(): void {
        */
       const runFloats = (afterStrike: boolean): void => {
         const initial = cloneUnits(afterStrike ? unitsAfter : unitsBefore);
-        renderState(svg, state, null, new Set(), localPlayer, initial);
+        const paintInitial = paintBelowIdsForMeleeHexStack(vfx, initial);
+        renderState(svg, state, null, new Set(), localPlayer, initial, paintInitial);
         updateUI();
         if (floats.length === 0) {
-          renderState(svg, state, null, new Set(), localPlayer, cloneUnits(unitsAfter));
+          const ua = cloneUnits(unitsAfter);
+          renderState(svg, state, null, new Set(), localPlayer, ua, paintBelowIdsForMeleeHexStack(vfx, ua));
           updateUI();
           onDone();
           return;
         }
         const afterDamageFloats = (): void => {
-          renderState(svg, state, null, new Set(), localPlayer, cloneUnits(unitsAfter));
+          const ua = cloneUnits(unitsAfter);
+          renderState(svg, state, null, new Set(), localPlayer, ua, paintBelowIdsForMeleeHexStack(vfx, ua));
           updateUI();
           onDone();
         };
