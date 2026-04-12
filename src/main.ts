@@ -40,8 +40,8 @@ import {
   clearCombatVfxLayers,
   playRangedArtilleryHexBarrageVfx,
   invalidateColorsCache,
-  paintBelowIdsForMeleeHexStack,
 } from './renderer';
+import { aiDamageFloatDrawParams } from './combatPlayback';
 import { getNeighbors } from './hex';
 import { isInEnemyZoC } from './game';
 import type { MoveAnimation } from './renderer';
@@ -471,22 +471,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
   };
 
   const runFloats = (): void => {
-    const m0 = moves[0];
-    const aid = payload.meleeAttackerId;
-    const ghostNeeded =
-      aid != null &&
-      !getUnitById(state, aid) &&
-      m0 != null &&
-      !payload.strikeReturn;
-    const floatUnits =
-      ghostNeeded ? [...state.units, { ...m0.unit, col: m0.toCol, row: m0.toRow, hp: 0 }] : undefined;
-    const unitsForPaint = floatUnits ?? state.units;
-    const vfxLike = {
-      attackerAnimAboveUnits: payload.attackerAnimAboveUnits,
-      meleeAttackerId: payload.meleeAttackerId,
-    };
-    const paintBelow = paintBelowIdsForMeleeHexStack(vfxLike, unitsForPaint);
-    renderState(svg, state, null, new Set(), localPlayer, floatUnits, paintBelow);
+    renderState(svg, state, null, new Set(), localPlayer);
     updateUI();
     if (floats.length === 0) finish();
     else {
@@ -2332,31 +2317,9 @@ svg.addEventListener('click', (e: MouseEvent) => {
         };
 
         const runFloatsOnly = (): void => {
-          // Strike/move anims hide units on the static layer; show them again before damage floats
-          // so the attacker does not vanish until float playback ends.
-          const vfx = combatVfx!;
-          const destCol = primaryMove?.toCol ?? col;
-          const destRow = primaryMove?.toRow ?? row;
-          const attackerEliminated =
-            vfx.meleeAttackerId === movingUnitId && !getUnitById(state, movingUnitId);
-          const floatUnits =
-            attackerEliminated &&
-            !vfx.strikeReturn &&
-            !vfx.mutualKillLunge &&
-            vfx.meleeAttackerId !== undefined
-              ? [...state.units, { ...movingUnit, col: destCol, row: destRow, hp: 0 }]
-              : undefined;
-          const unitsForPaint = floatUnits ?? state.units;
-          const paintBelow = paintBelowIdsForMeleeHexStack(vfx, unitsForPaint);
-          renderState(
-            svg,
-            state,
-            pendingProductionHex,
-            new Set(),
-            localPlayer,
-            floatUnits,
-            paintBelow,
-          );
+          // Strike/move anims hide units on the static layer; redraw resolved state before floats.
+          // Losing attackers are not re-added as ghosts — only post-combat state.units (damage floats are enough).
+          renderState(svg, state, pendingProductionHex, new Set(), localPlayer);
           updateUI();
           if (floats.length === 0) finishHumanAnim();
           else {
@@ -2657,24 +2620,24 @@ function runAiTurnWithAnimation(): void {
 
       /**
        * After strike: board already showed the exchange — use unitsAfter for floats.
-       * No strike (e.g. attacker dies): show unitsBefore while floats play so casualties
-       * do not vanish before the damage labels; then snap to unitsAfter.
+       * No strike: use unitsBefore for the float beat but hide casualty unit ids so two sprites
+       * never stack on one hex; mutual kill uses unitsAfter so the fight hex is empty.
        */
       const runFloats = (afterStrike: boolean): void => {
-        const initial = cloneUnits(afterStrike ? unitsAfter : unitsBefore);
-        const paintInitial = paintBelowIdsForMeleeHexStack(vfx, initial);
-        renderState(svg, state, null, new Set(), localPlayer, initial, paintInitial);
+        const { pick, hiddenUnitIds } = aiDamageFloatDrawParams(unitsBefore, unitsAfter, afterStrike);
+        const initial = cloneUnits(pick === 'after' ? unitsAfter : unitsBefore);
+        renderState(svg, state, null, hiddenUnitIds, localPlayer, initial);
         updateUI();
         if (floats.length === 0) {
           const ua = cloneUnits(unitsAfter);
-          renderState(svg, state, null, new Set(), localPlayer, ua, paintBelowIdsForMeleeHexStack(vfx, ua));
+          renderState(svg, state, null, new Set(), localPlayer, ua);
           updateUI();
           onDone();
           return;
         }
         const afterDamageFloats = (): void => {
           const ua = cloneUnits(unitsAfter);
-          renderState(svg, state, null, new Set(), localPlayer, ua, paintBelowIdsForMeleeHexStack(vfx, ua));
+          renderState(svg, state, null, new Set(), localPlayer, ua);
           updateUI();
           onDone();
         };

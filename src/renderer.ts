@@ -15,7 +15,7 @@ import {
   isInEnemyZoC,
   getBreakthroughDefenderOwner,
 } from './game';
-import type { Owner, CombatVfxPayload } from './types';
+import type { Owner } from './types';
 import type { GameState, Unit } from './types';
 import config from './gameconfig';
 
@@ -69,41 +69,6 @@ function positionAnimLayer(svgElement: SVGSVGElement, aboveStaticUnits: boolean)
 /** Default stack: anim layer between units and hex hits (empty layer is harmless). */
 function resetAnimLayerStackOrder(svgElement: SVGSVGElement): void {
   positionAnimLayer(svgElement, true);
-}
-
-/**
- * When two units share a hex, draw ids in {@link paintBelow} first (underneath), then others.
- */
-function sortUnitsForSameHexPaintOrder(units: Unit[], paintBelow: Set<number> | null | undefined): Unit[] {
-  if (!paintBelow?.size) return units;
-  const idx = new Map(units.map((u, i) => [u.id, i] as const));
-  return [...units].sort((a, b) => {
-    const ka = `${a.col},${a.row}`;
-    const kb = `${b.col},${b.row}`;
-    if (ka !== kb) return (idx.get(a.id) ?? 0) - (idx.get(b.id) ?? 0);
-    const ta = paintBelow.has(a.id) ? 0 : 1;
-    const tb = paintBelow.has(b.id) ? 0 : 1;
-    if (ta !== tb) return ta - tb;
-    return a.id - b.id;
-  });
-}
-
-/**
- * For a melee snapshot, which unit ids should be painted below any other unit on the same hex.
- * Matches {@link CombatVfxPayload.attackerAnimAboveUnits} / strike layering.
- */
-export function paintBelowIdsForMeleeHexStack(
-  vfx: Pick<CombatVfxPayload, 'attackerAnimAboveUnits' | 'meleeAttackerId'>,
-  units: Unit[],
-): Set<number> | undefined {
-  const aid = vfx.meleeAttackerId;
-  if (aid === undefined) return undefined;
-  const attacker = units.find(u => u.id === aid);
-  if (!attacker) return undefined;
-  const other = units.find(u => u.id !== aid && u.col === attacker.col && u.row === attacker.row);
-  if (!other) return undefined;
-  const wantAttackerOnTop = vfx.attackerAnimAboveUnits ?? true;
-  return new Set(wantAttackerOnTop ? [other.id] : [aid]);
 }
 
 /** Hover move-path preview timeline; killed whenever the target hex changes or the path clears. */
@@ -758,8 +723,6 @@ export function renderState(
    * Skips HP bar tween sync so bars match the snapshot, not end-of-turn state.
    */
   unitDrawOverride?: Unit[] | null,
-  /** When two units share a hex, these ids are drawn first (below others on that hex). */
-  sameHexPaintBelowUnitIds?: Set<number> | null,
 ): void {
   const tRenderStart = performance.now();
   const trackHpBars = svgElement.id === 'board' && !unitDrawOverride;
@@ -1065,8 +1028,7 @@ export function renderState(
   // Advance HP bar tweens for every unit (including hidden — moving/strike sprites skip
   // the draw loop, so we must tick visualHpForUnit for them or their bars never animate).
   const displayHpByUnit = new Map<number, number>();
-  const rawUnits = unitDrawOverride ?? state.units;
-  const unitsToDraw = sortUnitsForSameHexPaintOrder(rawUnits, sameHexPaintBelowUnitIds);
+  const unitsToDraw = unitDrawOverride ?? state.units;
   if (trackHpBars) {
     for (const unit of state.units) {
       displayHpByUnit.set(unit.id, visualHpForUnit(unit, now));
