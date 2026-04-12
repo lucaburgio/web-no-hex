@@ -528,7 +528,6 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   max-width: 100%;
   flex: none;
   flex-grow: 0;
-  background: #010101;
   overflow: hidden;
   cursor: url('/icons/pointer.svg') 13 14, pointer;
   user-select: none;
@@ -570,7 +569,6 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.44s cubic-bezier(0.22, 1, 0.36, 1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .unit-card:hover .unit-card-art {
@@ -582,7 +580,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   width: 100%;
   height: 160px;
   background-repeat: no-repeat;
-  background-size: 100% 100%;
+  background-size: cover;
   background-position: center;
   transform: translateY(100%);
   transition: transform 0.48s cubic-bezier(0.22, 1, 0.36, 1);

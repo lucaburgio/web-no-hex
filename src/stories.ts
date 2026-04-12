@@ -57,8 +57,8 @@ export const STORIES: StoryDef[] = [
   scenario: 'ww2us',
   title: 'Citadel',
   description: 'Description.',
-  unitPackage: 'de-ww2',
-  unitPackagePlayer2: 'us-ww2',
+  unitPackage: 'us-ww2',
+  unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
   map: {
     cols: 5,
