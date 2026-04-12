@@ -350,17 +350,28 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   flex-shrink: 0;
 }
 
-/* Playable board frame — #board’s size matches the hex grid viewport (see renderer).
-   Adjust these variables to change the dashed outline. */
-#board {
-  --board-frame-width: 2px;
-  --board-frame-style: dashed;
-  --board-frame-color: rgba(255, 255, 255, 0.38);
-  --board-frame-offset: 0px;
+/* Playable board outer edge — path.board-perimeter-outline in renderer (hex boundary).
+   Edit variables on #board / #recap-board to restyle the dashed stroke. */
+#board,
+#recap-board {
+  --board-perimeter-stroke: rgba(255, 255, 255, 0.42);
+  --board-perimeter-stroke-width: 2px;
+  --board-perimeter-dasharray: 8 6;
+}
 
+#board {
   display: block;
-  outline: var(--board-frame-width) var(--board-frame-style) var(--board-frame-color);
-  outline-offset: var(--board-frame-offset);
+}
+
+#board .board-perimeter-outline,
+#recap-board .board-perimeter-outline {
+  fill: none;
+  stroke: var(--board-perimeter-stroke);
+  stroke-width: var(--board-perimeter-stroke-width);
+  stroke-dasharray: var(--board-perimeter-dasharray);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
 }
 
 #board.cursor-fight,

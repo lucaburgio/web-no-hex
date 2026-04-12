@@ -429,6 +429,91 @@ function buildBoundaryPath(hexSet: Set<string>): string {
   return d;
 }
 
+/** Unit-length segments on the outer boundary of the full playable grid (same edge dirs as {@link buildBoundaryPath}). */
+function collectBoardOuterPerimeterSegments(cols: number, rows: number): { x1: number; y1: number; x2: number; y2: number }[] {
+  const segs: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const { x, y } = hexToPixel(c, r);
+      const dirs = r % 2 === 0 ? DIRS_EVEN : DIRS_ODD;
+      for (let i = 0; i < 6; i++) {
+        const [dc, dr] = dirs[i]!;
+        const nc = c + dc;
+        const nr = r + dr;
+        if (nc >= 0 && nc < cols && nr >= 0 && nr < rows) continue;
+        const a1 = (Math.PI / 180) * (60 * i - 30);
+        const a2 = (Math.PI / 180) * (60 * (i + 1) - 30);
+        segs.push({
+          x1: x + HEX_SIZE * Math.cos(a1),
+          y1: y + HEX_SIZE * Math.sin(a1),
+          x2: x + HEX_SIZE * Math.cos(a2),
+          y2: y + HEX_SIZE * Math.sin(a2),
+        });
+      }
+    }
+  }
+  return segs;
+}
+
+/** Merge boundary segments into one closed ring so stroke dashes run continuously around the board. */
+function chainEdgeSegmentsToClosedPath(
+  segments: { x1: number; y1: number; x2: number; y2: number }[],
+): string {
+  if (segments.length === 0) return '';
+  const q = (n: number) => Math.round(n * 100) / 100;
+  const key = (x: number, y: number) => `${q(x)},${q(y)}`;
+  type P = { x: number; y: number };
+  const neighbors = new Map<string, string[]>();
+  const coords = new Map<string, P>();
+  function addEdge(a: P, b: P): void {
+    const ka = key(a.x, a.y);
+    const kb = key(b.x, b.y);
+    if (ka === kb) return;
+    coords.set(ka, a);
+    coords.set(kb, b);
+    if (!neighbors.has(ka)) neighbors.set(ka, []);
+    if (!neighbors.has(kb)) neighbors.set(kb, []);
+    neighbors.get(ka)!.push(kb);
+    neighbors.get(kb)!.push(ka);
+  }
+  for (const s of segments) {
+    addEdge({ x: s.x1, y: s.y1 }, { x: s.x2, y: s.y2 });
+  }
+  const sortedKeys = [...coords.keys()].sort((a, b) => {
+    const [ax, ay] = a.split(',').map(Number);
+    const [bx, by] = b.split(',').map(Number);
+    if (ay !== by) return ay - by;
+    return ax - bx;
+  });
+  const start = sortedKeys[0]!;
+  const pathPts: P[] = [];
+  let prev = '';
+  let curr = start;
+  const maxIter = segments.length * 3 + 10;
+  for (let iter = 0; iter < maxIter; iter++) {
+    pathPts.push(coords.get(curr)!);
+    let nbrs = (neighbors.get(curr) ?? []).filter((n) => n !== prev);
+    nbrs = [...new Set(nbrs)].sort();
+    if (nbrs.length === 0) break;
+    const next = nbrs[0]!;
+    if (next === start && pathPts.length > 1) break;
+    prev = curr;
+    curr = next;
+  }
+  if (pathPts.length < 3) return '';
+  let d = `M${pathPts[0]!.x.toFixed(2)},${pathPts[0]!.y.toFixed(2)}`;
+  for (let i = 1; i < pathPts.length; i++) {
+    d += `L${pathPts[i]!.x.toFixed(2)},${pathPts[i]!.y.toFixed(2)}`;
+  }
+  d += 'Z';
+  return d;
+}
+
+function buildBoardOuterHexPath(cols: number, rows: number): string {
+  const segs = collectBoardOuterPerimeterSegments(cols, rows);
+  return chainEdgeSegmentsToClosedPath(segs);
+}
+
 /** Lexicographic order on (row, col) so edge dedup works for col ≥ 10. */
 function hexKeyLess(a: string, b: string): boolean {
   const [ac, ar] = a.split(',').map(Number);
@@ -599,6 +684,16 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   const hexLayer = svgEl('g');
   hexLayer.id = 'hex-layer';
   boardViewRoot.appendChild(hexLayer);
+
+  const boardPerimeterLayer = svgEl('g');
+  boardPerimeterLayer.id = 'board-perimeter-layer';
+  boardPerimeterLayer.setAttribute('pointer-events', 'none');
+  const boardPerimeterPath = svgEl('path');
+  boardPerimeterPath.classList.add('board-perimeter-outline');
+  boardPerimeterPath.setAttribute('fill', 'none');
+  boardPerimeterPath.setAttribute('d', buildBoardOuterHexPath(COLS, ROWS));
+  boardPerimeterLayer.appendChild(boardPerimeterPath);
+  boardViewRoot.appendChild(boardPerimeterLayer);
 
   const sectorOutlineLayer = svgEl('g');
   sectorOutlineLayer.id = 'sector-outline-layer';
