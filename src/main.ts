@@ -45,7 +45,7 @@ import { aiDamageFloatDrawParams } from './combatPlayback';
 import { getNeighbors } from './hex';
 import { isInEnemyZoC } from './game';
 import type { MoveAnimation } from './renderer';
-import config from './gameconfig';
+import config, { DEFAULT_TERRITORY_ECONOMY } from './gameconfig';
 import gsap from 'gsap';
 import type { GameState, Unit, CombatForecast, Owner, CombatVfxPayload, GameMode } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
@@ -1141,7 +1141,13 @@ class SettingsOnOffToggle {
 
 const settingsOnOffToggles = new Map<string, SettingsOnOffToggle>();
 
+/** Tracks game mode across settings UI updates so quota fields can be backed up / restored around Breakthrough. */
+let lastSettingsGameModeForQuota: string | null = null;
+let quotaFieldsBeforeBreakthrough: { territory: string; points: string } | null = null;
+
 function populateSettings(): void {
+  lastSettingsGameModeForQuota = null;
+  quotaFieldsBeforeBreakthrough = null;
   const vals: Record<string, number> = {
     controlPointCount: config.controlPointCount,
     conquestPointsPlayer: config.conquestPointsPlayer,
@@ -1214,6 +1220,26 @@ function updateModeSpecificSettingsVisibility(): void {
   const territoryQuotaRowEl = document.getElementById('cfg-territoryQuota-row') as HTMLDivElement | null;
   const pointsPerQuotaRowEl = document.getElementById('cfg-pointsPerQuota-row') as HTMLDivElement | null;
   const isBreakthrough = v === 'breakthrough';
+  const prevMode = lastSettingsGameModeForQuota;
+  const enteringBreakthrough = isBreakthrough && prevMode !== 'breakthrough';
+  const leavingBreakthrough = !isBreakthrough && prevMode === 'breakthrough';
+
+  if (enteringBreakthrough) {
+    quotaFieldsBeforeBreakthrough = {
+      territory: territoryQuotaEl.value,
+      points: pointsPerQuotaEl.value,
+    };
+  }
+  if (leavingBreakthrough) {
+    if (quotaFieldsBeforeBreakthrough) {
+      territoryQuotaEl.value = quotaFieldsBeforeBreakthrough.territory;
+      pointsPerQuotaEl.value = quotaFieldsBeforeBreakthrough.points;
+    } else {
+      territoryQuotaEl.value = String(DEFAULT_TERRITORY_ECONOMY.territoryQuota);
+      pointsPerQuotaEl.value = String(DEFAULT_TERRITORY_ECONOMY.pointsPerQuota);
+    }
+    quotaFieldsBeforeBreakthrough = null;
+  }
   if (isBreakthrough) {
     territoryQuotaEl.value = '0';
     pointsPerQuotaEl.value = '0';
@@ -1222,6 +1248,7 @@ function updateModeSpecificSettingsVisibility(): void {
   pointsPerQuotaEl.disabled = isBreakthrough;
   territoryQuotaRowEl?.toggleAttribute('disabled', isBreakthrough);
   pointsPerQuotaRowEl?.toggleAttribute('disabled', isBreakthrough);
+  lastSettingsGameModeForQuota = v;
 }
 
 function clampNumericInputToBounds(el: HTMLInputElement): number {

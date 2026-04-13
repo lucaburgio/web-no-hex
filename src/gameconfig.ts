@@ -52,6 +52,9 @@ export function updateConfig(overrides: Partial<Omit<GameConfig, 'unitTypes'>> &
   }
 }
 
+/** Shipped defaults for territory bonus; used when restoring settings UI after leaving Breakthrough. */
+export const DEFAULT_TERRITORY_ECONOMY = { territoryQuota: 8, pointsPerQuota: 3 } as const;
+
 const config: GameConfig = {
   gameMode: 'domination' as GameMode,
   controlPointCount: 1,
@@ -95,10 +98,10 @@ const config: GameConfig = {
   productionPointsPerTurnAi: 20,
 
   // Number of owned hexes required to form one quota
-  territoryQuota: 8,
+  territoryQuota: DEFAULT_TERRITORY_ECONOMY.territoryQuota,
 
   // Bonus production points earned per quota owned each turn
-  pointsPerQuota: 3,
+  pointsPerQuota: DEFAULT_TERRITORY_ECONOMY.pointsPerQuota,
 
   // Available unit types (id must be unique; cost is in production points)
   unitTypes: [
@@ -157,6 +160,7 @@ const config: GameConfig = {
       strength: 11,
       extraFlanking: 0.05,
       icon: 'icons/units/tank.svg',
+      image: 'images/units/sherman.png',
       package: 'us-ww2',
     },
     {
@@ -168,6 +172,7 @@ const config: GameConfig = {
       strength: 8,
       range: 3,
       icon: 'icons/units/artillery.svg',
+      image: 'images/units/m2-howitzer.png',
       package: 'us-ww2',
     },
     {
