@@ -15,6 +15,7 @@ import {
   getRangedAttackTargets,
   playerRangedAttack,
   isValidProductionPlacement,
+  hasAnyValidProductionPlacement,
   hasHomeProductionAccess,
   forecastCombat,
   vsHumanEndProduction,
@@ -25,6 +26,7 @@ import {
   COLS,
   ROWS,
   getBreakthroughAttackerOwner,
+  type EndProductionOptions,
 } from './game';
 import {
   initRenderer,
@@ -2800,12 +2802,19 @@ function hasAnyValidMove(): boolean {
 }
 
 function shouldAutoSkipProductionPhase(): boolean {
+  if (state.phase !== 'production' || state.activePlayer !== localPlayer) return false;
+  // No empty legal hex: nothing to do in production — always skip (even if auto-end is off).
+  if (!hasAnyValidProductionPlacement(state, localPlayer)) return true;
   return (
-    state.phase === 'production' &&
-    state.activePlayer === localPlayer &&
     autoEndProductionEl.checked &&
     (!canAffordAnyUnit() || !hasHomeProductionAccess(state, localPlayer))
   );
+}
+
+function productionEndOptionsForAutoSkip(): EndProductionOptions | undefined {
+  return !hasAnyValidProductionPlacement(state, localPlayer)
+    ? { skipReason: 'no-placements' }
+    : undefined;
 }
 
 /**
@@ -2813,10 +2822,11 @@ function shouldAutoSkipProductionPhase(): boolean {
  */
 function applyImmediateAutoSkipProductionIfNeeded(): void {
   if (!shouldAutoSkipProductionPhase()) return;
+  const opts = productionEndOptionsForAutoSkip();
   if (gameMode === 'vsAI') {
-    state = playerEndProduction(state);
+    state = playerEndProduction(state, opts);
   } else {
-    state = vsHumanEndProduction(state, localPlayer);
+    state = vsHumanEndProduction(state, localPlayer, opts);
   }
   hideUnitPicker();
 }
@@ -2826,10 +2836,11 @@ function maybeAutoEnd(): void {
   if (
     shouldAutoSkipProductionPhase()
   ) {
+    const opts = productionEndOptionsForAutoSkip();
     if (gameMode === 'vsAI') {
-      state = playerEndProduction(state);
+      state = playerEndProduction(state, opts);
     } else {
-      state = vsHumanEndProduction(state, localPlayer);
+      state = vsHumanEndProduction(state, localPlayer, opts);
       if (ws && ws.readyState === WebSocket.OPEN) {
         // After auto-ending production, check if movement also needs auto-ending
         render(); updateUI(); checkWinner();

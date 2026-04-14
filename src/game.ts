@@ -429,6 +429,18 @@ export function isValidProductionPlacement(state: GameState, col: number, row: n
   return !!(hex && hex.isProduction && hex.owner === localPlayer);
 }
 
+/** True if there is at least one empty hex where `localPlayer` may produce (home row / owned production hex). */
+export function hasAnyValidProductionPlacement(state: GameState, localPlayer: Owner): boolean {
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (isValidProductionPlacement(state, c, r, localPlayer)) return true;
+    }
+  }
+  return false;
+}
+
+export type EndProductionOptions = { skipReason?: 'no-placements' };
+
 // Returns true if (col,row) is under ZoC from any unit belonging to `enemyOwner`
 export function isInEnemyZoC(state: GameState, col: number, row: number, enemyOwner: Owner): boolean {
   if (!config.zoneOfControl) return false;
@@ -1578,9 +1590,13 @@ export function playerPlaceUnit(state: GameState, col: number, row: number, unit
   return state;
 }
 
-export function playerEndProduction(state: GameState): GameState {
+export function playerEndProduction(state: GameState, options?: EndProductionOptions): GameState {
   if (state.phase !== 'production' || state.activePlayer !== PLAYER) return state;
-  log(state, 'You ended production.');
+  if (options?.skipReason === 'no-placements') {
+    log(state, 'No empty hexes for production — movement phase.');
+  } else {
+    log(state, 'You ended production.');
+  }
   return advancePhase(state);
 }
 
@@ -1935,9 +1951,13 @@ export function playerEndMovement(state: GameState): GameState {
 // ── vsHuman phase transitions ─────────────────────────────────────────────────
 
 // Advance from production to movement without running AI production.
-export function vsHumanEndProduction(state: GameState, localPlayer: Owner): GameState {
+export function vsHumanEndProduction(state: GameState, localPlayer: Owner, options?: EndProductionOptions): GameState {
   if (state.phase !== 'production' || state.activePlayer !== localPlayer) return state;
-  log(state, 'You ended production.');
+  if (options?.skipReason === 'no-placements') {
+    log(state, 'No empty hexes for production — movement phase.');
+  } else {
+    log(state, 'You ended production.');
+  }
   state.phase = 'movement';
   state.units.forEach(u => { if (u.owner === localPlayer) u.movesUsed = 0; });
   log(state, `Turn ${state.turn} — Movement phase. Click a unit then a hex.`);
