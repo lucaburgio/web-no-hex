@@ -20,9 +20,9 @@ export const STORIES: StoryDef[] = [
 },
 {
   id: 'tutorial-02',
-  scenario: 'tutorial',
   title: 'Introduction — Tanks',
   description: 'Description.',
+  scenario: 'tutorial',
   unitPackage: 'us-ww2',
   unitPackagePlayer2: 'de-ww2',
   gameMode: 'domination',
@@ -32,8 +32,15 @@ export const STORIES: StoryDef[] = [
     mountains: ['0,1', '3,1', '3,2', '3,3'],
     playerStart: [{ col: 0, unitTypeId: 'tank' }, { col: 2, unitTypeId: 'tank' }],
     aiStart: [{ col: 1 }],
+    rivers: [
+      { col: 0, row: 2, segment: 'E-B-01', entrySide: 'E', exitSide: 'B' },
+      { col: 1, row: 2, segment: 'E-A-06', entrySide: 'E', exitSide: 'A' },
+      { col: 1, row: 1, segment: 'D-B-01', entrySide: 'D', exitSide: 'B' },
+      { col: 2, row: 1, segment: 'E-A-04', entrySide: 'E', exitSide: 'A' },
+      { col: 3, row: 0, segment: 'D-A-02', entrySide: 'D', exitSide: 'A' },
+    ],
   },
-  productionPointsPerTurnAi: 4,
+  productionPointsPerTurn: 20,
 },
 {
   id: 'tutorial-03',
