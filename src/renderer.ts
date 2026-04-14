@@ -1027,15 +1027,33 @@ export function renderState(
 
   const flipBoardY = svgElement.dataset.boardFlipY === '1';
 
-  // Draw mountain icons
+  // Draw mountain textures (clipped to hex shape)
   const mountainLayer = domCache?.mountainLayer ?? (svgElement.querySelector('#mountain-layer') as SVGGElement | null);
   if (mountainLayer) {
     mountainLayer.innerHTML = '';
+    const clipIdPrefix = `${svgElement.id || 'board'}-mtn-clip`;
+    const defs = svgEl('defs');
+    for (const key of mountainSet) {
+      const [mc, mr] = key.split(',').map(Number);
+      const { x, y } = hexToPixel(mc, mr);
+      const clip = svgEl('clipPath');
+      clip.setAttribute('id', `${clipIdPrefix}-${mc}-${mr}`);
+      clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
+      const clipPoly = svgEl('polygon');
+      clipPoly.setAttribute('points', hexPoints(x, y));
+      clip.appendChild(clipPoly);
+      defs.appendChild(clip);
+    }
+    mountainLayer.appendChild(defs);
+
     const iw = HEX_SIZE * Math.sqrt(3);
     const ih = HEX_SIZE * 2;
     for (const key of mountainSet) {
       const [mc, mr] = key.split(',').map(Number);
       const { x, y } = hexToPixel(mc, mr);
+      const clipped = svgEl('g');
+      clipped.setAttribute('clip-path', `url(#${clipIdPrefix}-${mc}-${mr})`);
+      clipped.setAttribute('pointer-events', 'none');
       const img = svgEl('image');
       img.setAttribute('href', mountainHexTextureUrl(key));
       img.setAttribute('x', String(x - iw / 2));
@@ -1046,10 +1064,11 @@ export function renderState(
       if (flipBoardY) {
         const upright = svgUprightAt(x, y);
         upright.appendChild(img);
-        mountainLayer.appendChild(upright);
+        clipped.appendChild(upright);
       } else {
-        mountainLayer.appendChild(img);
+        clipped.appendChild(img);
       }
+      mountainLayer.appendChild(clipped);
     }
   }
 
