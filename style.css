@@ -1198,6 +1198,12 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   display: none;
 }
 
+#settings-breakthrough-only {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 #settings-left {
   flex: 1;
   min-width: 0;
