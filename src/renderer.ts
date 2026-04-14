@@ -23,9 +23,11 @@ import mountainHex02 from '../public/images/misc/mountain-hex/mountain-02.png';
 import mountainHex03 from '../public/images/misc/mountain-hex/mountain-03.png';
 import mountainHex04 from '../public/images/misc/mountain-hex/mountain-04.png';
 import mountainHex05 from '../public/images/misc/mountain-hex/mountain-05.png';
+import mountainHex06 from '../public/images/misc/mountain-hex/mountain-06.png';
+import mountainHex07 from '../public/images/misc/mountain-hex/mountain-07.png';
 import { riverSegmentUrl } from './rivers';
 
-const MOUNTAIN_HEX_TEXTURES = [mountainHex01, mountainHex02, mountainHex03, mountainHex04, mountainHex05] as const;
+const MOUNTAIN_HEX_TEXTURES = [mountainHex01, mountainHex02, mountainHex03, mountainHex04, mountainHex05, mountainHex06, mountainHex07] as const;
 
 /** Stable pseudo-random pick so each mountain hex keeps the same art across re-renders. */
 function mountainHexTextureUrl(key: string): string {
