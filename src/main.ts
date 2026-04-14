@@ -1160,6 +1160,7 @@ let lastSettingsGameModeForQuota: string | null = null;
 let quotaFieldsBeforeBreakthrough: { territory: string; points: string } | null = null;
 
 function populateSettings(): void {
+  hideBoardColsStartingUnitsNote();
   lastSettingsGameModeForQuota = null;
   quotaFieldsBeforeBreakthrough = null;
   const vals: Record<string, number> = {
@@ -1209,6 +1210,7 @@ function populateSettings(): void {
   syncBreakthroughRoleControls();
   updateModeSpecificSettingsVisibility();
   syncModeCards();
+  clampStartingUnitsInputsToBoardWidth(vals.boardCols);
 }
 
 function syncBreakthroughRoleControls(): void {
@@ -1275,6 +1277,39 @@ function clampNumericInputToBounds(el: HTMLInputElement): number {
   const clamped = Math.max(min, Math.min(max, parsed));
   if (String(clamped) !== el.value) el.value = String(clamped);
   return clamped;
+}
+
+/** Starting unit count inputs — max is always {@link boardCols} (one unit per home-row hex). */
+const STARTING_UNITS_FIELD_IDS = [
+  'cfg-startingUnitsPlayer1',
+  'cfg-startingUnitsPlayer2',
+  'cfg-startingUnitsDefender',
+  'cfg-startingUnitsAttacker',
+] as const;
+
+function getCfgBoardColsStartingUnitsNoteEl(): HTMLElement | null {
+  return document.getElementById('cfg-boardCols-starting-units-note');
+}
+
+/** Sets each starting-units input `max` to `width` and clamps values above `width`. Returns whether any value was reduced. */
+function clampStartingUnitsInputsToBoardWidth(width: number): boolean {
+  let anyClamped = false;
+  for (const id of STARTING_UNITS_FIELD_IDS) {
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    if (!el) continue;
+    el.max = String(width);
+    const raw = parseFloat(el.value);
+    const v = Number.isFinite(raw) ? raw : Number(el.min) || 1;
+    if (v > width) {
+      el.value = String(width);
+      anyClamped = true;
+    }
+  }
+  return anyClamped;
+}
+
+function hideBoardColsStartingUnitsNote(): void {
+  getCfgBoardColsStartingUnitsNoteEl()?.classList.add('hidden');
 }
 
 function initCustomSettingsSelect(selectId: string): void {
@@ -1423,6 +1458,29 @@ for (const [id] of NUM_FIELDS) {
     clampNumericInputToBounds(el);
   });
 }
+
+let boardColsWidthAtFocus: number | null = null;
+let boardColsClampedStartingUnitsThisEdit = false;
+const boardColsSettingsEl = document.getElementById('cfg-boardCols') as HTMLInputElement;
+boardColsSettingsEl.addEventListener('focusin', () => {
+  boardColsWidthAtFocus = clampNumericInputToBounds(boardColsSettingsEl);
+  boardColsClampedStartingUnitsThisEdit = false;
+});
+boardColsSettingsEl.addEventListener('input', () => {
+  const w = clampNumericInputToBounds(boardColsSettingsEl);
+  if (clampStartingUnitsInputsToBoardWidth(w)) boardColsClampedStartingUnitsThisEdit = true;
+});
+boardColsSettingsEl.addEventListener('change', () => {
+  const w = clampNumericInputToBounds(boardColsSettingsEl);
+  clampStartingUnitsInputsToBoardWidth(w);
+  const noteEl = getCfgBoardColsStartingUnitsNoteEl();
+  const focusW = boardColsWidthAtFocus;
+  if (focusW != null && w < focusW && boardColsClampedStartingUnitsThisEdit) {
+    noteEl?.classList.remove('hidden');
+  } else {
+    noteEl?.classList.add('hidden');
+  }
+});
 
 // Populate unit package selects from config and build custom widgets
 (function () {

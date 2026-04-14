@@ -268,11 +268,11 @@
         <div id="settings-breakthrough-only" class="hidden">
           <div class="settings-row">
             <label class="settings-label" for="cfg-startingUnitsDefender">Starting units Defender</label>
-            <input class="settings-input" type="number" id="cfg-startingUnitsDefender" min="1" max="12" step="1" />
+            <input class="settings-input" type="number" id="cfg-startingUnitsDefender" min="1" max="48" step="1" />
           </div>
           <div class="settings-row">
             <label class="settings-label" for="cfg-startingUnitsAttacker">Starting units Attacker</label>
-            <input class="settings-input" type="number" id="cfg-startingUnitsAttacker" min="1" max="12" step="1" />
+            <input class="settings-input" type="number" id="cfg-startingUnitsAttacker" min="1" max="48" step="1" />
           </div>
           <div class="settings-row">
             <label class="settings-label" for="cfg-breakthroughPlayer1Role">Player 1 role (Host)</label>
@@ -319,11 +319,11 @@
         <div id="settings-domination-conquest-only">
           <div class="settings-row">
             <label class="settings-label" for="cfg-startingUnitsPlayer1">Starting units (P1)</label>
-            <input class="settings-input" type="number" id="cfg-startingUnitsPlayer1" min="1" max="12" step="1" />
+            <input class="settings-input" type="number" id="cfg-startingUnitsPlayer1" min="1" max="48" step="1" />
           </div>
           <div class="settings-row">
             <label class="settings-label" for="cfg-startingUnitsPlayer2">Starting units (P2)</label>
-            <input class="settings-input" type="number" id="cfg-startingUnitsPlayer2" min="1" max="12" step="1" />
+            <input class="settings-input" type="number" id="cfg-startingUnitsPlayer2" min="1" max="48" step="1" />
           </div>
         </div>
       </div>
@@ -333,6 +333,9 @@
         <div class="settings-row">
           <label class="settings-label" for="cfg-boardCols">Width</label>
           <input class="settings-input" type="number" id="cfg-boardCols" min="2" max="48" step="1" />
+        </div>
+        <div id="cfg-boardCols-starting-units-note" class="settings-note hidden" role="status">
+          you cannot have more units than initial production zones. starting units max updated
         </div>
         <div class="settings-row">
           <label class="settings-label" for="cfg-boardRows">Height</label>
