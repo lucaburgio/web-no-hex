@@ -221,7 +221,7 @@ export const STORIES: StoryDef[] = [
   breakthroughSectorCount: 3,
   breakthroughAttackerStartingPP: 180,
   productionPointsPerTurn: 20,
-  productionPointsPerTurnAi: 20,
+  productionPointsPerTurnAi: 16,
 },
 {
   id: 'ww2-08',
