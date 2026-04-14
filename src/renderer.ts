@@ -1255,15 +1255,17 @@ export function renderState(
     const baseColor = unit.owner === PLAYER ? c.player : c.ai;
     const tiredBase = unit.owner === PLAYER ? c.playerTired : c.aiTired;
     const isRangedTarget = rangedTargetKeys.has(`${dc},${dr}`);
-    const tired =
+    const movementTired =
       state.phase === 'movement' &&
       state.activePlayer === unit.owner &&
       unit.movesUsed >= unit.movement;
+    const productionTiredVisual =
+      state.phase === 'production' && productionFocusHexes.size > 0;
+    const tired = movementTired || productionTiredVisual;
     const fill =
       isRangedTarget ? c.rangedTarget : isSelected ? c.unitSelected : tired ? tiredBase : baseColor;
-    const unitDimmed = productionFocusHexes.size > 0;
-    const opacity   = unitDimmed ? '0.2' : '1';
-    const iconOpacity = unitDimmed ? opacity : tired ? String(config.tiredIconOpacity) : '1';
+    const opacity = '1';
+    const iconOpacity = tired ? String(config.tiredIconOpacity) : '1';
 
     const unitRoot = flipBoardY ? svgUprightAt(x, y) : null;
     if (unitRoot) unitLayer.appendChild(unitRoot);
