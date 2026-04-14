@@ -5,6 +5,8 @@
   /* ── Player / AI identity colors ────────────────────────────────────────── */
   --color-player: #457cdb;
   --color-ai:     #bc4949;
+  --color-player-tired: #6b8fc4;
+  --color-ai-tired:     #c97a7a;
 
   /* ── Unit states ────────────────────────────────────────────────────────── */
   --color-unit-selected: #C77E00;
@@ -32,4 +34,5 @@
   --color-hp-high: #81E2A0;
   --color-hp-mid:  #FFBE00;
   --color-hp-low:  #FF765E;
+  --color-hp-tired: #8aa899;
 }

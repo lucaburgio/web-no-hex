@@ -73,6 +73,9 @@ img {
     /* ── Player / AI identity colors ────────────────────────────────────────── */
     --color-player: var(--color-dark);
     --color-ai:     var(--color-gray-600);
+    /* Movement: unit has no moves left this turn (“tired”) — body + HP bar */
+    --color-player-tired: var(--color-gray-500);
+    --color-ai-tired:     var(--color-gray-400);
   
     /* ── Unit states ────────────────────────────────────────────────────────── */
     --color-unit-selected: var(--color-yellow-900);
@@ -102,6 +105,7 @@ img {
     --color-hp-high: #81E2A0;
     --color-hp-mid:  #FFBE00;
     --color-hp-low:  #FF765E;
+    --color-hp-tired: #9EB8A8;
 
     /* Combat damage float (matches strike UI ref: warm red chip, dark label) */
     --damage-float-bg: var(--color-red-500);

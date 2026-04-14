@@ -537,6 +537,8 @@ setBoardRenderCallback(() => render());
 const GUEST_IDENTITY_SWAP_PROPS = [
   '--color-player',
   '--color-ai',
+  '--color-player-tired',
+  '--color-ai-tired',
   '--color-hex-player',
   '--color-hex-ai',
   '--color-hex-player-dimmed',
@@ -569,6 +571,8 @@ function syncGuestIdentityColors(): void {
   const s = getComputedStyle(root);
   const player = s.getPropertyValue('--color-player').trim();
   const ai = s.getPropertyValue('--color-ai').trim();
+  const playerTired = s.getPropertyValue('--color-player-tired').trim();
+  const aiTired = s.getPropertyValue('--color-ai-tired').trim();
   const hexPlayer = s.getPropertyValue('--color-hex-player').trim();
   const hexAi = s.getPropertyValue('--color-hex-ai').trim();
   const hexPlayerDimmed = s.getPropertyValue('--color-hex-player-dimmed').trim();
@@ -576,6 +580,8 @@ function syncGuestIdentityColors(): void {
 
   root.style.setProperty('--color-player', ai);
   root.style.setProperty('--color-ai', player);
+  root.style.setProperty('--color-player-tired', aiTired);
+  root.style.setProperty('--color-ai-tired', playerTired);
   root.style.setProperty('--color-hex-player', hexAi);
   root.style.setProperty('--color-hex-ai', hexPlayer);
   root.style.setProperty('--color-hex-player-dimmed', hexAiDimmed);

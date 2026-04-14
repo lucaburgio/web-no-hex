@@ -374,6 +374,9 @@ interface Colors {
   hpHigh: string;
   hpMid: string;
   hpLow: string;
+  hpTired: string;
+  playerTired: string;
+  aiTired: string;
   rangedTarget: string;
 }
 
@@ -410,6 +413,9 @@ function colors(): Colors {
     hpHigh:          v('--color-hp-high'),
     hpMid:           v('--color-hp-mid'),
     hpLow:           v('--color-hp-low'),
+    hpTired:         v('--color-hp-tired'),
+    playerTired:     v('--color-player-tired'),
+    aiTired:         v('--color-ai-tired'),
     rangedTarget:    v('--color-red-700'),
   };
   return C;
@@ -1247,14 +1253,16 @@ export function renderState(
     const hpRatio    = displayHp / unit.maxHp;
 
     const baseColor = unit.owner === PLAYER ? c.player : c.ai;
+    const tiredBase = unit.owner === PLAYER ? c.playerTired : c.aiTired;
     const isRangedTarget = rangedTargetKeys.has(`${dc},${dr}`);
-    const fill      = isRangedTarget ? c.rangedTarget : isSelected ? c.unitSelected : baseColor;
-    const unitDimmed = productionFocusHexes.size > 0;
-    const moveExhausted =
+    const tired =
       state.phase === 'movement' &&
       state.activePlayer === unit.owner &&
       unit.movesUsed >= unit.movement;
-    const opacity   = (moveExhausted || unitDimmed) ? '0.2' : '1';
+    const fill =
+      isRangedTarget ? c.rangedTarget : isSelected ? c.unitSelected : tired ? tiredBase : baseColor;
+    const unitDimmed = productionFocusHexes.size > 0;
+    const opacity   = unitDimmed ? '0.2' : '1';
 
     const unitRoot = flipBoardY ? svgUprightAt(x, y) : null;
     if (unitRoot) unitLayer.appendChild(unitRoot);
@@ -1287,7 +1295,7 @@ export function renderState(
     barBg.setAttribute('opacity', opacity);
     uParent.appendChild(barBg);
 
-    const barColor = hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
+    const barColor = tired ? c.hpTired : hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
     const barFill = svgEl('rect');
     barFill.setAttribute('x', String(barX)); barFill.setAttribute('y', String(barY));
     barFill.setAttribute('width', String(barW * hpRatio)); barFill.setAttribute('height', String(barH));
