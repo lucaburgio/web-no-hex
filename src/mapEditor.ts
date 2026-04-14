@@ -1,6 +1,8 @@
 import config from './gameconfig';
 import { hexPoints } from './hex';
 import { SCENARIOS } from './scenarios';
+import type { RiverHex } from './types';
+import { generateRiver, getOutwardSides, riverSegmentUrl, SIDE_DELTA } from './rivers';
 
 const EDITOR_HEX_SIZE = 34;
 
@@ -53,6 +55,8 @@ interface EditorState {
   controlPoints: Set<string>;
   playerStart: Map<number, string>; // col -> unitTypeId
   aiStart: Map<number, string>;     // col -> unitTypeId
+  /** All river hexes across all generated rivers. */
+  rivers: RiverHex[];
   activeTool: EditorTool;
 }
 
@@ -67,6 +71,7 @@ function mkState(): EditorState {
     controlPoints: new Set(),
     playerStart: new Map(),
     aiStart: new Map(),
+    rivers: [],
     activeTool: 'normal',
   };
 }
@@ -215,6 +220,7 @@ function cleanOOB(): void {
     const [c, r] = k.split(',').map(Number);
     if (c >= cols || r >= rows) edState.controlPoints.delete(k);
   }
+  edState.rivers = edState.rivers.filter(rh => rh.col < cols && rh.row < rows);
   for (const c of [...edState.playerStart.keys()]) if (c >= cols) edState.playerStart.delete(c);
   for (const c of [...edState.aiStart.keys()]) if (c >= cols) edState.aiStart.delete(c);
 }
@@ -227,6 +233,7 @@ function refreshToolbar(): void {
   const { outer: tg, btns: tgBtns } = mkGroup('TERRAIN');
   tgBtns.appendChild(mkToolBtn('normal', 'NORMAL'));
   tgBtns.appendChild(mkToolBtn('mountain', 'MOUNTAIN'));
+  tgBtns.appendChild(mkToolBtn('river', 'RIVER'));
   if (edState.gameMode === 'conquest' || edState.gameMode === 'breakthrough') {
     tgBtns.appendChild(mkToolBtn('controlPoint', 'CTRL PT'));
   }
@@ -331,8 +338,28 @@ function renderBoard(): void {
   svgEl.setAttribute('viewBox', `${-leftMargin} ${-margin} ${totalW + leftMargin + margin} ${totalH + 2 * margin}`);
   svgEl.innerHTML = '';
 
+  // Build river lookup and clip-path defs
+  const riverByKey = new Map<string, RiverHex>();
+  for (const rh of edState.rivers) riverByKey.set(`${rh.col},${rh.row}`, rh);
+
+  const hlRiver = edState.activeTool === 'river';
   const hlPlayer = edState.activeTool.startsWith('player:');
   const hlAi = edState.activeTool.startsWith('ai:');
+
+  if (riverByKey.size > 0) {
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    for (const rh of edState.rivers) {
+      const { x, y } = hexToPixelLocal(rh.col, rh.row);
+      const clip = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
+      clip.setAttribute('id', `me-riv-clip-${rh.col}-${rh.row}`);
+      clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
+      const cp = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      cp.setAttribute('points', hexPoints(x, y, s));
+      clip.appendChild(cp);
+      defs.appendChild(clip);
+    }
+    svgEl.appendChild(defs);
+  }
 
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
@@ -352,10 +379,15 @@ function renderBoard(): void {
       else if (isPS)  fill = 'var(--color-hex-player)';
       else if (isAS)  fill = 'var(--color-hex-ai)';
 
+      const isRiver      = riverByKey.has(key);
+      const isBorderHex  = col === 0 || col === cols - 1 || row === 0 || row === rows - 1;
+      const isRiverStart = hlRiver && isBorderHex && !isMtn && getOutwardSides(col, row, cols, rows).length > 0;
+
       let stroke = 'var(--color-hex-stroke)';
       let strokeW = '1';
       if      (hlPlayer && isPlayerRow) { stroke = 'var(--color-unit-selected)'; strokeW = '2.5'; }
       else if (hlAi && isAiRow)         { stroke = 'var(--color-ai)';            strokeW = '2.5'; }
+      else if (isRiverStart)            { stroke = 'rgba(80,160,220,0.8)';       strokeW = '2.5'; }
       else if (isPlayerRow)             { stroke = 'rgba(0,0,0,0.35)';           strokeW = '1.5'; }
       else if (isAiRow)                 { stroke = 'rgba(100,100,100,0.45)';     strokeW = '1.5'; }
 
@@ -370,6 +402,28 @@ function renderBoard(): void {
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('stroke-width', strokeW);
       g.appendChild(poly);
+
+      // River texture overlay (clipped to hex shape)
+      if (isRiver) {
+        const rh = riverByKey.get(key)!;
+        const url = riverSegmentUrl(rh.segment);
+        if (url) {
+          const iw = s * Math.sqrt(3);
+          const ih = s * 2;
+          const clipped = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          clipped.setAttribute('clip-path', `url(#me-riv-clip-${col}-${row})`);
+          clipped.style.pointerEvents = 'none';
+          const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+          img.setAttribute('href', url);
+          img.setAttribute('x', String(x - iw / 2));
+          img.setAttribute('y', String(y - ih / 2));
+          img.setAttribute('width', String(iw));
+          img.setAttribute('height', String(ih));
+          img.style.pointerEvents = 'none';
+          clipped.appendChild(img);
+          g.appendChild(clipped);
+        }
+      }
 
       // Sector tint overlay (drawn on top of base fill, below labels)
       if (showSectors) {
@@ -502,6 +556,8 @@ function applyTool(e: MouseEvent): void {
   if (activeTool === 'normal') {
     edState.mountains.delete(key);
     edState.controlPoints.delete(key);
+    // Remove any river that passes through this hex
+    edState.rivers = edState.rivers.filter(rh => !(rh.col === col && rh.row === row));
     if (row === rows - 1) edState.playerStart.delete(col);
     if (row === 0) edState.aiStart.delete(col);
   } else if (activeTool === 'mountain') {
@@ -509,6 +565,9 @@ function applyTool(e: MouseEvent): void {
     edState.controlPoints.delete(key);
     if (row === rows - 1) edState.playerStart.delete(col);
     if (row === 0) edState.aiStart.delete(col);
+  } else if (activeTool === 'river') {
+    applyRiverTool(col, row);
+    return; // renderBoard called inside
   } else if (activeTool === 'controlPoint') {
     edState.controlPoints.add(key);
     edState.mountains.delete(key);
@@ -524,6 +583,70 @@ function applyTool(e: MouseEvent): void {
     edState.controlPoints.delete(key);
   }
 
+  renderBoard();
+}
+
+/**
+ * River tool click handler.
+ * - Clicking a border hex with an outward side generates a new river from there.
+ * - Clicking any hex that is already part of a river removes that entire river chain.
+ */
+function applyRiverTool(col: number, row: number): void {
+  const { cols, rows } = edState;
+
+  // If the clicked hex is part of an existing river, remove that river
+  const existingIdx = edState.rivers.findIndex(rh => rh.col === col && rh.row === row);
+  if (existingIdx !== -1) {
+    // Identify which river chain owns this hex by walking from the clicked hex
+    // outward: the chain is a contiguous run sharing the same entry→exit path.
+    // Simplest approach: remove ALL river hexes with the same connected segment.
+    const toRemove = new Set<string>();
+    // Walk forwards (follow exits) and backwards (follow entries) from this hex
+    const riverMap = new Map<string, RiverHex>();
+    for (const rh of edState.rivers) riverMap.set(`${rh.col},${rh.row}`, rh);
+
+    const queue: string[] = [`${col},${row}`];
+    while (queue.length > 0) {
+      const k = queue.pop()!;
+      if (toRemove.has(k)) continue;
+      toRemove.add(k);
+      const rh = riverMap.get(k);
+      if (!rh) continue;
+      // Follow exit → next hex forward
+      const parity = Math.abs(rh.row) % 2 === 0 ? 'even' : 'odd';
+      const [fdc, fdr] = SIDE_DELTA[parity][rh.exitSide];
+      const fnk = `${rh.col + fdc},${rh.row + fdr}`;
+      if (riverMap.has(fnk)) queue.push(fnk);
+      // Walk backwards: find any hex whose exit leads to k
+      for (const [nk, nrh] of riverMap) {
+        if (toRemove.has(nk)) continue;
+        const np = Math.abs(nrh.row) % 2 === 0 ? 'even' : 'odd';
+        const [ndc, ndr] = SIDE_DELTA[np][nrh.exitSide];
+        if (`${nrh.col + ndc},${nrh.row + ndr}` === k) queue.push(nk);
+      }
+    }
+    edState.rivers = edState.rivers.filter(rh => !toRemove.has(`${rh.col},${rh.row}`));
+    renderBoard();
+    return;
+  }
+
+  // Only border hexes with outward sides can start a river
+  const outwardSides = getOutwardSides(col, row, cols, rows);
+  if (outwardSides.length === 0) return;
+
+  // Generate a river from each outward side and pick the one that goes farthest
+  // (prefer longer rivers; if tied, pick a random one)
+  const candidates = outwardSides.map(side =>
+    generateRiver({ startCol: col, startRow: row, entrySide: side, cols, rows }),
+  );
+  candidates.sort((a, b) => b.length - a.length);
+  const best = candidates[0];
+  if (!best || best.length === 0) return;
+
+  // Append the new river hexes (skip any col,row already occupied by another river)
+  const occupiedByRiver = new Set(edState.rivers.map(rh => `${rh.col},${rh.row}`));
+  const newHexes = best.filter(rh => !occupiedByRiver.has(`${rh.col},${rh.row}`));
+  edState.rivers.push(...newHexes);
   renderBoard();
 }
 
@@ -578,6 +701,24 @@ function applyLoadedCode(raw: string): string | null {
     }
   }
 
+  const rivers: RiverHex[] = [];
+  if (Array.isArray(mapDef.rivers)) {
+    for (const rh of mapDef.rivers as Array<Record<string, unknown>>) {
+      if (
+        typeof rh.col === 'number' && typeof rh.row === 'number' &&
+        typeof rh.segment === 'string' &&
+        typeof rh.entrySide === 'string' && typeof rh.exitSide === 'string'
+      ) {
+        rivers.push({
+          col: rh.col, row: rh.row,
+          segment: rh.segment,
+          entrySide: rh.entrySide as RiverHex['entrySide'],
+          exitSide: rh.exitSide as RiverHex['exitSide'],
+        });
+      }
+    }
+  }
+
   // Commit to state
   edState.cols = cols;
   edState.rows = rows;
@@ -585,6 +726,7 @@ function applyLoadedCode(raw: string): string | null {
   edState.controlPoints = controlPoints;
   edState.playerStart = playerStart;
   edState.aiStart = aiStart;
+  edState.rivers = rivers;
 
   if (typeof parsed.gameMode === 'string') {
     edState.gameMode = parsed.gameMode as EditorGameMode;
@@ -618,7 +760,7 @@ function applyLoadedCode(raw: string): string | null {
 // ── Export ────────────────────────────────────────────────────────────────────
 
 function exportToClipboard(): void {
-  const { cols, rows, gameMode, scenario, mountains, controlPoints, playerStart, aiStart, unitPackage, unitPackagePlayer2 } = edState;
+  const { cols, rows, gameMode, scenario, mountains, controlPoints, playerStart, aiStart, unitPackage, unitPackagePlayer2, rivers } = edState;
   const i = '  ';
 
   const mStr = [...mountains].sort().map(m => `'${m}'`).join(', ');
@@ -653,6 +795,12 @@ function exportToClipboard(): void {
   code += `${i}${i}aiStart: [${aStr}],\n`;
   if ((gameMode === 'conquest' || gameMode === 'breakthrough') && controlPoints.size > 0) {
     code += `${i}${i}controlPoints: [${cpStr}],\n`;
+  }
+  if (rivers.length > 0) {
+    const rvStr = rivers
+      .map(rh => `{ col: ${rh.col}, row: ${rh.row}, segment: '${rh.segment}', entrySide: '${rh.entrySide}', exitSide: '${rh.exitSide}' }`)
+      .join(`,\n${i}${i}  `);
+    code += `${i}${i}rivers: [\n${i}${i}  ${rvStr},\n${i}${i}],\n`;
   }
   code += `${i}},\n`;
   code += `${i}productionPointsPerTurn: 20,\n`;

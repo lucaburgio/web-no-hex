@@ -1,0 +1,227 @@
+/**
+ * River generation system for hex boards.
+ *
+ * Hex side labeling — pointy-top orientation, clockwise from top-right:
+ *
+ *         F _____ A
+ *        /         \
+ *   E --+   center  +-- B
+ *        \         /
+ *         D ‾‾‾‾‾ C
+ *
+ *   A = top-right    B = right         C = bottom-right
+ *   D = bottom-left  E = left          F = top-left
+ *
+ * River image naming convention: {side1}-{side2}-{variant}.png
+ * The image connects the two named sides (direction-agnostic).
+ * Multiple variants of the same pair (e.g. A-D-01, A-D-02) can coexist
+ * and are selected randomly during generation.
+ *
+ * Neighbor delta table (odd-r offset, same parity rules as hex.ts):
+ *
+ *   Even rows:  A=[0,-1]  B=[1,0]  C=[0,1]  D=[-1,1]  E=[-1,0]  F=[-1,-1]
+ *   Odd  rows:  A=[1,-1]  B=[1,0]  C=[1,1]  D=[0,1]   E=[-1,0]  F=[0,-1]
+ */
+
+import type { HexSide, RiverHex } from './types';
+
+// ── Image imports (ES module — required for Tauri/Vite asset bundling) ─────────
+
+import riverDB01 from '../public/images/misc/river-hex/D-B-01.png';
+import riverEA01 from '../public/images/misc/river-hex/E-A-01.png';
+import riverEC01 from '../public/images/misc/river-hex/E-C-01.png';
+import riverFB01 from '../public/images/misc/river-hex/F-B-01.png';
+import riverFC01 from '../public/images/misc/river-hex/F-C-01.png';
+
+// ── Side metadata ──────────────────────────────────────────────────────────────
+
+export const HEX_SIDES: HexSide[] = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+/** Which side is directly opposite (the entry side into the next hex). */
+export const SIDE_OPPOSITE: Record<HexSide, HexSide> = {
+  A: 'D', B: 'E', C: 'F',
+  D: 'A', E: 'B', F: 'C',
+};
+
+/**
+ * [dc, dr] delta from (col, row) to its neighbor through side S.
+ * Matches the NEIGHBOR_DIRS parity rules in hex.ts.
+ */
+export const SIDE_DELTA: Record<'even' | 'odd', Record<HexSide, [number, number]>> = {
+  even: { A: [0, -1], B: [1,  0], C: [0,  1], D: [-1,  1], E: [-1, 0], F: [-1, -1] },
+  odd:  { A: [1, -1], B: [1,  0], C: [1,  1], D: [ 0,  1], E: [-1, 0], F: [ 0, -1] },
+};
+
+// ── Segment catalog ────────────────────────────────────────────────────────────
+
+interface RiverSegmentDef {
+  /** Canonical segment key used in RiverHex.segment (e.g. 'F-B-01'). */
+  key: string;
+  /** The two sides this image connects. */
+  sides: [HexSide, HexSide];
+  /** Resolved asset URL from the ES module import. */
+  url: string;
+}
+
+/**
+ * All registered river segment images.
+ * To add new art, import the PNG above and append an entry here.
+ */
+const RIVER_SEGMENT_DEFS: RiverSegmentDef[] = [
+  { key: 'D-B-01', sides: ['D', 'B'], url: riverDB01 },
+  { key: 'E-A-01', sides: ['E', 'A'], url: riverEA01 },
+  { key: 'E-C-01', sides: ['E', 'C'], url: riverEC01 },
+  { key: 'F-B-01', sides: ['F', 'B'], url: riverFB01 },
+  { key: 'F-C-01', sides: ['F', 'C'], url: riverFC01 },
+];
+
+/** Map from segment key → resolved image URL. */
+const SEGMENT_URL_MAP: Record<string, string> = {};
+for (const def of RIVER_SEGMENT_DEFS) {
+  SEGMENT_URL_MAP[def.key] = def.url;
+}
+
+/**
+ * Per-entry-side index: for a river arriving through side S, which exits are
+ * available and which image should be used?
+ */
+const CATALOG: Record<HexSide, Array<{ exitSide: HexSide; segmentKey: string }>> = {
+  A: [], B: [], C: [], D: [], E: [], F: [],
+};
+for (const def of RIVER_SEGMENT_DEFS) {
+  const [s1, s2] = def.sides;
+  CATALOG[s1].push({ exitSide: s2, segmentKey: def.key });
+  CATALOG[s2].push({ exitSide: s1, segmentKey: def.key });
+}
+
+/** Resolve a stored segment key to its bundled image URL. Returns empty string if unknown. */
+export function riverSegmentUrl(key: string): string {
+  return SEGMENT_URL_MAP[key] ?? '';
+}
+
+// ── Coordinate helpers ─────────────────────────────────────────────────────────
+
+/** Returns the board neighbor through a given side, or null if out of bounds. */
+export function getNeighborBySide(
+  col: number, row: number, side: HexSide, cols: number, rows: number,
+): [number, number] | null {
+  const parity = Math.abs(row) % 2 === 0 ? 'even' : 'odd';
+  const [dc, dr] = SIDE_DELTA[parity][side];
+  const nc = col + dc;
+  const nr = row + dr;
+  if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) return null;
+  return [nc, nr];
+}
+
+/** Returns the sides of a hex that face outside the board (neighbor is out of bounds). */
+export function getOutwardSides(col: number, row: number, cols: number, rows: number): HexSide[] {
+  return HEX_SIDES.filter(s => getNeighborBySide(col, row, s, cols, rows) === null);
+}
+
+/**
+ * All border hexes with at least one outward side that has a matching catalog entry.
+ * These are the valid starting points for river generation.
+ */
+export function getAllBorderEntries(
+  cols: number, rows: number,
+): Array<{ col: number; row: number; side: HexSide }> {
+  const out: Array<{ col: number; row: number; side: HexSide }> = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (c > 0 && c < cols - 1 && r > 0 && r < rows - 1) continue; // skip interior
+      for (const side of getOutwardSides(c, r, cols, rows)) {
+        if (CATALOG[side].length > 0) {
+          out.push({ col: c, row: r, side });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+// ── Seeded PRNG (mulberry32) ───────────────────────────────────────────────────
+
+function mkRng(seed: number): () => number {
+  let s = seed >>> 0;
+  return (): number => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 0xFFFFFFFF;
+  };
+}
+
+// ── River generation ───────────────────────────────────────────────────────────
+
+export interface GenerateRiverOptions {
+  startCol: number;
+  startRow: number;
+  /** The outward-facing side through which the river enters the board at startCol/startRow. */
+  entrySide: HexSide;
+  cols: number;
+  rows: number;
+  /** Optional seed for reproducibility. Random if omitted. */
+  seed?: number;
+  /** Hard cap on hex count (default: cols × rows). */
+  maxSteps?: number;
+}
+
+/**
+ * Generate a river path starting from a border hex.
+ *
+ * The algorithm performs a random walk:
+ *  1. Enter the start hex from `entrySide`.
+ *  2. Look up all catalog exits for the current entry side.
+ *  3. Prefer exits that lead to an unvisited in-bounds hex; fall back to
+ *     an exit that leaves the board (natural river terminus).
+ *  4. Repeat from the next hex until the river exits the board or no valid
+ *     continuation exists.
+ *
+ * Returns an array of RiverHex objects, in order from start to end.
+ */
+export function generateRiver(opts: GenerateRiverOptions): RiverHex[] {
+  const { startCol, startRow, entrySide, cols, rows } = opts;
+  const rng = mkRng(opts.seed ?? (Math.random() * 0xFFFFFFFF) >>> 0);
+  const maxSteps = opts.maxSteps ?? cols * rows;
+
+  const result: RiverHex[] = [];
+  const visited = new Set<string>();
+
+  let col = startCol;
+  let row = startRow;
+  let entry: HexSide = entrySide;
+
+  for (let step = 0; step < maxSteps; step++) {
+    const key = `${col},${row}`;
+    if (visited.has(key)) break; // loop guard
+    visited.add(key);
+
+    const exits = CATALOG[entry];
+    if (exits.length === 0) break;
+
+    // Exits that continue in-bounds to an unvisited hex
+    const continuing = exits.filter(e => {
+      const n = getNeighborBySide(col, row, e.exitSide, cols, rows);
+      return n !== null && !visited.has(`${n[0]},${n[1]}`);
+    });
+
+    // Exits that leave the board (valid terminus)
+    const terminating = exits.filter(e =>
+      getNeighborBySide(col, row, e.exitSide, cols, rows) === null,
+    );
+
+    const pool = continuing.length > 0 ? continuing : terminating;
+    if (pool.length === 0) break;
+
+    const chosen = pool[Math.floor(rng() * pool.length)]!;
+    result.push({ col, row, segment: chosen.segmentKey, entrySide: entry, exitSide: chosen.exitSide });
+
+    const next = getNeighborBySide(col, row, chosen.exitSide, cols, rows);
+    if (next === null) break; // exited the board — done
+
+    [col, row] = next;
+    entry = SIDE_OPPOSITE[chosen.exitSide];
+  }
+
+  return result;
+}

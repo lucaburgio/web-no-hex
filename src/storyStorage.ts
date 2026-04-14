@@ -57,6 +57,7 @@ export function loadStoryGameState(): GameState | null {
     const state = JSON.parse(saved) as GameState;
 
     if (!state.mountainHexes) state.mountainHexes = [];
+    if (!state.riverHexes) state.riverHexes = [];
     if (state.gameMode == null) state.gameMode = 'domination';
     if (!state.controlPointHexes) state.controlPointHexes = [];
     if (!state.sectorHexes) state.sectorHexes = [];

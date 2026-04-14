@@ -23,6 +23,7 @@ export function loadGameState(): GameState | null {
 
     // Backward-compat: mountainHexes added later
     if (!state.mountainHexes) state.mountainHexes = [];
+    if (!state.riverHexes) state.riverHexes = [];
     if (state.gameMode == null) state.gameMode = 'domination';
     if (!state.controlPointHexes) state.controlPointHexes = [];
     if (!state.sectorHexes) state.sectorHexes = [];

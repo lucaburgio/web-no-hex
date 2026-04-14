@@ -1,6 +1,29 @@
 // Shared types for the game engine
 
 export type Owner = 1 | 2;
+
+/**
+ * One of the six sides of a pointy-top hex, clockwise from top-right.
+ *
+ *       F _____ A
+ *      /         \
+ * E --+   center  +-- B
+ *      \         /
+ *       D ‾‾‾‾‾ C
+ */
+export type HexSide = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+
+/** One hex in a river path. Stored in the map definition and propagated to GameState. */
+export interface RiverHex {
+  col: number;
+  row: number;
+  /** Segment image key, e.g. 'F-B-01'. Resolved to a URL at render time via riverSegmentUrl(). */
+  segment: string;
+  /** Side through which the river enters this hex. */
+  entrySide: HexSide;
+  /** Side through which the river exits this hex. */
+  exitSide: HexSide;
+}
 export type Phase = 'production' | 'movement';
 
 /** Match rules: core gameplay is shared; each mode tweaks victory and scoring. */
@@ -42,6 +65,8 @@ export interface GameState {
   units: Unit[];
   hexStates: Record<string, HexState>;
   mountainHexes: string[];
+  /** River hexes placed on the map (visual only). */
+  riverHexes: RiverHex[];
   /** Set at match start from config; used for saves / multiplayer. */
   gameMode: GameMode;
   /** Hex keys `col,row` that are control points (Conquest). Empty in Domination. */
@@ -161,6 +186,8 @@ export interface StoryMapDef {
   aiStart: Array<{ col: number; unitTypeId?: string }>;
   /** Hex keys "col,row" for conquest control points. */
   controlPoints?: string[];
+  /** River hexes painted on this map. */
+  rivers?: RiverHex[];
 }
 
 export interface StoryDef {

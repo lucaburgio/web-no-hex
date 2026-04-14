@@ -23,6 +23,7 @@ import mountainHex02 from '../public/images/misc/mountain-hex/mountain-02.png';
 import mountainHex03 from '../public/images/misc/mountain-hex/mountain-03.png';
 import mountainHex04 from '../public/images/misc/mountain-hex/mountain-04.png';
 import mountainHex05 from '../public/images/misc/mountain-hex/mountain-05.png';
+import { riverSegmentUrl } from './rivers';
 
 const MOUNTAIN_HEX_TEXTURES = [mountainHex01, mountainHex02, mountainHex03, mountainHex04, mountainHex05] as const;
 
@@ -629,6 +630,7 @@ interface RenderDomCache {
   hexPolys: SVGPolygonElement[][];
   hexLayer: SVGGElement | null;
   unitLayer: SVGGElement | null;
+  riverLayer: SVGGElement | null;
   mountainLayer: SVGGElement | null;
   controlPointLayer: SVGGElement | null;
   prodStrokeLayer: SVGGElement | null;
@@ -724,7 +726,13 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
     }
   }
 
-  // Mountain icon layer (above hex fills, below units)
+  // River texture layer (above hex fills, below mountains and units)
+  const riverLayer = svgEl('g');
+  riverLayer.id = 'river-layer';
+  riverLayer.setAttribute('pointer-events', 'none');
+  hexLayer.appendChild(riverLayer);
+
+  // Mountain icon layer (above river art, below units)
   const mountainLayer = svgEl('g');
   mountainLayer.id = 'mountain-layer';
   mountainLayer.setAttribute('pointer-events', 'none');
@@ -792,6 +800,7 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
     hexPolys,
     hexLayer,
     unitLayer,
+    riverLayer,
     mountainLayer,
     controlPointLayer,
     prodStrokeLayer,
@@ -1028,6 +1037,54 @@ export function renderState(
   perfRecord('render.hexPass', performance.now() - tHexStart);
 
   const flipBoardY = svgElement.dataset.boardFlipY === '1';
+
+  // Draw river textures (clipped to hex shape, below mountains)
+  const riverLayer = domCache?.riverLayer ?? (svgElement.querySelector('#river-layer') as SVGGElement | null);
+  if (riverLayer) {
+    riverLayer.innerHTML = '';
+    const riverHexes = state.riverHexes ?? [];
+    if (riverHexes.length > 0) {
+      const clipIdPrefix = `${svgElement.id || 'board'}-riv-clip`;
+      const defs = svgEl('defs');
+      for (const rh of riverHexes) {
+        const { x, y } = hexToPixel(rh.col, rh.row);
+        const clip = svgEl('clipPath');
+        clip.setAttribute('id', `${clipIdPrefix}-${rh.col}-${rh.row}`);
+        clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
+        const clipPoly = svgEl('polygon');
+        clipPoly.setAttribute('points', hexPoints(x, y));
+        clip.appendChild(clipPoly);
+        defs.appendChild(clip);
+      }
+      riverLayer.appendChild(defs);
+
+      const iw = HEX_SIZE * Math.sqrt(3);
+      const ih = HEX_SIZE * 2;
+      for (const rh of riverHexes) {
+        const url = riverSegmentUrl(rh.segment);
+        if (!url) continue;
+        const { x, y } = hexToPixel(rh.col, rh.row);
+        const clipped = svgEl('g');
+        clipped.setAttribute('clip-path', `url(#${clipIdPrefix}-${rh.col}-${rh.row})`);
+        clipped.setAttribute('pointer-events', 'none');
+        const img = svgEl('image');
+        img.setAttribute('href', url);
+        img.setAttribute('x', String(x - iw / 2));
+        img.setAttribute('y', String(y - ih / 2));
+        img.setAttribute('width', String(iw));
+        img.setAttribute('height', String(ih));
+        img.setAttribute('pointer-events', 'none');
+        if (flipBoardY) {
+          const upright = svgUprightAt(x, y);
+          upright.appendChild(img);
+          clipped.appendChild(upright);
+        } else {
+          clipped.appendChild(img);
+        }
+        riverLayer.appendChild(clipped);
+      }
+    }
+  }
 
   // Draw mountain textures (clipped to hex shape)
   const mountainLayer = domCache?.mountainLayer ?? (svgElement.querySelector('#mountain-layer') as SVGGElement | null);
