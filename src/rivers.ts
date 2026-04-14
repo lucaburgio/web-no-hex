@@ -150,6 +150,56 @@ export function getOutwardSides(col: number, row: number, cols: number, rows: nu
   return HEX_SIDES.filter(s => getNeighborBySide(col, row, s, cols, rows) === null);
 }
 
+/** Rectangular board edge crossed when leaving through an outward hex face (row 0 = north). */
+export type BoardEdge = 'N' | 'S' | 'E' | 'W';
+
+/**
+ * Which map edge you cross by stepping out through `side` from (col, row).
+ * Returns null if `side` is not outward (neighbor in bounds).
+ */
+export function boardEdgeForOutwardSide(
+  col: number, row: number, side: HexSide, cols: number, rows: number,
+): BoardEdge | null {
+  const parity = Math.abs(row) % 2 === 0 ? 'even' : 'odd';
+  const [dc, dr] = SIDE_DELTA[parity][side];
+  const nc = col + dc;
+  const nr = row + dr;
+  if (nc >= 0 && nc < cols && nr >= 0 && nr < rows) return null;
+  if (nr < 0) return 'N';
+  if (nr >= rows) return 'S';
+  if (nc < 0) return 'W';
+  if (nc >= cols) return 'E';
+  return null;
+}
+
+function riverPathBorderQuality(
+  path: RiverHex[],
+  startCol: number,
+  startRow: number,
+  entrySide: HexSide,
+  cols: number,
+  rows: number,
+): { tier: number; length: number } {
+  if (path.length === 0) return { tier: 0, length: 0 };
+  const last = path[path.length - 1]!;
+  const outwardStart = getOutwardSides(startCol, startRow, cols, rows).includes(entrySide);
+  const outwardEnd = getOutwardSides(last.col, last.row, cols, rows).includes(last.exitSide);
+  if (!outwardStart || !outwardEnd) return { tier: 1, length: path.length };
+  const e0 = boardEdgeForOutwardSide(startCol, startRow, entrySide, cols, rows);
+  const e1 = boardEdgeForOutwardSide(last.col, last.row, last.exitSide, cols, rows);
+  if (!e0 || !e1) return { tier: 1, length: path.length };
+  if (e0 === e1) return { tier: 2, length: path.length };
+  return { tier: 3, length: path.length };
+}
+
+function isBetterRiverPath(
+  a: { tier: number; length: number },
+  b: { tier: number; length: number },
+): boolean {
+  if (a.tier !== b.tier) return a.tier > b.tier;
+  return a.length > b.length;
+}
+
 /**
  * All border hexes with at least one outward side that has a matching catalog entry.
  * These are the valid starting points for river generation.
@@ -188,7 +238,10 @@ function mkRng(seed: number): () => number {
 export interface GenerateRiverOptions {
   startCol: number;
   startRow: number;
-  /** The outward-facing side through which the river enters the board at startCol/startRow. */
+  /**
+   * The side through which the river enters the start hex from **off the board**.
+   * Must be an outward face (see `getOutwardSides`); invalid values yield an empty path.
+   */
   entrySide: HexSide;
   cols: number;
   rows: number;
@@ -196,24 +249,21 @@ export interface GenerateRiverOptions {
   seed?: number;
   /** Hard cap on hex count (default: cols × rows). */
   maxSteps?: number;
+  /**
+   * Retries with different RNG streams until the path ends on a different map edge than
+   * it started (or `maxAttempts` is reached). Default 64.
+   */
+  maxAttempts?: number;
 }
 
 /**
- * Generate a river path starting from a border hex.
- *
- * The algorithm performs a random walk:
- *  1. Enter the start hex from `entrySide`.
- *  2. Look up all catalog exits for the current entry side.
- *  3. Prefer exits that lead to an unvisited in-bounds hex; fall back to
- *     an exit that leaves the board (natural river terminus).
- *  4. Repeat from the next hex until the river exits the board or no valid
- *     continuation exists.
- *
- * Returns an array of RiverHex objects, in order from start to end.
+ * One random walk (single RNG stream). Prefer `generateRiver()` for border rules.
  */
-export function generateRiver(opts: GenerateRiverOptions): RiverHex[] {
-  const { startCol, startRow, entrySide, cols, rows } = opts;
-  const rng = mkRng(opts.seed ?? (Math.random() * 0xFFFFFFFF) >>> 0);
+function generateRiverWalk(opts: GenerateRiverOptions & { seed: number }): RiverHex[] {
+  const { startCol, startRow, entrySide, cols, rows, seed } = opts;
+  if (!getOutwardSides(startCol, startRow, cols, rows).includes(entrySide)) return [];
+
+  const rng = mkRng(seed);
   const maxSteps = opts.maxSteps ?? cols * rows;
 
   const result: RiverHex[] = [];
@@ -237,9 +287,9 @@ export function generateRiver(opts: GenerateRiverOptions): RiverHex[] {
       return n !== null && !visited.has(`${n[0]},${n[1]}`);
     });
 
-    // Exits that leave the board (valid terminus)
+    // Terminus: step off the board through a face that is actually outward (off-map)
     const terminating = exits.filter(e =>
-      getNeighborBySide(col, row, e.exitSide, cols, rows) === null,
+      boardEdgeForOutwardSide(col, row, e.exitSide, cols, rows) !== null,
     );
 
     const pool = continuing.length > 0 ? continuing : terminating;
@@ -256,4 +306,42 @@ export function generateRiver(opts: GenerateRiverOptions): RiverHex[] {
   }
 
   return result;
+}
+
+/**
+ * Generate a river path starting from a border hex.
+ *
+ * The algorithm performs a random walk:
+ *  1. Enter the start hex from `entrySide` (must be an **outward** face so the river
+ *     visibly comes in from off the board).
+ *  2. Look up all catalog exits for the current entry side.
+ *  3. Prefer exits that lead to an unvisited in-bounds hex; fall back to
+ *     an exit that leaves the board through another **outward** face.
+ *  4. Repeat until the river exits the board or no valid continuation exists.
+ *
+ * Retries with independent RNG streams (see `maxAttempts`) until the path **starts and
+ * ends on different map edges** (north / south / east / west), when possible; otherwise
+ * returns the best attempt (prefers outward entry/exit, then longer paths).
+ */
+export function generateRiver(opts: GenerateRiverOptions): RiverHex[] {
+  const maxAttempts = opts.maxAttempts ?? 64;
+  const baseSeed = opts.seed !== undefined ? opts.seed >>> 0 : (Math.random() * 0xFFFFFFFF) >>> 0;
+
+  let bestMeta = { tier: 0, length: 0 };
+  let best: RiverHex[] = [];
+
+  for (let a = 0; a < maxAttempts; a++) {
+    const seed = (baseSeed + Math.imul(a, 193_496_63)) >>> 0;
+    const path = generateRiverWalk({ ...opts, seed });
+    const meta = riverPathBorderQuality(
+      path, opts.startCol, opts.startRow, opts.entrySide, opts.cols, opts.rows,
+    );
+    if (meta.tier === 3 && path.length > 0) return path;
+    if (isBetterRiverPath(meta, bestMeta)) {
+      bestMeta = meta;
+      best = path;
+    }
+  }
+
+  return best;
 }
