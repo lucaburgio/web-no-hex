@@ -1,6 +1,6 @@
 import { getNeighbors, hexDistance } from './hex';
 import config, { getAvailableUnitTypes } from './gameconfig';
-import { generateRiver, getAllBorderEntries } from './rivers';
+import { generateRiver, getAllBorderEntries, riverMaxHexesFromBoardWidth } from './rivers';
 import type { RiverHex } from './types';
 import type {
   Unit,
@@ -1227,6 +1227,7 @@ export function createInitialState(): GameState {
         entrySide: entry.side,
         cols: COLS,
         rows: ROWS,
+        maxSteps: riverMaxHexesFromBoardWidth(COLS, config.riverMaxLengthBoardWidthMult),
       });
     }
   }

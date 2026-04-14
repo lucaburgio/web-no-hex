@@ -2,7 +2,7 @@ import config from './gameconfig';
 import { hexPoints } from './hex';
 import { SCENARIOS } from './scenarios';
 import type { RiverHex } from './types';
-import { generateRiver, getOutwardSides, riverSegmentUrl, SIDE_DELTA } from './rivers';
+import { generateRiver, getOutwardSides, riverMaxHexesFromBoardWidth, riverSegmentUrl, SIDE_DELTA } from './rivers';
 
 const EDITOR_HEX_SIZE = 34;
 
@@ -637,7 +637,14 @@ function applyRiverTool(col: number, row: number): void {
   // Generate a river from each outward side and pick the one that goes farthest
   // (prefer longer rivers; if tied, pick a random one)
   const candidates = outwardSides.map(side =>
-    generateRiver({ startCol: col, startRow: row, entrySide: side, cols, rows }),
+    generateRiver({
+      startCol: col,
+      startRow: row,
+      entrySide: side,
+      cols,
+      rows,
+      maxSteps: riverMaxHexesFromBoardWidth(cols, config.riverMaxLengthBoardWidthMult),
+    }),
   );
   candidates.sort((a, b) => b.length - a.length);
   const best = candidates[0];

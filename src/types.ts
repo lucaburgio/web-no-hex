@@ -295,6 +295,11 @@ export interface GameConfig {
   mountainPct: number;
   /** When true, one river is generated on new games before mountains are placed. */
   enableRivers: boolean;
+  /**
+   * Generated river length cap: at most this many times {@link boardCols} hexes wide
+   * (actual max hex count is floor(boardCols × this value), minimum 1).
+   */
+  riverMaxLengthBoardWidthMult: number;
   // Color of the movement path preview line
   movePathColor: string;
   // Stroke width of the movement path preview line (in pixels)

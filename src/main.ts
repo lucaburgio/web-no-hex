@@ -1087,6 +1087,7 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
   ['cfg-maxFlankingUnits',        'maxFlankingUnits',        1],
   ['cfg-healOwnTerritory',        'healOwnTerritory',        1],
   ['cfg-mountainPct',             'mountainPct',             100],
+  ['cfg-riverMaxLengthBoardWidthMult', 'riverMaxLengthBoardWidthMult', 100],
 ];
 
 // Proxy type for key checking only — never instantiated
@@ -1103,6 +1104,7 @@ declare const _cfgNumProxy: {
   flankingBonus: number; maxFlankingUnits: number;
   healOwnTerritory: number;
   mountainPct: number;
+  riverMaxLengthBoardWidthMult: number;
   // enableRivers is a toggle, handled separately via TOGGLE_FIELDS
 };
 
@@ -1170,6 +1172,7 @@ function populateSettings(): void {
     flankingBonus: config.flankingBonus, maxFlankingUnits: config.maxFlankingUnits,
     healOwnTerritory: config.healOwnTerritory,
     mountainPct: config.mountainPct,
+    riverMaxLengthBoardWidthMult: config.riverMaxLengthBoardWidthMult,
   };
   for (const [id, key, scale] of NUM_FIELDS) {
     const el = document.getElementById(id) as HTMLInputElement;

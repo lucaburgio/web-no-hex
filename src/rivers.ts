@@ -221,6 +221,11 @@ export function getAllBorderEntries(
   return out;
 }
 
+/** Max hexes allowed in a generated river for board width `cols` and length multiplier from config. */
+export function riverMaxHexesFromBoardWidth(cols: number, lengthMultVsBoardWidth: number): number {
+  return Math.max(1, Math.floor(cols * lengthMultVsBoardWidth));
+}
+
 // ── Seeded PRNG (mulberry32) ───────────────────────────────────────────────────
 
 function mkRng(seed: number): () => number {
@@ -247,7 +252,7 @@ export interface GenerateRiverOptions {
   rows: number;
   /** Optional seed for reproducibility. Random if omitted. */
   seed?: number;
-  /** Hard cap on hex count (default: cols × rows). */
+  /** Hard cap on hex count in this river (default: cols × rows). Use {@link riverMaxHexesFromBoardWidth}. */
   maxSteps?: number;
   /**
    * Retries with different RNG streams until the path ends on a different map edge than
