@@ -43,6 +43,7 @@ img {
 
   --color-yellow-900: #9F5A15;
   --color-yellow-500: #FFC13A;
+  --color-yellow-100: #EDE1C7;
 
   --color-gray-600: #797979;
   --color-gray-300: #A5A5A5;
@@ -1225,6 +1226,21 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   min-height: 0;
   width: 80%;
   height: 70%;
+}
+.settings-note{
+  font-family: 'Disket Mono', monospace;
+  background-color: var(--color-yellow-100);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-yellow-900);
+  padding: 16px;
+}
+.settings-note.neutral {
+  background-color: var(--color-gray-100);
+  color: var(--color-gray-600);
+  font-weight: 600;
+  padding: 10px 12px;
+  margin-top: 6px;
 }
 
 .back-link {

@@ -274,6 +274,9 @@
             <label class="settings-label" for="cfg-startingUnitsAttacker">Starting units Attacker</label>
             <input class="settings-input" type="number" id="cfg-startingUnitsAttacker" min="1" max="48" step="1" />
           </div>
+          <div class="settings-note neutral" role="note">
+            max units at start is defined by the width of the map
+          </div>
           <div class="settings-row">
             <label class="settings-label" for="cfg-breakthroughPlayer1Role">Player 1 role (Host)</label>
             <select class="settings-input settings-select" id="cfg-breakthroughPlayer1Role">
@@ -325,6 +328,9 @@
             <label class="settings-label" for="cfg-startingUnitsPlayer2">Starting units (P2)</label>
             <input class="settings-input" type="number" id="cfg-startingUnitsPlayer2" min="1" max="48" step="1" />
           </div>
+          <div class="settings-note neutral" role="note">
+            max units at start is defined by the width of the map
+          </div>
         </div>
       </div>
 
@@ -332,14 +338,11 @@
         <div class="settings-group-title">BOARD</div>
         <div class="settings-row">
           <label class="settings-label" for="cfg-boardCols">Width</label>
-          <input class="settings-input" type="number" id="cfg-boardCols" min="2" max="48" step="1" />
-        </div>
-        <div id="cfg-boardCols-starting-units-note" class="settings-note hidden" role="status">
-          you cannot have more units than initial production zones. starting units max updated
+          <input class="settings-input" type="number" id="cfg-boardCols" min="4" max="48" step="1" />
         </div>
         <div class="settings-row">
           <label class="settings-label" for="cfg-boardRows">Height</label>
-          <input class="settings-input" type="number" id="cfg-boardRows" min="2" max="48" step="1" />
+          <input class="settings-input" type="number" id="cfg-boardRows" min="4" max="48" step="1" />
         </div>
         <div class="settings-row">
           <label class="settings-label" for="cfg-mountainPct">Mountain hexes (%)</label>
