@@ -1485,9 +1485,15 @@ boardColsSettingsEl.addEventListener('input', () => {
   if (!Number.isFinite(raw)) return;
   const min = Number(boardColsSettingsEl.min);
   const max = Number(boardColsSettingsEl.max);
-  const w = Math.max(min, Math.min(max, raw));
-  if (String(w) !== boardColsSettingsEl.value) boardColsSettingsEl.value = String(w);
-  clampStartingUnitsInputsToBoardWidth(w);
+  // Do not enforce min while typing (e.g. "1" before "2" in "12"); blur commits min.
+  if (raw > max) {
+    boardColsSettingsEl.value = String(max);
+    clampStartingUnitsInputsToBoardWidth(max);
+    return;
+  }
+  if (raw >= min) {
+    clampStartingUnitsInputsToBoardWidth(raw);
+  }
 });
 boardColsSettingsEl.addEventListener('change', () => {
   const w = clampNumericInputToBounds(boardColsSettingsEl);
