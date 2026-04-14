@@ -139,7 +139,9 @@ const playerConquerPctEl  = document.getElementById('player-conquer-pct') as HTM
 const aiConquerPctEl      = document.getElementById('ai-conquer-pct') as HTMLElement;
 const playerConquerLabel  = document.getElementById('player-conquer-label') as HTMLElement;
 const aiConquerLabel      = document.getElementById('ai-conquer-label') as HTMLElement;
-const conquerBarEl        = document.getElementById('conquer-bar-line') as HTMLElement;
+const conquerBarEl = document.getElementById('conquer-bar-line') as HTMLElement;
+const conquerBarLocalEl      = conquerBarEl.querySelector('.conquer-bar-local') as HTMLElement;
+const conquerBarOpponentEl   = conquerBarEl.querySelector('.conquer-bar-opponent') as HTMLElement;
 const ppTooltipEl         = document.getElementById('pp-tooltip') as HTMLDivElement;
 const unitStatTooltipEl   = document.getElementById('unit-stat-tooltip') as HTMLDivElement;
 const settingsTooltipEl   = document.getElementById('settings-tooltip') as HTMLDivElement;
@@ -2945,13 +2947,17 @@ function updateUI(): void {
   // Two-color bar: left = local player, right = opponent
   const style = getComputedStyle(document.documentElement);
   const localColor    = localPlayer === PLAYER
-    ? style.getPropertyValue('--color-hex-player').trim()
-    : style.getPropertyValue('--color-hex-ai').trim();
+    ? style.getPropertyValue('--color-player').trim()
+    : style.getPropertyValue('--color-ai').trim();
   const opponentColor = localPlayer === PLAYER
-    ? style.getPropertyValue('--color-hex-ai').trim()
-    : style.getPropertyValue('--color-hex-player').trim();
-  conquerBarEl.style.background =
-    `linear-gradient(to right, ${localColor} ${leftPct}%, ${opponentColor} ${leftPct}%)`;
+    ? style.getPropertyValue('--color-ai').trim()
+    : style.getPropertyValue('--color-player').trim();
+  conquerBarEl.style.background = '';
+  const rightGrow = 100 - leftPct;
+  conquerBarLocalEl.style.flex = `${leftPct} 1 0`;
+  conquerBarLocalEl.style.background = localColor;
+  conquerBarOpponentEl.style.flex = `${rightGrow} 1 0`;
+  conquerBarOpponentEl.style.background = opponentColor;
 
   const isMyTurn = state.activePlayer === localPlayer;
   const showAiWaitingStatus = gameMode === 'vsAI' && aiTurnPendingStart;
