@@ -1103,13 +1103,15 @@ declare const _cfgNumProxy: {
   flankingBonus: number; maxFlankingUnits: number;
   healOwnTerritory: number;
   mountainPct: number;
+  // enableRivers is a toggle, handled separately via TOGGLE_FIELDS
 };
 
-const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'limitArtillery' | 'autoEndProduction' | 'autoEndMovement']> = [
+const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'limitArtillery' | 'autoEndProduction' | 'autoEndMovement' | 'enableRivers']> = [
   ['cfg-zoneOfControl',      'zoneOfControl'],
   ['cfg-limitArtillery',     'limitArtillery'],
   ['cfg-autoEndProduction',  'autoEndProduction'],
   ['cfg-autoEndMovement',    'autoEndMovement'],
+  ['cfg-enableRivers',       'enableRivers'],
 ];
 
 class SettingsOnOffToggle {

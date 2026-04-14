@@ -322,6 +322,9 @@ const config: GameConfig = {
   // Fraction of board hexes to randomly set as impassable mountains at game start (0–1)
   mountainPct: 0.12,
 
+  // Generate a river on new games (random walk from a border hex) before placing mountains
+  enableRivers: true,
+
   // Color of the movement path preview line shown when hovering a valid move hex
   movePathColor: '#C77E00',
 

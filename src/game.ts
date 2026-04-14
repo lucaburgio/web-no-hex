@@ -1,5 +1,7 @@
 import { getNeighbors, hexDistance } from './hex';
 import config, { getAvailableUnitTypes } from './gameconfig';
+import { generateRiver, getAllBorderEntries } from './rivers';
+import type { RiverHex } from './types';
 import type {
   Unit,
   UnitType,
@@ -1210,13 +1212,32 @@ export function createInitialState(): GameState {
     hexStates[`${u.col},${u.row}`] = { owner: u.owner, stableFor: 0, isProduction: false };
   }
 
-  // Generate random mountain hexes, excluding home rows and starting unit positions
+  // Generate river first (before mountains) so river hexes are excluded from mountain candidates
   const reservedKeys = new Set(units.map(u => `${u.col},${u.row}`));
+
+  let riverHexes: RiverHex[] = [];
+  if (config.enableRivers) {
+    const borderEntries = getAllBorderEntries(COLS, ROWS);
+    if (borderEntries.length > 0) {
+      // Pick a random border entry point
+      const entry = borderEntries[Math.floor(Math.random() * borderEntries.length)]!;
+      riverHexes = generateRiver({
+        startCol: entry.col,
+        startRow: entry.row,
+        entrySide: entry.side,
+        cols: COLS,
+        rows: ROWS,
+      });
+    }
+  }
+  const riverKeys = new Set(riverHexes.map(rh => `${rh.col},${rh.row}`));
+
+  // Generate random mountain hexes, excluding home rows, starting units, and river hexes
   const candidates: string[] = [];
   for (let r = 1; r < ROWS - 1; r++) {
     for (let c = 0; c < COLS; c++) {
       const key = `${c},${r}`;
-      if (!reservedKeys.has(key)) candidates.push(key);
+      if (!reservedKeys.has(key) && !riverKeys.has(key)) candidates.push(key);
     }
   }
   const mountainCount = Math.round(COLS * ROWS * config.mountainPct);
@@ -1333,7 +1354,7 @@ export function createInitialState(): GameState {
     units,
     hexStates,
     mountainHexes,
-    riverHexes: [],
+    riverHexes,
     gameMode: gm,
     controlPointHexes,
     conquestPoints,

@@ -293,6 +293,8 @@ export interface GameConfig {
   unitMoveSpeed: number;
   // Fraction of board hexes to randomly set as impassable mountains (0–1)
   mountainPct: number;
+  /** When true, one river is generated on new games before mountains are placed. */
+  enableRivers: boolean;
   // Color of the movement path preview line
   movePathColor: string;
   // Stroke width of the movement path preview line (in pixels)
