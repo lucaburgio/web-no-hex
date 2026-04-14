@@ -18,6 +18,18 @@ import {
 import type { Owner } from './types';
 import type { GameState, Unit } from './types';
 import config from './gameconfig';
+import mountainHex01 from '../public/images/misc/mountain-hex/mountain-01.png';
+import mountainHex02 from '../public/images/misc/mountain-hex/mountain-02.png';
+import mountainHex03 from '../public/images/misc/mountain-hex/mountain-03.png';
+
+const MOUNTAIN_HEX_TEXTURES = [mountainHex01, mountainHex02, mountainHex03] as const;
+
+/** Stable pseudo-random pick so each mountain hex keeps the same art across re-renders. */
+function mountainHexTextureUrl(key: string): string {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return MOUNTAIN_HEX_TEXTURES[h % MOUNTAIN_HEX_TEXTURES.length];
+}
 
 /** Margin in px between SVG edge and board origin (must match {@link initRenderer}). */
 export const BOARD_MARGIN = 100;
@@ -1025,7 +1037,7 @@ export function renderState(
       const [mc, mr] = key.split(',').map(Number);
       const { x, y } = hexToPixel(mc, mr);
       const img = svgEl('image');
-      img.setAttribute('href', '/icons/mountains.svg');
+      img.setAttribute('href', mountainHexTextureUrl(key));
       img.setAttribute('x', String(x - iw / 2));
       img.setAttribute('y', String(y - ih / 2));
       img.setAttribute('width', String(iw));
