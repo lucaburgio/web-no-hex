@@ -1238,9 +1238,6 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 .settings-note.neutral {
   background-color: var(--color-gray-100);
   color: var(--color-gray-600);
-  font-weight: 600;
-  padding: 10px 12px;
-  margin-top: 6px;
 }
 
 .back-link {
