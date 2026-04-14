@@ -319,6 +319,9 @@ const config: GameConfig = {
   // HP bar fill eases when unit HP changes (combat, healing, etc.)
   hpBarAnimDurationMs: 280,
 
+  // Unit silhouette icon opacity when out of movement (tired); body/HP use theme tired colors
+  tiredIconOpacity: 0.5,
+
   // Fraction of board hexes to randomly set as impassable mountains at game start (0–1)
   mountainPct: 0.12,
 

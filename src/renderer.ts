@@ -1263,6 +1263,7 @@ export function renderState(
       isRangedTarget ? c.rangedTarget : isSelected ? c.unitSelected : tired ? tiredBase : baseColor;
     const unitDimmed = productionFocusHexes.size > 0;
     const opacity   = unitDimmed ? '0.2' : '1';
+    const iconOpacity = unitDimmed ? opacity : tired ? String(config.tiredIconOpacity) : '1';
 
     const unitRoot = flipBoardY ? svgUprightAt(x, y) : null;
     if (unitRoot) unitLayer.appendChild(unitRoot);
@@ -1307,7 +1308,7 @@ export function renderState(
     // Icon (shifted up inside shape)
     const icon = unit.icon ?? unitIcon(unit.unitTypeId);
     const iconColor = isRangedTarget ? '#ffffff' : c.unitIconColor;
-    const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.34, HEX_SIZE * 0.4, iconColor, opacity);
+    const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.34, HEX_SIZE * 0.4, iconColor, iconOpacity);
     if (iconEl) uParent.appendChild(iconEl);
 
     if (isRangedTarget) {

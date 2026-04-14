@@ -312,4 +312,6 @@ export interface GameConfig {
   strikeReturnSpeedMs: number;
   /** Duration in ms when the on-board HP bar width eases to a new value after HP changes. */
   hpBarAnimDurationMs: number;
+  /** Opacity (0–1) for the unit type icon when the unit is tired (no movement left). */
+  tiredIconOpacity: number;
 }
