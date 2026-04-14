@@ -1158,6 +1158,8 @@ const settingsOnOffToggles = new Map<string, SettingsOnOffToggle>();
 /** Tracks game mode across settings UI updates so quota fields can be backed up / restored around Breakthrough. */
 let lastSettingsGameModeForQuota: string | null = null;
 let quotaFieldsBeforeBreakthrough: { territory: string; points: string } | null = null;
+/** Last committed board width (settings); used when width input is empty for snapshots. */
+let lastCommittedBoardCols = config.boardCols;
 
 function populateSettings(): void {
   hideBoardColsStartingUnitsNote();
@@ -1211,6 +1213,7 @@ function populateSettings(): void {
   updateModeSpecificSettingsVisibility();
   syncModeCards();
   clampStartingUnitsInputsToBoardWidth(vals.boardCols);
+  lastCommittedBoardCols = vals.boardCols;
 }
 
 function syncBreakthroughRoleControls(): void {
@@ -1277,6 +1280,17 @@ function clampNumericInputToBounds(el: HTMLInputElement): number {
   const clamped = Math.max(min, Math.min(max, parsed));
   if (String(clamped) !== el.value) el.value = String(clamped);
   return clamped;
+}
+
+/** Read a bounded numeric value without mutating the element. Empty or invalid → `fallback`. */
+function readNumericInputLoose(el: HTMLInputElement, fallback: number): number {
+  const t = el.value.trim();
+  if (t === '') return fallback;
+  const raw = parseFloat(t);
+  if (!Number.isFinite(raw)) return fallback;
+  const min = el.min === '' ? -Infinity : Number(el.min);
+  const max = el.max === '' ? Infinity : Number(el.max);
+  return Math.max(min, Math.min(max, raw));
 }
 
 /** Starting unit count inputs — max is always {@link boardCols} (one unit per home-row hex). */
@@ -1460,22 +1474,28 @@ for (const [id] of NUM_FIELDS) {
 }
 
 let boardColsWidthAtFocus: number | null = null;
-let boardColsClampedStartingUnitsThisEdit = false;
 const boardColsSettingsEl = document.getElementById('cfg-boardCols') as HTMLInputElement;
 boardColsSettingsEl.addEventListener('focusin', () => {
-  boardColsWidthAtFocus = clampNumericInputToBounds(boardColsSettingsEl);
-  boardColsClampedStartingUnitsThisEdit = false;
+  boardColsWidthAtFocus = readNumericInputLoose(boardColsSettingsEl, lastCommittedBoardCols);
 });
 boardColsSettingsEl.addEventListener('input', () => {
-  const w = clampNumericInputToBounds(boardColsSettingsEl);
-  if (clampStartingUnitsInputsToBoardWidth(w)) boardColsClampedStartingUnitsThisEdit = true;
+  const t = boardColsSettingsEl.value.trim();
+  if (t === '') return;
+  const raw = parseFloat(t);
+  if (!Number.isFinite(raw)) return;
+  const min = Number(boardColsSettingsEl.min);
+  const max = Number(boardColsSettingsEl.max);
+  const w = Math.max(min, Math.min(max, raw));
+  if (String(w) !== boardColsSettingsEl.value) boardColsSettingsEl.value = String(w);
+  clampStartingUnitsInputsToBoardWidth(w);
 });
 boardColsSettingsEl.addEventListener('change', () => {
   const w = clampNumericInputToBounds(boardColsSettingsEl);
-  clampStartingUnitsInputsToBoardWidth(w);
+  const anyClamped = clampStartingUnitsInputsToBoardWidth(w);
+  lastCommittedBoardCols = w;
   const noteEl = getCfgBoardColsStartingUnitsNoteEl();
   const focusW = boardColsWidthAtFocus;
-  if (focusW != null && w < focusW && boardColsClampedStartingUnitsThisEdit) {
+  if (focusW != null && w < focusW && anyClamped) {
     noteEl?.classList.remove('hidden');
   } else {
     noteEl?.classList.add('hidden');
