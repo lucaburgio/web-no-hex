@@ -26,25 +26,12 @@
 import type { HexSide, RiverHex } from './types';
 
 // ── Image imports (ES module — required for Tauri/Vite asset bundling) ─────────
+// All PNGs under river-hex/ are bundled; filenames must be {side}-{side}-{NN}.png (see header).
 
-import riverAC01 from '../public/images/misc/river-hex/A-C-01.png';
-import riverAC02 from '../public/images/misc/river-hex/A-C-02.png';
-import riverDA01 from '../public/images/misc/river-hex/D-A-01.png';
-import riverDA02 from '../public/images/misc/river-hex/D-A-02.png';
-import riverDB01 from '../public/images/misc/river-hex/D-B-01.png';
-import riverDB02 from '../public/images/misc/river-hex/D-B-02.png';
-import riverEA01 from '../public/images/misc/river-hex/E-A-01.png';
-import riverEA02 from '../public/images/misc/river-hex/E-A-02.png';
-import riverEB01 from '../public/images/misc/river-hex/E-B-01.png';
-import riverEB02 from '../public/images/misc/river-hex/E-B-02.png';
-import riverEC01 from '../public/images/misc/river-hex/E-C-01.png';
-import riverEC02 from '../public/images/misc/river-hex/E-C-02.png';
-import riverFB01 from '../public/images/misc/river-hex/F-B-01.png';
-import riverFB02 from '../public/images/misc/river-hex/F-B-02.png';
-import riverFC02 from '../public/images/misc/river-hex/F-C-02.png';
-import riverFC03 from '../public/images/misc/river-hex/F-C-03.png';
-import riverFD01 from '../public/images/misc/river-hex/F-D-01.png';
-import riverFD02 from '../public/images/misc/river-hex/F-D-02.png';
+const RIVER_HEX_URLS = import.meta.glob<string>(
+  '../public/images/misc/river-hex/*.png',
+  { eager: true, import: 'default' },
+);
 
 // ── Side metadata ──────────────────────────────────────────────────────────────
 
@@ -76,41 +63,34 @@ interface RiverSegmentDef {
   url: string;
 }
 
+const SEGMENT_FILE_RE = /^([A-F])-([A-F])-(\d{2})\.png$/;
+
+function buildRiverSegmentDefs(): RiverSegmentDef[] {
+  const defs: RiverSegmentDef[] = [];
+  for (const [path, url] of Object.entries(RIVER_HEX_URLS)) {
+    const base = path.split('/').pop() ?? '';
+    const m = base.match(SEGMENT_FILE_RE);
+    if (!m) continue;
+    const s1 = m[1] as HexSide;
+    const s2 = m[2] as HexSide;
+    const key = `${s1}-${s2}-${m[3]}`;
+    defs.push({ key, sides: [s1, s2], url });
+  }
+  defs.sort((a, b) => a.key.localeCompare(b.key));
+  return defs;
+}
+
 /**
- * All registered river segment images.
- * To add new art, import the PNG above and append an entry here.
+ * All registered river segment images (every matching PNG under `river-hex/`).
+ * Drop new `{side1}-{side2}-{NN}.png` files into that folder to extend the set.
  */
-const RIVER_SEGMENT_DEFS: RiverSegmentDef[] = [
-  { key: 'A-C-01', sides: ['A', 'C'], url: riverAC01 },
-  { key: 'A-C-02', sides: ['A', 'C'], url: riverAC02 },
-  { key: 'D-A-01', sides: ['D', 'A'], url: riverDA01 },
-  { key: 'D-A-02', sides: ['D', 'A'], url: riverDA02 },
-  { key: 'D-B-01', sides: ['D', 'B'], url: riverDB01 },
-  { key: 'D-B-02', sides: ['D', 'B'], url: riverDB02 },
-  { key: 'E-A-01', sides: ['E', 'A'], url: riverEA01 },
-  { key: 'E-A-02', sides: ['E', 'A'], url: riverEA02 },
-  { key: 'E-B-01', sides: ['E', 'B'], url: riverEB01 },
-  { key: 'E-B-02', sides: ['E', 'B'], url: riverEB02 },
-  { key: 'E-C-01', sides: ['E', 'C'], url: riverEC01 },
-  { key: 'E-C-02', sides: ['E', 'C'], url: riverEC02 },
-  { key: 'F-B-01', sides: ['F', 'B'], url: riverFB01 },
-  { key: 'F-B-02', sides: ['F', 'B'], url: riverFB02 },
-  { key: 'F-C-02', sides: ['F', 'C'], url: riverFC02 },
-  { key: 'F-C-03', sides: ['F', 'C'], url: riverFC03 },
-  { key: 'F-D-01', sides: ['F', 'D'], url: riverFD01 },
-  { key: 'F-D-02', sides: ['F', 'D'], url: riverFD02 },
-];
+const RIVER_SEGMENT_DEFS: RiverSegmentDef[] = buildRiverSegmentDefs();
 
 /** Map from segment key → resolved image URL. */
 const SEGMENT_URL_MAP: Record<string, string> = {};
 for (const def of RIVER_SEGMENT_DEFS) {
   SEGMENT_URL_MAP[def.key] = def.url;
 }
-
-/** Old map saves may reference removed asset keys; resolve to a current variant. */
-const LEGACY_SEGMENT_KEYS: Record<string, string> = {
-  'F-C-01': 'F-C-02',
-};
 
 /**
  * Per-entry-side index: for a river arriving through side S, which exits are
@@ -127,8 +107,7 @@ for (const def of RIVER_SEGMENT_DEFS) {
 
 /** Resolve a stored segment key to its bundled image URL. Returns empty string if unknown. */
 export function riverSegmentUrl(key: string): string {
-  const k = LEGACY_SEGMENT_KEYS[key] ?? key;
-  return SEGMENT_URL_MAP[k] ?? '';
+  return SEGMENT_URL_MAP[key] ?? '';
 }
 
 // ── Coordinate helpers ─────────────────────────────────────────────────────────
