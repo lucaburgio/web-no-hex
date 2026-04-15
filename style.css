@@ -1416,14 +1416,6 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   color: var(--color-gray-500);
 }
 
-/* Preset map: BOARD fields are disabled in JS; dim block for clarity */
-.settings-board-group[data-locked="true"] {
-  opacity: 0.72;
-}
-.settings-board-group[data-locked="true"] .settings-label {
-  cursor: default;
-}
-
 .settings-label {
   font-family: 'Disket Mono', monospace;
   font-size: 0.72rem;
@@ -1454,7 +1446,10 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 .settings-input:focus {
   background: var(--color-input-focus);
 }
-
+.settings-input:disabled {
+  background: var(--color-input);
+  color: var(--color-gray-200);
+}
 .settings-input[type="number"] {
   -moz-appearance: textfield;
 }
@@ -1625,6 +1620,10 @@ select.settings-input.settings-select option {
   transition: all 0.15s ease;
   width: 64px;
   text-align: center;
+}
+.settings-toggle[data-value="true"][disabled],.settings-toggle[data-value="false"][disabled] {
+  background: var(--color-input);
+  color: var(--color-gray-200);
 }
 
 .settings-toggle[data-value="false"] {
@@ -2247,7 +2246,7 @@ select.settings-input.settings-select option {
 }
 
 #map-editor-right {
-  width: 280px;
+  width: 360px;
   flex-shrink: 0;
   border-left: 1px solid rgba(0,0,0,0.1);
   overflow-y: auto;
@@ -2273,6 +2272,19 @@ select.settings-input.settings-select option {
   flex-direction: column;
   gap: 0.75rem;
   margin-top: auto;
+}
+
+#map-editor-actions .button-primary,
+#map-editor-actions .button-secondary,
+.me-load-actions .button-primary,
+.me-load-actions .button-secondary {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: 'Disket Mono', monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
 }
 
 /* ── Map Editor toolbar ─────────────────────────────────────────────────────── */
