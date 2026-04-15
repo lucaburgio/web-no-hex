@@ -1,7 +1,8 @@
 import config, { BOARD_HEX_DIM_MAX, BOARD_HEX_DIM_MIN } from './gameconfig';
 import { hexPoints } from './hex';
 import { SCENARIOS } from './scenarios';
-import { riverHexesFromPaintedKeys } from './rivers';
+import { riverHexesFromPaintedKeys, riverSegmentUrl } from './rivers';
+import type { RiverHex } from './types';
 
 const EDITOR_HEX_SIZE = 34;
 
@@ -66,6 +67,13 @@ interface EditorState {
   aiStart: Map<number, string>;     // col -> unitTypeId
   /** Painted river terrain (`"col,row"` keys), like {@link EditorState.mountains}. */
   riverHexKeys: Set<string>;
+  /**
+   * Last {@link riverHexesFromPaintedKeys} result from “Generate river” (random segment picks).
+   * Cleared when painted river hexes no longer match {@link riverPreviewKeysSig}.
+   */
+  riverPreviewHexes: RiverHex[] | null;
+  /** Sorted `riverHexKeys` signature when {@link riverPreviewHexes} was produced. */
+  riverPreviewKeysSig: string | null;
   activeTool: EditorTool;
 }
 
@@ -85,6 +93,8 @@ function mkState(): EditorState {
     playerStart: new Map(),
     aiStart: new Map(),
     riverHexKeys: new Set(),
+    riverPreviewHexes: null,
+    riverPreviewKeysSig: null,
     activeTool: 'normal',
   };
 }
@@ -103,6 +113,7 @@ let unitPackageSelect: HTMLSelectElement;
 let unitPackagePlayer2Select: HTMLSelectElement;
 let toolbarEl: HTMLDivElement;
 let exportBtn: HTMLButtonElement;
+let generateRiverBtn: HTMLButtonElement;
 let loadModalOverlay: HTMLDivElement;
 let loadTextarea: HTMLTextAreaElement;
 let loadErrorEl: HTMLDivElement;
@@ -120,6 +131,7 @@ export function initMapEditor(onBack: () => void): void {
   unitPackagePlayer2Select = document.getElementById('me-unit-package-player2') as HTMLSelectElement;
   toolbarEl        = document.getElementById('map-editor-toolbar') as HTMLDivElement;
   exportBtn        = document.getElementById('me-export-btn') as HTMLButtonElement;
+  generateRiverBtn = document.getElementById('me-generate-river-btn') as HTMLButtonElement;
 
   // Populate scenario select
   SCENARIOS.forEach(s => {
@@ -249,6 +261,15 @@ export function initMapEditor(onBack: () => void): void {
   });
   exportBtn.addEventListener('click', exportToClipboard);
 
+  generateRiverBtn.addEventListener('click', () => {
+    const { cols, rows, riverHexKeys } = edState;
+    if (riverHexKeys.size === 0) return;
+    const seed = (Math.random() * 0xFFFFFFFF) >>> 0;
+    edState.riverPreviewHexes = riverHexesFromPaintedKeys(riverHexKeys, cols, rows, seed);
+    edState.riverPreviewKeysSig = riverKeysSignature(riverHexKeys);
+    renderBoard();
+  });
+
   // SVG drag-paint interaction
   let painting = false;
   svgEl.addEventListener('mousedown', (e) => { painting = true; applyTool(e); });
@@ -371,6 +392,50 @@ function updateActive(): void {
   });
 }
 
+function riverKeysSignature(keys: Set<string>): string {
+  return [...keys].sort().join('|');
+}
+
+/** Clipped river art on the editor board (matches in-game river rendering at {@link EDITOR_HEX_SIZE}). */
+function appendRiverPreviewLayer(hexes: RiverHex[]): void {
+  const s = EDITOR_HEX_SIZE;
+  const clipPrefix = 'me-riv-clip';
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  for (const rh of hexes) {
+    const { x, y } = hexToPixelLocal(rh.col, rh.row);
+    const clip = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
+    clip.setAttribute('id', `${clipPrefix}-${rh.col}-${rh.row}`);
+    clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
+    const clipPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    clipPoly.setAttribute('points', hexPoints(x, y, s));
+    clip.appendChild(clipPoly);
+    defs.appendChild(clip);
+  }
+  svgEl.appendChild(defs);
+
+  const iw = s * Math.sqrt(3);
+  const ih = s * 2;
+  const layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  layer.setAttribute('pointer-events', 'none');
+  for (const rh of hexes) {
+    const url = riverSegmentUrl(rh.segment);
+    if (!url) continue;
+    const { x, y } = hexToPixelLocal(rh.col, rh.row);
+    const clipped = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    clipped.setAttribute('clip-path', `url(#${clipPrefix}-${rh.col}-${rh.row})`);
+    const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+    img.setAttribute('href', url);
+    img.setAttribute('x', String(x - iw / 2));
+    img.setAttribute('y', String(y - ih / 2));
+    img.setAttribute('width', String(iw));
+    img.setAttribute('height', String(ih));
+    img.setAttribute('pointer-events', 'none');
+    clipped.appendChild(img);
+    layer.appendChild(clipped);
+  }
+  svgEl.appendChild(layer);
+}
+
 // ── Canvas rendering ──────────────────────────────────────────────────────────
 
 function hexToPixelLocal(col: number, row: number): { x: number; y: number } {
@@ -382,6 +447,15 @@ function hexToPixelLocal(col: number, row: number): { x: number; y: number } {
 }
 
 function renderBoard(): void {
+  const keySig = riverKeysSignature(edState.riverHexKeys);
+  if (
+    edState.riverPreviewHexes !== null
+    && edState.riverPreviewKeysSig !== keySig
+  ) {
+    edState.riverPreviewHexes = null;
+    edState.riverPreviewKeysSig = null;
+  }
+
   const { cols, rows } = edState;
   const s = EDITOR_HEX_SIZE;
   const hexW = s * Math.sqrt(3);
@@ -498,6 +572,12 @@ function renderBoard(): void {
   if (showSectors) {
     renderSectorOverlay(rows, cols, sectorStarts, numSectors, s, leftMargin);
   }
+
+  if (edState.riverPreviewHexes !== null && edState.riverPreviewHexes.length > 0) {
+    appendRiverPreviewLayer(edState.riverPreviewHexes);
+  }
+
+  generateRiverBtn.disabled = edState.riverHexKeys.size === 0;
 }
 
 function renderSectorOverlay(
@@ -755,8 +835,13 @@ function exportToClipboard(): void {
     cols, rows, id, title, description, scenario, mountains,
     conquestControlPoints, breakthroughControlPoints,
     playerStart, aiStart, unitPackage, unitPackagePlayer2, riverHexKeys,
+    riverPreviewHexes, riverPreviewKeysSig,
   } = edState;
-  const rivers = riverHexesFromPaintedKeys(riverHexKeys, cols, rows);
+  const expSig = riverKeysSignature(riverHexKeys);
+  const rivers =
+    riverPreviewHexes !== null && riverPreviewKeysSig === expSig
+      ? riverPreviewHexes
+      : riverHexesFromPaintedKeys(riverHexKeys, cols, rows);
   const i = '  ';
   const q = escapeJsStringLiteral;
 

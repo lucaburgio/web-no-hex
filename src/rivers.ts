@@ -511,6 +511,8 @@ function riverHexesAlongLinearPath(
   coords: Array<{ col: number; row: number }>,
   cols: number,
   rows: number,
+  /** XOR’d with topology seed so repeated generation can vary segment picks. */
+  variantSeed?: number,
 ): RiverHex[] | null {
   if (coords.length === 0) return null;
   for (let i = 0; i < coords.length - 1; i++) {
@@ -519,7 +521,9 @@ function riverHexesAlongLinearPath(
     if (findSideTowardNeighbor(a.col, a.row, b.col, b.row) === null) return null;
   }
 
-  const rng = mkRng(pathCoordsSeed(coords));
+  const baseSeed = pathCoordsSeed(coords);
+  const rngSeed = variantSeed !== undefined ? (baseSeed ^ variantSeed) >>> 0 : baseSeed;
+  const rng = mkRng(rngSeed);
   const out: RiverHex[] = [];
 
   if (coords.length === 1) {
@@ -607,8 +611,16 @@ function partitionKeyComponents(keys: Set<string>, cols: number, rows: number): 
  * Map editor / copy export: painted `"col,row"` keys → {@link RiverHex} rows like `stories.ts` `map.rivers`.
  * Linear chains and simple cycles get proper entry/exit/segment keys; T-junctions or branches fall back
  * to a generic segment per hex.
+ *
+ * @param variantSeed When set, combined with path topology so repeated calls can produce different
+ *   segment variants for the same painted hexes (map editor “regenerate” button).
  */
-export function riverHexesFromPaintedKeys(keys: Set<string>, cols: number, rows: number): RiverHex[] {
+export function riverHexesFromPaintedKeys(
+  keys: Set<string>,
+  cols: number,
+  rows: number,
+  variantSeed?: number,
+): RiverHex[] {
   const out: RiverHex[] = [];
   const comps = partitionKeyComponents(keys, cols, rows)
     .sort((a, b) => ([...a].sort()[0] ?? '').localeCompare([...b].sort()[0] ?? ''));
@@ -616,7 +628,7 @@ export function riverHexesFromPaintedKeys(keys: Set<string>, cols: number, rows:
   for (const comp of comps) {
     const ordered = tryLinearHexOrder(comp, cols, rows);
     if (ordered && ordered.length === comp.size) {
-      const built = riverHexesAlongLinearPath(ordered, cols, rows);
+      const built = riverHexesAlongLinearPath(ordered, cols, rows, variantSeed);
       if (built && built.length === ordered.length) {
         out.push(...built);
         continue;
