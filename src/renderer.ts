@@ -380,6 +380,7 @@ interface Colors {
   playerTired: string;
   aiTired: string;
   rangedTarget: string;
+  colorDark: string;
 }
 
 let C: Colors | null = null;
@@ -419,6 +420,7 @@ function colors(): Colors {
     playerTired:     v('--color-player-tired'),
     aiTired:         v('--color-ai-tired'),
     rangedTarget:    v('--color-red-700'),
+    colorDark:       v('--color-dark'),
   };
   return C;
 }
@@ -1037,16 +1039,45 @@ export function renderState(
       if (state.phase === 'production' && canPlace && !isSelectedHex && !isValidMove) {
         const { x, y } = hexToPixel(col, r);
         const iw = HEX_SIZE * 0.4;
-        const prodPlus = svgEl('image');
-        prodPlus.setAttribute('href', '/icons/plus.svg');
-        prodPlus.setAttribute('x', String(x - iw / 2));
-        prodPlus.setAttribute('y', String(y - iw / 2));
-        prodPlus.setAttribute('width', String(iw));
-        prodPlus.setAttribute('height', String(iw));
-        prodPlus.setAttribute('opacity', hexDimmed ? '0.12' : '0.92');
-        prodPlus.setAttribute('pointer-events', 'none');
-        prodPlus.setAttribute('id', `marker-prod-plus-${col}-${r}`);
-        markerParent.appendChild(prodPlus);
+        const plusOpacity = hexDimmed ? '0.12' : '0.92';
+        if (isProdSelected) {
+          const half = iw / 2;
+          const sw = Math.max(1, iw * 0.125);
+          const g = svgEl('g');
+          g.setAttribute('opacity', plusOpacity);
+          g.setAttribute('pointer-events', 'none');
+          g.setAttribute('id', `marker-prod-plus-${col}-${r}`);
+          const lineH = svgEl('line');
+          lineH.setAttribute('x1', String(x - half));
+          lineH.setAttribute('y1', String(y));
+          lineH.setAttribute('x2', String(x + half));
+          lineH.setAttribute('y2', String(y));
+          lineH.setAttribute('stroke', c.colorDark);
+          lineH.setAttribute('stroke-width', String(sw));
+          lineH.setAttribute('stroke-linecap', 'square');
+          const lineV = svgEl('line');
+          lineV.setAttribute('x1', String(x));
+          lineV.setAttribute('y1', String(y - half));
+          lineV.setAttribute('x2', String(x));
+          lineV.setAttribute('y2', String(y + half));
+          lineV.setAttribute('stroke', c.colorDark);
+          lineV.setAttribute('stroke-width', String(sw));
+          lineV.setAttribute('stroke-linecap', 'square');
+          g.appendChild(lineH);
+          g.appendChild(lineV);
+          markerParent.appendChild(g);
+        } else {
+          const prodPlus = svgEl('image');
+          prodPlus.setAttribute('href', '/icons/plus.svg');
+          prodPlus.setAttribute('x', String(x - iw / 2));
+          prodPlus.setAttribute('y', String(y - iw / 2));
+          prodPlus.setAttribute('width', String(iw));
+          prodPlus.setAttribute('height', String(iw));
+          prodPlus.setAttribute('opacity', plusOpacity);
+          prodPlus.setAttribute('pointer-events', 'none');
+          prodPlus.setAttribute('id', `marker-prod-plus-${col}-${r}`);
+          markerParent.appendChild(prodPlus);
+        }
       }
     }
   }
