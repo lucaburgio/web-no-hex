@@ -146,14 +146,17 @@
       </div>
 
       <div class="settings-group">
-        <div class="settings-group-title">GAME MODE</div>
+        <div class="settings-group-title">EDIT LAYER</div>
         <div class="settings-row">
-          <label class="settings-label" for="me-game-mode">Mode</label>
+          <label class="settings-label" for="me-game-mode">Terrain / modes</label>
           <select class="settings-input settings-select" id="me-game-mode">
-            <option value="domination">Domination</option>
-            <option value="conquest">Conquest</option>
-            <option value="breakthrough">Breakthrough</option>
+            <option value="domination">Domination (terrain &amp; rivers)</option>
+            <option value="conquest">Conquest (control points)</option>
+            <option value="breakthrough">Breakthrough (sectors &amp; CPs)</option>
           </select>
+        </div>
+        <div class="settings-note neutral" role="note">
+          Switch layers to paint mountains, rivers, conquest CPs, and breakthrough CPs separately. Custom match presets require both conquest and breakthrough CPs.
         </div>
       </div>
 
@@ -185,7 +188,7 @@
     <div id="me-load-modal-overlay" class="hidden">
       <div id="me-load-modal">
         <p class="me-load-hint">Paste a story map definition:</p>
-        <textarea id="me-load-textarea" spellcheck="false" placeholder="{ id: 'my-map', gameMode: 'domination', map: { cols: 8, rows: 8, mountains: [], playerStart: [], aiStart: [] } }"></textarea>
+        <textarea id="me-load-textarea" spellcheck="false" placeholder="{ id: 'my-map', map: { cols: 8, rows: 8, mountains: [], conquestControlPoints: ['3,3'], breakthroughControlPoints: ['3,3','4,4'], playerStart: [], aiStart: [] } }"></textarea>
         <div id="me-load-error" class="hidden"></div>
         <div class="me-load-actions">
           <button id="me-load-confirm-btn" class="menu-btn">LOAD</button>

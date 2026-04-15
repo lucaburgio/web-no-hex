@@ -62,6 +62,7 @@ import modeIconConquest from '../public/icons/modes/conquest.svg';
 import modeIconBreakthrough from '../public/icons/modes/breakthrough.svg';
 import chevronFilledIcon from '../public/icons/chevron-filled.svg';
 import { STORIES } from './stories';
+import { storyMapHasFullCustomMatchSupport } from './storyMapLayouts';
 import { SCENARIOS, getScenarioById } from './scenarios';
 import {
   loadStoryProgress,
@@ -366,11 +367,11 @@ const STORY_CONFIG_DEFAULTS = {
 };
 let storyConfigSnapshot: typeof STORY_CONFIG_DEFAULTS | null = null;
 
-/** New vs-AI / multiplayer games: fixed terrain from settings when a playable story map is chosen. */
+/** New vs-AI / multiplayer games: fixed terrain when a multi-mode story map is chosen. */
 function createInitialStateForMenu(): GameState {
   const id = config.customMatchMapId;
   if (id) {
-    const story = STORIES.find(s => s.id === id && s.playable);
+    const story = STORIES.find(s => s.id === id && storyMapHasFullCustomMatchSupport(s.map));
     if (story) return createInitialStateFromPlayableStory(story);
   }
   return createInitialState();
@@ -1260,17 +1261,17 @@ function populateSettings(): void {
     autoOpt.value = '';
     autoOpt.textContent = '[auto generate]';
     customMapEl.appendChild(autoOpt);
-    for (const s of STORIES.filter(x => x.playable)) {
+    for (const s of STORIES.filter(x => storyMapHasFullCustomMatchSupport(x.map))) {
       const opt = document.createElement('option');
       opt.value = s.id;
       opt.textContent = s.title;
       customMapEl.appendChild(opt);
     }
     const cur = config.customMatchMapId ?? '';
-    const valid = cur !== '' && STORIES.some(s => s.id === cur && s.playable);
+    const valid = cur !== '' && STORIES.some(s => s.id === cur && storyMapHasFullCustomMatchSupport(s.map));
     customMapEl.value = valid ? cur : '';
     if (valid && cur) {
-      const st = STORIES.find(s => s.id === cur && s.playable);
+      const st = STORIES.find(s => s.id === cur && storyMapHasFullCustomMatchSupport(s.map));
       if (st) {
         (document.getElementById('cfg-boardCols') as HTMLInputElement).value = String(st.map.cols);
         (document.getElementById('cfg-boardRows') as HTMLInputElement).value = String(st.map.rows);
@@ -1500,7 +1501,7 @@ function collectSettings(): Parameters<typeof updateConfig>[0] {
   if (customMapEl) {
     const mapId = customMapEl.value.trim();
     out.customMatchMapId = mapId === '' ? null : mapId;
-    const story = mapId ? STORIES.find(s => s.id === mapId && s.playable) : undefined;
+    const story = mapId ? STORIES.find(s => s.id === mapId && storyMapHasFullCustomMatchSupport(s.map)) : undefined;
     if (story) {
       out.boardCols = story.map.cols;
       out.boardRows = story.map.rows;
@@ -1580,7 +1581,7 @@ initCustomSettingsSelect('cfg-unitPackagePlayer2');
 initCustomSettingsSelect('cfg-breakthroughPlayer1Role');
 document.getElementById('cfg-customMap')?.addEventListener('change', () => {
   const sel = document.getElementById('cfg-customMap') as HTMLSelectElement;
-  const story = sel.value ? STORIES.find(s => s.id === sel.value && s.playable) : undefined;
+  const story = sel.value ? STORIES.find(s => s.id === sel.value && storyMapHasFullCustomMatchSupport(s.map)) : undefined;
   const colsEl = document.getElementById('cfg-boardCols') as HTMLInputElement;
   const rowsEl = document.getElementById('cfg-boardRows') as HTMLInputElement;
   if (story) {
@@ -1840,7 +1841,7 @@ function buildRulesContent(): string {
     <h3>Overview</h3>
     <p>Turn-based hex strategy on a ${config.boardCols}×${config.boardRows} grid.
        You play from the south (bottom row); the AI plays from the north (top row).
-       In custom match settings you can pick a <strong>map layout</strong> (fixed mountains, rivers, and mode-appropriate control points) instead of a randomly generated board.</p>
+       In custom match settings you can pick a <strong>map layout</strong> from maps that define both Conquest and Breakthrough control points in the map editor; otherwise the board is randomly generated.</p>
 
     <h3>Turn Phases</h3>
     <ol>

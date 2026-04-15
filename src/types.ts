@@ -184,7 +184,17 @@ export interface StoryMapDef {
   mountains: string[];
   playerStart: Array<{ col: number; unitTypeId?: string }>;
   aiStart: Array<{ col: number; unitTypeId?: string }>;
-  /** Hex keys "col,row" for conquest control points. */
+  /**
+   * Hex keys for Conquest control points. When set alongside {@link breakthroughControlPoints},
+   * the map can be offered as a custom-match preset (all modes share terrain).
+   */
+  conquestControlPoints?: string[];
+  /** Hex keys for Breakthrough sector CPs (sectors = length + 1). */
+  breakthroughControlPoints?: string[];
+  /**
+   * Legacy single list used by older stories and the campaign when only one mode was authored.
+   * Prefer {@link conquestControlPoints} / {@link breakthroughControlPoints} for new maps.
+   */
   controlPoints?: string[];
   /** River hexes painted on this map. */
   rivers?: RiverHex[];
@@ -194,8 +204,6 @@ export interface StoryDef {
   id: string;
   title: string;
   description: string;
-  /** If true, this story's map layout can be chosen in custom match settings. */
-  playable?: boolean;
   /** Groups stories into a named collection displayed together in the UI. */
   scenario: string;
   /** Only unit types with this package are available for player 1 (south). Undefined = all units. */

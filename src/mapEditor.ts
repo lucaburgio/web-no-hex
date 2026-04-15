@@ -56,7 +56,9 @@ interface EditorState {
   unitPackage: string;
   unitPackagePlayer2: string;
   mountains: Set<string>;
-  controlPoints: Set<string>;
+  /** Conquest-mode objective hexes (separate from breakthrough CPs). */
+  conquestControlPoints: Set<string>;
+  breakthroughControlPoints: Set<string>;
   playerStart: Map<number, string>; // col -> unitTypeId
   aiStart: Map<number, string>;     // col -> unitTypeId
   /** All river hexes across all generated rivers. */
@@ -75,7 +77,8 @@ function mkState(): EditorState {
     unitPackage: '',
     unitPackagePlayer2: '',
     mountains: new Set(),
-    controlPoints: new Set(),
+    conquestControlPoints: new Set(),
+    breakthroughControlPoints: new Set(),
     playerStart: new Map(),
     aiStart: new Map(),
     rivers: [],
@@ -158,9 +161,8 @@ export function initMapEditor(onBack: () => void): void {
 
   gameModeSelect.addEventListener('change', () => {
     edState.gameMode = gameModeSelect.value as EditorGameMode;
-    if (edState.gameMode === 'domination') {
-      edState.controlPoints.clear();
-      if (edState.activeTool === 'controlPoint') edState.activeTool = 'normal';
+    if (edState.gameMode === 'domination' && edState.activeTool === 'controlPoint') {
+      edState.activeTool = 'normal';
     }
     refreshToolbar();
     renderBoard();
@@ -223,9 +225,13 @@ function cleanOOB(): void {
     const [c, r] = k.split(',').map(Number);
     if (c >= cols || r >= rows) edState.mountains.delete(k);
   }
-  for (const k of [...edState.controlPoints]) {
+  for (const k of [...edState.conquestControlPoints]) {
     const [c, r] = k.split(',').map(Number);
-    if (c >= cols || r >= rows) edState.controlPoints.delete(k);
+    if (c >= cols || r >= rows) edState.conquestControlPoints.delete(k);
+  }
+  for (const k of [...edState.breakthroughControlPoints]) {
+    const [c, r] = k.split(',').map(Number);
+    if (c >= cols || r >= rows) edState.breakthroughControlPoints.delete(k);
   }
   edState.rivers = edState.rivers.filter(rh => rh.col < cols && rh.row < rows);
   for (const c of [...edState.playerStart.keys()]) if (c >= cols) edState.playerStart.delete(c);
@@ -332,9 +338,9 @@ function renderBoard(): void {
   const totalW = cols * hexW + hexW * 0.5;
   const totalH = (rows - 1) * s * 1.5 + s * 2;
 
-  // Sector computation — breakthrough mode only, requires at least one CP
-  const showSectors = edState.gameMode === 'breakthrough' && edState.controlPoints.size > 0;
-  const numSectors  = showSectors ? edState.controlPoints.size + 1 : 0;
+  // Sector overlay — only in Breakthrough edit layer when BT CPs exist
+  const showSectors = edState.gameMode === 'breakthrough' && edState.breakthroughControlPoints.size > 0;
+  const numSectors  = showSectors ? edState.breakthroughControlPoints.size + 1 : 0;
   const sectorStarts = showSectors ? computeSectorStarts(rows, numSectors) : [];
 
   // Extra left margin to accommodate sector labels
@@ -374,7 +380,9 @@ function renderBoard(): void {
       const { x, y } = hexToPixelLocal(col, row);
 
       const isMtn       = edState.mountains.has(key);
-      const isCP        = edState.controlPoints.has(key);
+      const isCP =
+        (edState.gameMode === 'conquest' && edState.conquestControlPoints.has(key))
+        || (edState.gameMode === 'breakthrough' && edState.breakthroughControlPoints.has(key));
       const isPS        = row === rows - 1 && edState.playerStart.has(col);
       const isAS        = row === 0 && edState.aiStart.has(col);
       const isPlayerRow = row === rows - 1;
@@ -562,32 +570,40 @@ function applyTool(e: MouseEvent): void {
 
   if (activeTool === 'normal') {
     edState.mountains.delete(key);
-    edState.controlPoints.delete(key);
+    edState.conquestControlPoints.delete(key);
+    edState.breakthroughControlPoints.delete(key);
     // Remove any river that passes through this hex
     edState.rivers = edState.rivers.filter(rh => !(rh.col === col && rh.row === row));
     if (row === rows - 1) edState.playerStart.delete(col);
     if (row === 0) edState.aiStart.delete(col);
   } else if (activeTool === 'mountain') {
     edState.mountains.add(key);
-    edState.controlPoints.delete(key);
+    edState.conquestControlPoints.delete(key);
+    edState.breakthroughControlPoints.delete(key);
     if (row === rows - 1) edState.playerStart.delete(col);
     if (row === 0) edState.aiStart.delete(col);
   } else if (activeTool === 'river') {
     applyRiverTool(col, row);
     return; // renderBoard called inside
   } else if (activeTool === 'controlPoint') {
-    edState.controlPoints.add(key);
+    if (edState.gameMode === 'conquest') {
+      edState.conquestControlPoints.add(key);
+    } else if (edState.gameMode === 'breakthrough') {
+      edState.breakthroughControlPoints.add(key);
+    }
     edState.mountains.delete(key);
   } else if (activeTool.startsWith('player:')) {
     if (row !== rows - 1) return;
     edState.playerStart.set(col, activeTool.slice('player:'.length));
     edState.mountains.delete(key);
-    edState.controlPoints.delete(key);
+    edState.conquestControlPoints.delete(key);
+    edState.breakthroughControlPoints.delete(key);
   } else if (activeTool.startsWith('ai:')) {
     if (row !== 0) return;
     edState.aiStart.set(col, activeTool.slice('ai:'.length));
     edState.mountains.delete(key);
-    edState.controlPoints.delete(key);
+    edState.conquestControlPoints.delete(key);
+    edState.breakthroughControlPoints.delete(key);
   }
 
   renderBoard();
@@ -693,9 +709,18 @@ function applyLoadedCode(raw: string): string | null {
   const mountains = new Set<string>(
     Array.isArray(mapDef.mountains) ? mapDef.mountains.map(String) : []
   );
-  const controlPoints = new Set<string>(
-    Array.isArray(mapDef.controlPoints) ? mapDef.controlPoints.map(String) : []
+  let conquestControlPoints = new Set<string>(
+    Array.isArray(mapDef.conquestControlPoints) ? mapDef.conquestControlPoints.map(String) : []
   );
+  let breakthroughControlPoints = new Set<string>(
+    Array.isArray(mapDef.breakthroughControlPoints) ? mapDef.breakthroughControlPoints.map(String) : []
+  );
+  const legacyCp = Array.isArray(mapDef.controlPoints) ? mapDef.controlPoints.map(String) : [];
+  if (conquestControlPoints.size === 0 && breakthroughControlPoints.size === 0 && legacyCp.length > 0) {
+    const gm = (isWrapped && typeof parsed.gameMode === 'string' ? parsed.gameMode : 'domination') as EditorGameMode;
+    if (gm === 'conquest') conquestControlPoints = new Set(legacyCp);
+    else if (gm === 'breakthrough') breakthroughControlPoints = new Set(legacyCp);
+  }
 
   const playerStart = new Map<number, string>();
   if (Array.isArray(mapDef.playerStart)) {
@@ -736,7 +761,8 @@ function applyLoadedCode(raw: string): string | null {
   edState.cols = cols;
   edState.rows = rows;
   edState.mountains = mountains;
-  edState.controlPoints = controlPoints;
+  edState.conquestControlPoints = conquestControlPoints;
+  edState.breakthroughControlPoints = breakthroughControlPoints;
   edState.playerStart = playerStart;
   edState.aiStart = aiStart;
   edState.rivers = rivers;
@@ -785,7 +811,8 @@ function escapeJsStringLiteral(s: string): string {
 
 function exportToClipboard(): void {
   const {
-    cols, rows, id, title, description, gameMode, scenario, mountains, controlPoints,
+    cols, rows, id, title, description, scenario, mountains,
+    conquestControlPoints, breakthroughControlPoints,
     playerStart, aiStart, unitPackage, unitPackagePlayer2, rivers,
   } = edState;
   const i = '  ';
@@ -805,7 +832,8 @@ function exportToClipboard(): void {
       uid === 'infantry' ? `{ col: ${col} }` : `{ col: ${col}, unitTypeId: '${uid}' }`
     ).join(', ');
 
-  const cpStr = [...controlPoints].sort().map(c => `'${c}'`).join(', ');
+  const cqStr = [...conquestControlPoints].sort().map(c => `'${c}'`).join(', ');
+  const btStr = [...breakthroughControlPoints].sort().map(c => `'${c}'`).join(', ');
 
   let code = `{\n`;
   code += `${i}id: '${q(id)}',\n`;
@@ -816,15 +844,18 @@ function exportToClipboard(): void {
   if (unitPackagePlayer2 && unitPackagePlayer2 !== unitPackage) {
     code += `${i}unitPackagePlayer2: '${q(unitPackagePlayer2)}',\n`;
   }
-  code += `${i}gameMode: '${gameMode}',\n`;
+  code += `${i}gameMode: 'domination',\n`;
   code += `${i}map: {\n`;
   code += `${i}${i}cols: ${cols},\n`;
   code += `${i}${i}rows: ${rows},\n`;
   code += `${i}${i}mountains: [${mStr}],\n`;
   code += `${i}${i}playerStart: [${pStr}],\n`;
   code += `${i}${i}aiStart: [${aStr}],\n`;
-  if ((gameMode === 'conquest' || gameMode === 'breakthrough') && controlPoints.size > 0) {
-    code += `${i}${i}controlPoints: [${cpStr}],\n`;
+  if (conquestControlPoints.size > 0) {
+    code += `${i}${i}conquestControlPoints: [${cqStr}],\n`;
+  }
+  if (breakthroughControlPoints.size > 0) {
+    code += `${i}${i}breakthroughControlPoints: [${btStr}],\n`;
   }
   if (rivers.length > 0) {
     const rvStr = rivers

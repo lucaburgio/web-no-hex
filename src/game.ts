@@ -14,6 +14,10 @@ import type {
   GameMode,
   StoryDef,
 } from './types';
+import {
+  getBreakthroughControlPointsForMap,
+  getConquestControlPointsForMap,
+} from './storyMapLayouts';
 
 function perfEnabled(): boolean {
   if (typeof window === 'undefined') return false;
@@ -1447,10 +1451,11 @@ function resolveConquestCpsForPlayableStory(
 
   const candSet = new Set(cpCandidates);
 
-  if (story.gameMode === 'conquest' && story.map.controlPoints?.length) {
+  const authoredConquest = getConquestControlPointsForMap(story.map);
+  if (authoredConquest.length > 0) {
     const fromStory: string[] = [];
     const seen = new Set<string>();
-    for (const k of story.map.controlPoints) {
+    for (const k of authoredConquest) {
       if (!seen.has(k) && candSet.has(k)) {
         seen.add(k);
         fromStory.push(k);
@@ -1474,7 +1479,7 @@ function resolveConquestCpsForPlayableStory(
 }
 
 /**
- * Custom match: fixed mountains/rivers from a playable story, starting units and
+ * Custom match: fixed mountains/rivers from a multi-mode story map, starting units and
  * target mode from {@link config} (not story unit positions or story.gameMode).
  * Call {@link syncDimensions} so COLS/ROWS match `story.map` before this.
  */
@@ -1560,9 +1565,7 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
     }
 
     const storyCpSet = new Set(
-      story.gameMode === 'breakthrough' && story.map.controlPoints?.length
-        ? story.map.controlPoints.filter(k => assignable.includes(k))
-        : [],
+      getBreakthroughControlPointsForMap(story.map).filter(k => assignable.includes(k)),
     );
     sectorControlPointHex = sectorHexes.map(keys => {
       const storyCP = keys.find(k => storyCpSet.has(k));
@@ -1675,7 +1678,8 @@ export function createStoryState(story: StoryDef): GameState {
 
   const mountainHexes = [...story.map.mountains];
   const mountainSet = new Set(mountainHexes);
-  let controlPointHexes = story.map.controlPoints ? [...story.map.controlPoints] : [];
+  let controlPointHexes =
+    story.gameMode === 'conquest' ? [...getConquestControlPointsForMap(story.map)] : [];
 
   let sectorHexes: string[][] = [];
   let sectorOwners: Owner[] = [];
@@ -1703,7 +1707,7 @@ export function createStoryState(story: StoryDef): GameState {
     }
 
     // Sector count: explicit override > derived from map CPs+1 > config default
-    const storyMapCps = story.map.controlPoints ?? [];
+    const storyMapCps = getBreakthroughControlPointsForMap(story.map);
     const wantSectors = story.breakthroughSectorCount
       ?? (storyMapCps.length > 0 ? storyMapCps.length + 1 : config.breakthroughSectorCount);
     const nSectors = Math.max(2, Math.min(wantSectors, assignable.length));
