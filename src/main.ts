@@ -1280,6 +1280,7 @@ function populateSettings(): void {
       }
     }
     setBoardSettingsLocked(!!customMapEl.value.trim());
+    customMapEl.dispatchEvent(new Event('settings-select-rebuild'));
   } else {
     setBoardSettingsLocked(false);
   }
@@ -1420,22 +1421,29 @@ function initCustomSettingsSelect(selectId: string): void {
     buttonEl.setAttribute('aria-expanded', 'false');
   };
 
-  for (const optionEl of Array.from(selectEl.options)) {
-    const liEl = document.createElement('li');
-    const itemButtonEl = document.createElement('button');
-    itemButtonEl.type = 'button';
-    itemButtonEl.className = 'settings-custom-select-option';
-    itemButtonEl.dataset.value = optionEl.value;
-    itemButtonEl.textContent = optionEl.textContent;
-    itemButtonEl.addEventListener('click', () => {
-      selectEl.value = optionEl.value;
-      selectEl.dispatchEvent(new Event('change', { bubbles: true }));
-      syncFromSelect();
-      closeList();
-    });
-    liEl.appendChild(itemButtonEl);
-    listEl.appendChild(liEl);
-  }
+  const rebuildOptionList = (): void => {
+    closeList();
+    listEl.innerHTML = '';
+    for (const optionEl of Array.from(selectEl.options)) {
+      const liEl = document.createElement('li');
+      const itemButtonEl = document.createElement('button');
+      itemButtonEl.type = 'button';
+      itemButtonEl.className = 'settings-custom-select-option';
+      itemButtonEl.dataset.value = optionEl.value;
+      itemButtonEl.textContent = optionEl.textContent;
+      itemButtonEl.addEventListener('click', () => {
+        selectEl.value = optionEl.value;
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        syncFromSelect();
+        closeList();
+      });
+      liEl.appendChild(itemButtonEl);
+      listEl.appendChild(liEl);
+    }
+    syncFromSelect();
+  };
+
+  rebuildOptionList();
 
   buttonEl.addEventListener('click', () => {
     const isOpen = !listEl.classList.contains('hidden');
@@ -1460,7 +1468,7 @@ function initCustomSettingsSelect(selectId: string): void {
 
   selectEl.addEventListener('change', syncFromSelect);
   selectEl.addEventListener('settings-select-sync', syncFromSelect as EventListener);
-  syncFromSelect();
+  selectEl.addEventListener('settings-select-rebuild', rebuildOptionList as EventListener);
 }
 
 function collectSettings(): Parameters<typeof updateConfig>[0] {
@@ -1579,6 +1587,7 @@ boardColsSettingsEl.addEventListener('change', () => {
 initCustomSettingsSelect('cfg-unitPackage');
 initCustomSettingsSelect('cfg-unitPackagePlayer2');
 initCustomSettingsSelect('cfg-breakthroughPlayer1Role');
+initCustomSettingsSelect('cfg-customMap');
 document.getElementById('cfg-customMap')?.addEventListener('change', () => {
   const sel = document.getElementById('cfg-customMap') as HTMLSelectElement;
   const story = sel.value ? STORIES.find(s => s.id === sel.value && storyMapHasFullCustomMatchSupport(s.map)) : undefined;
