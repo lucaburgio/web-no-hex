@@ -411,7 +411,7 @@ export interface BuildRiverHexesFromPathCoordsOptions {
 }
 
 /**
- * Build {@link RiverHex} data for a user-painted path (border start, each step a grid neighbor).
+ * Build {@link RiverHex} data for a user-painted path (each step a grid neighbor; start anywhere).
  * Chooses segment art and open-tail exit on the last hex for preview / extension in the editor.
  */
 export function buildRiverHexesFromPathCoords(
@@ -437,30 +437,30 @@ export function buildRiverHexesFromPathCoords(
   }
 
   const first = coords[0]!;
-  const outward0 = getOutwardSides(first.col, first.row, cols, rows);
-  if (outward0.length === 0) return null;
-
   const rng = mkRngFromSeed(opts.seed ?? pathCoordsSeed(coords));
   const result: RiverHex[] = [];
 
   if (coords.length === 1) {
-    const entry = outward0[Math.floor(rng() * outward0.length)]!;
-    const exit = pickLastExitSide(first.col, first.row, entry, coords, cols, rows, rng);
-    if (exit === null) return null;
-    const segment = pickSegmentKey(entry, exit, rng);
-    if (segment === null) return null;
-    result.push({ col: first.col, row: first.row, segment, entrySide: entry, exitSide: exit });
-    return result;
+    const sides = [...HEX_SIDES];
+    for (let i = sides.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [sides[i], sides[j]] = [sides[j]!, sides[i]!];
+    }
+    for (const entry of sides) {
+      const exit = pickLastExitSide(first.col, first.row, entry, coords, cols, rows, rng);
+      if (exit === null) continue;
+      const segment = pickSegmentKey(entry, exit, rng);
+      if (segment === null) continue;
+      result.push({ col: first.col, row: first.row, segment, entrySide: entry, exitSide: exit });
+      return result;
+    }
+    return null;
   }
 
   const exitTowardSecond = findSideTowardNeighbor(first.col, first.row, coords[1]!.col, coords[1]!.row);
   if (exitTowardSecond === null) return null;
 
-  const entryCandidates = outward0.filter(e0 =>
-    CATALOG[e0].some(c => c.exitSide === exitTowardSecond),
-  );
-  if (entryCandidates.length === 0) return null;
-  const entry0 = entryCandidates[Math.floor(rng() * entryCandidates.length)]!;
+  const entry0 = SIDE_OPPOSITE[exitTowardSecond];
   const seg0 = pickSegmentKey(entry0, exitTowardSecond, rng);
   if (seg0 === null) return null;
   result.push({
@@ -533,7 +533,8 @@ export function partitionRiverComponents(rivers: RiverHex[]): RiverHex[][] {
 }
 
 /**
- * Recover the ordered path along the flow (border entry → … → tail). Null if not a simple chain.
+ * Recover the ordered path along the flow (upstream → … → tail). Null if not a simple chain.
+ * Head = hex whose upstream neighbor (across {@link RiverHex#entrySide}) is off-map or not in this chain.
  */
 export function extractOrderedRiverPath(
   hexes: RiverHex[],
@@ -541,30 +542,45 @@ export function extractOrderedRiverPath(
   rows: number,
 ): { col: number; row: number }[] | null {
   if (hexes.length === 0) return null;
+  const keys = new Set(hexes.map(h => `${h.col},${h.row}`));
   const byKey = new Map<string, RiverHex>(hexes.map(rh => [`${rh.col},${rh.row}`, rh]));
-  const starts = hexes.filter(rh =>
-    getOutwardSides(rh.col, rh.row, cols, rows).includes(rh.entrySide),
-  );
-  if (starts.length !== 1) return null;
 
-  const path: { col: number; row: number }[] = [];
-  const seen = new Set<string>();
-  let cur: RiverHex | undefined = starts[0];
+  function walkFrom(start: RiverHex): { col: number; row: number }[] | null {
+    const path: { col: number; row: number }[] = [];
+    const seen = new Set<string>();
+    let cur: RiverHex | undefined = start;
+    while (cur) {
+      const k = `${cur.col},${cur.row}`;
+      if (seen.has(k)) return null;
+      seen.add(k);
+      path.push({ col: cur.col, row: cur.row });
 
-  while (cur) {
-    const k = `${cur.col},${cur.row}`;
-    if (seen.has(k)) return null;
-    seen.add(k);
-    path.push({ col: cur.col, row: cur.row });
-
-    const n = getNeighborBySide(cur.col, cur.row, cur.exitSide, cols, rows);
-    if (!n) break;
-    const nk = `${n[0]},${n[1]}`;
-    const next = byKey.get(nk);
-    if (!next) break;
-    cur = next;
+      const n = getNeighborBySide(cur.col, cur.row, cur.exitSide, cols, rows);
+      if (!n) break;
+      const nk = `${n[0]},${n[1]}`;
+      const next = byKey.get(nk);
+      if (!next) break;
+      cur = next;
+    }
+    if (seen.size !== hexes.length) return null;
+    return path;
   }
 
-  if (seen.size !== hexes.length) return null;
-  return path;
+  const isHead = (rh: RiverHex): boolean => {
+    const u = getNeighborBySide(rh.col, rh.row, rh.entrySide, cols, rows);
+    if (u === null) return true;
+    return !keys.has(`${u[0]},${u[1]}`);
+  };
+
+  const heads = hexes.filter(isHead);
+  if (heads.length === 1) {
+    const path = walkFrom(heads[0]!);
+    if (path) return path;
+  }
+
+  const legacyStarts = hexes.filter(rh =>
+    getOutwardSides(rh.col, rh.row, cols, rows).includes(rh.entrySide),
+  );
+  if (legacyStarts.length === 1) return walkFrom(legacyStarts[0]!);
+  return null;
 }

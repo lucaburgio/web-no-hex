@@ -2255,7 +2255,7 @@ select.settings-input.settings-select option {
 }
 
 #map-editor-right {
-  width: 30%;
+  width: 420px;
   flex-shrink: 0;
   border-left: 1px solid rgba(0,0,0,0.1);
   overflow-y: auto;
@@ -2379,6 +2379,16 @@ select.settings-input.settings-select option {
 }
 .me-tool-btn.me-tool-active .me-tool-btn-icon {
   filter: brightness(0);
+  opacity: 1;
+}
+
+/* Map editor: one-shot action (not a persistent tool mode) */
+.me-tool-btn.me-tool-generate {
+  min-width: auto;
+  border-style: dashed;
+  opacity: 0.92;
+}
+.me-tool-btn.me-tool-generate:hover {
   opacity: 1;
 }
 

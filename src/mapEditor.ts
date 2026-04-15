@@ -5,9 +5,11 @@ import type { RiverHex } from './types';
 import {
   buildRiverHexesFromPathCoords,
   extractOrderedRiverPath,
+  generateRiver,
+  getAllBorderEntries,
   getNeighborBySide,
-  getOutwardSides,
   partitionRiverComponents,
+  riverMaxHexesFromBoardWidth,
   riverSegmentUrl,
   SIDE_DELTA,
 } from './rivers';
@@ -298,6 +300,17 @@ function refreshToolbar(): void {
   tgBtns.appendChild(mkToolBtn('normal', 'NORMAL'));
   tgBtns.appendChild(mkToolBtn('mountain', 'MOUNTAIN'));
   tgBtns.appendChild(mkToolBtn('river', 'RIVER'));
+  const genRiverBtn = document.createElement('button');
+  genRiverBtn.type = 'button';
+  genRiverBtn.className = 'me-tool-btn me-tool-generate';
+  genRiverBtn.textContent = 'GEN RIVER';
+  genRiverBtn.title = 'Generate river: random path from a map edge (skips hexes already used by rivers)';
+  genRiverBtn.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    generateRiverIntoEditor();
+  });
+  tgBtns.appendChild(genRiverBtn);
   if (edState.gameMode === 'conquest' || edState.gameMode === 'breakthrough') {
     tgBtns.appendChild(mkToolBtn('controlPoint', 'CTRL PT'));
   }
@@ -461,9 +474,6 @@ function renderBoard(): void {
       else if (isAS)  fill = 'var(--color-hex-ai)';
 
       const isRiver      = riverByKey.has(key);
-      const isBorderHex  = col === 0 || col === cols - 1 || row === 0 || row === rows - 1;
-      const isRiverStart =
-        hlRiver && isBorderHex && !isMtn && !isRiver && getOutwardSides(col, row, cols, rows).length > 0;
       const isRiverExtend = hlRiver && extendRiverTargets.has(key);
 
       let stroke = 'var(--color-hex-stroke)';
@@ -471,7 +481,6 @@ function renderBoard(): void {
       if      (hlPlayer && isPlayerRow) { stroke = 'var(--color-unit-selected)'; strokeW = '2.5'; }
       else if (hlAi && isAiRow)         { stroke = 'var(--color-ai)';            strokeW = '2.5'; }
       else if (isRiverExtend)           { stroke = 'rgba(80,160,220,0.8)';       strokeW = '2.5'; }
-      else if (isRiverStart)            { stroke = 'rgba(80,160,220,0.8)';       strokeW = '2.5'; }
       else if (isPlayerRow)             { stroke = 'rgba(0,0,0,0.35)';           strokeW = '1.5'; }
       else if (isAiRow)                 { stroke = 'rgba(100,100,100,0.45)';     strokeW = '1.5'; }
 
@@ -679,9 +688,41 @@ function applyTool(e: MouseEvent): void {
 }
 
 /**
- * River tool: paint like mountains — one hex per click along the flow.
- * - Border click on empty land starts a new chain (segments + art recomputed each time).
- * - Click the highlighted “next” hex (where the tail exits) to extend.
+ * Append a random edge-anchored river that does not use already-painted river hexes (retries).
+ */
+function generateRiverIntoEditor(): void {
+  const { cols, rows } = edState;
+  const entries = getAllBorderEntries(cols, rows);
+  if (entries.length === 0) return;
+
+  const occupied = new Set(edState.rivers.map(rh => `${rh.col},${rh.row}`));
+  const maxAttempts = 64;
+  const maxSteps = riverMaxHexesFromBoardWidth(cols, config.riverMaxLengthBoardWidthMult);
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const pick = entries[Math.floor(Math.random() * entries.length)]!;
+    const path = generateRiver({
+      startCol: pick.col,
+      startRow: pick.row,
+      entrySide: pick.side,
+      cols,
+      rows,
+      maxSteps,
+      seed: (Math.random() * 0xFFFFFFFF) >>> 0,
+    });
+    const fresh = path.filter(
+      rh => !occupied.has(`${rh.col},${rh.row}`) && !edState.mountains.has(`${rh.col},${rh.row}`),
+    );
+    if (fresh.length === 0) continue;
+    edState.rivers.push(...fresh);
+    renderBoard();
+    return;
+  }
+}
+
+/**
+ * River tool: paint one hex per click; start on any empty land hex.
+ * - Click the highlighted downstream hex to extend (tail exit).
  * - Click any river hex to remove that connected chain.
  */
 function applyRiverTool(col: number, row: number): void {
@@ -750,9 +791,6 @@ function applyRiverTool(col: number, row: number): void {
     renderBoard();
     return;
   }
-
-  const outwardSides = getOutwardSides(col, row, cols, rows);
-  if (outwardSides.length === 0) return;
 
   const blocked = new Set<string>(edState.mountains);
   for (const rh of edState.rivers) blocked.add(`${rh.col},${rh.row}`);
