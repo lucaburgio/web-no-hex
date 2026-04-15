@@ -534,6 +534,13 @@ export function getValidMoves(state: GameState, unit: Unit): [number, number][] 
   );
 }
 
+/** Empty opponent home hexes blocked by Domination home guard — use same board tint as ZoC. */
+export function getOpponentHomeGuardBlockedHexes(state: GameState, unit: Unit): [number, number][] {
+  return computeBaseValidMoves(state, unit).filter(([c, r]) =>
+    isOpponentHomeEntryBlocked(state, unit, c, r),
+  );
+}
+
 // BFS path from unit's position to (toCol,toRow), respecting movement rules (no mountains,
 // no friendly units, enemy units are valid destinations but block further passage).
 // Returns the full path including the start hex, or [] if unreachable.
@@ -1890,7 +1897,7 @@ export function playerMoveUnit(
     if (occupant && occupant.owner !== localPlayer) {
       log(state, 'Cannot attack: enemy is outside movement range or blocked by ZoC.');
     } else if (isHexBlockedByOpponentHomeGuardOnly(state, unit, col, row)) {
-      log(state, 'Cannot move onto an opponent home hex while an enemy is next to it (Domination).');
+      log(state, 'Blitz not allowed — you cannot blitz to the enemy border when an enemy unit is adjacent.');
     } else {
       log(state, 'Invalid move: blocked by Zone of Control or not adjacent.');
     }

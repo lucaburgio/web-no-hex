@@ -13,6 +13,7 @@ import {
   getValidMoves,
   getRangedAttackTargets,
   isInEnemyZoC,
+  getOpponentHomeGuardBlockedHexes,
   getBreakthroughDefenderOwner,
 } from './game';
 import type { Owner } from './types';
@@ -876,6 +877,11 @@ export function renderState(
       if (!getUnit(state, nc, nr) && isInEnemyZoC(state, nc, nr, zocEnemy)) {
         zocHexes.add(key);
       }
+    }
+  }
+  if (selectedUnit && state.phase === 'movement' && state.activePlayer === localPlayer) {
+    for (const [c, r] of getOpponentHomeGuardBlockedHexes(state, selectedUnit)) {
+      zocHexes.add(`${c},${r}`);
     }
   }
 

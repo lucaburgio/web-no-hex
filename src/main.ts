@@ -3278,8 +3278,8 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
     !target &&
     isHexBlockedByOpponentHomeGuardOnly(state, attacker, hex.col, hex.row)
   ) {
-    tooltipEl.innerHTML = `<div class="tt-title tt-zoc">Zone of Control</div>
-      <div class="tt-zoc-msg">Cannot enter an opponent home hex while an enemy is adjacent to it (Domination).</div>`;
+    tooltipEl.innerHTML = `<div class="tt-title tt-zoc">Blitz blocked</div>
+      <div class="tt-zoc-msg">Blitz not allowed. You cannot blitz to the enemy border when an enemy unit is adjacent.</div>`;
     tooltipEl.classList.remove('hidden');
     svg.classList.remove('cursor-fight');
     positionTooltip(e.pageX, e.pageY);
