@@ -400,7 +400,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 /* WKWebView: reduce hairline gaps between adjacent hex fills (no stroke on base polys). */
 #board #hex-layer > polygon,
 #recap-board #hex-layer > polygon {
-  shape-rendering: geometricPrecision;
+  shape-rendering: crispEdges;
 }
 
 #board .board-perimeter-outline,
