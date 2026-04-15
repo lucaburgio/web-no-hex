@@ -5,6 +5,10 @@ import { riverHexesFromPaintedKeys } from './rivers';
 
 const EDITOR_HEX_SIZE = 34;
 
+/** Defaults for new map editor sessions and resets when loading raw map JSON (no story wrapper). */
+const DEFAULT_MAP_EDITOR_SCENARIO = 'tutorial';
+const DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1 = 'standard';
+
 // ── Sector helpers (breakthrough mode) ───────────────────────────────────────
 
 const SECTOR_COLORS: [number, number, number][] = [
@@ -72,8 +76,8 @@ function mkState(): EditorState {
     title: 'My Map',
     description: 'Description.',
     gameMode: 'domination',
-    scenario: '',
-    unitPackage: '',
+    scenario: DEFAULT_MAP_EDITOR_SCENARIO,
+    unitPackage: DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1,
     unitPackagePlayer2: '',
     mountains: new Set(),
     conquestControlPoints: new Set(),
@@ -709,9 +713,9 @@ function applyLoadedCode(raw: string): string | null {
     edState.description = typeof parsed.description === 'string' ? parsed.description : 'Description.';
     edState.gameMode = (typeof parsed.gameMode === 'string' ? parsed.gameMode : 'domination') as EditorGameMode;
     gameModeSelect.value = edState.gameMode;
-    edState.scenario = typeof parsed.scenario === 'string' ? parsed.scenario : '';
+    edState.scenario = typeof parsed.scenario === 'string' ? parsed.scenario : DEFAULT_MAP_EDITOR_SCENARIO;
     scenarioSelect.value = edState.scenario;
-    edState.unitPackage = typeof parsed.unitPackage === 'string' ? parsed.unitPackage : '';
+    edState.unitPackage = typeof parsed.unitPackage === 'string' ? parsed.unitPackage : DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1;
     unitPackageSelect.value = edState.unitPackage;
     edState.unitPackagePlayer2 = typeof parsed.unitPackagePlayer2 === 'string' ? parsed.unitPackagePlayer2 : '';
     unitPackagePlayer2Select.value = edState.unitPackagePlayer2;
@@ -721,10 +725,10 @@ function applyLoadedCode(raw: string): string | null {
     edState.description = 'Description.';
     edState.gameMode = 'domination';
     gameModeSelect.value = 'domination';
-    edState.scenario = '';
-    scenarioSelect.value = '';
-    edState.unitPackage = '';
-    unitPackageSelect.value = '';
+    edState.scenario = DEFAULT_MAP_EDITOR_SCENARIO;
+    scenarioSelect.value = DEFAULT_MAP_EDITOR_SCENARIO;
+    edState.unitPackage = DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1;
+    unitPackageSelect.value = DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1;
     edState.unitPackagePlayer2 = '';
     unitPackagePlayer2Select.value = '';
   }
@@ -829,9 +833,9 @@ export function showMapEditor(): void {
   colsInput.value = '8';
   rowsInput.value = '8';
   gameModeSelect.value = 'domination';
-  scenarioSelect.value = '';
-  unitPackageSelect.value = '';
-  unitPackagePlayer2Select.value = '';
+  scenarioSelect.value = edState.scenario;
+  unitPackageSelect.value = edState.unitPackage;
+  unitPackagePlayer2Select.value = edState.unitPackagePlayer2;
   refreshToolbar();
   renderBoard();
   syncMapEditorSelectWidgets();
