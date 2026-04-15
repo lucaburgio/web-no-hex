@@ -284,14 +284,12 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   display: flex;
   align-items: center;
   gap: 6px;
-  isolation: isolate;
 }
 
 #header-pp-icon {
   display: block;
   width: 20px;
   height: 20px;
-  transform: translateZ(0);
 }
 
 #pp-display {
