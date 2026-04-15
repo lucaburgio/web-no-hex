@@ -81,6 +81,11 @@ import {
 } from './gameEndScreen';
 import { initMapEditor, showMapEditor, hideMapEditor } from './mapEditor';
 import { initGameAreaBoardTexture } from './gameAreaBoardTexture';
+import { isTauri } from '@tauri-apps/api/core';
+
+if (isTauri()) {
+  document.addEventListener('contextmenu', (e) => e.preventDefault(), { capture: true });
+}
 
 const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
 const WS_URL = `${wsProtocol}//${location.hostname}:3001`;
