@@ -1416,6 +1416,14 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   color: var(--color-gray-500);
 }
 
+/* Preset map: BOARD fields are disabled in JS; dim block for clarity */
+.settings-board-group[data-locked="true"] {
+  opacity: 0.72;
+}
+.settings-board-group[data-locked="true"] .settings-label {
+  cursor: default;
+}
+
 .settings-label {
   font-family: 'Disket Mono', monospace;
   font-size: 0.72rem;

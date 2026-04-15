@@ -1198,6 +1198,24 @@ let quotaFieldsBeforeBreakthrough: { territory: string; points: string } | null 
 /** Last committed board width (settings); used when width input is empty for snapshots. */
 let lastCommittedBoardCols = config.boardCols;
 
+const BOARD_SETTINGS_NUM_IDS = [
+  'cfg-boardCols',
+  'cfg-boardRows',
+  'cfg-mountainPct',
+  'cfg-riverMaxLengthBoardWidthMult',
+] as const;
+
+/** Fixed story map selected: board size and terrain generation options come from the map, not these fields. */
+function setBoardSettingsLocked(locked: boolean): void {
+  for (const id of BOARD_SETTINGS_NUM_IDS) {
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    if (el) el.disabled = locked;
+  }
+  const riversBtn = document.getElementById('cfg-enableRivers') as HTMLButtonElement | null;
+  if (riversBtn) riversBtn.disabled = locked;
+  document.getElementById('settings-board-group')?.toggleAttribute('data-locked', locked);
+}
+
 function populateSettings(): void {
   lastSettingsGameModeForQuota = null;
   quotaFieldsBeforeBreakthrough = null;
@@ -1273,6 +1291,9 @@ function populateSettings(): void {
         vals.boardRows = st.map.rows;
       }
     }
+    setBoardSettingsLocked(!!customMapEl.value.trim());
+  } else {
+    setBoardSettingsLocked(false);
   }
   clampStartingUnitsInputsToBoardWidth(vals.boardCols);
   lastCommittedBoardCols = vals.boardCols;
@@ -1581,6 +1602,7 @@ document.getElementById('cfg-customMap')?.addEventListener('change', () => {
     clampStartingUnitsInputsToBoardWidth(story.map.cols);
     lastCommittedBoardCols = story.map.cols;
   }
+  setBoardSettingsLocked(!!sel.value.trim());
 });
 document.getElementById('cfg-gameMode')!.addEventListener('change', () => {
   updateModeSpecificSettingsVisibility();
