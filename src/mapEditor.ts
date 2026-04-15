@@ -145,19 +145,55 @@ export function initMapEditor(onBack: () => void): void {
     unitPackagePlayer2Select.appendChild(opt2);
   });
 
-  colsInput.addEventListener('input', () => {
-    const v = Math.max(BOARD_HEX_DIM_MIN, Math.min(BOARD_HEX_DIM_MAX, parseInt(colsInput.value, 10) || 8));
-    edState.cols = v;
-    cleanOOB();
-    renderBoard();
-  });
+  function clampDimensionInput(el: HTMLInputElement): number {
+    const raw = parseFloat(el.value);
+    const min = el.min === '' ? -Infinity : Number(el.min);
+    const max = el.max === '' ? Infinity : Number(el.max);
+    const fallback = Number.isFinite(min) ? min : BOARD_HEX_DIM_MIN;
+    const parsed = Number.isFinite(raw) ? raw : fallback;
+    const clamped = Math.max(min, Math.min(max, parsed));
+    if (String(clamped) !== el.value) el.value = String(clamped);
+    return clamped;
+  }
 
-  rowsInput.addEventListener('input', () => {
-    const v = Math.max(BOARD_HEX_DIM_MIN, Math.min(BOARD_HEX_DIM_MAX, parseInt(rowsInput.value, 10) || 8));
-    edState.rows = v;
+  /** While typing, only cap above max (same as custom match numeric fields); min commits on blur. */
+  function onMapDimensionInput(which: 'cols' | 'rows'): void {
+    const el = which === 'cols' ? colsInput : rowsInput;
+    if (el.max !== '') {
+      const v = parseFloat(el.value);
+      const max = Number(el.max);
+      if (Number.isFinite(v) && Number.isFinite(max) && v > max) {
+        el.value = String(max);
+      }
+    }
+    const t = el.value.trim();
+    if (t === '') return;
+    const raw = parseInt(t, 10);
+    if (!Number.isFinite(raw)) return;
+    if (raw < BOARD_HEX_DIM_MIN) return;
+    const clamped = Math.max(BOARD_HEX_DIM_MIN, Math.min(BOARD_HEX_DIM_MAX, raw));
+    if (which === 'cols') edState.cols = clamped;
+    else edState.rows = clamped;
     cleanOOB();
     renderBoard();
-  });
+  }
+
+  function commitMapDimension(which: 'cols' | 'rows'): void {
+    const el = which === 'cols' ? colsInput : rowsInput;
+    const w = clampDimensionInput(el);
+    if (which === 'cols') edState.cols = w;
+    else edState.rows = w;
+    cleanOOB();
+    renderBoard();
+  }
+
+  colsInput.addEventListener('input', () => { onMapDimensionInput('cols'); });
+  colsInput.addEventListener('blur', () => { commitMapDimension('cols'); });
+  colsInput.addEventListener('change', () => { commitMapDimension('cols'); });
+
+  rowsInput.addEventListener('input', () => { onMapDimensionInput('rows'); });
+  rowsInput.addEventListener('blur', () => { commitMapDimension('rows'); });
+  rowsInput.addEventListener('change', () => { commitMapDimension('rows'); });
 
   gameModeSelect.addEventListener('change', () => {
     edState.gameMode = gameModeSelect.value as EditorGameMode;
@@ -215,6 +251,13 @@ export function initMapEditor(onBack: () => void): void {
   svgEl.addEventListener('mousedown', (e) => { painting = true; applyTool(e); });
   svgEl.addEventListener('mousemove', (e) => { if (painting) applyTool(e); });
   window.addEventListener('mouseup', () => { painting = false; });
+}
+
+/** Keeps custom settings dropdown labels in sync after programmatic value changes. */
+function syncMapEditorSelectWidgets(): void {
+  for (const el of [scenarioSelect, gameModeSelect, unitPackageSelect, unitPackagePlayer2Select]) {
+    el.dispatchEvent(new Event('settings-select-sync'));
+  }
 }
 
 // ── State management ──────────────────────────────────────────────────────────
@@ -803,6 +846,7 @@ function applyLoadedCode(raw: string): string | null {
   edState.activeTool = 'normal';
   refreshToolbar();
   renderBoard();
+  syncMapEditorSelectWidgets();
   return null;
 }
 
@@ -900,6 +944,7 @@ export function showMapEditor(): void {
   unitPackagePlayer2Select.value = '';
   refreshToolbar();
   renderBoard();
+  syncMapEditorSelectWidgets();
   overlayEl.classList.remove('hidden');
 }
 

@@ -1099,6 +1099,10 @@ initMapEditor(() => {
   showMainMenu();
 });
 
+for (const id of ['me-scenario', 'me-game-mode', 'me-unit-package', 'me-unit-package-player2'] as const) {
+  initCustomSettingsSelect(id);
+}
+
 menuMapEditorBtn.addEventListener('click', () => {
   hideMainMenu();
   showMapEditor();
@@ -1259,7 +1263,7 @@ function populateSettings(): void {
     customMapEl.innerHTML = '';
     const autoOpt = document.createElement('option');
     autoOpt.value = '';
-    autoOpt.textContent = '[auto generate]';
+    autoOpt.textContent = '[generate]';
     customMapEl.appendChild(autoOpt);
     for (const s of STORIES.filter(x => storyMapHasFullCustomMatchSupport(x.map))) {
       const opt = document.createElement('option');
