@@ -3287,20 +3287,28 @@ pauseContinueBtn.addEventListener('click', () => {
   pauseOverlayEl.classList.add('hidden');
 });
 
-document.addEventListener('keydown', (e: KeyboardEvent) => {
-  if (e.key === 'Escape') {
+// Capture phase + preventDefault: in Tauri/WKWebView, Escape otherwise exits native fullscreen
+// before our bubble handler runs; we still want ESC to only toggle the in-game pause menu.
+document.addEventListener(
+  'keydown',
+  (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
     const inGame = mainMenuOverlayEl.classList.contains('hidden')
       && introOverlayEl.classList.contains('hidden')
       && recapOverlayEl.classList.contains('hidden');
     if (!inGame) return;
+    e.preventDefault();
     if (pauseOverlayEl.classList.contains('hidden')) {
       pauseRestartBtn.hidden = gameMode === 'vsHuman';
       pauseOverlayEl.classList.remove('hidden');
     } else {
       pauseOverlayEl.classList.add('hidden');
     }
-    return;
-  }
+  },
+  true,
+);
+
+document.addEventListener('keydown', (e: KeyboardEvent) => {
   if (e.key === 'Enter' && !endMoveBtn.hidden && endMoveBtn.style.display !== 'none') {
     if (isAnimating) return;
     endMoveBtn.click();

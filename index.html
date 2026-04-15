@@ -20,7 +20,9 @@
 <body>
   <header id="conquer-header">
     <div id="pp-info">
-      <img src="icons/points.svg" id="header-pp-icon" alt="PP" />
+      <!-- Distinct URL from unit-card cost icons (same asset) avoids WKWebView/Tauri compositor
+           briefly applying the card’s CSS filter stack to this image during hover animations. -->
+      <img src="icons/points.svg?v=header" id="header-pp-icon" alt="PP" />
       <strong id="pp-display">0</strong>
     </div>
     <div id="header-territory">
