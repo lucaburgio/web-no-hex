@@ -1,7 +1,7 @@
 import gsap from 'gsap';
 import { playDefenderHexBarrage } from './artilleryProjectileVfx';
 import type { ArtilleryProjectileHandle } from './artilleryProjectileVfx';
-import { hexToPixel, hexPoints, HEX_SIZE, getNeighbors } from './hex';
+import { hexToPixel, hexPoints, hexFillPoints, HEX_SIZE, getNeighbors } from './hex';
 import {
   COLS,
   ROWS,
@@ -718,7 +718,7 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
       const { x, y } = hexToPixel(col, r);
 
       const poly = svgEl('polygon');
-      poly.setAttribute('points', hexPoints(x, y));
+      poly.setAttribute('points', hexFillPoints(x, y));
       poly.setAttribute('id', `hex-${col}-${r}`);
       poly.setAttribute('data-col', String(col));
       poly.setAttribute('data-row', String(r));

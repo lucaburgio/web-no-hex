@@ -5,6 +5,9 @@ import config from './gameconfig';
 
 export const HEX_SIZE: number = config.hexSize;
 
+/** Radius multiplier for terrain fill polygons only — slight overlap hides sub-pixel seams between adjacent SVG fills (WKWebView). */
+export const HEX_FILL_RADIUS_MULT = 1.0025;
+
 // Pixel position for a hex at (col, row) — pointy-top, odd-r offset
 export function hexToPixel(col: number, row: number): { x: number; y: number } {
   const x = HEX_SIZE * Math.sqrt(3) * (col + (Math.abs(row) % 2 === 1 ? 0.5 : 0));
@@ -43,6 +46,11 @@ export function hexPoints(cx: number, cy: number, size: number = HEX_SIZE): stri
     pts.push(`${cx + size * Math.cos(angle)},${cy + size * Math.sin(angle)}`);
   }
   return pts.join(' ');
+}
+
+/** Hex outline for `#hex-layer` terrain fills; slightly larger than {@link hexPoints} so neighbors overlap. */
+export function hexFillPoints(cx: number, cy: number): string {
+  return hexPoints(cx, cy, HEX_SIZE * HEX_FILL_RADIUS_MULT);
 }
 
 // Simple BFS distance between two hex cells (offset coords)
