@@ -1432,6 +1432,225 @@ export function createInitialState(): GameState {
   };
 }
 
+/**
+ * Conquest: merge authored story control points with {@link config.controlPointCount}
+ * and spread placement (extra points picked like {@link pickControlPointHexes}).
+ */
+function resolveConquestCpsForPlayableStory(
+  story: StoryDef,
+  cpCandidates: string[],
+  cols: number,
+  rows: number,
+): string[] {
+  const want = config.controlPointCount;
+  if (want <= 0 || cpCandidates.length === 0) return [];
+
+  const candSet = new Set(cpCandidates);
+
+  if (story.gameMode === 'conquest' && story.map.controlPoints?.length) {
+    const fromStory: string[] = [];
+    const seen = new Set<string>();
+    for (const k of story.map.controlPoints) {
+      if (!seen.has(k) && candSet.has(k)) {
+        seen.add(k);
+        fromStory.push(k);
+      }
+    }
+
+    if (fromStory.length >= want) {
+      return pickControlPointHexes(fromStory, want, cols, rows);
+    }
+
+    if (fromStory.length > 0) {
+      const picked = new Set(fromStory);
+      const restPool = cpCandidates.filter(k => !picked.has(k));
+      const need = want - fromStory.length;
+      const extra = need > 0 ? pickControlPointHexes(restPool, need, cols, rows) : [];
+      return [...fromStory, ...extra].slice(0, want);
+    }
+  }
+
+  return pickControlPointHexes(cpCandidates, want, cols, rows);
+}
+
+/**
+ * Custom match: fixed mountains/rivers from a playable story, starting units and
+ * target mode from {@link config} (not story unit positions or story.gameMode).
+ * Call {@link syncDimensions} so COLS/ROWS match `story.map` before this.
+ */
+export function createInitialStateFromPlayableStory(story: StoryDef): GameState {
+  unitIdCounter = 0;
+  const gm = config.gameMode as GameMode;
+  const breakthroughAttackerOwnerForState: Owner | undefined =
+    gm === 'breakthrough'
+      ? (
+          config.breakthroughRandomRoles
+            ? (Math.random() < 0.5 ? PLAYER : AI)
+            : config.breakthroughPlayer1Role === 'attacker'
+              ? PLAYER
+              : AI
+        )
+      : undefined;
+
+  const units: Unit[] = [];
+  let playerStartingUnits = config.startingUnitsPlayer1;
+  let aiStartingUnits = config.startingUnitsPlayer2;
+  if (gm === 'breakthrough' && breakthroughAttackerOwnerForState !== undefined) {
+    const att = breakthroughAttackerOwnerForState;
+    playerStartingUnits = att === PLAYER ? config.startingUnitsAttacker : config.startingUnitsDefender;
+    aiStartingUnits = att === AI ? config.startingUnitsAttacker : config.startingUnitsDefender;
+  }
+  const playerStartingCols = spreadCols(playerStartingUnits, COLS);
+  const aiStartingCols = spreadCols(aiStartingUnits, COLS);
+
+  for (const c of playerStartingCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
+  for (const c of aiStartingCols) units.push(makeUnit(AI, c, 0));
+
+  let hexStates: Record<string, HexState> = {};
+  for (const u of units) {
+    hexStates[`${u.col},${u.row}`] = { owner: u.owner, stableFor: 0, isProduction: false };
+  }
+
+  const reservedKeys = new Set(units.map(u => `${u.col},${u.row}`));
+  const mountainHexes = [...story.map.mountains];
+  const mountainSet = new Set(mountainHexes);
+  const riverHexes: RiverHex[] = story.map.rivers ?? [];
+
+  const cpCandidates: string[] = [];
+  for (let r = 1; r < ROWS - 1; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const key = `${c},${r}`;
+      if (!reservedKeys.has(key) && !mountainSet.has(key)) cpCandidates.push(key);
+    }
+  }
+
+  let sectorHexes: string[][] = [];
+  let sectorOwners: Owner[] = [];
+  let sectorControlPointHex: string[] = [];
+  let breakthroughCpOccupation: number[] = [];
+  let sectorIndexByHex: Record<string, number> = {};
+
+  let controlPointHexes: string[] = [];
+  if (gm === 'breakthrough' && breakthroughAttackerOwnerForState !== undefined) {
+    const assignable: string[] = [];
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const key = `${c},${r}`;
+        if (!mountainSet.has(key)) assignable.push(key);
+      }
+    }
+    const wantSectors = Math.max(2, config.breakthroughSectorCount);
+    const nSectors = Math.min(wantSectors, Math.max(2, assignable.length));
+    sectorHexes = partitionBreakthroughSectors(assignable, nSectors);
+    const att: Owner = breakthroughAttackerOwnerForState;
+    const nSec = sectorHexes.length;
+    sectorOwners = sectorHexes.map((_, i) =>
+      att === PLAYER ? (i === 0 ? PLAYER : AI) : i === nSec - 1 ? AI : PLAYER,
+    );
+    sectorIndexByHex = {};
+    sectorHexes.forEach((keys, sid) => {
+      for (const k of keys) sectorIndexByHex[k] = sid;
+    });
+    hexStates = {};
+    for (let s = 0; s < sectorHexes.length; s++) {
+      const owner = sectorOwners[s]!;
+      for (const k of sectorHexes[s]!) {
+        hexStates[k] = { owner, stableFor: 0, isProduction: false };
+      }
+    }
+
+    const storyCpSet = new Set(
+      story.gameMode === 'breakthrough' && story.map.controlPoints?.length
+        ? story.map.controlPoints.filter(k => assignable.includes(k))
+        : [],
+    );
+    sectorControlPointHex = sectorHexes.map(keys => {
+      const storyCP = keys.find(k => storyCpSet.has(k));
+      return storyCP ?? pickBreakthroughSectorControlPoint(keys, COLS, ROWS);
+    });
+    controlPointHexes = [];
+    breakthroughCpOccupation = Array(sectorHexes.length).fill(0);
+    const homeIdx = att === PLAYER ? 0 : nSec - 1;
+    const cpHome = sectorControlPointHex[homeIdx];
+    if (cpHome) {
+      sectorControlPointHex[homeIdx] = '';
+    }
+    const frontlineIdx = att === PLAYER
+      ? sectorOwners.findIndex(o => o !== att)
+      : (() => {
+          for (let i = sectorOwners.length - 1; i >= 0; i--) {
+            if (sectorOwners[i] !== att) return i;
+          }
+          return -1;
+        })();
+    controlPointHexes =
+      frontlineIdx >= 0 && sectorControlPointHex[frontlineIdx]
+        ? [sectorControlPointHex[frontlineIdx]!]
+        : [];
+    primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
+  } else if (gm === 'conquest' && config.controlPointCount > 0 && cpCandidates.length > 0) {
+    controlPointHexes = resolveConquestCpsForPlayableStory(story, cpCandidates, COLS, ROWS);
+  }
+
+  const conquestPoints =
+    gm === 'conquest'
+      ? ({
+          [PLAYER]: config.conquestPointsPlayer,
+          [AI]: config.conquestPointsAi,
+        } as Record<Owner, number>)
+      : null;
+
+  let ppPlayer: number;
+  let ppAi: number;
+  if (gm === 'breakthrough' && breakthroughAttackerOwnerForState !== undefined) {
+    const att = breakthroughAttackerOwnerForState;
+    const def: Owner = att === PLAYER ? AI : PLAYER;
+    const defHexCount = Object.values(hexStates).filter(h => h.owner === def).length;
+    const defBonus = territoryBonusForHexCount(defHexCount);
+    const defBasePP = def === AI ? config.productionPointsPerTurnAi : config.productionPointsPerTurn;
+    const defPP = defBasePP + defBonus;
+    const attPP = config.breakthroughAttackerStartingPP;
+    ppPlayer = att === PLAYER ? attPP : defPP;
+    ppAi = att === AI ? attPP : defPP;
+  } else {
+    ppPlayer = config.productionPointsPerTurn;
+    ppAi = config.productionPointsPerTurnAi;
+  }
+
+  const logMsg =
+    gm === 'breakthrough'
+      ? 'Game started — Breakthrough. Your turn — Production phase.'
+      : 'Game started. Your turn — Production phase.';
+
+  return {
+    units,
+    hexStates,
+    mountainHexes,
+    riverHexes,
+    gameMode: gm,
+    controlPointHexes,
+    conquestPoints,
+    sectorHexes,
+    sectorOwners,
+    sectorControlPointHex,
+    breakthroughCpOccupation,
+    sectorIndexByHex,
+    ...(gm === 'breakthrough' && breakthroughAttackerOwnerForState !== undefined
+      ? { breakthroughAttackerOwner: breakthroughAttackerOwnerForState }
+      : {}),
+    turn: 1,
+    phase: 'production',
+    activePlayer: PLAYER,
+    selectedUnit: null,
+    productionPoints: {
+      [PLAYER]: ppPlayer,
+      [AI]: ppAi,
+    } as Record<Owner, number>,
+    log: [logMsg],
+    winner: null,
+  };
+}
+
 // ── Story state ───────────────────────────────────────────────────────────────
 
 /**

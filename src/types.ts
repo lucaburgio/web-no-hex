@@ -194,6 +194,8 @@ export interface StoryDef {
   id: string;
   title: string;
   description: string;
+  /** If true, this story's map layout can be chosen in custom match settings. */
+  playable?: boolean;
   /** Groups stories into a named collection displayed together in the UI. */
   scenario: string;
   /** Only unit types with this package are available for player 1 (south). Undefined = all units. */
@@ -260,6 +262,9 @@ export interface GameConfig {
   breakthroughPlayer1Role: 'attacker' | 'defender';
   /** Breakthrough: ignore {@link breakthroughPlayer1Role} and assign attacker randomly at match start. */
   breakthroughRandomRoles: boolean;
+
+  /** Custom match: use fixed terrain from this story id, or null for procedurally generated map. */
+  customMatchMapId: string | null;
 
   boardCols: number;
   boardRows: number;

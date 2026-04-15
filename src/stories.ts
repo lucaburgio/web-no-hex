@@ -21,6 +21,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'tutorial-02',
   title: 'Introduction — Tanks',
+  playable: true,
   description: 'Description.',
   scenario: 'tutorial',
   unitPackage: 'us-ww2',
@@ -62,6 +63,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'tutorial-04',
   title: 'Learn Conquest mode',
+  playable: true,
   description: 'Description.',
   scenario: 'tutorial',
   unitPackage: 'us-ww2',
@@ -82,6 +84,7 @@ export const STORIES: StoryDef[] = [
 {
   id: 'tutorial-05',
   title: 'Learn Breakthrough mode',
+  playable: true,
   description: 'Description.',
   scenario: 'tutorial',
   unitPackage: 'us-ww2',
@@ -102,6 +105,7 @@ export const STORIES: StoryDef[] = [
   id: 'ww2-01',
   scenario: 'ww2us',
   title: 'Citadel',
+  playable: true,
   description: 'Description.',
   unitPackage: 'us-ww2',
   unitPackagePlayer2: 'de-ww2',

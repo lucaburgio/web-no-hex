@@ -1,5 +1,6 @@
 import {
   createInitialState,
+  createInitialStateFromPlayableStory,
   createStoryState,
   playerPlaceUnit,
   playerEndProduction,
@@ -361,10 +362,21 @@ const STORY_CONFIG_DEFAULTS = {
   breakthroughSectorCount: config.breakthroughSectorCount,
   breakthroughPlayer1Role: config.breakthroughPlayer1Role,
   breakthroughRandomRoles: config.breakthroughRandomRoles,
+  customMatchMapId: null as string | null,
 };
 let storyConfigSnapshot: typeof STORY_CONFIG_DEFAULTS | null = null;
 
-let state: GameState = createInitialState();
+/** New vs-AI / multiplayer games: fixed terrain from settings when a playable story map is chosen. */
+function createInitialStateForMenu(): GameState {
+  const id = config.customMatchMapId;
+  if (id) {
+    const story = STORIES.find(s => s.id === id && s.playable);
+    if (story) return createInitialStateFromPlayableStory(story);
+  }
+  return createInitialState();
+}
+
+let state: GameState = createInitialStateForMenu();
 let pendingProductionHex: { col: number; row: number } | null = null;
 let isAnimating = false;
 /** True while local vs-AI AI turn visuals run (shared cancel token must not be treated as human interrupt). */
@@ -922,9 +934,11 @@ function startStory(storyIndex: number, savedState?: GameState): void {
     breakthroughSectorCount: config.breakthroughSectorCount,
     breakthroughPlayer1Role: config.breakthroughPlayer1Role,
     breakthroughRandomRoles: config.breakthroughRandomRoles,
+    customMatchMapId: config.customMatchMapId,
   };
 
   updateConfig({
+    customMatchMapId: null,
     boardCols: story.map.cols,
     boardRows: story.map.rows,
     ...(story.productionPointsPerTurn !== undefined ? { productionPointsPerTurn: story.productionPointsPerTurn } : {}),
@@ -1015,7 +1029,7 @@ menuNewGameBtn.addEventListener('click', () => {
     showSettings(() => {
       gameMode = 'vsAI';
       localPlayer = PLAYER;
-      startGame(createInitialState());
+      startGame(createInitialStateForMenu());
     });
   }
 });
@@ -1027,7 +1041,7 @@ confirmNewGameBtn.addEventListener('click', () => {
   showSettings(() => {
     gameMode = 'vsAI';
     localPlayer = PLAYER;
-    startGame(createInitialState());
+    startGame(createInitialStateForMenu());
   });
 });
 
@@ -1051,7 +1065,7 @@ cancelStoryStartBtn.addEventListener('click', () => {
 menuHostBtn.addEventListener('click', () => {
   gameMode = 'vsHuman';
   localPlayer = PLAYER;
-  state = createInitialState();
+  state = createInitialStateForMenu();
   lobbyTitleEl.textContent = 'HOST GAME';
   lobbyOverlayEl.classList.remove('hidden');
   lobbyMenuEl.classList.add('hidden');
@@ -1234,6 +1248,32 @@ function populateSettings(): void {
   syncBreakthroughRoleControls();
   updateModeSpecificSettingsVisibility();
   syncModeCards();
+  const customMapEl = document.getElementById('cfg-customMap') as HTMLSelectElement | null;
+  if (customMapEl) {
+    customMapEl.innerHTML = '';
+    const autoOpt = document.createElement('option');
+    autoOpt.value = '';
+    autoOpt.textContent = '[auto generate]';
+    customMapEl.appendChild(autoOpt);
+    for (const s of STORIES.filter(x => x.playable)) {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.title;
+      customMapEl.appendChild(opt);
+    }
+    const cur = config.customMatchMapId ?? '';
+    const valid = cur !== '' && STORIES.some(s => s.id === cur && s.playable);
+    customMapEl.value = valid ? cur : '';
+    if (valid && cur) {
+      const st = STORIES.find(s => s.id === cur && s.playable);
+      if (st) {
+        (document.getElementById('cfg-boardCols') as HTMLInputElement).value = String(st.map.cols);
+        (document.getElementById('cfg-boardRows') as HTMLInputElement).value = String(st.map.rows);
+        vals.boardCols = st.map.cols;
+        vals.boardRows = st.map.rows;
+      }
+    }
+  }
   clampStartingUnitsInputsToBoardWidth(vals.boardCols);
   lastCommittedBoardCols = vals.boardCols;
 }
@@ -1448,6 +1488,16 @@ function collectSettings(): Parameters<typeof updateConfig>[0] {
   const breakthroughRandEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement;
   if (breakthroughRoleEl) out.breakthroughPlayer1Role = breakthroughRoleEl.value as 'attacker' | 'defender';
   if (breakthroughRandEl) out.breakthroughRandomRoles = breakthroughRandEl.checked;
+  const customMapEl = document.getElementById('cfg-customMap') as HTMLSelectElement | null;
+  if (customMapEl) {
+    const mapId = customMapEl.value.trim();
+    out.customMatchMapId = mapId === '' ? null : mapId;
+    const story = mapId ? STORIES.find(s => s.id === mapId && s.playable) : undefined;
+    if (story) {
+      out.boardCols = story.map.cols;
+      out.boardRows = story.map.rows;
+    }
+  }
   return out as Parameters<typeof updateConfig>[0];
 }
 
@@ -1520,6 +1570,18 @@ boardColsSettingsEl.addEventListener('change', () => {
 initCustomSettingsSelect('cfg-unitPackage');
 initCustomSettingsSelect('cfg-unitPackagePlayer2');
 initCustomSettingsSelect('cfg-breakthroughPlayer1Role');
+document.getElementById('cfg-customMap')?.addEventListener('change', () => {
+  const sel = document.getElementById('cfg-customMap') as HTMLSelectElement;
+  const story = sel.value ? STORIES.find(s => s.id === sel.value && s.playable) : undefined;
+  const colsEl = document.getElementById('cfg-boardCols') as HTMLInputElement;
+  const rowsEl = document.getElementById('cfg-boardRows') as HTMLInputElement;
+  if (story) {
+    colsEl.value = String(story.map.cols);
+    rowsEl.value = String(story.map.rows);
+    clampStartingUnitsInputsToBoardWidth(story.map.cols);
+    lastCommittedBoardCols = story.map.cols;
+  }
+});
 document.getElementById('cfg-gameMode')!.addEventListener('change', () => {
   updateModeSpecificSettingsVisibility();
   syncModeCards();
@@ -1742,7 +1804,7 @@ introContinueBtn.addEventListener('click', () => {
     introOverlayEl.classList.add('hidden');
     gameMode = 'vsAI';
     localPlayer = PLAYER;
-    startGame(createInitialState());
+    startGame(createInitialStateForMenu());
   }
 });
 
@@ -1768,7 +1830,8 @@ function buildRulesContent(): string {
 
     <h3>Overview</h3>
     <p>Turn-based hex strategy on a ${config.boardCols}×${config.boardRows} grid.
-       You play from the south (bottom row); the AI plays from the north (top row).</p>
+       You play from the south (bottom row); the AI plays from the north (top row).
+       In custom match settings you can pick a <strong>map layout</strong> (fixed mountains, rivers, and mode-appropriate control points) instead of a randomly generated board.</p>
 
     <h3>Turn Phases</h3>
     <ol>
@@ -1921,7 +1984,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     hideLobby();
     hideMainMenu();
     showSettings((settings) => {
-      state = createInitialState();
+      state = createInitialStateForMenu();
       if (ws) ws.send(JSON.stringify({ type: 'game-start', state, settings: { ...settings, unitPackage: settingsUnitPackage, unitPackagePlayer2: settingsUnitPackagePlayer2 } }));
       startGame(state);
     }, 'PLAYER 2 CONNECTED');
@@ -2015,13 +2078,13 @@ vsAiBtn.addEventListener('click', () => {
   localPlayer = PLAYER;
   closeLobbyWs();
   hideLobby();
-  startGame(createInitialState());
+  startGame(createInitialStateForMenu());
 });
 
 hostBtn.addEventListener('click', () => {
   gameMode = 'vsHuman';
   localPlayer = PLAYER;
-  state = createInitialState();
+  state = createInitialStateForMenu();
 
   lobbyMenuEl.classList.add('hidden');
   lobbyJoinFormEl.classList.add('hidden');
@@ -3329,7 +3392,7 @@ pauseRestartBtn.addEventListener('click', () => {
   if (activeStoryIndex !== null) {
     startStory(activeStoryIndex);
   } else {
-    startGame(createInitialState());
+    startGame(createInitialStateForMenu());
   }
 });
 

@@ -68,6 +68,8 @@ const config: GameConfig = {
   breakthroughPlayer1Role: 'attacker',
   breakthroughRandomRoles: false,
 
+  customMatchMapId: null,
+
   // Board dimensions (number of hexes)
   boardCols: 8,
   boardRows: 8,
