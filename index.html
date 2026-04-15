@@ -118,7 +118,10 @@
   <!-- Map Editor overlay -->
   <div id="map-editor-overlay" class="hidden">
     <div id="map-editor-canvas-area">
-      <svg id="map-editor-board"></svg>
+      <div id="map-editor-canvas-scroll">
+        <svg id="map-editor-board"></svg>
+      </div>
+      <div id="map-editor-toolbar"></div>
     </div>
     <div id="map-editor-right">
       <div id="map-editor-title">MAP<br>EDITOR</div>
@@ -182,7 +185,6 @@
         <button id="me-back-btn" type="button" class="button-secondary">BACK</button>
       </div>
     </div>
-    <div id="map-editor-toolbar"></div>
 
     <!-- Load Map modal -->
     <div id="me-load-modal-overlay" class="hidden">

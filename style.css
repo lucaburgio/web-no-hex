@@ -2226,13 +2226,22 @@ select.settings-input.settings-select option {
   flex-direction: row;
   align-items: stretch;
   z-index: 40;
-  padding-bottom: 72px; /* leave room for floating toolbar */
+  min-height: 0;
 }
 #map-editor-overlay.hidden { display: none; }
 
 #map-editor-canvas-area {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+#map-editor-canvas-scroll {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   display: flex;
   align-items: flex-start;
@@ -2246,7 +2255,7 @@ select.settings-input.settings-select option {
 }
 
 #map-editor-right {
-  width: 360px;
+  width: 30%;
   flex-shrink: 0;
   border-left: 1px solid rgba(0,0,0,0.1);
   overflow-y: auto;
@@ -2287,15 +2296,12 @@ select.settings-input.settings-select option {
   text-align: center;
 }
 
-/* ── Map Editor toolbar ─────────────────────────────────────────────────────── */
+/* ── Map Editor toolbar (bottom of left column, under canvas) ─────────────── */
 #map-editor-toolbar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  flex-shrink: 0;
+  width: 100%;
   height: 72px;
   background: var(--color-dark);
-  z-index: 41;
   display: flex;
   flex-direction: row;
   align-items: stretch;
