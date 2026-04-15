@@ -331,10 +331,9 @@ export function generateRiver(opts: GenerateRiverOptions): RiverHex[] {
 }
 
 /**
- * Map editor export: painted `"col,row"` keys → valid {@link RiverHex} rows for `story.map.rivers`.
- * Uses one catalog segment for every cell (in-game art is generic until a smarter pass exists).
+ * Map editor export fallback: one generic catalog segment per cell (junctions / non-path shapes).
  */
-export function placeholderRiverHexesFromKeys(keys: Iterable<string>): RiverHex[] {
+function placeholderRiverHexesFromKeys(keys: Iterable<string>): RiverHex[] {
   const def = RIVER_SEGMENT_DEFS[0];
   if (!def) return [];
   const [entrySide, exitSide] = def.sides;
@@ -346,6 +345,286 @@ export function placeholderRiverHexesFromKeys(keys: Iterable<string>): RiverHex[
     if (!Number.isInteger(col) || !Number.isInteger(row)) continue;
     out.push({ col, row, segment: def.key, entrySide, exitSide });
   }
+  out.sort((a, b) => a.row - b.row || a.col - b.col);
+  return out;
+}
+
+function parseKey(k: string): { col: number; row: number } | null {
+  const [cs, rs] = k.split(',');
+  const col = Number(cs);
+  const row = Number(rs);
+  if (!Number.isInteger(col) || !Number.isInteger(row)) return null;
+  return { col, row };
+}
+
+function keyOf(col: number, row: number): string {
+  return `${col},${row}`;
+}
+
+/** Which side from (col, row) points toward adjacent hex (ncol, nrow), or null if not neighbors. */
+function findSideTowardNeighbor(
+  col: number, row: number, ncol: number, nrow: number,
+): HexSide | null {
+  const parity = Math.abs(row) % 2 === 0 ? 'even' : 'odd';
+  for (const side of HEX_SIDES) {
+    const [dc, dr] = SIDE_DELTA[parity][side];
+    if (col + dc === ncol && row + dr === nrow) return side;
+  }
+  return null;
+}
+
+function buildAdjacencyInKeys(component: Set<string>, cols: number, rows: number): Map<string, Set<string>> {
+  const adj = new Map<string, Set<string>>();
+  for (const k of component) adj.set(k, new Set());
+  for (const k of component) {
+    const p = parseKey(k);
+    if (!p) continue;
+    for (const side of HEX_SIDES) {
+      const n = getNeighborBySide(p.col, p.row, side, cols, rows);
+      if (!n) continue;
+      const nk = keyOf(n[0], n[1]);
+      if (component.has(nk)) {
+        adj.get(k)!.add(nk);
+        adj.get(nk)!.add(k);
+      }
+    }
+  }
+  return adj;
+}
+
+/** Try to order a component as a simple path or cycle (each vertex degree ≤ 2). */
+function tryLinearHexOrder(component: Set<string>, cols: number, rows: number): { col: number; row: number }[] | null {
+  const n = component.size;
+  if (n === 0) return null;
+  const adj = buildAdjacencyInKeys(component, cols, rows);
+  if (n === 1) {
+    const k = [...component][0]!;
+    const p = parseKey(k);
+    return p ? [p] : null;
+  }
+
+  const endpoints = [...component].filter(k => (adj.get(k)?.size ?? 0) === 1);
+
+  if (endpoints.length === 2) {
+    const start = endpoints[0]!;
+    const order: string[] = [];
+    let prev: string | null = null;
+    let cur: string | null = start;
+    while (cur && order.length < n) {
+      order.push(cur);
+      const nextOpts: string[] = [...adj.get(cur)!].filter(x => x !== prev);
+      if (order.length === n) break;
+      if (nextOpts.length !== 1) return null;
+      prev = cur;
+      cur = nextOpts[0]!;
+    }
+    if (order.length !== n) return null;
+    return order.map(k => parseKey(k)!);
+  }
+
+  if (endpoints.length === 0) {
+    const start = [...component].sort((a, b) => a.localeCompare(b))[0]!;
+    const neigh = [...adj.get(start)!].sort((a, b) => a.localeCompare(b));
+    if (neigh.length !== 2) return null;
+
+    for (const first of neigh) {
+      const order: string[] = [start];
+      let prev = start;
+      let cur = first;
+      for (let i = 1; i < n; i++) {
+        order.push(cur);
+        if (i < n - 1) {
+          const candidates = [...adj.get(cur)!].filter(x => x !== prev);
+          if (candidates.length !== 1) {
+            order.length = 0;
+            break;
+          }
+          prev = cur;
+          cur = candidates[0]!;
+        } else {
+          const last = cur;
+          if (!adj.get(last)!.has(start)) {
+            order.length = 0;
+            break;
+          }
+        }
+      }
+      if (order.length === n) return order.map(k => parseKey(k)!);
+    }
+    return null;
+  }
+
+  return null;
+}
+
+function pathCoordsSeed(coords: Array<{ col: number; row: number }>): number {
+  let h = 2166136261;
+  for (const p of coords) {
+    h ^= p.col + 0x9E3779B9;
+    h = Math.imul(h, 16777619);
+    h ^= p.row + 0x9E3779B9;
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function pickSegmentVariant(entry: HexSide, exit: HexSide, rng: () => number): string | null {
+  const matches = CATALOG[entry].filter(e => e.exitSide === exit);
+  if (matches.length === 0) return null;
+  return matches[Math.floor(rng() * matches.length)]!.segmentKey;
+}
+
+function pickLastExitForPathEnd(
+  col: number,
+  row: number,
+  entry: HexSide,
+  coords: Array<{ col: number; row: number }>,
+  cols: number,
+  rows: number,
+  rng: () => number,
+): HexSide | null {
+  const pathSet = new Set(coords.map(c => `${c.col},${c.row}`));
+  const prev = coords.length >= 2 ? coords[coords.length - 2]! : null;
+  const backSide = prev ? findSideTowardNeighbor(col, row, prev.col, prev.row) : null;
+
+  const candidates = CATALOG[entry].filter(e => backSide === null || e.exitSide !== backSide);
+  if (candidates.length === 0) return null;
+
+  const scored = candidates.map(e => {
+    const nb = getNeighborBySide(col, row, e.exitSide, cols, rows);
+    let score = 0;
+    if (nb === null) score = 4;
+    else if (!pathSet.has(`${nb[0]},${nb[1]}`)) score = 3;
+    else score = 0;
+    return { exitSide: e.exitSide, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored[0]!.score;
+  const pool = scored.filter(s => s.score === best);
+  return pool[Math.floor(rng() * pool.length)]!.exitSide;
+}
+
+/**
+ * Build story-style {@link RiverHex} rows for an ordered path (grid-adjacent steps).
+ */
+function riverHexesAlongLinearPath(
+  coords: Array<{ col: number; row: number }>,
+  cols: number,
+  rows: number,
+): RiverHex[] | null {
+  if (coords.length === 0) return null;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const a = coords[i]!;
+    const b = coords[i + 1]!;
+    if (findSideTowardNeighbor(a.col, a.row, b.col, b.row) === null) return null;
+  }
+
+  const rng = mkRng(pathCoordsSeed(coords));
+  const out: RiverHex[] = [];
+
+  if (coords.length === 1) {
+    const p = coords[0]!;
+    const sides = [...HEX_SIDES];
+    for (let i = sides.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [sides[i], sides[j]] = [sides[j]!, sides[i]!];
+    }
+    for (const entry of sides) {
+      const exit = pickLastExitForPathEnd(p.col, p.row, entry, coords, cols, rows, rng);
+      if (exit === null) continue;
+      const segment = pickSegmentVariant(entry, exit, rng);
+      if (segment === null) continue;
+      out.push({ col: p.col, row: p.row, segment, entrySide: entry, exitSide: exit });
+      return out;
+    }
+    return null;
+  }
+
+  const exit0 = findSideTowardNeighbor(coords[0]!.col, coords[0]!.row, coords[1]!.col, coords[1]!.row);
+  if (exit0 === null) return null;
+  const entry0 = SIDE_OPPOSITE[exit0];
+  const seg0 = pickSegmentVariant(entry0, exit0, rng);
+  if (seg0 === null) return null;
+  out.push({
+    col: coords[0]!.col,
+    row: coords[0]!.row,
+    segment: seg0,
+    entrySide: entry0,
+    exitSide: exit0,
+  });
+
+  let prevExit: HexSide = exit0;
+
+  for (let i = 1; i < coords.length; i++) {
+    const p = coords[i]!;
+    const entry = SIDE_OPPOSITE[prevExit];
+    let exit: HexSide;
+    if (i < coords.length - 1) {
+      const towardNext = findSideTowardNeighbor(p.col, p.row, coords[i + 1]!.col, coords[i + 1]!.row);
+      if (towardNext === null) return null;
+      exit = towardNext;
+    } else {
+      const last = pickLastExitForPathEnd(p.col, p.row, entry, coords, cols, rows, rng);
+      if (last === null) return null;
+      exit = last;
+    }
+    const segment = pickSegmentVariant(entry, exit, rng);
+    if (segment === null) return null;
+    out.push({ col: p.col, row: p.row, segment, entrySide: entry, exitSide: exit });
+    prevExit = exit;
+  }
+
+  return out;
+}
+
+function partitionKeyComponents(keys: Set<string>, cols: number, rows: number): Set<string>[] {
+  const unseen = new Set(keys);
+  const comps: Set<string>[] = [];
+  while (unseen.size > 0) {
+    const start = unseen.values().next().value as string;
+    const comp = new Set<string>();
+    const q: string[] = [start];
+    while (q.length > 0) {
+      const k = q.pop()!;
+      if (!unseen.has(k)) continue;
+      unseen.delete(k);
+      comp.add(k);
+      const p = parseKey(k);
+      if (!p) continue;
+      for (const side of HEX_SIDES) {
+        const n = getNeighborBySide(p.col, p.row, side, cols, rows);
+        if (!n) continue;
+        const nk = keyOf(n[0], n[1]);
+        if (unseen.has(nk)) q.push(nk);
+      }
+    }
+    comps.push(comp);
+  }
+  return comps;
+}
+
+/**
+ * Map editor / copy export: painted `"col,row"` keys → {@link RiverHex} rows like `stories.ts` `map.rivers`.
+ * Linear chains and simple cycles get proper entry/exit/segment keys; T-junctions or branches fall back
+ * to a generic segment per hex.
+ */
+export function riverHexesFromPaintedKeys(keys: Set<string>, cols: number, rows: number): RiverHex[] {
+  const out: RiverHex[] = [];
+  const comps = partitionKeyComponents(keys, cols, rows)
+    .sort((a, b) => ([...a].sort()[0] ?? '').localeCompare([...b].sort()[0] ?? ''));
+
+  for (const comp of comps) {
+    const ordered = tryLinearHexOrder(comp, cols, rows);
+    if (ordered && ordered.length === comp.size) {
+      const built = riverHexesAlongLinearPath(ordered, cols, rows);
+      if (built && built.length === ordered.length) {
+        out.push(...built);
+        continue;
+      }
+    }
+    out.push(...placeholderRiverHexesFromKeys(comp));
+  }
+
   out.sort((a, b) => a.row - b.row || a.col - b.col);
   return out;
 }

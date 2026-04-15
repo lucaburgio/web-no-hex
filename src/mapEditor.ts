@@ -1,7 +1,7 @@
 import config, { BOARD_HEX_DIM_MAX, BOARD_HEX_DIM_MIN } from './gameconfig';
 import { hexPoints } from './hex';
 import { SCENARIOS } from './scenarios';
-import { placeholderRiverHexesFromKeys } from './rivers';
+import { riverHexesFromPaintedKeys } from './rivers';
 
 const EDITOR_HEX_SIZE = 34;
 
@@ -752,7 +752,7 @@ function exportToClipboard(): void {
     conquestControlPoints, breakthroughControlPoints,
     playerStart, aiStart, unitPackage, unitPackagePlayer2, riverHexKeys,
   } = edState;
-  const rivers = placeholderRiverHexesFromKeys(riverHexKeys);
+  const rivers = riverHexesFromPaintedKeys(riverHexKeys, cols, rows);
   const i = '  ';
   const q = escapeJsStringLiteral;
 
