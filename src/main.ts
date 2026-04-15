@@ -26,6 +26,8 @@ import {
   COLS,
   ROWS,
   getBreakthroughAttackerOwner,
+  isInEnemyZoC,
+  isHexBlockedByOpponentHomeGuardOnly,
   type EndProductionOptions,
 } from './game';
 import {
@@ -45,7 +47,6 @@ import {
 } from './renderer';
 import { aiDamageFloatDrawParams } from './combatPlayback';
 import { getNeighbors } from './hex';
-import { isInEnemyZoC } from './game';
 import type { MoveAnimation } from './renderer';
 import config, { DEFAULT_TERRITORY_ECONOMY } from './gameconfig';
 import gsap from 'gsap';
@@ -1801,6 +1802,7 @@ function buildRulesContent(): string {
       <li><strong>Artillery:</strong> each turn you either <strong>move</strong> one hex or fire a <strong>ranged attack</strong> at an enemy ${arRanged} (not both). Ranged fire does not use movement into the target&rsquo;s hex.</li>
       <li><strong>Zone of Control (ZoC):</strong> a unit adjacent to an enemy is locked — it may only attack
         or retreat to a hex not itself adjacent to any enemy. ZoC limits movement and adjacent attacks; it does not block artillery ranged fire at longer range.</li>
+      <li><strong>Domination — guarded home row:</strong> with ZoC enabled, you cannot move onto an <strong>empty</strong> hex on the opponent&rsquo;s <strong>home row</strong> if any enemy is adjacent to that hex (this stops fast units from bypassing ZoC with multi-hex moves). You can still move onto that hex to attack an enemy unit sitting on it.</li>
     </ul>
 
     <h3>Combat</h3>
@@ -3269,6 +3271,19 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
       positionTooltip(e.pageX, e.pageY);
       return;
     }
+  }
+
+  if (
+    !isValidMove &&
+    !target &&
+    isHexBlockedByOpponentHomeGuardOnly(state, attacker, hex.col, hex.row)
+  ) {
+    tooltipEl.innerHTML = `<div class="tt-title tt-zoc">Zone of Control</div>
+      <div class="tt-zoc-msg">Cannot enter an opponent home hex while an enemy is adjacent to it (Domination).</div>`;
+    tooltipEl.classList.remove('hidden');
+    svg.classList.remove('cursor-fight');
+    positionTooltip(e.pageX, e.pageY);
+    return;
   }
 
   if (!target || target.owner !== enemyOwner) { tooltipEl.classList.add('hidden'); svg.classList.remove('cursor-fight'); return; }

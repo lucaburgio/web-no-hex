@@ -451,8 +451,34 @@ export function isInEnemyZoC(state: GameState, col: number, row: number, enemyOw
   });
 }
 
-// Valid destination hexes for a unit (respects ZoC, supports multi-hex movement)
-export function getValidMoves(state: GameState, unit: Unit): [number, number][] {
+/**
+ * Domination + ZoC: cannot move onto an empty opponent home-row hex if any enemy is adjacent to that hex.
+ * Stops fast units from using multi-hex movement to reach the win row without ever being adjacent to a
+ * defender at the start of the move. Moving onto an enemy on that row (melee) is still allowed.
+ */
+export function isOpponentHomeEntryBlocked(state: GameState, unit: Unit, destCol: number, destRow: number): boolean {
+  if (!config.zoneOfControl || state.gameMode !== 'domination') return false;
+  const enemy: Owner = unit.owner === PLAYER ? AI : PLAYER;
+  const opponentHomeRow = unit.owner === PLAYER ? 0 : ROWS - 1;
+  if (destRow !== opponentHomeRow) return false;
+  const occupant = getUnit(state, destCol, destRow);
+  if (occupant && occupant.owner === enemy) return false;
+  return isInEnemyZoC(state, destCol, destRow, enemy);
+}
+
+/** True if this hex would be a legal destination except for `isOpponentHomeEntryBlocked` (for UI feedback). */
+export function isHexBlockedByOpponentHomeGuardOnly(
+  state: GameState,
+  unit: Unit,
+  destCol: number,
+  destRow: number,
+): boolean {
+  if (!isOpponentHomeEntryBlocked(state, unit, destCol, destRow)) return false;
+  return computeBaseValidMoves(state, unit).some(([c, r]) => c === destCol && r === destRow);
+}
+
+/** Base movement destinations before Domination home-row guard; supports multi-hex movement and ZoC lock. */
+function computeBaseValidMoves(state: GameState, unit: Unit): [number, number][] {
   const enemy: Owner = unit.owner === PLAYER ? AI : PLAYER;
   const mountains = new Set(state.mountainHexes ?? []);
   // ZoC is checked on the SOURCE hex, not the destination.
@@ -499,6 +525,13 @@ export function getValidMoves(state: GameState, unit: Unit): [number, number][] 
     const [c, r] = key.split(',').map(Number);
     return [c, r] as [number, number];
   });
+}
+
+// Valid destination hexes for a unit (respects ZoC, supports multi-hex movement, Domination home guard)
+export function getValidMoves(state: GameState, unit: Unit): [number, number][] {
+  return computeBaseValidMoves(state, unit).filter(
+    ([c, r]) => !isOpponentHomeEntryBlocked(state, unit, c, r),
+  );
 }
 
 // BFS path from unit's position to (toCol,toRow), respecting movement rules (no mountains,
@@ -1856,6 +1889,8 @@ export function playerMoveUnit(
     const occupant = getUnit(state, col, row);
     if (occupant && occupant.owner !== localPlayer) {
       log(state, 'Cannot attack: enemy is outside movement range or blocked by ZoC.');
+    } else if (isHexBlockedByOpponentHomeGuardOnly(state, unit, col, row)) {
+      log(state, 'Cannot move onto an opponent home hex while an enemy is next to it (Domination).');
     } else {
       log(state, 'Invalid move: blocked by Zone of Control or not adjacent.');
     }
