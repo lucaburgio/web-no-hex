@@ -89,7 +89,7 @@ img {
     /* Production phase: owned territory not in focus (replaces opacity dimming) */
     --color-hex-player-dimmed: var(--color-gray-200);
     --color-hex-ai-dimmed:     var(--color-gray-100);
-    --color-hex-can-place:     var(--color-dark);
+    --color-hex-can-place:     var(--color-gray-600);
     --color-hex-prod-selected: var(--color-yellow-500);
     --color-hex-prod-stroke:   transparent;
     --color-hex-zoc:           #d58f8f;
