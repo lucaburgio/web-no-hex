@@ -47,6 +47,10 @@ type EditorTool = string; // 'normal' | 'mountain' | 'controlPoint' | 'player:TY
 interface EditorState {
   cols: number;
   rows: number;
+  /** StoryDef `id`; preserved when loading a full story object and emitted on copy. */
+  id: string;
+  title: string;
+  description: string;
   gameMode: EditorGameMode;
   scenario: string;
   unitPackage: string;
@@ -63,6 +67,9 @@ interface EditorState {
 function mkState(): EditorState {
   return {
     cols: 8, rows: 8,
+    id: 'my-map',
+    title: 'My Map',
+    description: 'Description.',
     gameMode: 'domination',
     scenario: '',
     unitPackage: '',
@@ -674,10 +681,9 @@ function applyLoadedCode(raw: string): string | null {
 
   if (!parsed || typeof parsed !== 'object') return 'Not a valid object.';
 
-  // Accept either a full StoryDef-like object or a bare StoryMapDef
-  const mapDef = (parsed.map && typeof parsed.map === 'object'
-    ? parsed.map
-    : parsed) as Record<string, unknown>;
+  // Full story: `{ id, map: { … } }`. Bare map: only `StoryMapDef` keys (no wrapper).
+  const isWrapped = Boolean(parsed.map && typeof parsed.map === 'object');
+  const mapDef = (isWrapped ? parsed.map : parsed) as Record<string, unknown>;
 
   const cols = Number(mapDef.cols);
   const rows = Number(mapDef.rows);
@@ -735,24 +741,30 @@ function applyLoadedCode(raw: string): string | null {
   edState.aiStart = aiStart;
   edState.rivers = rivers;
 
-  if (typeof parsed.gameMode === 'string') {
-    edState.gameMode = parsed.gameMode as EditorGameMode;
+  if (isWrapped) {
+    edState.id = typeof parsed.id === 'string' ? parsed.id : 'my-map';
+    edState.title = typeof parsed.title === 'string' ? parsed.title : 'My Map';
+    edState.description = typeof parsed.description === 'string' ? parsed.description : 'Description.';
+    edState.gameMode = (typeof parsed.gameMode === 'string' ? parsed.gameMode : 'domination') as EditorGameMode;
     gameModeSelect.value = edState.gameMode;
-  }
-  if (typeof parsed.scenario === 'string') {
-    edState.scenario = parsed.scenario;
+    edState.scenario = typeof parsed.scenario === 'string' ? parsed.scenario : '';
     scenarioSelect.value = edState.scenario;
+    edState.unitPackage = typeof parsed.unitPackage === 'string' ? parsed.unitPackage : '';
+    unitPackageSelect.value = edState.unitPackage;
+    edState.unitPackagePlayer2 = typeof parsed.unitPackagePlayer2 === 'string' ? parsed.unitPackagePlayer2 : '';
+    unitPackagePlayer2Select.value = edState.unitPackagePlayer2;
   } else {
+    edState.id = 'my-map';
+    edState.title = 'My Map';
+    edState.description = 'Description.';
+    edState.gameMode = 'domination';
+    gameModeSelect.value = 'domination';
     edState.scenario = '';
     scenarioSelect.value = '';
-  }
-  if (typeof parsed.unitPackage === 'string') {
-    edState.unitPackage = parsed.unitPackage;
-    unitPackageSelect.value = edState.unitPackage;
-  }
-  if (typeof parsed.unitPackagePlayer2 === 'string') {
-    edState.unitPackagePlayer2 = parsed.unitPackagePlayer2;
-    unitPackagePlayer2Select.value = edState.unitPackagePlayer2;
+    edState.unitPackage = '';
+    unitPackageSelect.value = '';
+    edState.unitPackagePlayer2 = '';
+    unitPackagePlayer2Select.value = '';
   }
 
   colsInput.value = String(cols);
@@ -766,9 +778,18 @@ function applyLoadedCode(raw: string): string | null {
 
 // ── Export ────────────────────────────────────────────────────────────────────
 
+/** Escape for single-quoted JS string literals in generated map code. */
+function escapeJsStringLiteral(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 function exportToClipboard(): void {
-  const { cols, rows, gameMode, scenario, mountains, controlPoints, playerStart, aiStart, unitPackage, unitPackagePlayer2, rivers } = edState;
+  const {
+    cols, rows, id, title, description, gameMode, scenario, mountains, controlPoints,
+    playerStart, aiStart, unitPackage, unitPackagePlayer2, rivers,
+  } = edState;
   const i = '  ';
+  const q = escapeJsStringLiteral;
 
   const mStr = [...mountains].sort().map(m => `'${m}'`).join(', ');
 
@@ -787,12 +808,14 @@ function exportToClipboard(): void {
   const cpStr = [...controlPoints].sort().map(c => `'${c}'`).join(', ');
 
   let code = `{\n`;
-  code += `${i}id: 'my-map',\n`;
-  code += `${i}title: 'My Map',\n`;
-  code += `${i}description: 'Description.',\n`;
-  if (scenario) code += `${i}scenario: '${scenario}',\n`;
-  if (unitPackage) code += `${i}unitPackage: '${unitPackage}',\n`;
-  if (unitPackagePlayer2 && unitPackagePlayer2 !== unitPackage) code += `${i}unitPackagePlayer2: '${unitPackagePlayer2}',\n`;
+  code += `${i}id: '${q(id)}',\n`;
+  code += `${i}title: '${q(title)}',\n`;
+  code += `${i}description: '${q(description)}',\n`;
+  if (scenario) code += `${i}scenario: '${q(scenario)}',\n`;
+  if (unitPackage) code += `${i}unitPackage: '${q(unitPackage)}',\n`;
+  if (unitPackagePlayer2 && unitPackagePlayer2 !== unitPackage) {
+    code += `${i}unitPackagePlayer2: '${q(unitPackagePlayer2)}',\n`;
+  }
   code += `${i}gameMode: '${gameMode}',\n`;
   code += `${i}map: {\n`;
   code += `${i}${i}cols: ${cols},\n`;
@@ -839,6 +862,7 @@ export function showMapEditor(): void {
   gameModeSelect.value = 'domination';
   scenarioSelect.value = '';
   unitPackageSelect.value = '';
+  unitPackagePlayer2Select.value = '';
   refreshToolbar();
   renderBoard();
   overlayEl.classList.remove('hidden');
