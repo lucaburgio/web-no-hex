@@ -1,18 +1,7 @@
 import config, { BOARD_HEX_DIM_MAX, BOARD_HEX_DIM_MIN } from './gameconfig';
 import { hexPoints } from './hex';
 import { SCENARIOS } from './scenarios';
-import type { RiverHex } from './types';
-import {
-  buildRiverHexesFromPathCoords,
-  extractOrderedRiverPath,
-  generateRiver,
-  getAllBorderEntries,
-  getNeighborBySide,
-  partitionRiverComponents,
-  riverMaxHexesFromBoardWidth,
-  riverSegmentUrl,
-  SIDE_DELTA,
-} from './rivers';
+import { placeholderRiverHexesFromKeys } from './rivers';
 
 const EDITOR_HEX_SIZE = 34;
 
@@ -71,8 +60,8 @@ interface EditorState {
   breakthroughControlPoints: Set<string>;
   playerStart: Map<number, string>; // col -> unitTypeId
   aiStart: Map<number, string>;     // col -> unitTypeId
-  /** All river hexes across all generated rivers. */
-  rivers: RiverHex[];
+  /** Painted river terrain (`"col,row"` keys), like {@link EditorState.mountains}. */
+  riverHexKeys: Set<string>;
   activeTool: EditorTool;
 }
 
@@ -91,7 +80,7 @@ function mkState(): EditorState {
     breakthroughControlPoints: new Set(),
     playerStart: new Map(),
     aiStart: new Map(),
-    rivers: [],
+    riverHexKeys: new Set(),
     activeTool: 'normal',
   };
 }
@@ -286,7 +275,12 @@ function cleanOOB(): void {
     const [c, r] = k.split(',').map(Number);
     if (c >= cols || r >= rows) edState.breakthroughControlPoints.delete(k);
   }
-  edState.rivers = edState.rivers.filter(rh => rh.col < cols && rh.row < rows);
+  edState.riverHexKeys = new Set(
+    [...edState.riverHexKeys].filter(k => {
+      const [c, r] = k.split(',').map(Number);
+      return c >= 0 && r >= 0 && c < cols && r < rows;
+    }),
+  );
   for (const c of [...edState.playerStart.keys()]) if (c >= cols) edState.playerStart.delete(c);
   for (const c of [...edState.aiStart.keys()]) if (c >= cols) edState.aiStart.delete(c);
 }
@@ -300,17 +294,6 @@ function refreshToolbar(): void {
   tgBtns.appendChild(mkToolBtn('normal', 'NORMAL'));
   tgBtns.appendChild(mkToolBtn('mountain', 'MOUNTAIN'));
   tgBtns.appendChild(mkToolBtn('river', 'RIVER'));
-  const genRiverBtn = document.createElement('button');
-  genRiverBtn.type = 'button';
-  genRiverBtn.className = 'me-tool-btn me-tool-generate';
-  genRiverBtn.textContent = 'GEN RIVER';
-  genRiverBtn.title = 'Generate river: random path from a map edge (skips hexes already used by rivers)';
-  genRiverBtn.addEventListener('click', e => {
-    e.preventDefault();
-    e.stopPropagation();
-    generateRiverIntoEditor();
-  });
-  tgBtns.appendChild(genRiverBtn);
   if (edState.gameMode === 'conquest' || edState.gameMode === 'breakthrough') {
     tgBtns.appendChild(mkToolBtn('controlPoint', 'CTRL PT'));
   }
@@ -415,43 +398,9 @@ function renderBoard(): void {
   svgEl.setAttribute('viewBox', `${-leftMargin} ${-margin} ${totalW + leftMargin + margin} ${totalH + 2 * margin}`);
   svgEl.innerHTML = '';
 
-  // Build river lookup and clip-path defs
-  const riverByKey = new Map<string, RiverHex>();
-  for (const rh of edState.rivers) riverByKey.set(`${rh.col},${rh.row}`, rh);
-
   const hlRiver = edState.activeTool === 'river';
-  const extendRiverTargets = new Set<string>();
-  if (hlRiver && riverByKey.size > 0) {
-    for (const comp of partitionRiverComponents(edState.rivers)) {
-      const ord = extractOrderedRiverPath(comp, cols, rows);
-      if (!ord?.length) continue;
-      const last = ord[ord.length - 1]!;
-      const lastRh = riverByKey.get(`${last.col},${last.row}`);
-      if (!lastRh) continue;
-      const n = getNeighborBySide(lastRh.col, lastRh.row, lastRh.exitSide, cols, rows);
-      if (!n) continue;
-      const nk = `${n[0]},${n[1]}`;
-      if (edState.mountains.has(nk) || riverByKey.has(nk)) continue;
-      extendRiverTargets.add(nk);
-    }
-  }
   const hlPlayer = edState.activeTool.startsWith('player:');
   const hlAi = edState.activeTool.startsWith('ai:');
-
-  if (riverByKey.size > 0) {
-    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-    for (const rh of edState.rivers) {
-      const { x, y } = hexToPixelLocal(rh.col, rh.row);
-      const clip = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
-      clip.setAttribute('id', `me-riv-clip-${rh.col}-${rh.row}`);
-      clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
-      const cp = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-      cp.setAttribute('points', hexPoints(x, y, s));
-      clip.appendChild(cp);
-      defs.appendChild(clip);
-    }
-    svgEl.appendChild(defs);
-  }
 
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
@@ -467,20 +416,20 @@ function renderBoard(): void {
       const isPlayerRow = row === rows - 1;
       const isAiRow     = row === 0;
 
+      const isRiver = edState.riverHexKeys.has(key);
+
       let fill = 'var(--color-hex-neutral)';
       if      (isMtn) fill = '#7a6e6b';
+      else if (isRiver) fill = 'rgba(55, 130, 220, 0.92)';
       else if (isCP)  fill = '#c9b87a';
       else if (isPS)  fill = 'var(--color-hex-player)';
       else if (isAS)  fill = 'var(--color-hex-ai)';
-
-      const isRiver      = riverByKey.has(key);
-      const isRiverExtend = hlRiver && extendRiverTargets.has(key);
 
       let stroke = 'var(--color-hex-stroke)';
       let strokeW = '1';
       if      (hlPlayer && isPlayerRow) { stroke = 'var(--color-unit-selected)'; strokeW = '2.5'; }
       else if (hlAi && isAiRow)         { stroke = 'var(--color-ai)';            strokeW = '2.5'; }
-      else if (isRiverExtend)           { stroke = 'rgba(80,160,220,0.8)';       strokeW = '2.5'; }
+      else if (hlRiver && isRiver)      { stroke = 'rgba(40, 90, 160, 0.95)';    strokeW = '2.5'; }
       else if (isPlayerRow)             { stroke = 'rgba(0,0,0,0.35)';           strokeW = '1.5'; }
       else if (isAiRow)                 { stroke = 'rgba(100,100,100,0.45)';     strokeW = '1.5'; }
 
@@ -495,28 +444,6 @@ function renderBoard(): void {
       poly.setAttribute('stroke', stroke);
       poly.setAttribute('stroke-width', strokeW);
       g.appendChild(poly);
-
-      // River texture overlay (clipped to hex shape)
-      if (isRiver) {
-        const rh = riverByKey.get(key)!;
-        const url = riverSegmentUrl(rh.segment);
-        if (url) {
-          const iw = s * Math.sqrt(3);
-          const ih = s * 2;
-          const clipped = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-          clipped.setAttribute('clip-path', `url(#me-riv-clip-${col}-${row})`);
-          clipped.style.pointerEvents = 'none';
-          const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-          img.setAttribute('href', url);
-          img.setAttribute('x', String(x - iw / 2));
-          img.setAttribute('y', String(y - ih / 2));
-          img.setAttribute('width', String(iw));
-          img.setAttribute('height', String(ih));
-          img.style.pointerEvents = 'none';
-          clipped.appendChild(img);
-          g.appendChild(clipped);
-        }
-      }
 
       // Sector tint overlay (drawn on top of base fill, below labels)
       if (showSectors) {
@@ -650,19 +577,23 @@ function applyTool(e: MouseEvent): void {
     edState.mountains.delete(key);
     edState.conquestControlPoints.delete(key);
     edState.breakthroughControlPoints.delete(key);
-    // Remove any river that passes through this hex
-    edState.rivers = edState.rivers.filter(rh => !(rh.col === col && rh.row === row));
+    edState.riverHexKeys.delete(key);
     if (row === rows - 1) edState.playerStart.delete(col);
     if (row === 0) edState.aiStart.delete(col);
   } else if (activeTool === 'mountain') {
     edState.mountains.add(key);
+    edState.riverHexKeys.delete(key);
     edState.conquestControlPoints.delete(key);
     edState.breakthroughControlPoints.delete(key);
     if (row === rows - 1) edState.playerStart.delete(col);
     if (row === 0) edState.aiStart.delete(col);
   } else if (activeTool === 'river') {
-    applyRiverTool(col, row);
-    return; // renderBoard called inside
+    if (edState.mountains.has(key)) return;
+    edState.riverHexKeys.add(key);
+    edState.conquestControlPoints.delete(key);
+    edState.breakthroughControlPoints.delete(key);
+    if (row === rows - 1) edState.playerStart.delete(col);
+    if (row === 0) edState.aiStart.delete(col);
   } else if (activeTool === 'controlPoint') {
     if (edState.gameMode === 'conquest') {
       edState.conquestControlPoints.add(key);
@@ -670,134 +601,23 @@ function applyTool(e: MouseEvent): void {
       edState.breakthroughControlPoints.add(key);
     }
     edState.mountains.delete(key);
+    edState.riverHexKeys.delete(key);
   } else if (activeTool.startsWith('player:')) {
     if (row !== rows - 1) return;
     edState.playerStart.set(col, activeTool.slice('player:'.length));
     edState.mountains.delete(key);
+    edState.riverHexKeys.delete(key);
     edState.conquestControlPoints.delete(key);
     edState.breakthroughControlPoints.delete(key);
   } else if (activeTool.startsWith('ai:')) {
     if (row !== 0) return;
     edState.aiStart.set(col, activeTool.slice('ai:'.length));
     edState.mountains.delete(key);
+    edState.riverHexKeys.delete(key);
     edState.conquestControlPoints.delete(key);
     edState.breakthroughControlPoints.delete(key);
   }
 
-  renderBoard();
-}
-
-/**
- * Append a random edge-anchored river that does not use already-painted river hexes (retries).
- */
-function generateRiverIntoEditor(): void {
-  const { cols, rows } = edState;
-  const entries = getAllBorderEntries(cols, rows);
-  if (entries.length === 0) return;
-
-  const occupied = new Set(edState.rivers.map(rh => `${rh.col},${rh.row}`));
-  const maxAttempts = 64;
-  const maxSteps = riverMaxHexesFromBoardWidth(cols, config.riverMaxLengthBoardWidthMult);
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const pick = entries[Math.floor(Math.random() * entries.length)]!;
-    const path = generateRiver({
-      startCol: pick.col,
-      startRow: pick.row,
-      entrySide: pick.side,
-      cols,
-      rows,
-      maxSteps,
-      seed: (Math.random() * 0xFFFFFFFF) >>> 0,
-    });
-    const fresh = path.filter(
-      rh => !occupied.has(`${rh.col},${rh.row}`) && !edState.mountains.has(`${rh.col},${rh.row}`),
-    );
-    if (fresh.length === 0) continue;
-    edState.rivers.push(...fresh);
-    renderBoard();
-    return;
-  }
-}
-
-/**
- * River tool: paint one hex per click; start on any empty land hex.
- * - Click the highlighted downstream hex to extend (tail exit).
- * - Click any river hex to remove that connected chain.
- */
-function applyRiverTool(col: number, row: number): void {
-  const { cols, rows } = edState;
-  const key = `${col},${row}`;
-
-  if (edState.mountains.has(key)) return;
-
-  const existingIdx = edState.rivers.findIndex(rh => rh.col === col && rh.row === row);
-  if (existingIdx !== -1) {
-    const toRemove = new Set<string>();
-    const riverMap = new Map<string, RiverHex>();
-    for (const rh of edState.rivers) riverMap.set(`${rh.col},${rh.row}`, rh);
-
-    const queue: string[] = [key];
-    while (queue.length > 0) {
-      const k = queue.pop()!;
-      if (toRemove.has(k)) continue;
-      toRemove.add(k);
-      const rh = riverMap.get(k);
-      if (!rh) continue;
-      const parity = Math.abs(rh.row) % 2 === 0 ? 'even' : 'odd';
-      const [fdc, fdr] = SIDE_DELTA[parity][rh.exitSide];
-      const fnk = `${rh.col + fdc},${rh.row + fdr}`;
-      if (riverMap.has(fnk)) queue.push(fnk);
-      for (const [nk, nrh] of riverMap) {
-        if (toRemove.has(nk)) continue;
-        const np = Math.abs(nrh.row) % 2 === 0 ? 'even' : 'odd';
-        const [ndc, ndr] = SIDE_DELTA[np][nrh.exitSide];
-        if (`${nrh.col + ndc},${nrh.row + ndr}` === k) queue.push(nk);
-      }
-    }
-    edState.rivers = edState.rivers.filter(rh => !toRemove.has(`${rh.col},${rh.row}`));
-    renderBoard();
-    return;
-  }
-
-  const componentSortKey = (comp: RiverHex[]): string =>
-    comp.map(r => `${r.col},${r.row}`).sort()[0] ?? '';
-  const sortedComps = [...partitionRiverComponents(edState.rivers)].sort((a, b) =>
-    componentSortKey(a).localeCompare(componentSortKey(b)),
-  );
-
-  for (const comp of sortedComps) {
-    const ordered = extractOrderedRiverPath(comp, cols, rows);
-    if (!ordered?.length) continue;
-    const last = ordered[ordered.length - 1]!;
-    const lastRh = comp.find(rh => rh.col === last.col && rh.row === last.row);
-    if (!lastRh) continue;
-    const next = getNeighborBySide(lastRh.col, lastRh.row, lastRh.exitSide, cols, rows);
-    if (!next || next[0] !== col || next[1] !== row) continue;
-
-    const compKeys = new Set(comp.map(rh => `${rh.col},${rh.row}`));
-    const blocked = new Set<string>();
-    for (const k of edState.mountains) blocked.add(k);
-    for (const rh of edState.rivers) {
-      const rk = `${rh.col},${rh.row}`;
-      if (!compKeys.has(rk)) blocked.add(rk);
-    }
-
-    const built = buildRiverHexesFromPathCoords([...ordered, { col, row }], { cols, rows, blocked });
-    if (!built) return;
-
-    edState.rivers = edState.rivers.filter(rh => !compKeys.has(`${rh.col},${rh.row}`));
-    edState.rivers.push(...built);
-    renderBoard();
-    return;
-  }
-
-  const blocked = new Set<string>(edState.mountains);
-  for (const rh of edState.rivers) blocked.add(`${rh.col},${rh.row}`);
-
-  const built = buildRiverHexesFromPathCoords([{ col, row }], { cols, rows, blocked });
-  if (!built) return;
-  edState.rivers.push(...built);
   renderBoard();
 }
 
@@ -864,20 +684,11 @@ function applyLoadedCode(raw: string): string | null {
     }
   }
 
-  const rivers: RiverHex[] = [];
+  const riverHexKeys = new Set<string>();
   if (Array.isArray(mapDef.rivers)) {
     for (const rh of mapDef.rivers as Array<Record<string, unknown>>) {
-      if (
-        typeof rh.col === 'number' && typeof rh.row === 'number' &&
-        typeof rh.segment === 'string' &&
-        typeof rh.entrySide === 'string' && typeof rh.exitSide === 'string'
-      ) {
-        rivers.push({
-          col: rh.col, row: rh.row,
-          segment: rh.segment,
-          entrySide: rh.entrySide as RiverHex['entrySide'],
-          exitSide: rh.exitSide as RiverHex['exitSide'],
-        });
+      if (typeof rh.col === 'number' && typeof rh.row === 'number') {
+        riverHexKeys.add(`${rh.col},${rh.row}`);
       }
     }
   }
@@ -890,7 +701,7 @@ function applyLoadedCode(raw: string): string | null {
   edState.breakthroughControlPoints = breakthroughControlPoints;
   edState.playerStart = playerStart;
   edState.aiStart = aiStart;
-  edState.rivers = rivers;
+  edState.riverHexKeys = riverHexKeys;
 
   if (isWrapped) {
     edState.id = typeof parsed.id === 'string' ? parsed.id : 'my-map';
@@ -939,8 +750,9 @@ function exportToClipboard(): void {
   const {
     cols, rows, id, title, description, scenario, mountains,
     conquestControlPoints, breakthroughControlPoints,
-    playerStart, aiStart, unitPackage, unitPackagePlayer2, rivers,
+    playerStart, aiStart, unitPackage, unitPackagePlayer2, riverHexKeys,
   } = edState;
+  const rivers = placeholderRiverHexesFromKeys(riverHexKeys);
   const i = '  ';
   const q = escapeJsStringLiteral;
 

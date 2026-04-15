@@ -2382,16 +2382,6 @@ select.settings-input.settings-select option {
   opacity: 1;
 }
 
-/* Map editor: one-shot action (not a persistent tool mode) */
-.me-tool-btn.me-tool-generate {
-  min-width: auto;
-  border-style: dashed;
-  opacity: 0.92;
-}
-.me-tool-btn.me-tool-generate:hover {
-  opacity: 1;
-}
-
 /* ── Map Editor — load modal ────────────────────────────────────────────────── */
 #me-load-modal-overlay {
   position: fixed;
