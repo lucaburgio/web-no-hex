@@ -1,4 +1,4 @@
-import config from './gameconfig';
+import config, { BOARD_HEX_DIM_MAX, BOARD_HEX_DIM_MIN } from './gameconfig';
 import { hexPoints } from './hex';
 import { SCENARIOS } from './scenarios';
 import type { RiverHex } from './types';
@@ -146,14 +146,14 @@ export function initMapEditor(onBack: () => void): void {
   });
 
   colsInput.addEventListener('input', () => {
-    const v = Math.max(2, Math.min(24, parseInt(colsInput.value, 10) || 8));
+    const v = Math.max(BOARD_HEX_DIM_MIN, Math.min(BOARD_HEX_DIM_MAX, parseInt(colsInput.value, 10) || 8));
     edState.cols = v;
     cleanOOB();
     renderBoard();
   });
 
   rowsInput.addEventListener('input', () => {
-    const v = Math.max(2, Math.min(24, parseInt(rowsInput.value, 10) || 8));
+    const v = Math.max(BOARD_HEX_DIM_MIN, Math.min(BOARD_HEX_DIM_MAX, parseInt(rowsInput.value, 10) || 8));
     edState.rows = v;
     cleanOOB();
     renderBoard();
@@ -703,8 +703,12 @@ function applyLoadedCode(raw: string): string | null {
 
   const cols = Number(mapDef.cols);
   const rows = Number(mapDef.rows);
-  if (!Number.isInteger(cols) || cols < 2 || cols > 24) return 'Invalid cols (must be 2–24).';
-  if (!Number.isInteger(rows) || rows < 2 || rows > 24) return 'Invalid rows (must be 2–24).';
+  if (!Number.isInteger(cols) || cols < BOARD_HEX_DIM_MIN || cols > BOARD_HEX_DIM_MAX) {
+    return `Invalid cols (must be ${BOARD_HEX_DIM_MIN}–${BOARD_HEX_DIM_MAX}).`;
+  }
+  if (!Number.isInteger(rows) || rows < BOARD_HEX_DIM_MIN || rows > BOARD_HEX_DIM_MAX) {
+    return `Invalid rows (must be ${BOARD_HEX_DIM_MIN}–${BOARD_HEX_DIM_MAX}).`;
+  }
 
   const mountains = new Set<string>(
     Array.isArray(mapDef.mountains) ? mapDef.mountains.map(String) : []
