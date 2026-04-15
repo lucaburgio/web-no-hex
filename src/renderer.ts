@@ -723,10 +723,8 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
       poly.setAttribute('data-col', String(col));
       poly.setAttribute('data-row', String(r));
       poly.setAttribute('fill', c.hexNeutral);
-      poly.setAttribute('stroke', 'transparent');
-      poly.setAttribute('stroke-width', '2.5');
-      poly.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);
-      poly.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
+      poly.setAttribute('stroke', 'none');
+      poly.setAttribute('stroke-width', '0');
       poly.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
       hexLayer.appendChild(poly);
       hexPolys[r]![col] = poly;
@@ -988,7 +986,17 @@ export function renderState(
       }
       const opacityDimmed = hexDimmed && fill !== c.hexPlayerDimmed && fill !== c.hexAiDimmed;
       poly.setAttribute('fill', fill);
-      poly.setAttribute('stroke', stroke);
+      if (stroke === 'transparent') {
+        poly.setAttribute('stroke', 'none');
+        poly.setAttribute('stroke-width', '0');
+        poly.removeAttribute('stroke-dasharray');
+        poly.removeAttribute('stroke-dashoffset');
+      } else {
+        poly.setAttribute('stroke', stroke);
+        poly.setAttribute('stroke-width', '2.5');
+        poly.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);
+        poly.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
+      }
       poly.setAttribute('opacity', opacityDimmed ? '0.2' : '1');
 
       if (prodOverlayStroke && prodStrokeLayer) {
