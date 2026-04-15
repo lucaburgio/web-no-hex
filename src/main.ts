@@ -1198,22 +1198,9 @@ let quotaFieldsBeforeBreakthrough: { territory: string; points: string } | null 
 /** Last committed board width (settings); used when width input is empty for snapshots. */
 let lastCommittedBoardCols = config.boardCols;
 
-const BOARD_SETTINGS_NUM_IDS = [
-  'cfg-boardCols',
-  'cfg-boardRows',
-  'cfg-mountainPct',
-  'cfg-riverMaxLengthBoardWidthMult',
-] as const;
-
-/** Fixed story map selected: board size and terrain generation options come from the map, not these fields. */
+/** Fixed story map selected: hide BOARD — size and terrain come from the preset. */
 function setBoardSettingsLocked(locked: boolean): void {
-  for (const id of BOARD_SETTINGS_NUM_IDS) {
-    const el = document.getElementById(id) as HTMLInputElement | null;
-    if (el) el.disabled = locked;
-  }
-  const riversBtn = document.getElementById('cfg-enableRivers') as HTMLButtonElement | null;
-  if (riversBtn) riversBtn.disabled = locked;
-  document.getElementById('settings-board-group')?.toggleAttribute('data-locked', locked);
+  document.getElementById('settings-board-section')?.classList.toggle('hidden', locked);
 }
 
 function populateSettings(): void {
