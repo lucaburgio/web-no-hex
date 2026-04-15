@@ -2081,7 +2081,7 @@ function showUnitPicker(col: number, row: number): void {
   pendingProductionHex = { col, row };
   unitPickerList.innerHTML = '';
 
-  const statIconCost = 'icons/points.svg';
+  const statIconCost = 'icons/points-yellow.svg';
   const statIconMove = 'icons/movement.svg';
   const statIconRange = 'icons/range.svg';
   const statIconStr = 'icons/strength.svg';

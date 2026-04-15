@@ -741,17 +741,11 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   display: block;
 }
 
-.unit-card-stat--cost .unit-card-stat-icon img {
-  filter: brightness(0) saturate(100%) invert(77%) sepia(99%) saturate(1352%) hue-rotate(334deg) brightness(102%) contrast(101%);
-}
 .unit-card-stat--cost .unit-card-stat-value {
   color: var(--color-yellow-500);
 }
 .unit-card-stat:not(.unit-card-stat--cost) .unit-card-stat-value {
   color: var(--color-gray-400);
-}
-.unit-card-stat--cost .unit-card-stat-icon img {
-  filter: brightness(0) saturate(100%) invert(77%) sepia(99%) saturate(1352%) hue-rotate(334deg) brightness(102%) contrast(101%);
 }
 
 .unit-card-stat:not(.unit-card-stat--cost) .unit-card-stat-icon img {
