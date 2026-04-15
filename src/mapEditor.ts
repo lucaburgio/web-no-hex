@@ -2,7 +2,15 @@ import config, { BOARD_HEX_DIM_MAX, BOARD_HEX_DIM_MIN } from './gameconfig';
 import { hexPoints } from './hex';
 import { SCENARIOS } from './scenarios';
 import type { RiverHex } from './types';
-import { generateRiver, getOutwardSides, riverMaxHexesFromBoardWidth, riverSegmentUrl, SIDE_DELTA } from './rivers';
+import {
+  buildRiverHexesFromPathCoords,
+  extractOrderedRiverPath,
+  getNeighborBySide,
+  getOutwardSides,
+  partitionRiverComponents,
+  riverSegmentUrl,
+  SIDE_DELTA,
+} from './rivers';
 
 const EDITOR_HEX_SIZE = 34;
 
@@ -399,6 +407,21 @@ function renderBoard(): void {
   for (const rh of edState.rivers) riverByKey.set(`${rh.col},${rh.row}`, rh);
 
   const hlRiver = edState.activeTool === 'river';
+  const extendRiverTargets = new Set<string>();
+  if (hlRiver && riverByKey.size > 0) {
+    for (const comp of partitionRiverComponents(edState.rivers)) {
+      const ord = extractOrderedRiverPath(comp, cols, rows);
+      if (!ord?.length) continue;
+      const last = ord[ord.length - 1]!;
+      const lastRh = riverByKey.get(`${last.col},${last.row}`);
+      if (!lastRh) continue;
+      const n = getNeighborBySide(lastRh.col, lastRh.row, lastRh.exitSide, cols, rows);
+      if (!n) continue;
+      const nk = `${n[0]},${n[1]}`;
+      if (edState.mountains.has(nk) || riverByKey.has(nk)) continue;
+      extendRiverTargets.add(nk);
+    }
+  }
   const hlPlayer = edState.activeTool.startsWith('player:');
   const hlAi = edState.activeTool.startsWith('ai:');
 
@@ -439,12 +462,15 @@ function renderBoard(): void {
 
       const isRiver      = riverByKey.has(key);
       const isBorderHex  = col === 0 || col === cols - 1 || row === 0 || row === rows - 1;
-      const isRiverStart = hlRiver && isBorderHex && !isMtn && getOutwardSides(col, row, cols, rows).length > 0;
+      const isRiverStart =
+        hlRiver && isBorderHex && !isMtn && !isRiver && getOutwardSides(col, row, cols, rows).length > 0;
+      const isRiverExtend = hlRiver && extendRiverTargets.has(key);
 
       let stroke = 'var(--color-hex-stroke)';
       let strokeW = '1';
       if      (hlPlayer && isPlayerRow) { stroke = 'var(--color-unit-selected)'; strokeW = '2.5'; }
       else if (hlAi && isAiRow)         { stroke = 'var(--color-ai)';            strokeW = '2.5'; }
+      else if (isRiverExtend)           { stroke = 'rgba(80,160,220,0.8)';       strokeW = '2.5'; }
       else if (isRiverStart)            { stroke = 'rgba(80,160,220,0.8)';       strokeW = '2.5'; }
       else if (isPlayerRow)             { stroke = 'rgba(0,0,0,0.35)';           strokeW = '1.5'; }
       else if (isAiRow)                 { stroke = 'rgba(100,100,100,0.45)';     strokeW = '1.5'; }
@@ -653,37 +679,34 @@ function applyTool(e: MouseEvent): void {
 }
 
 /**
- * River tool click handler.
- * - Clicking a border hex with an outward side generates a new river from there.
- * - Clicking any hex that is already part of a river removes that entire river chain.
+ * River tool: paint like mountains — one hex per click along the flow.
+ * - Border click on empty land starts a new chain (segments + art recomputed each time).
+ * - Click the highlighted “next” hex (where the tail exits) to extend.
+ * - Click any river hex to remove that connected chain.
  */
 function applyRiverTool(col: number, row: number): void {
   const { cols, rows } = edState;
+  const key = `${col},${row}`;
 
-  // If the clicked hex is part of an existing river, remove that river
+  if (edState.mountains.has(key)) return;
+
   const existingIdx = edState.rivers.findIndex(rh => rh.col === col && rh.row === row);
   if (existingIdx !== -1) {
-    // Identify which river chain owns this hex by walking from the clicked hex
-    // outward: the chain is a contiguous run sharing the same entry→exit path.
-    // Simplest approach: remove ALL river hexes with the same connected segment.
     const toRemove = new Set<string>();
-    // Walk forwards (follow exits) and backwards (follow entries) from this hex
     const riverMap = new Map<string, RiverHex>();
     for (const rh of edState.rivers) riverMap.set(`${rh.col},${rh.row}`, rh);
 
-    const queue: string[] = [`${col},${row}`];
+    const queue: string[] = [key];
     while (queue.length > 0) {
       const k = queue.pop()!;
       if (toRemove.has(k)) continue;
       toRemove.add(k);
       const rh = riverMap.get(k);
       if (!rh) continue;
-      // Follow exit → next hex forward
       const parity = Math.abs(rh.row) % 2 === 0 ? 'even' : 'odd';
       const [fdc, fdr] = SIDE_DELTA[parity][rh.exitSide];
       const fnk = `${rh.col + fdc},${rh.row + fdr}`;
       if (riverMap.has(fnk)) queue.push(fnk);
-      // Walk backwards: find any hex whose exit leads to k
       for (const [nk, nrh] of riverMap) {
         if (toRemove.has(nk)) continue;
         const np = Math.abs(nrh.row) % 2 === 0 ? 'even' : 'odd';
@@ -696,30 +719,47 @@ function applyRiverTool(col: number, row: number): void {
     return;
   }
 
-  // Only border hexes with outward sides can start a river
+  const componentSortKey = (comp: RiverHex[]): string =>
+    comp.map(r => `${r.col},${r.row}`).sort()[0] ?? '';
+  const sortedComps = [...partitionRiverComponents(edState.rivers)].sort((a, b) =>
+    componentSortKey(a).localeCompare(componentSortKey(b)),
+  );
+
+  for (const comp of sortedComps) {
+    const ordered = extractOrderedRiverPath(comp, cols, rows);
+    if (!ordered?.length) continue;
+    const last = ordered[ordered.length - 1]!;
+    const lastRh = comp.find(rh => rh.col === last.col && rh.row === last.row);
+    if (!lastRh) continue;
+    const next = getNeighborBySide(lastRh.col, lastRh.row, lastRh.exitSide, cols, rows);
+    if (!next || next[0] !== col || next[1] !== row) continue;
+
+    const compKeys = new Set(comp.map(rh => `${rh.col},${rh.row}`));
+    const blocked = new Set<string>();
+    for (const k of edState.mountains) blocked.add(k);
+    for (const rh of edState.rivers) {
+      const rk = `${rh.col},${rh.row}`;
+      if (!compKeys.has(rk)) blocked.add(rk);
+    }
+
+    const built = buildRiverHexesFromPathCoords([...ordered, { col, row }], { cols, rows, blocked });
+    if (!built) return;
+
+    edState.rivers = edState.rivers.filter(rh => !compKeys.has(`${rh.col},${rh.row}`));
+    edState.rivers.push(...built);
+    renderBoard();
+    return;
+  }
+
   const outwardSides = getOutwardSides(col, row, cols, rows);
   if (outwardSides.length === 0) return;
 
-  // Generate a river from each outward side and pick the one that goes farthest
-  // (prefer longer rivers; if tied, pick a random one)
-  const candidates = outwardSides.map(side =>
-    generateRiver({
-      startCol: col,
-      startRow: row,
-      entrySide: side,
-      cols,
-      rows,
-      maxSteps: riverMaxHexesFromBoardWidth(cols, config.riverMaxLengthBoardWidthMult),
-    }),
-  );
-  candidates.sort((a, b) => b.length - a.length);
-  const best = candidates[0];
-  if (!best || best.length === 0) return;
+  const blocked = new Set<string>(edState.mountains);
+  for (const rh of edState.rivers) blocked.add(`${rh.col},${rh.row}`);
 
-  // Append the new river hexes (skip any col,row already occupied by another river)
-  const occupiedByRiver = new Set(edState.rivers.map(rh => `${rh.col},${rh.row}`));
-  const newHexes = best.filter(rh => !occupiedByRiver.has(`${rh.col},${rh.row}`));
-  edState.rivers.push(...newHexes);
+  const built = buildRiverHexesFromPathCoords([{ col, row }], { cols, rows, blocked });
+  if (!built) return;
+  edState.rivers.push(...built);
   renderBoard();
 }
 
