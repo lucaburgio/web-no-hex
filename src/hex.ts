@@ -6,7 +6,7 @@ import config from './gameconfig';
 export const HEX_SIZE: number = config.hexSize;
 
 /** Radius multiplier for terrain fill polygons only — slight overlap hides sub-pixel seams between adjacent SVG fills (WKWebView). */
-export const HEX_FILL_RADIUS_MULT = 1.006;
+export const HEX_FILL_RADIUS_MULT = 1.004;
 
 // Pixel position for a hex at (col, row) — pointy-top, odd-r offset
 export function hexToPixel(col: number, row: number): { x: number; y: number } {

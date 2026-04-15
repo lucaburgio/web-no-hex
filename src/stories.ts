@@ -380,9 +380,6 @@ export const STORIES: StoryDef[] = [
   productionPointsPerTurn: 20,
 },
 {
-  // Domination — 7×8 portrait
-  // Theme: Broad front liberation assault. A central mountain spine splits
-  // the battlefield into two corridors; corner fortifications anchor each flank.
   id: 'ww2-17',
   scenario: 'ww2us',
   title: 'Liberation',
@@ -393,16 +390,26 @@ export const STORIES: StoryDef[] = [
   map: {
     cols: 7,
     rows: 8,
-    mountains: ['0,2', '1,3', '6,2', '3,3', '3,4', '0,5', '1,5', '5,5', '6,5', '6,6'],
+    mountains: ['0,2', '0,5', '1,3', '1,5', '3,3', '3,4', '5,5', '6,2', '6,5', '6,6'],
     playerStart: [{ col: 1 }, { col: 3 }, { col: 5 }],
     aiStart: [{ col: 1 }, { col: 3 }, { col: 5 }],
+    rivers: [
+      { col: 0, row: 4, segment: 'F-B-06', entrySide: 'F', exitSide: 'B' },
+      { col: 1, row: 4, segment: 'E-B-10', entrySide: 'E', exitSide: 'B' },
+      { col: 2, row: 4, segment: 'E-C-05', entrySide: 'E', exitSide: 'C' },
+      { col: 2, row: 5, segment: 'F-D-03', entrySide: 'F', exitSide: 'D' },
+      { col: 2, row: 6, segment: 'A-C-02', entrySide: 'A', exitSide: 'C' },
+      { col: 2, row: 7, segment: 'F-B-03', entrySide: 'F', exitSide: 'B' },
+      { col: 3, row: 7, segment: 'E-B-12', entrySide: 'E', exitSide: 'B' },
+      { col: 4, row: 7, segment: 'E-B-09', entrySide: 'E', exitSide: 'B' },
+      { col: 5, row: 7, segment: 'E-B-11', entrySide: 'E', exitSide: 'B' },
+      { col: 6, row: 7, segment: 'E-C-05', entrySide: 'E', exitSide: 'C' },
+    ],
   },
   productionPointsPerTurn: 20,
+  productionPointsPerTurnAi: 16,
 },
 {
-  // Conquest — 6×6 square
-  // Theme: Seize a vital river bridgehead. Two control points mark the crossing
-  // zones; corner mountain spurs compress the battlefield toward the centre.
   id: 'ww2-18',
   scenario: 'ww2us',
   title: 'Bridgehead',
@@ -413,13 +420,20 @@ export const STORIES: StoryDef[] = [
   map: {
     cols: 6,
     rows: 6,
-    mountains: ['0,1', '1,1', '5,1', '0,4', '5,4'],
-    controlPoints: ['1,2', '4,3'],
+    mountains: ['0,1', '0,4', '1,1', '5,4'],
     playerStart: [{ col: 2 }, { col: 3 }],
     aiStart: [{ col: 2 }, { col: 3 }],
+    controlPoints: ['1,2', '4,3'],
+    rivers: [
+      { col: 0, row: 3, segment: 'E-B-01', entrySide: 'E', exitSide: 'B' },
+      { col: 1, row: 3, segment: 'E-B-11', entrySide: 'E', exitSide: 'B' },
+      { col: 2, row: 3, segment: 'E-B-06', entrySide: 'E', exitSide: 'B' },
+      { col: 3, row: 3, segment: 'E-A-09', entrySide: 'E', exitSide: 'A' },
+      { col: 4, row: 2, segment: 'D-A-06', entrySide: 'D', exitSide: 'A' },
+      { col: 4, row: 1, segment: 'D-B-11', entrySide: 'D', exitSide: 'B' },
+      { col: 5, row: 1, segment: 'E-C-02', entrySide: 'E', exitSide: 'C' },
+    ],
   },
-  conquestPointsPlayer: 8,
-  conquestPointsAi: 8,
   productionPointsPerTurn: 20,
 },
 {

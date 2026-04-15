@@ -89,13 +89,13 @@ img {
     /* Production phase: owned territory not in focus (replaces opacity dimming) */
     --color-hex-player-dimmed: var(--color-gray-200);
     --color-hex-ai-dimmed:     var(--color-gray-100);
-    --color-hex-can-place:     var(--color-gray-600);
-    --color-hex-prod-selected: #e1c47c;
-    --color-hex-prod-stroke:   var(--color-yellow-900);
+    --color-hex-can-place:     var(--color-dark);
+    --color-hex-prod-selected: var(--color-yellow-500);
+    --color-hex-prod-stroke:   transparent;
     --color-hex-zoc:           #d58f8f;
     /* Unconquered hexes: transparent so the game-area line texture shows through */
     --color-hex-neutral:       var(--color-light);
-    --color-hex-stroke:        var(--color-dark);
+    --color-hex-stroke:        transparent;
   
     /* ── Movement area perimeter outline ────────────────────────────────────── */
     --color-move-border: var(--color-yellow-900);
