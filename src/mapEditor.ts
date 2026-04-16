@@ -12,6 +12,9 @@ const DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1 = 'standard';
 
 // ── Sector helpers (breakthrough mode) ───────────────────────────────────────
 
+/** Max height (rows) of the attacker starting sector in the map editor overlay. */
+const BREAKTHROUGH_ATTACKER_SECTOR_MAX_ROWS = 3;
+
 const SECTOR_COLORS: [number, number, number][] = [
   [60,  100, 220],
   [220, 150,  30],
@@ -41,15 +44,30 @@ function breakthroughCpRowsNorthToSouth(cpKeys: Iterable<string>): number[] {
 }
 
 /**
- * Game sector index for a hex row: 0 = attacker strip (south of all CP rows). Defender rows use the
- * nearest CP by row distance (1D Voronoi), which centers each fixed CP vertically in its band.
+ * Game sector index for a hex row: 0 = attacker strip at the map bottom (south of CPs), at most
+ * {@link BREAKTHROUGH_ATTACKER_SECTOR_MAX_ROWS} rows; extra rows south of the southernmost CP count
+ * as sector 1 (southmost defender). Other defender rows use nearest CP by row (1D Voronoi).
  * Tie: northern CP wins when two rows are equidistant.
  */
-function breakthroughEditorGameSectorForRow(row: number, cpRowsNorthToSouth: number[]): number {
+function breakthroughEditorGameSectorForRow(
+  row: number,
+  cpRowsNorthToSouth: number[],
+  mapRows: number,
+): number {
   const r = cpRowsNorthToSouth;
   const K = r.length;
   if (K === 0) return 0;
-  if (row > r[K - 1]!) return 0;
+  const southCp = r[K - 1]!;
+  const candLow = southCp + 1;
+  const candHigh = mapRows - 1;
+
+  if (candLow <= candHigh) {
+    const h = candHigh - candLow + 1;
+    const nAtk = Math.min(BREAKTHROUGH_ATTACKER_SECTOR_MAX_ROWS, h);
+    const atkLo = candHigh - nAtk + 1;
+    if (row >= atkLo && row <= candHigh) return 0;
+    if (row >= candLow && row < atkLo) return 1;
+  }
 
   let bestJ = 0;
   let bestD = Infinity;
@@ -64,12 +82,12 @@ function breakthroughEditorGameSectorForRow(row: number, cpRowsNorthToSouth: num
 }
 
 /** Row extents per sector from {@link breakthroughEditorGameSectorForRow} (labels / overlay). */
-function breakthroughSectorRowExtentsVoronoi(cpRowsNorthToSouth: number[], rows: number): { lo: number; hi: number }[] {
+function breakthroughSectorRowExtentsVoronoi(cpRowsNorthToSouth: number[], mapRows: number): { lo: number; hi: number }[] {
   const K = cpRowsNorthToSouth.length;
   const numSectors = K + 1;
-  const ext = Array.from({ length: numSectors }, () => ({ lo: rows, hi: -1 }));
-  for (let row = 0; row < rows; row++) {
-    const s = breakthroughEditorGameSectorForRow(row, cpRowsNorthToSouth);
+  const ext = Array.from({ length: numSectors }, () => ({ lo: mapRows, hi: -1 }));
+  for (let row = 0; row < mapRows; row++) {
+    const s = breakthroughEditorGameSectorForRow(row, cpRowsNorthToSouth, mapRows);
     const e = ext[s]!;
     e.lo = Math.min(e.lo, row);
     e.hi = Math.max(e.hi, row);
@@ -84,18 +102,30 @@ function breakthroughSectorCanvasLabel(gameSector: number): string {
 }
 
 /**
- * Horizontal guide lines: mid-Y between consecutive CP rows, then defender/attacker boundary
- * south of the southernmost CP when there is room.
+ * Horizontal guide lines: mid-Y between consecutive CP rows; defender vs attacker line at the north
+ * edge of the (capped) attacker strip, or immediately south of the southernmost CP when the strip
+ * is at most {@link BREAKTHROUGH_ATTACKER_SECTOR_MAX_ROWS} rows tall.
  */
-function breakthroughSectorBoundaryYs(cpRowsNorthToSouth: number[], rows: number, rowToY: (row: number) => number): number[] {
+function breakthroughSectorBoundaryYs(cpRowsNorthToSouth: number[], mapRows: number, rowToY: (row: number) => number): number[] {
   const r = cpRowsNorthToSouth;
   const K = r.length;
   const ys: number[] = [];
   for (let j = 0; j < K - 1; j++) {
     ys.push((rowToY(r[j]!) + rowToY(r[j + 1]!)) / 2);
   }
-  if (K > 0 && r[K - 1]! < rows - 1) {
-    ys.push((rowToY(r[K - 1]!) + rowToY(r[K - 1]! + 1)) / 2);
+  if (K === 0) return ys;
+  const southCp = r[K - 1]!;
+  const candLow = southCp + 1;
+  const candHigh = mapRows - 1;
+  if (candLow <= candHigh) {
+    const h = candHigh - candLow + 1;
+    const nAtk = Math.min(BREAKTHROUGH_ATTACKER_SECTOR_MAX_ROWS, h);
+    const atkLo = candHigh - nAtk + 1;
+    if (h <= BREAKTHROUGH_ATTACKER_SECTOR_MAX_ROWS) {
+      ys.push((rowToY(southCp) + rowToY(southCp + 1)) / 2);
+    } else {
+      ys.push((rowToY(atkLo - 1) + rowToY(atkLo)) / 2);
+    }
   }
   return ys;
 }
@@ -628,7 +658,7 @@ function renderBoard(): void {
 
       // Sector tint overlay (drawn on top of base fill, below labels)
       if (showSectors) {
-        const sector = breakthroughEditorGameSectorForRow(row, btCpRowsNorthToSouth);
+        const sector = breakthroughEditorGameSectorForRow(row, btCpRowsNorthToSouth, rows);
         const tint = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         tint.setAttribute('points', hexPoints(x, y, s));
         tint.setAttribute('fill', sectorTint(sector));
