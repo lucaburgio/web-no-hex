@@ -758,8 +758,13 @@ function log(state: GameState, msg: string): void {
 
 // ── Combat ────────────────────────────────────────────────────────────────────
 
-function unitTypeForUnit(unit: Unit): UnitType {
-  return config.unitTypes.find(u => u.id === unit.unitTypeId) ?? config.unitTypes[0];
+/** Resolve config row for a unit; prefer the owner's active package when ids repeat across packages. */
+export function unitTypeForUnit(unit: Unit): UnitType {
+  return (
+    getAvailableUnitTypes(unit.owner).find(u => u.id === unit.unitTypeId) ??
+    config.unitTypes.find(u => u.id === unit.unitTypeId) ??
+    config.unitTypes[0]
+  );
 }
 
 /** Upgrade points for a unit that dealt damage in combat (attacker or defender in melee). */

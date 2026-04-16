@@ -31,6 +31,7 @@ import {
   isHexBlockedByOpponentHomeGuardOnly,
   playerApplyUnitUpgrade,
   resolvePendingAiUpgradeChoices,
+  unitTypeForUnit,
   type EndProductionOptions,
 } from './game';
 import {
@@ -2617,8 +2618,7 @@ function buildMovementUnitCardInner(unit: Unit, unitType: UnitType): void {
   extra.addEventListener('mouseenter', () => {
     const u = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
     if (!u) return;
-    const ut =
-      config.unitTypes.find(t => t.id === u.unitTypeId) ?? config.unitTypes[0];
+    const ut = unitTypeForUnit(u);
     unitStatTooltipEl.innerHTML = `
         <div class="unit-stat-tt-title">Upgrade points</div>
         <div class="unit-stat-tt-desc">Earned by dealing damage to enemies and destroying them. Current points / points needed for the next level (${ut.upgradePointsToLevel} for this unit type).</div>`;
@@ -2664,7 +2664,7 @@ function syncMovementUnitCard(): void {
     return;
   }
 
-  const unitType = config.unitTypes.find(u => u.id === unit.unitTypeId) ?? config.unitTypes[0];
+  const unitType = unitTypeForUnit(unit);
   const isNewSelection = movementUnitCardBoundId !== unit.id;
   movementUnitCardBoundId = unit.id;
 
