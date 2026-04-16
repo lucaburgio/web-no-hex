@@ -83,6 +83,9 @@ export function loadStoryGameState(): GameState | null {
       if (unit.strength == null) unit.strength = ut.strength;
       unit.hp = Math.min(unit.hp ?? unit.maxHp, unit.maxHp);
       if (unit.upgradePoints == null) unit.upgradePoints = 0;
+      if (unit.upgradeFlanking == null) unit.upgradeFlanking = 0;
+      if (unit.upgradeAttack == null) unit.upgradeAttack = 0;
+      if (unit.upgradeDefense == null) unit.upgradeDefense = 0;
     }
 
     return state;

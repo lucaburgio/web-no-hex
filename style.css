@@ -757,8 +757,8 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   line-height: 1;
 }
 
-/* ── Movement phase: selected unit card (horizontal layout) ─────────────────── */
-.movement-unit-card-wrap {
+/* ── Movement phase: HUD stack (upgrade picker + unit card) ─────────────────── */
+.movement-hud-stack {
   display: none;
   position: fixed;
   bottom: 40px;
@@ -766,13 +766,104 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   right: 12px;
   z-index: 25;
   box-sizing: border-box;
-  pointer-events: none;
-  justify-content: center;
-  align-items: flex-end;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none; /* children re-enable for card + picker */
 }
 
-.movement-unit-card-wrap.movement-unit-card-wrap--visible {
+.movement-hud-stack.movement-hud-stack--visible {
   display: flex;
+}
+
+.upgrade-picker-panel {
+  width: 100%;
+  max-width: 440px;
+  background: #d4d4d4;
+  border: 1px solid #a3a3a3;
+  box-sizing: border-box;
+  pointer-events: auto;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Disket Mono', 'Courier New', monospace;
+}
+
+.upgrade-picker-header {
+  background: #f4b41a;
+  color: #000;
+  text-align: center;
+  padding: 10px 12px;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+}
+
+.upgrade-picker-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.upgrade-picker-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 12px;
+  margin: 0;
+  border: none;
+  border-top: 1px solid #b8b8b8;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.upgrade-picker-row:first-of-type {
+  border-top: none;
+}
+
+.upgrade-picker-row:hover,
+.upgrade-picker-row:focus-visible {
+  background: #c6c6c6;
+  outline: none;
+}
+
+.upgrade-picker-row-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  object-fit: contain;
+  display: block;
+}
+
+.upgrade-picker-row-pct {
+  color: #000;
+  min-width: 52px;
+  letter-spacing: 0.03em;
+}
+
+.upgrade-picker-row-desc {
+  color: #6e6e6e;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.25;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Inner: unit card only (stack handles outer layout) */
+.movement-unit-card-wrap {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  pointer-events: none;
+  box-sizing: border-box;
 }
 
 .movement-unit-card-surface {
@@ -853,9 +944,14 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   flex-direction: row;
   gap: 4px;
   align-items: center;
-  color: #808080;
-  font-size: 13px;
-  line-height: 1;
+  line-height: 0;
+}
+
+.movement-unit-card-stars img[data-mv-star] {
+  width: 14px;
+  height: 14px;
+  display: block;
+  object-fit: contain;
 }
 
 .movement-unit-card-stats {
@@ -949,6 +1045,15 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 .tt-side {
   flex: 1;
+}
+
+.tt-upgrade-line {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-yellow-500, #f4b41a);
+  margin-top: 4px;
+  line-height: 1.35;
 }
 
 .tt-side-label {

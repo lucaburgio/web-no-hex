@@ -29,6 +29,8 @@ import {
   getBreakthroughAttackerOwner,
   isInEnemyZoC,
   isHexBlockedByOpponentHomeGuardOnly,
+  playerApplyUnitUpgrade,
+  resolvePendingAiUpgradeChoices,
   type EndProductionOptions,
 } from './game';
 import {
@@ -51,7 +53,7 @@ import { getNeighbors } from './hex';
 import type { MoveAnimation } from './renderer';
 import config, { DEFAULT_TERRITORY_ECONOMY } from './gameconfig';
 import gsap from 'gsap';
-import type { GameState, Unit, UnitType, CombatForecast, Owner, CombatVfxPayload, GameMode } from './types';
+import type { GameState, Unit, UnitType, CombatForecast, Owner, CombatVfxPayload, GameMode, UnitUpgradeKind } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
 import { updateConfig, setActiveUnitPackage, setActiveUnitPackagePlayer2, getAvailableUnitTypes } from './gameconfig';
 import modeImgDomination from '../public/images/modes/domination.png';
@@ -144,6 +146,8 @@ const recapOverlayEl = document.getElementById('recap-overlay') as HTMLDivElemen
 
 const unitPickerEl   = document.getElementById('unit-picker') as HTMLDivElement;
 const unitPickerList = document.getElementById('unit-picker-list') as HTMLDivElement;
+const movementHudStackEl = document.getElementById('movement-hud-stack') as HTMLDivElement;
+const upgradePickerPanelEl = document.getElementById('upgrade-picker-panel') as HTMLDivElement;
 const movementUnitCardEl = document.getElementById('movement-unit-card') as HTMLDivElement;
 
 const playerConquerPctEl  = document.getElementById('player-conquer-pct') as HTMLElement;
@@ -1909,7 +1913,7 @@ function buildRulesContent(): string {
         (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%), in fixed neighbor order.
         Some unit types add <strong>extra flanking</strong> when they are among those adjacent flankers.</li>
       <li><strong>Damage:</strong> <code>floor(${config.combatDamageBase} × exp(±ΔCS / ${config.combatStrengthScale}))</code>, min 1 per side.</li>
-      <li><strong>Upgrade points:</strong> in <strong>adjacent combat</strong>, each side earns <strong>${config.upgradePointsPerDamageDealt}</strong> point per HP of damage it actually deals to the other, plus <strong>${config.upgradePointsKillBonus}</strong> extra if it destroys that unit. <strong>Ranged fire</strong> only damages the target (no return shot), so only the firing unit earns points from that exchange. Required points to level up depend on unit type (shown on the movement unit card).</li>
+      <li><strong>Upgrade points:</strong> in <strong>adjacent combat</strong>, each side earns <strong>${config.upgradePointsPerDamageDealt}</strong> point per HP of damage it actually deals to the other, plus <strong>${config.upgradePointsKillBonus}</strong> extra if it destroys that unit. <strong>Ranged fire</strong> only damages the target (no return shot), so only the firing unit earns points from that exchange. Required points to level up depend on unit type (shown on the movement unit card). When you have enough points during movement, choose one upgrade: <strong>+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%</strong> CS when attacking with ${config.maxFlankingUnits} flankers, <strong>+${Math.round(config.upgradeBonusAttackPerStack * 100)}%</strong> CS when attacking, or <strong>+${Math.round(config.upgradeBonusDefensePerStack * 100)}%</strong> CS when defending (stacks if you pick the same option again).</li>
       <li>If defender dies: attacker advances and conquers the hex. If both die: both removed.</li>
       <li>Hover over an enemy unit during movement to see a combat forecast.</li>
     </ul>
@@ -2358,6 +2362,92 @@ function hideUnitPicker(): void {
 /** Last unit id rendered into the movement-phase card (for enter animation + partial updates). */
 let movementUnitCardBoundId: number | null = null;
 
+function totalUpgradeTiers(unit: Unit): number {
+  return (unit.upgradeFlanking ?? 0) + (unit.upgradeAttack ?? 0) + (unit.upgradeDefense ?? 0);
+}
+
+function patchMovementUnitCardStars(unit: Unit): void {
+  const surface = movementUnitCardEl.querySelector('.movement-unit-card-surface');
+  if (!surface) return;
+  const starsWrap = surface.querySelector('.movement-unit-card-stars');
+  if (!starsWrap) return;
+  const filled = Math.min(3, totalUpgradeTiers(unit));
+  starsWrap.querySelectorAll('img[data-mv-star]').forEach((img, i) => {
+    (img as HTMLImageElement).src = i < filled ? 'icons/star-yellow.svg' : 'icons/star.svg';
+  });
+}
+
+function buildUpgradePickerPanel(unit: Unit): void {
+  upgradePickerPanelEl.innerHTML = '';
+  upgradePickerPanelEl.classList.remove('hidden');
+  const header = document.createElement('div');
+  header.className = 'upgrade-picker-header';
+  header.textContent = 'UPGRADE AVAILABLE';
+  const rows = document.createElement('div');
+  rows.className = 'upgrade-picker-rows';
+  const pctFlank = `+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%`;
+  const pctAttack = `+${Math.round(config.upgradeBonusAttackPerStack * 100)}%`;
+  const pctDefense = `+${Math.round(config.upgradeBonusDefensePerStack * 100)}%`;
+  const defs: { kind: UnitUpgradeKind; icon: string; pct: string; desc: string }[] = [
+    {
+      kind: 'flanking',
+      icon: 'icons/upgrade-choice-flank.svg',
+      pct: pctFlank,
+      desc: 'ATTACK WHEN FLANKING WITH 2 MORE UNITS',
+    },
+    {
+      kind: 'attack',
+      icon: 'icons/upgrade-choice-attack.svg',
+      pct: pctAttack,
+      desc: 'COMBAT STRENGTH WHEN ATTACKING',
+    },
+    {
+      kind: 'defense',
+      icon: 'icons/upgrade-choice-defense.svg',
+      pct: pctDefense,
+      desc: 'COMBAT STRENGTH WHEN DEFENDING',
+    },
+  ];
+  for (const d of defs) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'upgrade-picker-row';
+    const ic = document.createElement('img');
+    ic.className = 'upgrade-picker-row-icon';
+    ic.src = d.icon;
+    ic.alt = '';
+    const pctEl = document.createElement('span');
+    pctEl.className = 'upgrade-picker-row-pct';
+    pctEl.textContent = d.pct;
+    const descEl = document.createElement('span');
+    descEl.className = 'upgrade-picker-row-desc';
+    descEl.textContent = d.desc;
+    btn.appendChild(ic);
+    btn.appendChild(pctEl);
+    btn.appendChild(descEl);
+    btn.addEventListener('click', () => {
+      playerApplyUnitUpgrade(state, unit.id, d.kind, localPlayer);
+      if (gameMode === 'vsAI') scheduleSaveGameState();
+      sendStateUpdate();
+      render();
+      updateUI();
+      checkWinner();
+    });
+    rows.appendChild(btn);
+  }
+  upgradePickerPanelEl.appendChild(header);
+  upgradePickerPanelEl.appendChild(rows);
+}
+
+function syncUpgradePickerPanel(unit: Unit, unitType: UnitType): void {
+  if (unit.upgradePoints >= unitType.upgradePointsToLevel) {
+    buildUpgradePickerPanel(unit);
+  } else {
+    upgradePickerPanelEl.innerHTML = '';
+    upgradePickerPanelEl.classList.add('hidden');
+  }
+}
+
 function patchMovementUnitCardStats(unit: Unit, unitType: UnitType): void {
   const surface = movementUnitCardEl.querySelector('.movement-unit-card-surface');
   if (!surface) return;
@@ -2372,6 +2462,7 @@ function patchMovementUnitCardStats(unit: Unit, unitType: UnitType): void {
   if (hpEl) hpEl.textContent = String(unit.hp);
   if (upCur) upCur.textContent = String(unit.upgradePoints);
   if (upReq) upReq.textContent = String(unitType.upgradePointsToLevel);
+  patchMovementUnitCardStars(unit);
 }
 
 function buildMovementUnitCardInner(unit: Unit, unitType: UnitType): void {
@@ -2409,9 +2500,12 @@ function buildMovementUnitCardInner(unit: Unit, unitType: UnitType): void {
   const stars = document.createElement('div');
   stars.className = 'movement-unit-card-stars';
   stars.setAttribute('aria-hidden', 'true');
+  const starFill = Math.min(3, totalUpgradeTiers(unit));
   for (let i = 0; i < 3; i++) {
-    const s = document.createElement('span');
-    s.textContent = '\u2605';
+    const s = document.createElement('img');
+    s.setAttribute('data-mv-star', String(i));
+    s.src = i < starFill ? 'icons/star-yellow.svg' : 'icons/star.svg';
+    s.alt = '';
     stars.appendChild(s);
   }
 
@@ -2530,7 +2624,9 @@ function syncMovementUnitCard(): void {
 
   if (!eligible) {
     movementUnitCardEl.innerHTML = '';
-    movementUnitCardEl.classList.remove('movement-unit-card-wrap--visible');
+    upgradePickerPanelEl.innerHTML = '';
+    upgradePickerPanelEl.classList.add('hidden');
+    movementHudStackEl.classList.remove('movement-hud-stack--visible');
     movementUnitCardBoundId = null;
     return;
   }
@@ -2538,7 +2634,9 @@ function syncMovementUnitCard(): void {
   const unit = getUnitById(state, state.selectedUnit!);
   if (!unit || unit.owner !== localPlayer) {
     movementUnitCardEl.innerHTML = '';
-    movementUnitCardEl.classList.remove('movement-unit-card-wrap--visible');
+    upgradePickerPanelEl.innerHTML = '';
+    upgradePickerPanelEl.classList.add('hidden');
+    movementHudStackEl.classList.remove('movement-hud-stack--visible');
     movementUnitCardBoundId = null;
     return;
   }
@@ -2547,13 +2645,14 @@ function syncMovementUnitCard(): void {
   const isNewSelection = movementUnitCardBoundId !== unit.id;
   movementUnitCardBoundId = unit.id;
 
-  movementUnitCardEl.classList.add('movement-unit-card-wrap--visible');
+  movementHudStackEl.classList.add('movement-hud-stack--visible');
 
   if (isNewSelection) {
     buildMovementUnitCardInner(unit, unitType);
   } else {
     patchMovementUnitCardStats(unit, unitType);
   }
+  syncUpgradePickerPanel(unit, unitType);
 }
 
 // ── Board click ───────────────────────────────────────────────────────────────
@@ -3267,6 +3366,9 @@ function maybeAutoEnd(): void {
 // ── UI helpers ────────────────────────────────────────────────────────────────
 
 function updateUI(): void {
+  if (gameMode === 'vsAI') {
+    resolvePendingAiUpgradeChoices(state);
+  }
   turnEl.textContent  = `Turn ${state.turn}`;
   const hidingTransientAutoSkippedProduction = shouldAutoSkipProductionPhase();
   const phaseForDisplay =
@@ -3434,6 +3536,7 @@ interface SideFactors {
   extraFlankingFrom?: { name: string; bonusPct: number }[];
   breakthroughMalusMultPct?: number;
   breakthroughMalusDeltaPct?: number;
+  upgradeLines?: string[];
 }
 
 function buildSideHTML(unit: Unit, dmg: number, hpAfter: number, label: string, labelClass: string, factors: SideFactors): string {
@@ -3465,6 +3568,7 @@ function buildSideHTML(unit: Unit, dmg: number, hpAfter: number, label: string, 
         ${factors.breakthroughMalusMultPct !== undefined && factors.breakthroughMalusDeltaPct !== undefined
           ? `<div>· Breakthrough captured-sector malus: ${factors.breakthroughMalusDeltaPct}% (×${factors.breakthroughMalusMultPct}%)</div>`
           : ''}
+        ${(factors.upgradeLines ?? []).map(l => `<div class="tt-upgrade-line">${l}</div>`).join('')}
       </div>
     </div>`;
 }
@@ -3488,6 +3592,10 @@ function showCombatTooltip(attacker: Unit, defender: Unit, pageX: number, pageY:
     flankCount: fc.flankingCount,
     flankBonusPct: fc.flankBonusPct,
     extraFlankingFrom: fc.extraFlankingFrom.length > 0 ? fc.extraFlankingFrom : undefined,
+    upgradeLines:
+      fc.attackerUpgradeForecastLines && fc.attackerUpgradeForecastLines.length > 0
+        ? fc.attackerUpgradeForecastLines
+        : undefined,
   };
   const defenderFactors: SideFactors = {
     cs: fc.defenderCS,
@@ -3496,6 +3604,10 @@ function showCombatTooltip(attacker: Unit, defender: Unit, pageX: number, pageY:
     flankBonusPct: 0,
     breakthroughMalusMultPct: fc.breakthroughDefenderMalus ? Math.round(config.breakthroughEnemySectorStrengthMult * 100) : undefined,
     breakthroughMalusDeltaPct: fc.breakthroughDefenderMalus ? Math.round((config.breakthroughEnemySectorStrengthMult - 1) * 100) : undefined,
+    upgradeLines:
+      fc.defenderUpgradeForecastLines && fc.defenderUpgradeForecastLines.length > 0
+        ? fc.defenderUpgradeForecastLines
+        : undefined,
   };
 
   let outcomeText: string, outcomeClass: string;

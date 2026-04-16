@@ -55,7 +55,16 @@ export interface Unit {
   movement: number;
   /** Accumulated upgrade points from dealing damage and scoring kills (see gameconfig). */
   upgradePoints: number;
+  /** Stacks of the flanking upgrade (+CS when attacking with max flankers). */
+  upgradeFlanking: number;
+  /** Stacks of the attack upgrade (+CS when attacking). */
+  upgradeAttack: number;
+  /** Stacks of the defense upgrade (+CS when defending). */
+  upgradeDefense: number;
 }
+
+/** Per-level upgrade choice (movement-phase level-up picker). */
+export type UnitUpgradeKind = 'flanking' | 'attack' | 'defense';
 
 export interface HexState {
   owner: Owner;
@@ -159,6 +168,10 @@ export interface CombatForecast {
   defenderConditionPct: number;
   /** Breakthrough: defender has strength malus in attacker-held sector. */
   breakthroughDefenderMalus?: boolean;
+  /** Active upgrade bonuses included in attacker CS (combat tooltip). */
+  attackerUpgradeForecastLines?: string[];
+  /** Active upgrade bonuses included in defender CS (combat tooltip). */
+  defenderUpgradeForecastLines?: string[];
 }
 
 export interface UnitType {
@@ -308,6 +321,12 @@ export interface GameConfig {
   upgradePointsPerDamageDealt: number;
   /** Extra upgrade points when the attacker destroys the defender. */
   upgradePointsKillBonus: number;
+  /** Per stack: multiplier added to CS when attacking (upgrade choice). */
+  upgradeBonusAttackPerStack: number;
+  /** Per stack: extra multiplier when attacking with max flankers adjacent to defender. */
+  upgradeBonusFlankingPerStack: number;
+  /** Per stack: multiplier added to CS when defending. */
+  upgradeBonusDefensePerStack: number;
   autoEndProduction: boolean;
   autoEndMovement: boolean;
   // Duration in ms for the unit move animation (0 = instant)

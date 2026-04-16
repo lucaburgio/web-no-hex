@@ -322,6 +322,11 @@ const config: GameConfig = {
   upgradePointsPerDamageDealt: 1,
   upgradePointsKillBonus: 1,
 
+  // Per-level upgrade combat multipliers (stack when the same upgrade is chosen again)
+  upgradeBonusAttackPerStack: 0.05,
+  upgradeBonusFlankingPerStack: 0.05,
+  upgradeBonusDefensePerStack: 0.1,
+
   // ── Automation ───────────────────────────────────────────────────────────────
 
   // Automatically end the production phase when the player can no longer afford any unit

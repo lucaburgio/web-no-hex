@@ -13,6 +13,7 @@ import type {
   AiAnimStep,
   GameMode,
   StoryDef,
+  UnitUpgradeKind,
 } from './types';
 import {
   getBreakthroughControlPointsForMap,
@@ -89,6 +90,9 @@ function makeUnit(owner: Owner, col: number, row: number, unitTypeId = 'infantry
     strength: unitType.strength,
     movement: unitType.movement,
     upgradePoints: 0,
+    upgradeFlanking: 0,
+    upgradeAttack: 0,
+    upgradeDefense: 0,
   };
 }
 
@@ -817,12 +821,25 @@ function effectiveCS(
   unit: Unit,
   flankingCount: number = 0,
   extraFlankingSum: number = 0,
+  combatRole: 'attacker' | 'defender' = 'defender',
 ): number {
   const hpRatio = unit.hp / unit.maxHp;
   const woundedMult = 0.5 + 0.5 * hpRatio;
   const flankMult = 1 + flankingCount * config.flankingBonus + extraFlankingSum;
   const brMult = breakthroughStrengthMult(state, unit);
-  return unit.strength * brMult * woundedMult * flankMult;
+  let upgradeMult = 1;
+  const uA = unit.upgradeAttack ?? 0;
+  const uF = unit.upgradeFlanking ?? 0;
+  const uD = unit.upgradeDefense ?? 0;
+  if (combatRole === 'attacker') {
+    upgradeMult += uA * config.upgradeBonusAttackPerStack;
+    if (flankingCount >= config.maxFlankingUnits) {
+      upgradeMult += uF * config.upgradeBonusFlankingPerStack;
+    }
+  } else {
+    upgradeMult += uD * config.upgradeBonusDefensePerStack;
+  }
+  return unit.strength * brMult * woundedMult * flankMult * upgradeMult;
 }
 
 /** True when limit-artillery mode blocks ranged fire (any enemy adjacent to this ranged unit). */
@@ -876,8 +893,8 @@ export interface CombatResolveResult {
 function resolveCombat(state: GameState, attacker: Unit, defender: Unit): CombatResolveResult {
   const ranged = isRangedCombat(state, attacker, defender);
   const { count: flanking, extraSum } = analyzeFlanking(state, attacker, defender);
-  const csA = effectiveCS(state, attacker, flanking, extraSum);
-  const csD = effectiveCS(state, defender, 0);
+  const csA = effectiveCS(state, attacker, flanking, extraSum, 'attacker');
+  const csD = effectiveCS(state, defender, 0, 0, 'defender');
   const delta = csA - csD;
   const scale = config.combatStrengthScale;
   const base  = config.combatDamageBase;
@@ -1024,11 +1041,36 @@ function combatVfxFromResolve(
 
 // ── Combat forecast (pure — no state mutation) ────────────────────────────────
 
+function attackerUpgradeForecastLines(unit: Unit, flankingCount: number): string[] {
+  const lines: string[] = [];
+  const uA = unit.upgradeAttack ?? 0;
+  const uF = unit.upgradeFlanking ?? 0;
+  if (uA > 0) {
+    lines.push(
+      `Upgrade: +${Math.round(uA * config.upgradeBonusAttackPerStack * 100)}% combat strength when attacking`,
+    );
+  }
+  if (uF > 0 && flankingCount >= config.maxFlankingUnits) {
+    lines.push(
+      `Upgrade: +${Math.round(uF * config.upgradeBonusFlankingPerStack * 100)}% combat strength when flanking with ${config.maxFlankingUnits} units`,
+    );
+  }
+  return lines;
+}
+
+function defenderUpgradeForecastLines(unit: Unit): string[] {
+  const uD = unit.upgradeDefense ?? 0;
+  if (uD === 0) return [];
+  return [
+    `Upgrade: +${Math.round(uD * config.upgradeBonusDefensePerStack * 100)}% combat strength when defending`,
+  ];
+}
+
 export function forecastCombat(state: GameState, attacker: Unit, defender: Unit): CombatForecast {
   const ranged = isRangedCombat(state, attacker, defender);
   const { count: flanking, extraSum, extraFlankingFrom } = analyzeFlanking(state, attacker, defender);
-  const csA = effectiveCS(state, attacker, flanking, extraSum);
-  const csD = effectiveCS(state, defender, 0);
+  const csA = effectiveCS(state, attacker, flanking, extraSum, 'attacker');
+  const csD = effectiveCS(state, defender, 0, 0, 'defender');
   const delta = csA - csD;
   const scale = config.combatStrengthScale;
   const base  = config.combatDamageBase;
@@ -1053,7 +1095,42 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
     defenderConditionPct: Math.round((0.5 + 0.5 * (defender.hp / defender.maxHp)) * 100),
     breakthroughDefenderMalus:
       state.gameMode === 'breakthrough' && breakthroughStrengthMult(state, defender) < 1 ? true : undefined,
+    attackerUpgradeForecastLines: attackerUpgradeForecastLines(attacker, flanking),
+    defenderUpgradeForecastLines: defenderUpgradeForecastLines(defender),
   };
+}
+
+/** Apply a level-up upgrade during movement (local player). */
+export function playerApplyUnitUpgrade(
+  state: GameState,
+  unitId: number,
+  kind: UnitUpgradeKind,
+  localPlayer: Owner = PLAYER,
+): GameState {
+  if (state.phase !== 'movement' || state.activePlayer !== localPlayer) return state;
+  const unit = getUnitById(state, unitId);
+  if (!unit || unit.owner !== localPlayer) return state;
+  const ut = unitTypeForUnit(unit);
+  if (unit.upgradePoints < ut.upgradePointsToLevel) return state;
+  unit.upgradePoints -= ut.upgradePointsToLevel;
+  if (kind === 'flanking') unit.upgradeFlanking += 1;
+  else if (kind === 'attack') unit.upgradeAttack += 1;
+  else unit.upgradeDefense += 1;
+  log(state, `Unit #${unit.id} upgraded (${kind}).`);
+  return state;
+}
+
+/** vs AI: spend AI unit upgrade points without a UI (greedy attack stacks). Call only when gameMode is vsAI. */
+export function resolvePendingAiUpgradeChoices(state: GameState): void {
+  for (const unit of state.units) {
+    if (unit.owner !== AI) continue;
+    const ut = unitTypeForUnit(unit);
+    while (unit.upgradePoints >= ut.upgradePointsToLevel) {
+      unit.upgradePoints -= ut.upgradePointsToLevel;
+      unit.upgradeAttack += 1;
+      log(state, `AI unit #${unit.id} upgraded (attack).`);
+    }
+  }
 }
 
 // ── Victory check ─────────────────────────────────────────────────────────────

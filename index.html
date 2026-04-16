@@ -58,8 +58,11 @@
     <div id="unit-picker-list"></div>
   </div>
 
-  <!-- Selected unit card during movement (local player) -->
-  <div id="movement-unit-card" class="movement-unit-card-wrap" aria-live="polite"></div>
+  <!-- Movement HUD: level-up picker + selected unit card (local player) -->
+  <div id="movement-hud-stack" class="movement-hud-stack" aria-live="polite">
+    <div id="upgrade-picker-panel" class="upgrade-picker-panel hidden"></div>
+    <div id="movement-unit-card" class="movement-unit-card-wrap"></div>
+  </div>
 
   <!-- Sticky footer -->
   <footer id="game-footer">
