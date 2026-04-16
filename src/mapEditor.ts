@@ -33,7 +33,7 @@ function sectorLabelColor(idx: number): string {
 
 /**
  * Breakthrough editor: control-point rows sorted north → south (increasing r).
- * Sectors are horizontal bands; game sector 0 is south (attacker starting sector, no CP).
+ * Sectors partition by row from fixed CP positions (nearest CP in row); sector 0 is south (attacker).
  */
 function breakthroughCpRowsNorthToSouth(cpKeys: Iterable<string>): number[] {
   const rows = [...cpKeys].map(k => Number(k.split(',')[1])).filter(Number.isFinite);
@@ -41,31 +41,40 @@ function breakthroughCpRowsNorthToSouth(cpKeys: Iterable<string>): number[] {
 }
 
 /**
- * Game sector index for a row: 0 = south (attacker home band), K = north when there are K CPs.
+ * Game sector index for a hex row: 0 = attacker strip (south of all CP rows). Defender rows use the
+ * nearest CP by row distance (1D Voronoi), which centers each fixed CP vertically in its band.
+ * Tie: northern CP wins when two rows are equidistant.
  */
 function breakthroughEditorGameSectorForRow(row: number, cpRowsNorthToSouth: number[]): number {
   const r = cpRowsNorthToSouth;
   const K = r.length;
   if (K === 0) return 0;
   if (row > r[K - 1]!) return 0;
-  if (row <= r[0]!) return K;
-  for (let j = 1; j < K; j++) {
-    if (row <= r[j]! && row > r[j - 1]!) return K - j;
+
+  let bestJ = 0;
+  let bestD = Infinity;
+  for (let j = 0; j < K; j++) {
+    const d = Math.abs(row - r[j]!);
+    if (d < bestD || (d === bestD && j < bestJ)) {
+      bestD = d;
+      bestJ = j;
+    }
   }
-  return K;
+  return K - bestJ;
 }
 
-/** Inclusive row span per game sector index (same indexing as {@link breakthroughEditorGameSectorForRow}). */
-function breakthroughSectorRowSpans(cpRowsNorthToSouth: number[], rows: number): { lo: number; hi: number }[] {
-  const r = cpRowsNorthToSouth;
-  const K = r.length;
-  const out: { lo: number; hi: number }[] = [];
-  out[K] = { lo: 0, hi: r[0]! };
-  for (let j = 1; j < K; j++) {
-    out[K - j] = { lo: r[j - 1]! + 1, hi: r[j]! };
+/** Row extents per sector from {@link breakthroughEditorGameSectorForRow} (labels / overlay). */
+function breakthroughSectorRowExtentsVoronoi(cpRowsNorthToSouth: number[], rows: number): { lo: number; hi: number }[] {
+  const K = cpRowsNorthToSouth.length;
+  const numSectors = K + 1;
+  const ext = Array.from({ length: numSectors }, () => ({ lo: rows, hi: -1 }));
+  for (let row = 0; row < rows; row++) {
+    const s = breakthroughEditorGameSectorForRow(row, cpRowsNorthToSouth);
+    const e = ext[s]!;
+    e.lo = Math.min(e.lo, row);
+    e.hi = Math.max(e.hi, row);
   }
-  out[0] = { lo: r[K - 1]! + 1, hi: rows - 1 };
-  return out;
+  return ext;
 }
 
 const ATTACKER_START_SECTOR_LABEL = 'Attacker starting sector';
@@ -74,14 +83,19 @@ function breakthroughSectorCanvasLabel(gameSector: number): string {
   return gameSector === 0 ? ATTACKER_START_SECTOR_LABEL : `S${gameSector + 1}`;
 }
 
-/** Y positions for dashed lines between row bands (matches {@link breakthroughSectorRowSpans}). */
+/**
+ * Horizontal guide lines: mid-Y between consecutive CP rows, then defender/attacker boundary
+ * south of the southernmost CP when there is room.
+ */
 function breakthroughSectorBoundaryYs(cpRowsNorthToSouth: number[], rows: number, rowToY: (row: number) => number): number[] {
   const r = cpRowsNorthToSouth;
+  const K = r.length;
   const ys: number[] = [];
-  for (let i = 0; i < r.length; i++) {
-    if (r[i]! < rows - 1) {
-      ys.push((rowToY(r[i]!) + rowToY(r[i]! + 1)) / 2);
-    }
+  for (let j = 0; j < K - 1; j++) {
+    ys.push((rowToY(r[j]!) + rowToY(r[j + 1]!)) / 2);
+  }
+  if (K > 0 && r[K - 1]! < rows - 1) {
+    ys.push((rowToY(r[K - 1]!) + rowToY(r[K - 1]! + 1)) / 2);
   }
   return ys;
 }
@@ -92,84 +106,6 @@ function dedupeBreakthroughCpOnePerRow(set: Set<string>): void {
     const r = Number(k.split(',')[1]);
     if (!Number.isFinite(r) || seen.has(r)) set.delete(k);
     else seen.add(r);
-  }
-}
-
-function breakthroughCpEntriesNorthToSouth(cpKeys: Iterable<string>): { key: string; c: number; r: number }[] {
-  return [...cpKeys]
-    .map(k => {
-      const [c, r] = k.split(',').map(Number);
-      return { key: k, c, r };
-    })
-    .filter(p => Number.isFinite(p.c) && Number.isFinite(p.r))
-    .sort((a, b) => a.r - b.r);
-}
-
-/** Prefer `preferredR`, then other rows in `span` by increasing distance (mountains / other CP rows skipped). */
-function pickBreakthroughCpRowInSpan(
-  c: number,
-  span: { lo: number; hi: number },
-  preferredR: number,
-  cols: number,
-  rows: number,
-  mountains: Set<string>,
-  bt: Set<string>,
-  selfKey: string,
-): number | null {
-  const otherRows = new Set(
-    [...bt].filter(k => k !== selfKey).map(k => Number(k.split(',')[1])),
-  );
-  const inSpan: number[] = [];
-  for (let r = span.lo; r <= span.hi; r++) inSpan.push(r);
-  inSpan.sort((a, b) => Math.abs(a - preferredR) - Math.abs(b - preferredR) || a - b);
-  for (const r of inSpan) {
-    if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
-    const k = `${c},${r}`;
-    if (mountains.has(k)) continue;
-    if (otherRows.has(r)) continue;
-    return r;
-  }
-  return null;
-}
-
-/**
- * Nudge each breakthrough CP toward the vertical middle of its row-band sector when the band is
- * at least 3 rows tall; otherwise leave placement unchanged. Re-runs until stable (mountains / rows
- * taken by other CPs may prevent moving).
- */
-function snapBreakthroughCpsToVerticalSectorCenters(
-  bt: Set<string>,
-  cols: number,
-  rows: number,
-  mountains: Set<string>,
-): void {
-  const MAX = 32;
-  for (let iter = 0; iter < MAX; iter++) {
-    dedupeBreakthroughCpOnePerRow(bt);
-    const entries = breakthroughCpEntriesNorthToSouth(bt);
-    const K = entries.length;
-    if (K === 0) return;
-    const cpRows = breakthroughCpRowsNorthToSouth(bt);
-    const spans = breakthroughSectorRowSpans(cpRows, rows);
-    let changed = false;
-    for (let j = 0; j < K; j++) {
-      const gameSector = K - j;
-      const span = spans[gameSector]!;
-      const height = span.hi - span.lo + 1;
-      if (height < 3) continue;
-
-      const p = entries[j]!;
-      const preferredR = span.lo + Math.floor((span.hi - span.lo) / 2);
-      const picked = pickBreakthroughCpRowInSpan(
-        p.c, span, preferredR, cols, rows, mountains, bt, p.key,
-      );
-      if (picked === null || picked === p.r) continue;
-      const newKey = `${p.c},${picked}`;
-      bt.delete(p.key);
-      bt.add(newKey);
-      changed = true;
-    }
-    if (!changed) break;
   }
 }
 
@@ -466,14 +402,6 @@ function cleanOOB(): void {
     if (c >= cols || r >= rows) edState.breakthroughControlPoints.delete(k);
   }
   dedupeBreakthroughCpOnePerRow(edState.breakthroughControlPoints);
-  if (edState.gameMode === 'breakthrough') {
-    snapBreakthroughCpsToVerticalSectorCenters(
-      edState.breakthroughControlPoints,
-      cols,
-      rows,
-      edState.mountains,
-    );
-  }
   edState.riverHexKeys = new Set(
     [...edState.riverHexKeys].filter(k => {
       const [c, r] = k.split(',').map(Number);
@@ -641,7 +569,7 @@ function renderBoard(): void {
   const showSectors = edState.gameMode === 'breakthrough' && edState.breakthroughControlPoints.size > 0;
   const numSectors  = showSectors ? edState.breakthroughControlPoints.size + 1 : 0;
   const btCpRowsNorthToSouth = showSectors ? breakthroughCpRowsNorthToSouth(edState.breakthroughControlPoints) : [];
-  const btSectorSpans = showSectors ? breakthroughSectorRowSpans(btCpRowsNorthToSouth, rows) : [];
+  const btSectorSpans = showSectors ? breakthroughSectorRowExtentsVoronoi(btCpRowsNorthToSouth, rows) : [];
 
   // Extra left margin to accommodate sector labels
   const leftMargin = showSectors ? s * 2.8 : margin;
@@ -776,7 +704,7 @@ function renderSectorOverlay(
   const hexW = hexSize * Math.sqrt(3);
   const rowY = (r: number) => hexToPixelLocal(0, r).y;
 
-  // Dashed boundary lines between row bands (one line per CP row band edge)
+  // Dashed boundary lines between Voronoi bands (mid between CP rows, then defender/attacker)
   for (const lineY of breakthroughSectorBoundaryYs(cpRowsNorthToSouth, rows, rowY)) {
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', String(-hexW * 0.5));
@@ -929,14 +857,6 @@ function applyTool(e: MouseEvent): void {
     edState.breakthroughControlPoints.delete(key);
   }
 
-  if (edState.gameMode === 'breakthrough') {
-    snapBreakthroughCpsToVerticalSectorCenters(
-      edState.breakthroughControlPoints,
-      edState.cols,
-      edState.rows,
-      edState.mountains,
-    );
-  }
   renderBoard();
 }
 
@@ -1047,15 +967,6 @@ function applyLoadedCode(raw: string): string | null {
     unitPackageSelect.value = DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1;
     edState.unitPackagePlayer2 = '';
     unitPackagePlayer2Select.value = '';
-  }
-
-  if (edState.gameMode === 'breakthrough') {
-    snapBreakthroughCpsToVerticalSectorCenters(
-      edState.breakthroughControlPoints,
-      edState.cols,
-      edState.rows,
-      edState.mountains,
-    );
   }
 
   colsInput.value = String(cols);
