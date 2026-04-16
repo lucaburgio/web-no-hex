@@ -105,6 +105,7 @@ let onBackCb: () => void = () => {};
 // DOM refs (set in initMapEditor)
 let overlayEl: HTMLDivElement;
 let svgEl: SVGSVGElement;
+let tooltipEl: HTMLDivElement;
 let colsInput: HTMLInputElement;
 let rowsInput: HTMLInputElement;
 let gameModeSelect: HTMLSelectElement;
@@ -123,6 +124,15 @@ export function initMapEditor(onBack: () => void): void {
 
   overlayEl        = document.getElementById('map-editor-overlay') as HTMLDivElement;
   svgEl            = document.getElementById('map-editor-board') as unknown as SVGSVGElement;
+
+  // Tooltip element for unit hover
+  tooltipEl = document.getElementById('me-unit-tooltip') as HTMLDivElement;
+  if (!tooltipEl) {
+    tooltipEl = document.createElement('div');
+    tooltipEl.id = 'me-unit-tooltip';
+    tooltipEl.className = 'me-unit-tooltip';
+    document.body.appendChild(tooltipEl);
+  }
   colsInput        = document.getElementById('me-cols') as HTMLInputElement;
   rowsInput        = document.getElementById('me-rows') as HTMLInputElement;
   gameModeSelect   = document.getElementById('me-game-mode') as HTMLSelectElement;
@@ -273,7 +283,22 @@ export function initMapEditor(onBack: () => void): void {
   // SVG drag-paint interaction
   let painting = false;
   svgEl.addEventListener('mousedown', (e) => { painting = true; applyTool(e); });
-  svgEl.addEventListener('mousemove', (e) => { if (painting) applyTool(e); });
+  svgEl.addEventListener('mousemove', (e) => {
+    if (painting) applyTool(e);
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const g = el?.closest('[data-unit-name]') as SVGGElement | null;
+    if (g && svgEl.contains(g)) {
+      tooltipEl.textContent = g.dataset.unitName!;
+      tooltipEl.style.left = `${e.clientX + 12}px`;
+      tooltipEl.style.top  = `${e.clientY - 28}px`;
+      tooltipEl.classList.add('me-unit-tooltip-visible');
+    } else {
+      tooltipEl.classList.remove('me-unit-tooltip-visible');
+    }
+  });
+  svgEl.addEventListener('mouseleave', () => {
+    tooltipEl.classList.remove('me-unit-tooltip-visible');
+  });
   window.addEventListener('mouseup', () => { painting = false; });
 }
 
@@ -552,15 +577,26 @@ function renderBoard(): void {
       if (isPS) {
         const uid = edState.playerStart.get(col)!;
         const ut = config.unitTypes.find(u => u.id === uid && u.package === edState.unitPackage);
-        addTxt(g, x, y, (ut?.name ?? uid).slice(0, 3).toUpperCase(), s * 0.32, 'var(--color-dark)');
+        if (ut?.icon) {
+          addUnitIcon(g, x, y, ut.icon, ut.name, s);
+        } else {
+          addTxt(g, x, y, (ut?.name ?? uid).slice(0, 3).toUpperCase(), s * 0.32, 'var(--color-dark)');
+        }
+        g.dataset.unitName = ut?.name ?? uid;
       } else if (isPlayerRow && !isMtn) {
         addTxt(g, x, y, 'P', s * 0.28, 'rgba(0,0,0,0.18)');
       }
 
       if (isAS) {
         const uid = edState.aiStart.get(col)!;
-        const ut = config.unitTypes.find(u => u.id === uid && u.package === edState.unitPackage);
-        addTxt(g, x, y, (ut?.name ?? uid).slice(0, 3).toUpperCase(), s * 0.32, 'var(--color-dark)');
+        const pkg2 = edState.unitPackagePlayer2 || edState.unitPackage;
+        const ut = config.unitTypes.find(u => u.id === uid && u.package === pkg2);
+        if (ut?.icon) {
+          addUnitIcon(g, x, y, ut.icon, ut.name, s);
+        } else {
+          addTxt(g, x, y, (ut?.name ?? uid).slice(0, 3).toUpperCase(), s * 0.32, 'var(--color-dark)');
+        }
+        g.dataset.unitName = ut?.name ?? uid;
       } else if (isAiRow && !isMtn) {
         addTxt(g, x, y, 'A', s * 0.28, 'rgba(0,0,0,0.18)');
       }
@@ -624,6 +660,21 @@ function renderSectorOverlay(
     label.style.pointerEvents = 'none';
     svgEl.appendChild(label);
   }
+}
+
+function addUnitIcon(
+  g: SVGGElement, x: number, y: number,
+  icon: string, _name: string, hexSize: number,
+): void {
+  const size = hexSize * 0.72;
+  const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+  img.setAttribute('href', icon);
+  img.setAttribute('x', String(x - size / 2));
+  img.setAttribute('y', String(y - size / 2));
+  img.setAttribute('width', String(size));
+  img.setAttribute('height', String(size));
+  img.setAttribute('pointer-events', 'none');
+  g.appendChild(img);
 }
 
 function addTxt(
