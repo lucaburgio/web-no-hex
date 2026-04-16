@@ -95,6 +95,84 @@ function dedupeBreakthroughCpOnePerRow(set: Set<string>): void {
   }
 }
 
+function breakthroughCpEntriesNorthToSouth(cpKeys: Iterable<string>): { key: string; c: number; r: number }[] {
+  return [...cpKeys]
+    .map(k => {
+      const [c, r] = k.split(',').map(Number);
+      return { key: k, c, r };
+    })
+    .filter(p => Number.isFinite(p.c) && Number.isFinite(p.r))
+    .sort((a, b) => a.r - b.r);
+}
+
+/** Prefer `preferredR`, then other rows in `span` by increasing distance (mountains / other CP rows skipped). */
+function pickBreakthroughCpRowInSpan(
+  c: number,
+  span: { lo: number; hi: number },
+  preferredR: number,
+  cols: number,
+  rows: number,
+  mountains: Set<string>,
+  bt: Set<string>,
+  selfKey: string,
+): number | null {
+  const otherRows = new Set(
+    [...bt].filter(k => k !== selfKey).map(k => Number(k.split(',')[1])),
+  );
+  const inSpan: number[] = [];
+  for (let r = span.lo; r <= span.hi; r++) inSpan.push(r);
+  inSpan.sort((a, b) => Math.abs(a - preferredR) - Math.abs(b - preferredR) || a - b);
+  for (const r of inSpan) {
+    if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
+    const k = `${c},${r}`;
+    if (mountains.has(k)) continue;
+    if (otherRows.has(r)) continue;
+    return r;
+  }
+  return null;
+}
+
+/**
+ * Nudge each breakthrough CP toward the vertical middle of its row-band sector when the band is
+ * at least 3 rows tall; otherwise leave placement unchanged. Re-runs until stable (mountains / rows
+ * taken by other CPs may prevent moving).
+ */
+function snapBreakthroughCpsToVerticalSectorCenters(
+  bt: Set<string>,
+  cols: number,
+  rows: number,
+  mountains: Set<string>,
+): void {
+  const MAX = 32;
+  for (let iter = 0; iter < MAX; iter++) {
+    dedupeBreakthroughCpOnePerRow(bt);
+    const entries = breakthroughCpEntriesNorthToSouth(bt);
+    const K = entries.length;
+    if (K === 0) return;
+    const cpRows = breakthroughCpRowsNorthToSouth(bt);
+    const spans = breakthroughSectorRowSpans(cpRows, rows);
+    let changed = false;
+    for (let j = 0; j < K; j++) {
+      const gameSector = K - j;
+      const span = spans[gameSector]!;
+      const height = span.hi - span.lo + 1;
+      if (height < 3) continue;
+
+      const p = entries[j]!;
+      const preferredR = span.lo + Math.floor((span.hi - span.lo) / 2);
+      const picked = pickBreakthroughCpRowInSpan(
+        p.c, span, preferredR, cols, rows, mountains, bt, p.key,
+      );
+      if (picked === null || picked === p.r) continue;
+      const newKey = `${p.c},${picked}`;
+      bt.delete(p.key);
+      bt.add(newKey);
+      changed = true;
+    }
+    if (!changed) break;
+  }
+}
+
 let placementHintTimeoutId = 0;
 function showPlacementHint(clientX: number, clientY: number, message: string): void {
   tooltipEl.textContent = message;
@@ -388,6 +466,14 @@ function cleanOOB(): void {
     if (c >= cols || r >= rows) edState.breakthroughControlPoints.delete(k);
   }
   dedupeBreakthroughCpOnePerRow(edState.breakthroughControlPoints);
+  if (edState.gameMode === 'breakthrough') {
+    snapBreakthroughCpsToVerticalSectorCenters(
+      edState.breakthroughControlPoints,
+      cols,
+      rows,
+      edState.mountains,
+    );
+  }
   edState.riverHexKeys = new Set(
     [...edState.riverHexKeys].filter(k => {
       const [c, r] = k.split(',').map(Number);
@@ -843,6 +929,14 @@ function applyTool(e: MouseEvent): void {
     edState.breakthroughControlPoints.delete(key);
   }
 
+  if (edState.gameMode === 'breakthrough') {
+    snapBreakthroughCpsToVerticalSectorCenters(
+      edState.breakthroughControlPoints,
+      edState.cols,
+      edState.rows,
+      edState.mountains,
+    );
+  }
   renderBoard();
 }
 
@@ -953,6 +1047,15 @@ function applyLoadedCode(raw: string): string | null {
     unitPackageSelect.value = DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1;
     edState.unitPackagePlayer2 = '';
     unitPackagePlayer2Select.value = '';
+  }
+
+  if (edState.gameMode === 'breakthrough') {
+    snapBreakthroughCpsToVerticalSectorCenters(
+      edState.breakthroughControlPoints,
+      edState.cols,
+      edState.rows,
+      edState.mountains,
+    );
   }
 
   colsInput.value = String(cols);
