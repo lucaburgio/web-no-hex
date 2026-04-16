@@ -1054,12 +1054,12 @@ function attackerUpgradeForecastLines(unit: Unit, flankingCount: number): string
   const uF = unit.upgradeFlanking ?? 0;
   if (uA > 0) {
     lines.push(
-      `Upgrade: +${Math.round(uA * config.upgradeBonusAttackPerStack * 100)}% combat strength when attacking`,
+      `Attack upgrade: +${Math.round(uA * config.upgradeBonusAttackPerStack * 100)}%`,
     );
   }
   if (uF > 0 && flankingCount >= config.maxFlankingUnits) {
     lines.push(
-      `Upgrade: +${Math.round(uF * config.upgradeBonusFlankingPerStack * 100)}% combat strength when flanking with ${config.maxFlankingUnits} units`,
+      `Flanking upgrade ×${config.maxFlankingUnits}: +${Math.round(uF * config.upgradeBonusFlankingPerStack * 100)}%`,
     );
   }
   return lines;
@@ -1069,7 +1069,7 @@ function defenderUpgradeForecastLines(unit: Unit): string[] {
   const uD = unit.upgradeDefense ?? 0;
   if (uD === 0) return [];
   return [
-    `Upgrade: +${Math.round(uD * config.upgradeBonusDefensePerStack * 100)}% combat strength when defending`,
+    `Defense upgrade: +${Math.round(uD * config.upgradeBonusDefensePerStack * 100)}%`,
   ];
 }
 

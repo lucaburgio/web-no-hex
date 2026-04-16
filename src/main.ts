@@ -2404,19 +2404,19 @@ function buildUpgradePickerPanel(unit: Unit): void {
   const defs: { kind: UnitUpgradeKind; icon: string; pct: string; desc: string }[] = [
     {
       kind: 'flanking',
-      icon: 'icons/upgrade-choice-flank.svg',
+      icon: 'icons/upgrade/flank.svg',
       pct: pctFlank,
       desc: 'ATTACK WHEN FLANKING WITH 2 MORE UNITS',
     },
     {
       kind: 'attack',
-      icon: 'icons/upgrade-choice-attack.svg',
+      icon: 'icons/upgrade/attack.svg',
       pct: pctAttack,
       desc: 'COMBAT STRENGTH WHEN ATTACKING',
     },
     {
       kind: 'defense',
-      icon: 'icons/upgrade-choice-defense.svg',
+      icon: 'icons/upgrade/defense.svg',
       pct: pctDefense,
       desc: 'COMBAT STRENGTH WHEN DEFENDING',
     },
@@ -3583,7 +3583,7 @@ function buildSideHTML(unit: Unit, dmg: number, hpAfter: number, label: string, 
         ${factors.breakthroughMalusMultPct !== undefined && factors.breakthroughMalusDeltaPct !== undefined
           ? `<div>· Breakthrough captured-sector malus: ${factors.breakthroughMalusDeltaPct}% (×${factors.breakthroughMalusMultPct}%)</div>`
           : ''}
-        ${(factors.upgradeLines ?? []).map(l => `<div class="tt-upgrade-line">${l}</div>`).join('')}
+        ${(factors.upgradeLines ?? []).map(l => `<div>· ${l}</div>`).join('')}
       </div>
     </div>`;
 }

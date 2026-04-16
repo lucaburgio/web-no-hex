@@ -779,8 +779,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 .upgrade-picker-panel {
   width: 100%;
   max-width: 440px;
-  background: #d4d4d4;
-  border: 1px solid #a3a3a3;
+  background: var(--color-gray-100);
   box-sizing: border-box;
   pointer-events: auto;
   user-select: none;
@@ -790,10 +789,10 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 .upgrade-picker-header {
-  background: #f4b41a;
-  color: #000;
+  background: var(--color-yellow-500);
+  color: var(--color-yellow-900);
   text-align: center;
-  padding: 10px 12px;
+  padding: 4px 8px;
   font-size: 13px;
   letter-spacing: 0.1em;
   line-height: 1.2;
@@ -810,12 +809,11 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 12px 12px;
+  padding: 16px 16px;
   margin: 0;
   border: none;
-  border-top: 1px solid #b8b8b8;
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
   background: transparent;
-  cursor: pointer;
   text-align: left;
   font: inherit;
   color: inherit;
@@ -827,27 +825,27 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 .upgrade-picker-row:hover,
 .upgrade-picker-row:focus-visible {
-  background: #c6c6c6;
+  background: var(--color-gray-200);
   outline: none;
 }
 
 .upgrade-picker-row-icon {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   object-fit: contain;
   display: block;
 }
 
 .upgrade-picker-row-pct {
-  color: #000;
+  color: var(--color-dark);
   min-width: 52px;
   letter-spacing: 0.03em;
 }
 
 .upgrade-picker-row-desc {
-  color: #6e6e6e;
-  font-size: 11px;
+  color: var(--color-gray-600);
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   line-height: 1.25;
@@ -1045,15 +1043,6 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 .tt-side {
   flex: 1;
-}
-
-.tt-upgrade-line {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--color-yellow-500, #f4b41a);
-  margin-top: 4px;
-  line-height: 1.35;
 }
 
 .tt-side-label {
