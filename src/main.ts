@@ -2392,7 +2392,7 @@ function patchMovementUnitCardStars(unit: Unit): void {
 
 function buildUpgradePickerPanel(unit: Unit): void {
   upgradePickerPanelEl.innerHTML = '';
-  upgradePickerPanelEl.classList.remove('hidden');
+  upgradePickerPanelEl.classList.remove('hidden', 'upgrade-picker-panel--enter');
   const header = document.createElement('div');
   header.className = 'upgrade-picker-header';
   header.textContent = 'UPGRADE AVAILABLE';
@@ -2450,6 +2450,16 @@ function buildUpgradePickerPanel(unit: Unit): void {
   }
   upgradePickerPanelEl.appendChild(header);
   upgradePickerPanelEl.appendChild(rows);
+  upgradePickerPanelEl.classList.add('upgrade-picker-panel--enter');
+  upgradePickerPanelEl.addEventListener(
+    'animationend',
+    (e: AnimationEvent) => {
+      if (e.animationName === 'unit-card-enter') {
+        upgradePickerPanelEl.classList.remove('upgrade-picker-panel--enter');
+      }
+    },
+    { once: true },
+  );
 }
 
 function syncUpgradePickerPanel(unit: Unit, unitType: UnitType): void {

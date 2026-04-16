@@ -788,6 +788,18 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   font-family: 'Disket Mono', 'Courier New', monospace;
 }
 
+.upgrade-picker-panel.upgrade-picker-panel--enter {
+  animation: unit-card-enter 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upgrade-picker-panel.upgrade-picker-panel--enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .upgrade-picker-header {
   background: var(--color-yellow-500);
   color: var(--color-yellow-900);
