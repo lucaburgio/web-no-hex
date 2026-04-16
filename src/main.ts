@@ -1859,6 +1859,7 @@ function buildRulesContent(): string {
     })
     .join(', ');
   const maxFlankBonus = Math.round(config.maxFlankingUnits * config.flankingBonus * 100);
+  const brPct = Math.round(config.breakthroughEnemySectorStrengthMult * 100);
   return `
     <h2>Game Rules</h2>
 
@@ -1917,6 +1918,18 @@ function buildRulesContent(): string {
       <li>If defender dies: attacker advances and conquers the hex. If both die: both removed.</li>
       <li>Hover over an enemy unit during movement to see a combat forecast.</li>
     </ul>
+
+    <!-- Keep in sync with effectiveCS, resolveCombat, forecastCombat in game.ts and combat-related keys in gameconfig.ts -->
+    <h3>Combat in detail</h3>
+    <p><strong>Base strength</strong> (integer on the unit) is only the starting stat from the unit type. <strong>Effective combat strength (CS)</strong> multiplies that base by modifiers below. The engine uses full-precision numbers; the combat forecast shows <strong>CS to one decimal place</strong>.</p>
+    <p><strong>Effective CS</strong> = base strength × breakthrough sector mult × condition mult × flank mult × upgrade mult (when that role applies).</p>
+    <ul>
+      <li><strong>Condition mult</strong> = <code>0.5 + 0.5 × (current HP / max HP)</code> — from <strong>50%</strong> of full effectiveness at 0 HP up to <strong>100%</strong> at full HP (linear in HP fraction).</li>
+      <li><strong>Flank mult</strong> (attacker only) = <code>1 + <em>f</em> × ${Math.round(config.flankingBonus * 100)}%</code> where <em>f</em> is the number of contributing adjacent friendlies next to the defender, capped at <strong>${config.maxFlankingUnits}</strong>, in fixed neighbor order, plus any per-unit-type <strong>extra flanking</strong> from those flankers (see short Combat section).</li>
+      <li><strong>Breakthrough</strong> mult for a defender in a sector already captured by the attacker = <strong>${brPct}%</strong> (same setting as above).</li>
+      <li><strong>Upgrade</strong> mult: when attacking, stacks of attack upgrade add <strong>+${Math.round(config.upgradeBonusAttackPerStack * 100)}%</strong> CS each; with ${config.maxFlankingUnits} flankers, stacks of flanking upgrade add <strong>+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%</strong> CS each. When defending, defense upgrade stacks add <strong>+${Math.round(config.upgradeBonusDefensePerStack * 100)}%</strong> CS each.</li>
+    </ul>
+    <p>Let <strong>ΔCS</strong> = attacker CS − defender CS. <strong>Damage</strong> uses ΔCS, not percentages of HP directly: adjacent melee deals <code>max(1, floor(${config.combatDamageBase} × exp(ΔCS / ${config.combatStrengthScale})))</code> to the defender and <code>max(1, floor(${config.combatDamageBase} × exp(−ΔCS / ${config.combatStrengthScale})))</code> to the attacker at the same time. Ranged artillery uses the same formula for damage to the target only (no return fire). A percentage bonus to CS changes ΔCS and therefore damage through this curve — it is not a direct “+X% damage”.</p>
 
     <h3>Healing</h3>
     <ul>
@@ -3559,7 +3572,7 @@ function buildSideHTML(unit: Unit, dmg: number, hpAfter: number, label: string, 
         <div class="tt-hp-nums">${unit.hp} → ${hpAfter} HP</div>
       </div>
       <div class="tt-dmg">−${dmg} damage</div>
-      <div class="tt-cs">CS: ${factors.cs}</div>
+      <div class="tt-cs">CS: ${factors.cs.toFixed(1)}</div>
       <div class="tt-factors">
         <div>· Strength: ${unit.strength}</div>
         <div>· Condition: ${factors.conditionPct}%</div>

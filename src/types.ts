@@ -152,6 +152,7 @@ export interface CombatVfxPayload {
 export interface CombatForecast {
   /** True when attacker uses ranged rules (no return fire, no advance on kill). */
   isRanged?: boolean;
+  /** Effective CS values are rounded to one decimal for display; combat uses full precision before rounding. */
   attackerCS: number;
   defenderCS: number;
   dmgToAttacker: number;

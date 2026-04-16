@@ -19,7 +19,7 @@ web-strategic/
 
 ## Game Rules
 
-> **IMPORTANT — keep in sync:** Whenever production, movement, victory conditions, game modes, or combat logic changes in `game.ts`, `gameconfig.ts`, or related code, you **must** also update the in-game rules overlay built by `buildRulesContent()` in `src/main.ts` (shown in `#rules-modal`) to reflect the new logic. The overlay is the canonical player-facing description of the rules and must always match the actual code.
+> **IMPORTANT — keep in sync:** Whenever production, movement, victory conditions, game modes, or combat logic changes in `game.ts`, `gameconfig.ts`, or related code, you **must** also update the in-game rules overlay built by `buildRulesContent()` in `src/main.ts` (shown in `#rules-modal`) to reflect the new logic. The overlay is the canonical player-facing description of the rules and must always match the actual code. For combat, update both the concise **Combat** list and the **Combat in detail** section (formulas must stay aligned with `effectiveCS`, `resolveCombat`, and `forecastCombat` in `game.ts`, and combat-related settings in `gameconfig.ts`).
 
 ### Board
 - 6×4 hexagonal grid (configurable in `gameconfig.js`), pointy-top orientation

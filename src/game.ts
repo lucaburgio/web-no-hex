@@ -816,6 +816,11 @@ function breakthroughStrengthMult(state: GameState, unit: Unit): number {
   return config.breakthroughEnemySectorStrengthMult;
 }
 
+/** Rounds effective CS to one decimal for UI and logs; combat resolution uses full precision until this step. */
+function roundCombatStrengthForDisplay(cs: number): number {
+  return Math.round(cs * 10) / 10;
+}
+
 function effectiveCS(
   state: GameState,
   unit: Unit,
@@ -903,10 +908,12 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): Combat
   const dmgToAttacker = ranged ? 0 : Math.max(1, Math.floor(base * Math.exp(-delta / scale)));
 
   const flankStr = flanking > 0 ? ` (${flanking} flanker${flanking > 1 ? 's' : ''})` : '';
+  const csAS = roundCombatStrengthForDisplay(csA).toFixed(1);
+  const csDS = roundCombatStrengthForDisplay(csD).toFixed(1);
   if (ranged) {
-    log(state, `Ranged: #${attacker.id} [${Math.round(csA)}CS] vs #${defender.id} [${Math.round(csD)}CS]${flankStr} → dealt ${dmgToDefender} dmg (no return fire)`);
+    log(state, `Ranged: #${attacker.id} [${csAS}CS] vs #${defender.id} [${csDS}CS]${flankStr} → dealt ${dmgToDefender} dmg (no return fire)`);
   } else {
-    log(state, `Combat: #${attacker.id} [${Math.round(csA)}CS] vs #${defender.id} [${Math.round(csD)}CS]${flankStr} → dealt ${dmgToDefender}/${dmgToAttacker} dmg`);
+    log(state, `Combat: #${attacker.id} [${csAS}CS] vs #${defender.id} [${csDS}CS]${flankStr} → dealt ${dmgToDefender}/${dmgToAttacker} dmg`);
   }
 
   if (ranged) {
@@ -1080,8 +1087,8 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
 
   return {
     isRanged:             ranged,
-    attackerCS:           Math.round(csA),
-    defenderCS:           Math.round(csD),
+    attackerCS:           roundCombatStrengthForDisplay(csA),
+    defenderCS:           roundCombatStrengthForDisplay(csD),
     dmgToAttacker,
     dmgToDefender,
     attackerHpAfter:      Math.max(0, attacker.hp - dmgToAttacker),
