@@ -175,6 +175,8 @@ export interface CombatForecast {
   attackerUpgradeForecastLines?: string[];
   /** Active upgrade bonuses included in defender CS (combat tooltip). */
   defenderUpgradeForecastLines?: string[];
+  /** Tank spearhead charge: percentage added to attacker CS when applicable (melee). */
+  spearheadBonusPct?: number;
 }
 
 export interface UnitType {
@@ -332,6 +334,8 @@ export interface GameConfig {
   upgradeBonusFlankingPerStack: number;
   /** Per stack: multiplier added to CS when defending. */
   upgradeBonusDefensePerStack: number;
+  /** Tank melee: additive fraction to attacker CS when the approach uses the full movement allowance in one charge (path steps = movement, from rest that turn). */
+  tankSpearheadAttackBonus: number;
   autoEndProduction: boolean;
   autoEndMovement: boolean;
   // Duration in ms for the unit move animation (0 = instant)

@@ -838,6 +838,7 @@ function effectiveCS(
   flankingCount: number = 0,
   extraFlankingSum: number = 0,
   combatRole: 'attacker' | 'defender' = 'defender',
+  spearhead: boolean = false,
 ): number {
   const hpRatio = unit.hp / unit.maxHp;
   const woundedMult = 0.5 + 0.5 * hpRatio;
@@ -856,10 +857,18 @@ function effectiveCS(
     upgradeMult += uD * config.upgradeBonusDefensePerStack;
   }
   let cs = unit.strength * brMult * woundedMult * flankMult * upgradeMult;
+  if (combatRole === 'attacker' && spearhead) {
+    cs *= 1 + config.tankSpearheadAttackBonus;
+  }
   if (combatRole === 'defender' && isUnitOnRiver(state, unit)) {
     cs *= 1 + config.riverDefenseBonus;
   }
   return cs;
+}
+
+/** Melee only: tank charges using full movement allowance in one approach (path steps = movement, started with no MP spent this turn). */
+function tankSpearheadFromApproach(unit: Unit, stepsCost: number, movesUsedBefore: number): boolean {
+  return unit.unitTypeId === 'tank' && movesUsedBefore === 0 && stepsCost === unit.movement;
 }
 
 /** True when limit-artillery mode blocks ranged fire (any enemy adjacent to this ranged unit). */
@@ -910,10 +919,16 @@ export interface CombatResolveResult {
   defenderDied: boolean;
 }
 
-function resolveCombat(state: GameState, attacker: Unit, defender: Unit): CombatResolveResult {
+function resolveCombat(
+  state: GameState,
+  attacker: Unit,
+  defender: Unit,
+  opts?: { spearhead?: boolean },
+): CombatResolveResult {
   const ranged = isRangedCombat(state, attacker, defender);
+  const spearhead = !ranged && (opts?.spearhead ?? false);
   const { count: flanking, extraSum } = analyzeFlanking(state, attacker, defender);
-  const csA = effectiveCS(state, attacker, flanking, extraSum, 'attacker');
+  const csA = effectiveCS(state, attacker, flanking, extraSum, 'attacker', spearhead);
   const csD = effectiveCS(state, defender, 0, 0, 'defender');
   const delta = csA - csD;
   const scale = config.combatStrengthScale;
@@ -923,12 +938,13 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): Combat
   const dmgToAttacker = ranged ? 0 : Math.max(1, Math.floor(base * Math.exp(-delta / scale)));
 
   const flankStr = flanking > 0 ? ` (${flanking} flanker${flanking > 1 ? 's' : ''})` : '';
+  const spearStr = spearhead ? ' spearhead' : '';
   const csAS = roundCombatStrengthForDisplay(csA).toFixed(1);
   const csDS = roundCombatStrengthForDisplay(csD).toFixed(1);
   if (ranged) {
     log(state, `Ranged: #${attacker.id} [${csAS}CS] vs #${defender.id} [${csDS}CS]${flankStr} → dealt ${dmgToDefender} dmg (no return fire)`);
   } else {
-    log(state, `Combat: #${attacker.id} [${csAS}CS] vs #${defender.id} [${csDS}CS]${flankStr} → dealt ${dmgToDefender}/${dmgToAttacker} dmg`);
+    log(state, `Combat: #${attacker.id} [${csAS}CS]${spearStr} vs #${defender.id} [${csDS}CS]${flankStr} → dealt ${dmgToDefender}/${dmgToAttacker} dmg`);
   }
 
   if (ranged) {
@@ -1090,8 +1106,22 @@ function defenderUpgradeForecastLines(unit: Unit): string[] {
 
 export function forecastCombat(state: GameState, attacker: Unit, defender: Unit): CombatForecast {
   const ranged = isRangedCombat(state, attacker, defender);
-  const { count: flanking, extraSum, extraFlankingFrom } = analyzeFlanking(state, attacker, defender);
-  const csA = effectiveCS(state, attacker, flanking, extraSum, 'attacker');
+  const path = getMovePath(state, attacker, defender.col, defender.row);
+  const approachSteps =
+    path.length > 0 ? path.length - 1 : bfsDistance(state, attacker.col, attacker.row, defender.col, defender.row);
+  const attackerForFlank: Unit =
+    ranged
+      ? attacker
+      : path.length >= 3
+        ? { ...attacker, col: path[path.length - 2]![0], row: path[path.length - 2]![1] }
+        : attacker;
+  const spearhead =
+    !ranged &&
+    attacker.unitTypeId === 'tank' &&
+    attacker.movesUsed === 0 &&
+    approachSteps === attacker.movement;
+  const { count: flanking, extraSum, extraFlankingFrom } = analyzeFlanking(state, attackerForFlank, defender);
+  const csA = effectiveCS(state, attacker, flanking, extraSum, 'attacker', spearhead);
   const csD = effectiveCS(state, defender, 0, 0, 'defender');
   const delta = csA - csD;
   const scale = config.combatStrengthScale;
@@ -1122,6 +1152,7 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
       : undefined,
     attackerUpgradeForecastLines: attackerUpgradeForecastLines(attacker, flanking),
     defenderUpgradeForecastLines: defenderUpgradeForecastLines(defender),
+    spearheadBonusPct: spearhead ? Math.round(config.tankSpearheadAttackBonus * 100) : undefined,
   };
 }
 
@@ -2257,17 +2288,19 @@ export function playerMoveUnit(
 
   const path = getMovePath(state, unit, col, row);
   const stepsCost = path.length > 0 ? path.length - 1 : bfsDistance(state, unit.col, unit.row, col, row);
+  const movesBefore = unit.movesUsed;
   unit.movesUsed += stepsCost;
   state.selectedUnit = null;
 
   if (target && target.owner === enemy) {
     // Combat exhausts remaining movement
     unit.movesUsed = unit.movement;
+    const spearhead = tankSpearheadFromApproach(unit, stepsCost, movesBefore);
     const attackerId = unit.id;
     advanceAlongPathBeforeCombat(state, unit, path, localPlayer);
     const atkCol = unit.col;
     const atkRow = unit.row;
-    const res = resolveCombat(state, unit, target);
+    const res = resolveCombat(state, unit, target, { spearhead });
     checkVictory(state);
     return {
       state,
@@ -2670,6 +2703,9 @@ export function aiMovement(state: GameState): {
         const target = getUnit(state, best.col, best.row);
         if (!target || target.owner !== PLAYER) break;
         const path = getMovePath(state, unit, best.col, best.row);
+        const stepsCost = path.length > 0 ? path.length - 1 : bfsDistance(state, unit.col, unit.row, best.col, best.row);
+        const movesBefore = unit.movesUsed;
+        const spearhead = tankSpearheadFromApproach(unit, stepsCost, movesBefore);
         unit.movesUsed = unit.movement;
         const attackerId = unit.id;
         const unitBeforeMelee = { ...unit } as Unit;
@@ -2680,7 +2716,7 @@ export function aiMovement(state: GameState): {
         const atkRow = unit.row;
         const beforeResolveUnits = snapshotUnits(state);
 
-        const res = resolveCombat(state, unit, target);
+        const res = resolveCombat(state, unit, target, { spearhead });
         const vfx = combatVfxFromResolve(attackerId, atkCol, atkRow, best.col, best.row, res, path);
         combatVfx.push(vfx);
 

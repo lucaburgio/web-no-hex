@@ -1911,6 +1911,7 @@ function buildRulesContent(): string {
       <li><strong>Artillery ranged (2+ hexes):</strong> only the defender takes damage (no return fire). Destroying a unit with a ranged attack does <strong>not</strong> move the artillery or conquer that hex.</li>
       <li><strong>Limit Artillery</strong> (optional game setting): when enabled, if <strong>any</strong> enemy is adjacent to your artillery, it cannot use ranged attacks against other hexes until no adjacent enemies remain — use adjacent combat (move to attack) first.</li>
       <li><strong>CS</strong> = unit type&rsquo;s base strength × condition (50–100% of current max HP) × flanking bonus. Defenders on a <strong>river</strong> hex gain <strong>+${riverDefPct}%</strong> effective strength.</li>
+      <li><strong>Tank spearhead:</strong> a <strong>tank</strong> gains <strong>+${Math.round(config.tankSpearheadAttackBonus * 100)}%</strong> attacker CS when it moves into <strong>adjacent</strong> melee after a <strong>straight-line approach that uses its full movement allowance in one move</strong> (e.g. movement 2 = two hexes along the attack path; movement 3 = three hexes).</li>
       <li><strong>Breakthrough:</strong> northern (defender) units in a <strong>sector already captured</strong> by the attacker use reduced effective strength in combat (see game settings for the percentage).</li>
       <li><strong>Flanking:</strong> +${Math.round(config.flankingBonus * 100)}% CS per adjacent friendly
         (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%), in fixed neighbor order.
@@ -1924,13 +1925,14 @@ function buildRulesContent(): string {
     <!-- Keep in sync with effectiveCS, resolveCombat, forecastCombat in game.ts and combat-related keys in gameconfig.ts -->
     <h3>Combat in detail</h3>
     <p><strong>Base strength</strong> (integer on the unit) is only the starting stat from the unit type. <strong>Effective combat strength (CS)</strong> multiplies that base by modifiers below. The engine uses full-precision numbers; the combat forecast shows <strong>CS to one decimal place</strong>.</p>
-    <p><strong>Effective CS</strong> = base strength × breakthrough sector mult × condition mult × flank mult × upgrade mult × river defense mult (when that role applies).</p>
+    <p><strong>Effective CS</strong> = base strength × breakthrough sector mult × condition mult × flank mult × upgrade mult × river defense mult (when that role applies) × tank spearhead mult (attacking tank only, when applicable).</p>
     <ul>
       <li><strong>Condition mult</strong> = <code>0.5 + 0.5 × (current HP / max HP)</code> — from <strong>50%</strong> of full effectiveness at 0 HP up to <strong>100%</strong> at full HP (linear in HP fraction).</li>
       <li><strong>Flank mult</strong> (attacker only) = <code>1 + <em>f</em> × ${Math.round(config.flankingBonus * 100)}%</code> where <em>f</em> is the number of contributing adjacent friendlies next to the defender, capped at <strong>${config.maxFlankingUnits}</strong>, in fixed neighbor order, plus any per-unit-type <strong>extra flanking</strong> from those flankers (see short Combat section).</li>
       <li><strong>Breakthrough</strong> mult for a defender in a sector already captured by the attacker = <strong>${brPct}%</strong> (same setting as above).</li>
       <li><strong>River defense</strong> mult for a defender whose unit is on a river hex = <strong>${100 + riverDefPct}%</strong> (additive +${riverDefPct}% to CS).</li>
       <li><strong>Upgrade</strong> mult: when attacking, stacks of attack upgrade add <strong>+${Math.round(config.upgradeBonusAttackPerStack * 100)}%</strong> CS each; with ${config.maxFlankingUnits} flankers, stacks of flanking upgrade add <strong>+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%</strong> CS each. When defending, defense upgrade stacks add <strong>+${Math.round(config.upgradeBonusDefensePerStack * 100)}%</strong> CS each.</li>
+      <li><strong>Tank spearhead</strong> mult (melee attacker only) = <strong>${100 + Math.round(config.tankSpearheadAttackBonus * 100)}%</strong> when the attacker is a <strong>tank</strong>, it had <strong>not</strong> spent movement earlier this phase, and the move into adjacent combat costs <strong>exactly</strong> that unit&rsquo;s <strong>movement</strong> stat in path steps (scales if tanks later have movement 3+).</li>
     </ul>
     <p>Let <strong>ΔCS</strong> = attacker CS − defender CS. <strong>Damage</strong> uses ΔCS, not percentages of HP directly: adjacent melee deals <code>max(1, floor(${config.combatDamageBase} × exp(ΔCS / ${config.combatStrengthScale})))</code> to the defender and <code>max(1, floor(${config.combatDamageBase} × exp(−ΔCS / ${config.combatStrengthScale})))</code> to the attacker at the same time. Ranged artillery uses the same formula for damage to the target only (no return fire). A percentage bonus to CS changes ΔCS and therefore damage through this curve — it is not a direct “+X% damage”.</p>
 
@@ -3565,6 +3567,8 @@ interface SideFactors {
   breakthroughMalusDeltaPct?: number;
   /** Defender on a river: bonus % to CS from config. */
   riverDefenseBonusPct?: number;
+  /** Tank spearhead charge (melee). */
+  spearheadBonusPct?: number;
   upgradeLines?: string[];
 }
 
@@ -3600,23 +3604,16 @@ function buildSideHTML(unit: Unit, dmg: number, hpAfter: number, label: string, 
         ${factors.riverDefenseBonusPct !== undefined
           ? `<div>· River defense: +${factors.riverDefenseBonusPct}%</div>`
           : ''}
+        ${factors.spearheadBonusPct !== undefined
+          ? `<div>· Spearhead: +${factors.spearheadBonusPct}%</div>`
+          : ''}
         ${(factors.upgradeLines ?? []).map(l => `<div>· ${l}</div>`).join('')}
       </div>
     </div>`;
 }
 
 function showCombatTooltip(attacker: Unit, defender: Unit, pageX: number, pageY: number): void {
-  const validMoves = getValidMoves(state, attacker);
-  const meleeAttack = validMoves.some(([c, r]) => c === defender.col && r === defender.row);
-  let attackerForForecast = attacker;
-  if (meleeAttack) {
-    const path = getMovePath(state, attacker, defender.col, defender.row);
-    attackerForForecast =
-      path.length >= 3
-        ? { ...attacker, col: path[path.length - 2][0]!, row: path[path.length - 2][1]! }
-        : attacker;
-  }
-  const fc: CombatForecast = forecastCombat(state, attackerForForecast, defender);
+  const fc: CombatForecast = forecastCombat(state, attacker, defender);
 
   const attackerFactors: SideFactors = {
     cs: fc.attackerCS,
@@ -3624,6 +3621,7 @@ function showCombatTooltip(attacker: Unit, defender: Unit, pageX: number, pageY:
     flankCount: fc.flankingCount,
     flankBonusPct: fc.flankBonusPct,
     extraFlankingFrom: fc.extraFlankingFrom.length > 0 ? fc.extraFlankingFrom : undefined,
+    spearheadBonusPct: fc.spearheadBonusPct,
     upgradeLines:
       fc.attackerUpgradeForecastLines && fc.attackerUpgradeForecastLines.length > 0
         ? fc.attackerUpgradeForecastLines

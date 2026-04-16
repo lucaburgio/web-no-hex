@@ -119,9 +119,8 @@ const config: GameConfig = {
       maxHp: 10,
       strength: 10,
       icon: 'icons/units/infantry.svg',
-      image: 'images/units/infantry.png',
       package: 'standard',
-      upgradePointsToLevel: 20,
+      upgradePointsToLevel: 8,
     },
     {
       id: 'tank',
@@ -132,9 +131,8 @@ const config: GameConfig = {
       strength: 11,
       extraFlanking: 0.05,
       icon: 'icons/units/tank.svg',
-      image: 'images/units/tank.png',
       package: 'standard',
-      upgradePointsToLevel: 28,
+      upgradePointsToLevel: 10,
     },
     {
       id: 'artillery',
@@ -145,9 +143,8 @@ const config: GameConfig = {
       strength: 8,
       range: 3,
       icon: 'icons/units/artillery.svg',
-      image: 'images/units/artillery.png',
       package: 'standard',
-      upgradePointsToLevel: 24,
+      upgradePointsToLevel: 20,
     },
 
 
@@ -161,9 +158,8 @@ const config: GameConfig = {
       maxHp: 10,
       strength: 10,
       icon: 'icons/units/infantry.svg',
-      image: 'images/units/marines.png',
       package: 'us-ww2',
-      upgradePointsToLevel: 20,
+      upgradePointsToLevel: 8,
     },
     {
       id: 'tank',
@@ -174,9 +170,8 @@ const config: GameConfig = {
       strength: 11,
       extraFlanking: 0.05,
       icon: 'icons/units/tank.svg',
-      image: 'images/units/sherman.png',
       package: 'us-ww2',
-      upgradePointsToLevel: 28,
+      upgradePointsToLevel: 10,
     },
     {
       id: 'artillery',
@@ -187,9 +182,8 @@ const config: GameConfig = {
       strength: 8,
       range: 3,
       icon: 'icons/units/artillery.svg',
-      image: 'images/units/m2-howitzer.png',
       package: 'us-ww2',
-      upgradePointsToLevel: 24,
+      upgradePointsToLevel: 20,
     },
     {
       id: 'artillery',
@@ -200,9 +194,8 @@ const config: GameConfig = {
       strength: 9,
       range: 4,
       icon: 'icons/units/artillery.svg',
-      image: 'images/units/m1-long-tom.png',
       package: 'us-ww2',
-      upgradePointsToLevel: 26,
+      upgradePointsToLevel: 20,
     },
 
 
@@ -221,9 +214,8 @@ const config: GameConfig = {
       maxHp: 10,
       strength: 10,
       icon: 'icons/units/de-infantry.svg',
-      image: 'images/units/de-infantry.png',
       package: 'de-ww2',
-      upgradePointsToLevel: 20,
+      upgradePointsToLevel: 8,
     },
     {
       id: 'tank',
@@ -234,9 +226,8 @@ const config: GameConfig = {
       strength: 11,
       extraFlanking: 0.05,
       icon: 'icons/units/panzer-iv.svg',
-      image: 'images/units/panzer-iv.png',
       package: 'de-ww2',
-      upgradePointsToLevel: 28,
+      upgradePointsToLevel: 10,
     },
     {
       id: 'artillery',
@@ -248,7 +239,7 @@ const config: GameConfig = {
       range: 3,
       icon: 'icons/units/artillery.svg',
       package: 'de-ww2',
-      upgradePointsToLevel: 24,
+      upgradePointsToLevel: 20,
     },
 
 
@@ -267,7 +258,7 @@ const config: GameConfig = {
       strength: 10,
       icon: 'icons/units/infantry.svg',
       package: 'ru-ww2',
-      upgradePointsToLevel: 20,
+      upgradePointsToLevel: 8,
     },
     {
       id: 'tank',
@@ -279,7 +270,7 @@ const config: GameConfig = {
       extraFlanking: 0.05,
       icon: 'icons/units/tank.svg',
       package: 'ru-ww2',
-      upgradePointsToLevel: 28,
+      upgradePointsToLevel: 10,
     },
     {
       id: 'artillery',
@@ -291,7 +282,7 @@ const config: GameConfig = {
       range: 3,
       icon: 'icons/units/artillery.svg',
       package: 'ru-ww2',
-      upgradePointsToLevel: 24,
+      upgradePointsToLevel: 20,
     }
   ],
 
@@ -308,6 +299,9 @@ const config: GameConfig = {
 
   // Maximum number of flanking units that contribute a bonus
   maxFlankingUnits: 2,
+
+  // Tank only: +CS when moving into adjacent melee after using the unit's full movement allowance in one approach (melee path length = movement, from full MP at start of the move)
+  tankSpearheadAttackBonus: 0.05,
 
   // Defender CS multiplier while standing on a river hex (additive: 0.15 = +15%)
   riverDefenseBonus: 0.15,
