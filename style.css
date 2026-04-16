@@ -48,7 +48,7 @@ img {
   --color-gray-600: #797979;
   --color-gray-300: #A5A5A5;
   --color-gray-200: #C8C8C8;
-  --color-gray-150: #d7d7d7;
+  --color-gray-150: #d3d3d3;
   --color-gray-100: #DCDCDC;
 
   --color-gray-500: #9E9E9E;
@@ -890,7 +890,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   align-items: stretch;
   width: 100%;
   max-width: 440px;
-  min-height: 76px;
+  min-height: 68px;
   overflow: hidden;
   pointer-events: auto;
   user-select: none;
@@ -938,7 +938,6 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   grid-template-columns: 1fr auto;
   grid-template-rows: auto auto;
   column-gap: 16px;
-  row-gap: 8px;
   align-items: center;
 }
 
