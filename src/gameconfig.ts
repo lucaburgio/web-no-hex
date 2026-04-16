@@ -309,6 +309,9 @@ const config: GameConfig = {
   // Maximum number of flanking units that contribute a bonus
   maxFlankingUnits: 2,
 
+  // Defender CS multiplier while standing on a river hex (additive: 0.15 = +15%)
+  riverDefenseBonus: 0.15,
+
   // HP recovered per turn when unit is on owned territory
   healOwnTerritory: 2,
 

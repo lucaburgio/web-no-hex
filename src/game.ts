@@ -821,6 +821,12 @@ function breakthroughStrengthMult(state: GameState, unit: Unit): number {
   return config.breakthroughEnemySectorStrengthMult;
 }
 
+function isUnitOnRiver(state: GameState, unit: Unit): boolean {
+  const hexes = state.riverHexes;
+  if (!hexes?.length) return false;
+  return hexes.some(rh => rh.col === unit.col && rh.row === unit.row);
+}
+
 /** Rounds effective CS to one decimal for UI and logs; combat resolution uses full precision until this step. */
 function roundCombatStrengthForDisplay(cs: number): number {
   return Math.round(cs * 10) / 10;
@@ -849,7 +855,11 @@ function effectiveCS(
   } else {
     upgradeMult += uD * config.upgradeBonusDefensePerStack;
   }
-  return unit.strength * brMult * woundedMult * flankMult * upgradeMult;
+  let cs = unit.strength * brMult * woundedMult * flankMult * upgradeMult;
+  if (combatRole === 'defender' && isUnitOnRiver(state, unit)) {
+    cs *= 1 + config.riverDefenseBonus;
+  }
+  return cs;
 }
 
 /** True when limit-artillery mode blocks ranged fire (any enemy adjacent to this ranged unit). */
@@ -1107,6 +1117,9 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
     defenderConditionPct: Math.round((0.5 + 0.5 * (defender.hp / defender.maxHp)) * 100),
     breakthroughDefenderMalus:
       state.gameMode === 'breakthrough' && breakthroughStrengthMult(state, defender) < 1 ? true : undefined,
+    defenderRiverDefenseBonusPct: isUnitOnRiver(state, defender)
+      ? Math.round(config.riverDefenseBonus * 100)
+      : undefined,
     attackerUpgradeForecastLines: attackerUpgradeForecastLines(attacker, flanking),
     defenderUpgradeForecastLines: defenderUpgradeForecastLines(defender),
   };

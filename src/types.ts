@@ -169,6 +169,8 @@ export interface CombatForecast {
   defenderConditionPct: number;
   /** Breakthrough: defender has strength malus in attacker-held sector. */
   breakthroughDefenderMalus?: boolean;
+  /** Defender on a river hex: percentage bonus to CS from {@link GameConfig.riverDefenseBonus}. */
+  defenderRiverDefenseBonusPct?: number;
   /** Active upgrade bonuses included in attacker CS (combat tooltip). */
   attackerUpgradeForecastLines?: string[];
   /** Active upgrade bonuses included in defender CS (combat tooltip). */
@@ -314,6 +316,8 @@ export interface GameConfig {
   combatStrengthScale: number;
   flankingBonus: number;
   maxFlankingUnits: number;
+  /** Additive fraction applied to defender CS on a river hex (e.g. 0.15 = +15%). */
+  riverDefenseBonus: number;
   healOwnTerritory: number;
   zoneOfControl: boolean;
   /** If true, artillery cannot use ranged fire while any enemy is adjacent; must clear adjacencies first. */
