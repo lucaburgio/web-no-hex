@@ -48,6 +48,7 @@ img {
   --color-gray-600: #797979;
   --color-gray-300: #A5A5A5;
   --color-gray-200: #C8C8C8;
+  --color-gray-150: #d7d7d7;
   --color-gray-100: #DCDCDC;
 
   --color-gray-500: #9E9E9E;
@@ -789,7 +790,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 .upgrade-picker-panel.upgrade-picker-panel--enter {
-  animation: unit-card-enter 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: unit-card-enter 1s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -825,10 +826,17 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   margin: 0;
   border: none;
   cursor: url('/icons/pointer.svg') 13 14, pointer;
-  background: transparent;
   text-align: left;
   font: inherit;
   color: inherit;
+}
+
+.upgrade-picker-row:nth-child(odd) {
+  background: var(--color-gray-100);
+}
+
+.upgrade-picker-row:nth-child(even) {
+  background: var(--color-gray-150);
 }
 
 .upgrade-picker-row:first-of-type {
