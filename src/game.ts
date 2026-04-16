@@ -758,16 +758,17 @@ function unitTypeForUnit(unit: Unit): UnitType {
   return config.unitTypes.find(u => u.id === unit.unitTypeId) ?? config.unitTypes[0];
 }
 
-function awardAttackerUpgradePoints(
-  attacker: Unit,
-  defenderHpBefore: number,
-  dmgToDefender: number,
-  defenderDied: boolean,
+/** Upgrade points for a unit that dealt damage in combat (attacker or defender in melee). */
+function awardUpgradePointsForCombatDamage(
+  dealer: Unit,
+  targetHpBefore: number,
+  dmgToTarget: number,
+  targetDied: boolean,
 ): void {
-  const hpLost = Math.min(dmgToDefender, Math.max(0, defenderHpBefore));
+  const hpLost = Math.min(dmgToTarget, Math.max(0, targetHpBefore));
   let gain = Math.floor(hpLost * config.upgradePointsPerDamageDealt);
-  if (defenderDied) gain += config.upgradePointsKillBonus;
-  attacker.upgradePoints += gain;
+  if (targetDied) gain += config.upgradePointsKillBonus;
+  dealer.upgradePoints += gain;
 }
 
 // Adjacent friendlies to the defender in neighbor order (excluding the attacker's hex),
@@ -897,7 +898,7 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): Combat
     attacker.attackedThisTurn = true;
     defender.attackedThisTurn = true;
     const defenderDied = defender.hp <= 0;
-    awardAttackerUpgradePoints(attacker, defenderHpBefore, dmgToDefender, defenderDied);
+    awardUpgradePointsForCombatDamage(attacker, defenderHpBefore, dmgToDefender, defenderDied);
     if (defenderDied) {
       log(state, `Unit #${defender.id} was destroyed.`);
       removeUnit(state, defender.id);
@@ -917,6 +918,7 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): Combat
 
   // Melee: apply damage simultaneously
   const defenderHpBefore = defender.hp;
+  const attackerHpBefore = attacker.hp;
   attacker.hp -= dmgToAttacker;
   defender.hp -= dmgToDefender;
   attacker.attackedThisTurn = true;
@@ -924,7 +926,8 @@ function resolveCombat(state: GameState, attacker: Unit, defender: Unit): Combat
 
   const attackerDied = attacker.hp <= 0;
   const defenderDied = defender.hp <= 0;
-  awardAttackerUpgradePoints(attacker, defenderHpBefore, dmgToDefender, defenderDied);
+  awardUpgradePointsForCombatDamage(attacker, defenderHpBefore, dmgToDefender, defenderDied);
+  awardUpgradePointsForCombatDamage(defender, attackerHpBefore, dmgToAttacker, attackerDied);
   const mutualKill = attackerDied && defenderDied;
 
   if (defenderDied) {

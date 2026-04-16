@@ -1909,7 +1909,7 @@ function buildRulesContent(): string {
         (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%), in fixed neighbor order.
         Some unit types add <strong>extra flanking</strong> when they are among those adjacent flankers.</li>
       <li><strong>Damage:</strong> <code>floor(${config.combatDamageBase} × exp(±ΔCS / ${config.combatStrengthScale}))</code>, min 1 per side.</li>
-      <li><strong>Upgrade points:</strong> the attacking unit earns <strong>${config.upgradePointsPerDamageDealt}</strong> point per HP of damage actually dealt to the enemy, plus <strong>${config.upgradePointsKillBonus}</strong> extra if it destroys the unit. Required points to level up depend on unit type (shown on the movement unit card).</li>
+      <li><strong>Upgrade points:</strong> in <strong>adjacent combat</strong>, each side earns <strong>${config.upgradePointsPerDamageDealt}</strong> point per HP of damage it actually deals to the other, plus <strong>${config.upgradePointsKillBonus}</strong> extra if it destroys that unit. <strong>Ranged fire</strong> only damages the target (no return shot), so only the firing unit earns points from that exchange. Required points to level up depend on unit type (shown on the movement unit card).</li>
       <li>If defender dies: attacker advances and conquers the hex. If both die: both removed.</li>
       <li>Hover over an enemy unit during movement to see a combat forecast.</li>
     </ul>
