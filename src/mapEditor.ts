@@ -31,59 +31,59 @@ function sectorLabelColor(idx: number): string {
   return `rgba(${r},${g},${b},0.65)`;
 }
 
-/** Parsed breakthrough CP, sorted north → south for stable sector indexing. */
-interface BreakthroughCp {
-  key: string;
-  c: number;
-  r: number;
-}
-
-function breakthroughCpListNorthToSouth(cpKeys: Iterable<string>): BreakthroughCp[] {
-  return [...cpKeys]
-    .map(k => {
-      const [c, r] = k.split(',').map(Number);
-      return { key: k, c, r };
-    })
-    .filter(p => Number.isFinite(p.c) && Number.isFinite(p.r))
-    .sort((a, b) => a.r - b.r);
+/**
+ * Breakthrough editor: control-point rows sorted north → south (increasing r).
+ * Sectors are horizontal bands; game sector 0 is south (attacker starting sector, no CP).
+ */
+function breakthroughCpRowsNorthToSouth(cpKeys: Iterable<string>): number[] {
+  const rows = [...cpKeys].map(k => Number(k.split(',')[1])).filter(Number.isFinite);
+  return [...new Set(rows)].sort((a, b) => a - b);
 }
 
 /**
- * Assign each hex to a game sector: sector 0 = full-width attacker strip (south of all CP rows).
- * Otherwise pick the CP that minimizes horizontal distance first, then row — so each CP sits in the
- * column center of its region (Voronoi between CP columns on the defender half of the map).
+ * Game sector index for a row: 0 = south (attacker home band), K = north when there are K CPs.
  */
-function breakthroughEditorSectorForHex(
-  col: number,
-  row: number,
-  cps: BreakthroughCp[],
-  rows: number,
-): number {
-  const K = cps.length;
+function breakthroughEditorGameSectorForRow(row: number, cpRowsNorthToSouth: number[]): number {
+  const r = cpRowsNorthToSouth;
+  const K = r.length;
   if (K === 0) return 0;
-  const southmostR = cps[K - 1]!.r;
-  if (row > southmostR) return 0;
-
-  let bestJ = 0;
-  let bestColD = Infinity;
-  let bestRowD = Infinity;
-  for (let j = 0; j < K; j++) {
-    const { c, r } = cps[j]!;
-    const colD = Math.abs(col - c);
-    const rowD = Math.abs(row - r);
-    if (colD < bestColD || (colD === bestColD && rowD < bestRowD)) {
-      bestColD = colD;
-      bestRowD = rowD;
-      bestJ = j;
-    }
+  if (row > r[K - 1]!) return 0;
+  if (row <= r[0]!) return K;
+  for (let j = 1; j < K; j++) {
+    if (row <= r[j]! && row > r[j - 1]!) return K - j;
   }
-  return K - bestJ;
+  return K;
+}
+
+/** Inclusive row span per game sector index (same indexing as {@link breakthroughEditorGameSectorForRow}). */
+function breakthroughSectorRowSpans(cpRowsNorthToSouth: number[], rows: number): { lo: number; hi: number }[] {
+  const r = cpRowsNorthToSouth;
+  const K = r.length;
+  const out: { lo: number; hi: number }[] = [];
+  out[K] = { lo: 0, hi: r[0]! };
+  for (let j = 1; j < K; j++) {
+    out[K - j] = { lo: r[j - 1]! + 1, hi: r[j]! };
+  }
+  out[0] = { lo: r[K - 1]! + 1, hi: rows - 1 };
+  return out;
 }
 
 const ATTACKER_START_SECTOR_LABEL = 'Attacker starting sector';
 
 function breakthroughSectorCanvasLabel(gameSector: number): string {
   return gameSector === 0 ? ATTACKER_START_SECTOR_LABEL : `S${gameSector + 1}`;
+}
+
+/** Y positions for dashed lines between row bands (matches {@link breakthroughSectorRowSpans}). */
+function breakthroughSectorBoundaryYs(cpRowsNorthToSouth: number[], rows: number, rowToY: (row: number) => number): number[] {
+  const r = cpRowsNorthToSouth;
+  const ys: number[] = [];
+  for (let i = 0; i < r.length; i++) {
+    if (r[i]! < rows - 1) {
+      ys.push((rowToY(r[i]!) + rowToY(r[i]! + 1)) / 2);
+    }
+  }
+  return ys;
 }
 
 function dedupeBreakthroughCpOnePerRow(set: Set<string>): void {
@@ -534,18 +534,6 @@ function hexToPixelLocal(col: number, row: number): { x: number; y: number } {
   };
 }
 
-/** Vertical dashed lines at mid-columns between CPs sorted by column (defender area). */
-function breakthroughColumnBoundaryPixelXs(cps: BreakthroughCp[], refRow: number): number[] {
-  if (cps.length < 2) return [];
-  const sorted = [...cps].sort((a, b) => a.c - b.c);
-  const xs: number[] = [];
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const midC = (sorted[i]!.c + sorted[i + 1]!.c) / 2;
-    xs.push(hexToPixelLocal(midC, refRow).x);
-  }
-  return xs;
-}
-
 function renderBoard(): void {
   const keySig = riverKeysSignature(edState.riverHexKeys);
   if (
@@ -566,10 +554,8 @@ function renderBoard(): void {
   // Sector overlay — only in Breakthrough edit layer when BT CPs exist
   const showSectors = edState.gameMode === 'breakthrough' && edState.breakthroughControlPoints.size > 0;
   const numSectors  = showSectors ? edState.breakthroughControlPoints.size + 1 : 0;
-  const btCps = showSectors ? breakthroughCpListNorthToSouth(edState.breakthroughControlPoints) : [];
-  const sectorRowExtent = showSectors
-    ? Array.from({ length: numSectors }, () => ({ lo: rows, hi: -1 }))
-    : [];
+  const btCpRowsNorthToSouth = showSectors ? breakthroughCpRowsNorthToSouth(edState.breakthroughControlPoints) : [];
+  const btSectorSpans = showSectors ? breakthroughSectorRowSpans(btCpRowsNorthToSouth, rows) : [];
 
   // Extra left margin to accommodate sector labels
   const leftMargin = showSectors ? s * 2.8 : margin;
@@ -628,10 +614,7 @@ function renderBoard(): void {
 
       // Sector tint overlay (drawn on top of base fill, below labels)
       if (showSectors) {
-        const sector = breakthroughEditorSectorForHex(col, row, btCps, rows);
-        const ext = sectorRowExtent[sector]!;
-        ext.lo = Math.min(ext.lo, row);
-        ext.hi = Math.max(ext.hi, row);
+        const sector = breakthroughEditorGameSectorForRow(row, btCpRowsNorthToSouth);
         const tint = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
         tint.setAttribute('points', hexPoints(x, y, s));
         tint.setAttribute('fill', sectorTint(sector));
@@ -687,8 +670,7 @@ function renderBoard(): void {
   }
 
   if (showSectors) {
-    const southR = btCps.length ? btCps[btCps.length - 1]!.r : 0;
-    renderSectorOverlay(rows, cols, btCps, sectorRowExtent, numSectors, s, leftMargin, southR);
+    renderSectorOverlay(rows, cols, btCpRowsNorthToSouth, btSectorSpans, numSectors, s, leftMargin);
   }
 
   if (edState.riverPreviewHexes !== null && edState.riverPreviewHexes.length > 0) {
@@ -700,45 +682,26 @@ function renderBoard(): void {
 
 function renderSectorOverlay(
   rows: number, cols: number,
-  cps: BreakthroughCp[],
+  cpRowsNorthToSouth: number[],
   sectorSpans: { lo: number; hi: number }[],
   numSectors: number,
   hexSize: number, leftMargin: number,
-  southmostCpRow: number,
 ): void {
   const hexW = hexSize * Math.sqrt(3);
   const rowY = (r: number) => hexToPixelLocal(0, r).y;
-  const refRow = Math.max(0, Math.min(rows - 1, Math.round((0 + southmostCpRow) / 2)));
-  const yDefTop = rowY(0) - hexSize * 0.9;
-  const yDefBot = rowY(southmostCpRow) + hexSize * 0.9;
 
-  // Horizontal divider: attacker strip (sector 0) vs defender — only if that strip has height
-  if (southmostCpRow < rows - 1) {
-    const lineY = (rowY(southmostCpRow) + rowY(southmostCpRow + 1)) / 2;
-    const hLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    hLine.setAttribute('x1', String(-hexW * 0.5));
-    hLine.setAttribute('y1', String(lineY));
-    hLine.setAttribute('x2', String(cols * hexW + hexW * 0.5));
-    hLine.setAttribute('y2', String(lineY));
-    hLine.setAttribute('stroke', 'rgba(0,0,0,0.22)');
-    hLine.setAttribute('stroke-width', '1.5');
-    hLine.setAttribute('stroke-dasharray', '5 4');
-    hLine.style.pointerEvents = 'none';
-    svgEl.appendChild(hLine);
-  }
-
-  // Vertical dividers at column midpoints between CPs (column-centered sectors)
-  for (const lineX of breakthroughColumnBoundaryPixelXs(cps, refRow)) {
-    const vLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    vLine.setAttribute('x1', String(lineX));
-    vLine.setAttribute('y1', String(yDefTop));
-    vLine.setAttribute('x2', String(lineX));
-    vLine.setAttribute('y2', String(yDefBot));
-    vLine.setAttribute('stroke', 'rgba(0,0,0,0.22)');
-    vLine.setAttribute('stroke-width', '1.5');
-    vLine.setAttribute('stroke-dasharray', '5 4');
-    vLine.style.pointerEvents = 'none';
-    svgEl.appendChild(vLine);
+  // Dashed boundary lines between row bands (one line per CP row band edge)
+  for (const lineY of breakthroughSectorBoundaryYs(cpRowsNorthToSouth, rows, rowY)) {
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', String(-hexW * 0.5));
+    line.setAttribute('y1', String(lineY));
+    line.setAttribute('x2', String(cols * hexW + hexW * 0.5));
+    line.setAttribute('y2', String(lineY));
+    line.setAttribute('stroke', 'rgba(0,0,0,0.22)');
+    line.setAttribute('stroke-width', '1.5');
+    line.setAttribute('stroke-dasharray', '5 4');
+    line.style.pointerEvents = 'none';
+    svgEl.appendChild(line);
   }
 
   // Sector labels in the expanded left margin (north → south on screen: game sector K … 0)
