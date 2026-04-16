@@ -1909,6 +1909,7 @@ function buildRulesContent(): string {
         (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%), in fixed neighbor order.
         Some unit types add <strong>extra flanking</strong> when they are among those adjacent flankers.</li>
       <li><strong>Damage:</strong> <code>floor(${config.combatDamageBase} × exp(±ΔCS / ${config.combatStrengthScale}))</code>, min 1 per side.</li>
+      <li><strong>Upgrade points:</strong> the attacking unit earns <strong>${config.upgradePointsPerDamageDealt}</strong> point per HP of damage actually dealt to the enemy, plus <strong>${config.upgradePointsKillBonus}</strong> extra if it destroys the unit. Required points to level up depend on unit type (shown on the movement unit card).</li>
       <li>If defender dies: attacker advances and conquers the hex. If both die: both removed.</li>
       <li>Hover over an enemy unit during movement to see a combat forecast.</li>
     </ul>
@@ -2357,16 +2358,20 @@ function hideUnitPicker(): void {
 /** Last unit id rendered into the movement-phase card (for enter animation + partial updates). */
 let movementUnitCardBoundId: number | null = null;
 
-function patchMovementUnitCardStats(unit: Unit): void {
+function patchMovementUnitCardStats(unit: Unit, unitType: UnitType): void {
   const surface = movementUnitCardEl.querySelector('.movement-unit-card-surface');
   if (!surface) return;
   const rem = Math.max(0, unit.movement - unit.movesUsed);
   const moveEl = surface.querySelector('[data-mv-stat="move"]');
   const strEl = surface.querySelector('[data-mv-stat="str"]');
   const hpEl = surface.querySelector('[data-mv-stat="hp"]');
+  const upCur = surface.querySelector('[data-mv-extra="cur"]');
+  const upReq = surface.querySelector('[data-mv-extra="req"]');
   if (moveEl) moveEl.textContent = String(rem);
   if (strEl) strEl.textContent = String(unit.strength);
   if (hpEl) hpEl.textContent = String(unit.hp);
+  if (upCur) upCur.textContent = String(unit.upgradePoints);
+  if (upReq) upReq.textContent = String(unitType.upgradePointsToLevel);
 }
 
 function buildMovementUnitCardInner(unit: Unit, unitType: UnitType): void {
@@ -2473,29 +2478,38 @@ function buildMovementUnitCardInner(unit: Unit, unitType: UnitType): void {
 
   const extra = document.createElement('div');
   extra.className = 'movement-unit-card-extra';
-  extra.setAttribute('aria-hidden', 'true');
-  const arrowNs = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(arrowNs, 'svg');
-  svg.setAttribute('class', 'movement-unit-card-extra-icon');
-  svg.setAttribute('viewBox', '0 0 12 14');
-  svg.setAttribute('aria-hidden', 'true');
-  const path = document.createElementNS(arrowNs, 'path');
-  path.setAttribute('fill', 'currentColor');
-  path.setAttribute('d', 'M6 0 12 10H0L6 0z');
-  svg.appendChild(path);
+  const upIcon = document.createElement('img');
+  upIcon.className = 'movement-unit-card-extra-icon';
+  upIcon.src = 'icons/upgrade-yellow.svg';
+  upIcon.alt = '';
   const num = document.createElement('span');
   num.className = 'movement-unit-card-extra-num';
-  num.textContent = '14.4';
+  num.setAttribute('data-mv-extra', 'cur');
+  num.textContent = String(unit.upgradePoints);
   const sep = document.createElement('span');
   sep.className = 'movement-unit-card-extra-sep';
   sep.textContent = '/';
   const den = document.createElement('span');
   den.className = 'movement-unit-card-extra-den';
-  den.textContent = '20';
-  extra.appendChild(svg);
+  den.setAttribute('data-mv-extra', 'req');
+  den.textContent = String(unitType.upgradePointsToLevel);
+  extra.appendChild(upIcon);
   extra.appendChild(num);
   extra.appendChild(sep);
   extra.appendChild(den);
+  extra.addEventListener('mouseenter', () => {
+    const u = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
+    if (!u) return;
+    const ut =
+      config.unitTypes.find(t => t.id === u.unitTypeId) ?? config.unitTypes[0];
+    unitStatTooltipEl.innerHTML = `
+        <div class="unit-stat-tt-title">Upgrade points</div>
+        <div class="unit-stat-tt-desc">Earned by dealing damage to enemies and destroying them. Current points / points needed for the next level (${ut.upgradePointsToLevel} for this unit type).</div>`;
+    positionFixedTooltipBelow(unitStatTooltipEl, extra.getBoundingClientRect());
+  });
+  extra.addEventListener('mouseleave', () => {
+    unitStatTooltipEl.classList.add('hidden');
+  });
 
   main.appendChild(title);
   main.appendChild(stars);
@@ -2538,7 +2552,7 @@ function syncMovementUnitCard(): void {
   if (isNewSelection) {
     buildMovementUnitCardInner(unit, unitType);
   } else {
-    patchMovementUnitCardStats(unit);
+    patchMovementUnitCardStats(unit, unitType);
   }
 }
 

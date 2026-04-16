@@ -121,6 +121,7 @@ const config: GameConfig = {
       icon: 'icons/units/infantry.svg',
       image: 'images/units/infantry.png',
       package: 'standard',
+      upgradePointsToLevel: 20,
     },
     {
       id: 'tank',
@@ -133,6 +134,7 @@ const config: GameConfig = {
       icon: 'icons/units/tank.svg',
       image: 'images/units/tank.png',
       package: 'standard',
+      upgradePointsToLevel: 28,
     },
     {
       id: 'artillery',
@@ -145,6 +147,7 @@ const config: GameConfig = {
       icon: 'icons/units/artillery.svg',
       image: 'images/units/artillery.png',
       package: 'standard',
+      upgradePointsToLevel: 24,
     },
 
 
@@ -160,6 +163,7 @@ const config: GameConfig = {
       icon: 'icons/units/infantry.svg',
       image: 'images/units/marines.png',
       package: 'us-ww2',
+      upgradePointsToLevel: 20,
     },
     {
       id: 'tank',
@@ -172,6 +176,7 @@ const config: GameConfig = {
       icon: 'icons/units/tank.svg',
       image: 'images/units/sherman.png',
       package: 'us-ww2',
+      upgradePointsToLevel: 28,
     },
     {
       id: 'artillery',
@@ -184,6 +189,7 @@ const config: GameConfig = {
       icon: 'icons/units/artillery.svg',
       image: 'images/units/m2-howitzer.png',
       package: 'us-ww2',
+      upgradePointsToLevel: 24,
     },
     {
       id: 'artillery',
@@ -196,6 +202,7 @@ const config: GameConfig = {
       icon: 'icons/units/artillery.svg',
       image: 'images/units/m1-long-tom.png',
       package: 'us-ww2',
+      upgradePointsToLevel: 26,
     },
 
 
@@ -216,6 +223,7 @@ const config: GameConfig = {
       icon: 'icons/units/de-infantry.svg',
       image: 'images/units/de-infantry.png',
       package: 'de-ww2',
+      upgradePointsToLevel: 20,
     },
     {
       id: 'tank',
@@ -228,6 +236,7 @@ const config: GameConfig = {
       icon: 'icons/units/panzer-iv.svg',
       image: 'images/units/panzer-iv.png',
       package: 'de-ww2',
+      upgradePointsToLevel: 28,
     },
     {
       id: 'artillery',
@@ -239,6 +248,7 @@ const config: GameConfig = {
       range: 3,
       icon: 'icons/units/artillery.svg',
       package: 'de-ww2',
+      upgradePointsToLevel: 24,
     },
 
 
@@ -257,6 +267,7 @@ const config: GameConfig = {
       strength: 10,
       icon: 'icons/units/infantry.svg',
       package: 'ru-ww2',
+      upgradePointsToLevel: 20,
     },
     {
       id: 'tank',
@@ -268,6 +279,7 @@ const config: GameConfig = {
       extraFlanking: 0.05,
       icon: 'icons/units/tank.svg',
       package: 'ru-ww2',
+      upgradePointsToLevel: 28,
     },
     {
       id: 'artillery',
@@ -279,6 +291,7 @@ const config: GameConfig = {
       range: 3,
       icon: 'icons/units/artillery.svg',
       package: 'ru-ww2',
+      upgradePointsToLevel: 24,
     }
   ],
 
@@ -304,6 +317,10 @@ const config: GameConfig = {
 
   // If true, artillery cannot ranged-attack while any enemy is adjacent (must fight adjacent first)
   limitArtillery: false,
+
+  // Upgrade points: attacker earns these from damage dealt to enemies and from kills (see game.ts combat)
+  upgradePointsPerDamageDealt: 1,
+  upgradePointsKillBonus: 1,
 
   // ── Automation ───────────────────────────────────────────────────────────────
 

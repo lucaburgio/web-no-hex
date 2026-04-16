@@ -55,6 +55,7 @@ export function loadGameState(): GameState | null {
       if (unit.maxHp == null) unit.maxHp = ut.maxHp;
       if (unit.strength == null) unit.strength = ut.strength;
       unit.hp = Math.min(unit.hp ?? unit.maxHp, unit.maxHp);
+      if (unit.upgradePoints == null) unit.upgradePoints = 0;
     }
 
     return state;

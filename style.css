@@ -893,6 +893,8 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   flex-shrink: 0;
   width: 12px;
   height: 14px;
+  display: block;
+  object-fit: contain;
   color: #ffcc00;
 }
 

@@ -53,6 +53,8 @@ export interface Unit {
   maxHp: number;
   strength: number;
   movement: number;
+  /** Accumulated upgrade points from dealing damage and scoring kills (see gameconfig). */
+  upgradePoints: number;
 }
 
 export interface HexState {
@@ -175,6 +177,8 @@ export interface UnitType {
   image?: string;
   /** Story unit package this unit belongs to. In story mode only units matching the story's unitPackage are available. */
   package?: string;
+  /** Upgrade points required to level up this unit type (displayed on the movement unit card). */
+  upgradePointsToLevel: number;
 }
 
 export interface StoryMapDef {
@@ -300,6 +304,10 @@ export interface GameConfig {
   zoneOfControl: boolean;
   /** If true, artillery cannot use ranged fire while any enemy is adjacent; must clear adjacencies first. */
   limitArtillery: boolean;
+  /** Multiplier on HP actually removed from the enemy when awarding upgrade points (1 = one point per damage). */
+  upgradePointsPerDamageDealt: number;
+  /** Extra upgrade points when the attacker destroys the defender. */
+  upgradePointsKillBonus: number;
   autoEndProduction: boolean;
   autoEndMovement: boolean;
   // Duration in ms for the unit move animation (0 = instant)
