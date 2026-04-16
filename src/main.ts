@@ -79,7 +79,10 @@ import {
   revealGameEndScreenAfterReplay,
   showGameEndScreenForOutcome,
   showGameEndScreenDisconnected,
+  configureStoryEndButtons,
   gameEndRestartBtn,
+  gameEndNextStoryBtn,
+  gameEndBackMenuBtn,
   gameEndRecapBtn,
 } from './gameEndScreen';
 import { initMapEditor, showMapEditor, hideMapEditor } from './mapEditor';
@@ -342,6 +345,9 @@ let activeStoryIndex: number | null = null;
 
 /** Story index awaiting start confirmation (overwriting existing save). */
 let pendingStoryStartIndex: number | null = null;
+
+/** Next story index queued from the end screen "Next story" button, null if none. */
+let pendingNextStoryIndex: number | null = null;
 
 /** Currently selected scenario ID in the stories UI. */
 let activeScenarioId: string = SCENARIOS[0]?.id ?? '';
@@ -2962,6 +2968,21 @@ function leaveEndGameToMainMenu(): void {
 
 gameEndRestartBtn.addEventListener('click', leaveEndGameToMainMenu);
 
+gameEndNextStoryBtn.addEventListener('click', () => {
+  if (pendingNextStoryIndex === null) return;
+  const idx = pendingNextStoryIndex;
+  pendingNextStoryIndex = null;
+  hideGameEndScreen();
+  hideUnitPicker();
+  restoreConfigAfterStory();
+  startStory(idx);
+});
+
+gameEndBackMenuBtn.addEventListener('click', () => {
+  pendingNextStoryIndex = null;
+  leaveEndGameToMainMenu();
+});
+
 // ── Auto-end helpers ──────────────────────────────────────────────────────────
 
 function canAffordAnyUnit(): boolean {
@@ -3180,6 +3201,13 @@ function checkWinner(): void {
   showGameEndScreenForOutcome(state.winner === localPlayer, state.winReason);
   if (activeStoryIndex !== null && state.winner === localPlayer) {
     handleStoryWin();
+    const story = STORIES[activeStoryIndex]!;
+    const scenarioStories = STORIES.filter(s => s.scenario === story.scenario);
+    const nextInScenario = scenarioStories.indexOf(story) + 1;
+    pendingNextStoryIndex = nextInScenario < scenarioStories.length
+      ? STORIES.indexOf(scenarioStories[nextInScenario])
+      : null;
+    configureStoryEndButtons(true, pendingNextStoryIndex !== null);
   }
 }
 

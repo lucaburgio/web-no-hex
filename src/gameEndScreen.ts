@@ -40,13 +40,27 @@ function getWinReasonSubtitle(reason: WinReason | undefined, won: boolean): stri
 export const gameEndRestartBtn = document.getElementById(
   'game-end-restart-btn',
 ) as HTMLButtonElement;
+export const gameEndNextStoryBtn = document.getElementById(
+  'game-end-next-story-btn',
+) as HTMLButtonElement;
+export const gameEndBackMenuBtn = document.getElementById(
+  'game-end-back-menu-btn',
+) as HTMLButtonElement;
 export const gameEndRecapBtn = document.getElementById(
   'game-end-recap-btn',
 ) as HTMLButtonElement;
 
+/** Show story-specific navigation buttons (win screen). Call with false to reset. */
+export function configureStoryEndButtons(show: boolean, hasNext: boolean): void {
+  gameEndRestartBtn.classList.toggle('hidden', show);
+  gameEndNextStoryBtn.classList.toggle('hidden', !show || !hasNext);
+  gameEndBackMenuBtn.classList.toggle('hidden', !show);
+}
+
 export function hideGameEndScreen(): void {
   revertMpResultIntro();
   overlayEl.classList.add('hidden');
+  configureStoryEndButtons(false, false);
 }
 
 /** Hide only for replay; preserves GSAP state so closing recap can restore without replaying intro. */
