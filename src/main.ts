@@ -51,7 +51,7 @@ import { getNeighbors } from './hex';
 import type { MoveAnimation } from './renderer';
 import config, { DEFAULT_TERRITORY_ECONOMY } from './gameconfig';
 import gsap from 'gsap';
-import type { GameState, Unit, CombatForecast, Owner, CombatVfxPayload, GameMode } from './types';
+import type { GameState, Unit, UnitType, CombatForecast, Owner, CombatVfxPayload, GameMode } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
 import { updateConfig, setActiveUnitPackage, setActiveUnitPackagePlayer2, getAvailableUnitTypes } from './gameconfig';
 import modeImgDomination from '../public/images/modes/domination.png';
@@ -144,6 +144,7 @@ const recapOverlayEl = document.getElementById('recap-overlay') as HTMLDivElemen
 
 const unitPickerEl   = document.getElementById('unit-picker') as HTMLDivElement;
 const unitPickerList = document.getElementById('unit-picker-list') as HTMLDivElement;
+const movementUnitCardEl = document.getElementById('movement-unit-card') as HTMLDivElement;
 
 const playerConquerPctEl  = document.getElementById('player-conquer-pct') as HTMLElement;
 const aiConquerPctEl      = document.getElementById('ai-conquer-pct') as HTMLElement;
@@ -2353,6 +2354,194 @@ function hideUnitPicker(): void {
   unitStatTooltipEl.classList.add('hidden');
 }
 
+/** Last unit id rendered into the movement-phase card (for enter animation + partial updates). */
+let movementUnitCardBoundId: number | null = null;
+
+function patchMovementUnitCardStats(unit: Unit): void {
+  const surface = movementUnitCardEl.querySelector('.movement-unit-card-surface');
+  if (!surface) return;
+  const rem = Math.max(0, unit.movement - unit.movesUsed);
+  const moveEl = surface.querySelector('[data-mv-stat="move"]');
+  const strEl = surface.querySelector('[data-mv-stat="str"]');
+  const hpEl = surface.querySelector('[data-mv-stat="hp"]');
+  if (moveEl) moveEl.textContent = String(rem);
+  if (strEl) strEl.textContent = String(unit.strength);
+  if (hpEl) hpEl.textContent = String(unit.hp);
+}
+
+function buildMovementUnitCardInner(unit: Unit, unitType: UnitType): void {
+  const statIconMove = 'icons/movement.svg';
+  const statIconStr = 'icons/strength.svg';
+  const statIconHp = 'icons/hp.svg';
+
+  movementUnitCardEl.innerHTML = '';
+
+  const surface = document.createElement('div');
+  surface.className = 'movement-unit-card-surface movement-unit-card-surface--enter';
+  surface.addEventListener(
+    'animationend',
+    (e: AnimationEvent) => {
+      if (e.animationName === 'unit-card-enter') surface.classList.remove('movement-unit-card-surface--enter');
+    },
+    { once: true },
+  );
+
+  const sidebar = document.createElement('div');
+  sidebar.className = 'movement-unit-card-sidebar';
+  const sidebarIcon = document.createElement('img');
+  sidebarIcon.className = 'movement-unit-card-sidebar-icon';
+  sidebarIcon.src = unitType.icon ? `${unitType.icon}` : `icons/${unitType.id}.svg`;
+  sidebarIcon.alt = '';
+  sidebar.appendChild(sidebarIcon);
+
+  const main = document.createElement('div');
+  main.className = 'movement-unit-card-main';
+
+  const title = document.createElement('div');
+  title.className = 'movement-unit-card-name';
+  title.textContent = unitType.name.toUpperCase();
+
+  const stars = document.createElement('div');
+  stars.className = 'movement-unit-card-stars';
+  stars.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 3; i++) {
+    const s = document.createElement('span');
+    s.textContent = '\u2605';
+    stars.appendChild(s);
+  }
+
+  const stats = document.createElement('div');
+  stats.className = 'movement-unit-card-stats';
+
+  function addStat(
+    modClass: string,
+    kind: 'move' | 'str' | 'hp',
+    iconSrc: string,
+  ): HTMLSpanElement {
+    const row = document.createElement('div');
+    row.className = `unit-card-stat movement-unit-card-stat ${modClass}`;
+    const iconWrap = document.createElement('span');
+    iconWrap.className = 'unit-card-stat-icon';
+    iconWrap.setAttribute('aria-hidden', 'true');
+    const iconImg = document.createElement('img');
+    iconImg.src = iconSrc;
+    iconImg.alt = '';
+    const val = document.createElement('span');
+    val.className = 'unit-card-stat-value';
+    val.setAttribute('data-mv-stat', kind);
+    iconWrap.appendChild(iconImg);
+    row.appendChild(iconWrap);
+    row.appendChild(val);
+    row.addEventListener('mouseenter', () => {
+      const u = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
+      if (!u) return;
+      let ttTitle: string;
+      let ttDesc: string;
+      if (kind === 'move') {
+        ttTitle = 'Movement';
+        const r = Math.max(0, u.movement - u.movesUsed);
+        ttDesc =
+          r === 0
+            ? 'No movement left this turn.'
+            : `Hexes this unit can still move this turn (${r} remaining).`;
+      } else if (kind === 'str') {
+        ttTitle = 'Strength';
+        ttDesc = 'Base combat strength; condition and flanking modify it in battle.';
+      } else {
+        ttTitle = 'Hit points';
+        ttDesc = `Current HP out of maximum (${u.maxHp}). The unit is removed when reduced to zero.`;
+      }
+      unitStatTooltipEl.innerHTML = `
+        <div class="unit-stat-tt-title">${ttTitle}</div>
+        <div class="unit-stat-tt-desc">${ttDesc}</div>`;
+      positionFixedTooltipBelow(unitStatTooltipEl, row.getBoundingClientRect());
+    });
+    row.addEventListener('mouseleave', () => {
+      unitStatTooltipEl.classList.add('hidden');
+    });
+    stats.appendChild(row);
+    return val;
+  }
+
+  const rem = Math.max(0, unit.movement - unit.movesUsed);
+  const vMove = addStat('unit-card-stat--move', 'move', statIconMove);
+  const vStr = addStat('unit-card-stat--str', 'str', statIconStr);
+  const vHp = addStat('unit-card-stat--hp', 'hp', statIconHp);
+  vMove.textContent = String(rem);
+  vStr.textContent = String(unit.strength);
+  vHp.textContent = String(unit.hp);
+
+  const extra = document.createElement('div');
+  extra.className = 'movement-unit-card-extra';
+  extra.setAttribute('aria-hidden', 'true');
+  const arrowNs = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(arrowNs, 'svg');
+  svg.setAttribute('class', 'movement-unit-card-extra-icon');
+  svg.setAttribute('viewBox', '0 0 12 14');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(arrowNs, 'path');
+  path.setAttribute('fill', 'currentColor');
+  path.setAttribute('d', 'M6 0 12 10H0L6 0z');
+  svg.appendChild(path);
+  const num = document.createElement('span');
+  num.className = 'movement-unit-card-extra-num';
+  num.textContent = '14.4';
+  const sep = document.createElement('span');
+  sep.className = 'movement-unit-card-extra-sep';
+  sep.textContent = '/';
+  const den = document.createElement('span');
+  den.className = 'movement-unit-card-extra-den';
+  den.textContent = '20';
+  extra.appendChild(svg);
+  extra.appendChild(num);
+  extra.appendChild(sep);
+  extra.appendChild(den);
+
+  main.appendChild(title);
+  main.appendChild(stars);
+  main.appendChild(stats);
+  main.appendChild(extra);
+
+  surface.appendChild(sidebar);
+  surface.appendChild(main);
+  movementUnitCardEl.appendChild(surface);
+}
+
+function syncMovementUnitCard(): void {
+  const eligible =
+    !state.winner &&
+    state.phase === 'movement' &&
+    state.activePlayer === localPlayer &&
+    state.selectedUnit !== null;
+
+  if (!eligible) {
+    movementUnitCardEl.innerHTML = '';
+    movementUnitCardEl.classList.remove('movement-unit-card-wrap--visible');
+    movementUnitCardBoundId = null;
+    return;
+  }
+
+  const unit = getUnitById(state, state.selectedUnit!);
+  if (!unit || unit.owner !== localPlayer) {
+    movementUnitCardEl.innerHTML = '';
+    movementUnitCardEl.classList.remove('movement-unit-card-wrap--visible');
+    movementUnitCardBoundId = null;
+    return;
+  }
+
+  const unitType = config.unitTypes.find(u => u.id === unit.unitTypeId) ?? config.unitTypes[0];
+  const isNewSelection = movementUnitCardBoundId !== unit.id;
+  movementUnitCardBoundId = unit.id;
+
+  movementUnitCardEl.classList.add('movement-unit-card-wrap--visible');
+
+  if (isNewSelection) {
+    buildMovementUnitCardInner(unit, unitType);
+  } else {
+    patchMovementUnitCardStats(unit);
+  }
+}
+
 // ── Board click ───────────────────────────────────────────────────────────────
 
 svg.addEventListener('click', (e: MouseEvent) => {
@@ -3187,6 +3376,8 @@ function updateUI(): void {
     endMoveBtn.style.display = 'none';
     phaseLabelEl.textContent = '';
   }
+
+  syncMovementUnitCard();
 
   logEl.innerHTML = '';
   for (const msg of state.log) {
