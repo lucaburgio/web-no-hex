@@ -2985,7 +2985,8 @@ svg.addEventListener('click', (e: MouseEvent) => {
 });
 
 // Deselect when clicking outside the SVG (header, footer, game-area padding). Bubble order runs the
-// #board handler before this, so hex/unit clicks never hit this path.
+// #board handler before this, so hex/unit clicks never hit this path. Movement HUD (unit card,
+// upgrade picker) is outside the SVG — exclude it so clicks there do not clear selection.
 document.body.addEventListener('click', (e: MouseEvent) => {
   if (state.winner) return;
   if (state.activePlayer !== localPlayer) return;
@@ -2994,6 +2995,7 @@ document.body.addEventListener('click', (e: MouseEvent) => {
   const t = e.target;
   if (!(t instanceof Element)) return;
   if (svg.contains(t)) return;
+  if (movementHudStackEl.contains(t)) return;
 
   let didInterruptHumanMove = false;
   if (humanMoveAnimCancel && !aiPlaybackInProgress) {
