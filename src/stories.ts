@@ -377,6 +377,37 @@ export const STORIES: StoryDef[] = [
   breakthroughAttackerStartingPP: 160,
   productionPointsPerTurn: 20,
   productionPointsPerTurnAi: 20,
+},
+{
+  id: 'ww2-20',
+  title: 'My Map',
+  description: 'Description.',
+  scenario: 'ww2ru',
+  unitPackage: 'de-ww2',
+  unitPackagePlayer2: 'ru-ww2',
+  breakthroughPlayer1Role: 'defender',
+  gameMode: 'breakthrough',
+  map: {
+    cols: 8,
+    rows: 8,
+    mountains: ['7,4'],
+    playerStart: [{ col: 2 }, { col: 3 }, { col: 4 }],
+    aiStart: [{ col: 0, unitTypeId: 'artillery' }, { col: 7, unitTypeId: 'artillery' }],
+    conquestControlPoints: ['2,2'],
+    breakthroughControlPoints: ['2,1', '4,3'],
+    rivers: [
+      { col: 0, row: 4, segment: 'E-B-11', entrySide: 'E', exitSide: 'B' },
+      { col: 1, row: 4, segment: 'E-B-12', entrySide: 'E', exitSide: 'B' },
+      { col: 2, row: 4, segment: 'E-B-02', entrySide: 'E', exitSide: 'B' },
+      { col: 3, row: 4, segment: 'E-B-08', entrySide: 'E', exitSide: 'B' },
+      { col: 4, row: 4, segment: 'E-B-08', entrySide: 'E', exitSide: 'B' },
+      { col: 5, row: 4, segment: 'E-B-07', entrySide: 'E', exitSide: 'B' },
+      { col: 6, row: 4, segment: 'E-C-08', entrySide: 'E', exitSide: 'C' },
+      { col: 6, row: 5, segment: 'F-B-01', entrySide: 'F', exitSide: 'B' },
+      { col: 7, row: 5, segment: 'E-C-09', entrySide: 'E', exitSide: 'C' },
+    ],
+  },
+  productionPointsPerTurn: 20,
 }
 ];
 
