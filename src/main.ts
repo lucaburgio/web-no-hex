@@ -53,11 +53,16 @@ import {
 import { aiDamageFloatDrawParams } from './combatPlayback';
 import { getNeighbors } from './hex';
 import type { MoveAnimation } from './renderer';
-import config, { DEFAULT_TERRITORY_ECONOMY } from './gameconfig';
+import config, {
+  DEFAULT_TERRITORY_ECONOMY,
+  updateConfig,
+  setActiveUnitPackage,
+  setActiveUnitPackagePlayer2,
+  getAvailableUnitTypes,
+} from './gameconfig';
 import gsap from 'gsap';
 import type { GameState, Unit, UnitType, CombatForecast, Owner, CombatVfxPayload, GameMode, UnitUpgradeKind } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
-import { updateConfig, setActiveUnitPackage, setActiveUnitPackagePlayer2, getAvailableUnitTypes } from './gameconfig';
 import modeImgDomination from '../public/images/modes/domination.png';
 import modeImgConquest from '../public/images/modes/conquest.png';
 import modeImgBreakthrough from '../public/images/modes/breakthrough.png';
@@ -178,7 +183,20 @@ document.getElementById('rules-btn')!.addEventListener('click', () => {
   rulesOverlayEl.classList.remove('hidden');
 });
 document.getElementById('rules-close')!.addEventListener('click', () => rulesOverlayEl.classList.add('hidden'));
-rulesOverlayEl.addEventListener('click', e => { if (e.target === rulesOverlayEl) rulesOverlayEl.classList.add('hidden'); });
+rulesOverlayEl.addEventListener('click', e => {
+  if (e.target === rulesOverlayEl) rulesOverlayEl.classList.add('hidden');
+});
+rulesOverlayEl.addEventListener('click', e => {
+  const link = (e.target as HTMLElement).closest('.rules-sidebar a[href^="#"]');
+  if (!link || !rulesContentEl.contains(link)) return;
+  const id = link.getAttribute('href')?.slice(1);
+  if (!id) return;
+  const doc = rulesContentEl.querySelector('.rules-doc');
+  const target = document.getElementById(id);
+  if (!doc || !target || !doc.contains(target)) return;
+  e.preventDefault();
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 // ── PP tooltip ────────────────────────────────────────────────────────────────
 
@@ -1790,44 +1808,166 @@ introContinueBtn.addEventListener('click', () => {
 
 // ── Rules content ─────────────────────────────────────────────────────────────
 
+function escapeHtmlRules(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function unitTypeIdSignature(types: UnitType[]): string {
+  return types.map(t => t.id).join('\0');
+}
+
+function buildUnitRowHtml(u: UnitType): string {
+  const iconSrc = u.icon ?? `icons/${u.id}.svg`;
+  const safeSrc = escapeHtmlRules(iconSrc);
+  const rangeHtml =
+    u.range != null
+      ? `<span class="rules-unit-stat"><img src="icons/range.svg" alt="" width="14" height="14" /> Range ${u.range}</span>`
+      : '';
+  const extraFlankHtml =
+    u.extraFlanking != null && u.extraFlanking !== 0
+      ? `<span class="rules-unit-stat rules-unit-stat--extra">Extra flank +${Math.round(u.extraFlanking * 100)}%</span>`
+      : '';
+  return `
+    <div class="rules-unit-row">
+      <img class="rules-unit-icon" src="${safeSrc}" width="36" height="36" alt="" />
+      <div class="rules-unit-body">
+        <div class="rules-unit-name">${escapeHtmlRules(u.name)}</div>
+        <div class="rules-unit-stats">
+          <span class="rules-unit-stat"><img src="icons/points-yellow.svg" alt="" width="14" height="14" /> ${u.cost} PP</span>
+          <span class="rules-unit-stat"><img src="icons/movement.svg" alt="" width="14" height="14" /> Move ${u.movement}</span>
+          <span class="rules-unit-stat"><img src="icons/strength.svg" alt="" width="14" height="14" /> Str ${u.strength}</span>
+          <span class="rules-unit-stat"><img src="icons/hp.svg" alt="" width="14" height="14" /> ${u.maxHp} HP</span>
+          ${rangeHtml}
+          <span class="rules-unit-stat rules-unit-stat--lvl">${u.upgradePointsToLevel} pts to level</span>
+          ${extraFlankHtml}
+        </div>
+      </div>
+    </div>`;
+}
+
+function buildMatchUnitsRosterHtml(): string {
+  const p1 = getAvailableUnitTypes(1);
+  const p2 = getAvailableUnitTypes(2);
+  const pkg1 = p1[0]?.package;
+  const pkg2 = p2[0]?.package;
+  const sameRoster =
+    unitTypeIdSignature(p1) === unitTypeIdSignature(p2) && (pkg1 ?? '') === (pkg2 ?? '');
+
+  if (p1.length === 0 && p2.length === 0) {
+    return `<p class="rules-prose rules-prose--muted">No unit roster is configured for this match.</p>`;
+  }
+
+  const listHtml = (types: UnitType[]) =>
+    types.length === 0
+      ? `<p class="rules-prose rules-prose--muted">No units in this package.</p>`
+      : `<div class="rules-units-list">${types.map(buildUnitRowHtml).join('')}</div>`;
+
+  if (sameRoster) {
+    const pkgNote =
+      pkg1 != null
+        ? `<p class="rules-units-package">Unit package: <strong>${escapeHtmlRules(pkg1)}</strong> · both players</p>`
+        : '';
+    return `
+      ${pkgNote}
+      ${listHtml(p1)}`;
+  }
+
+  const pkgNote1 =
+    pkg1 != null ? `<p class="rules-units-package">Package: <strong>${escapeHtmlRules(pkg1)}</strong></p>` : '';
+  const pkgNote2 =
+    pkg2 != null ? `<p class="rules-units-package">Package: <strong>${escapeHtmlRules(pkg2)}</strong></p>` : '';
+
+  return `
+    <div class="rules-units-split">
+      <div class="rules-units-faction">
+        <div class="rules-units-faction-title">Player 1 · South</div>
+        ${pkgNote1}
+        ${listHtml(p1)}
+      </div>
+      <div class="rules-units-faction">
+        <div class="rules-units-faction-title">Player 2 · North</div>
+        ${pkgNote2}
+        ${listHtml(p2)}
+      </div>
+    </div>`;
+}
+
 function buildRulesContent(): string {
-  const ar = config.unitTypes.find(u => u.id === 'artillery');
+  const ar = getAvailableUnitTypes(1).find(u => u.id === 'artillery')
+    ?? getAvailableUnitTypes(2).find(u => u.id === 'artillery')
+    ?? config.unitTypes.find(u => u.id === 'artillery');
   const arRanged =
     ar?.range != null
       ? `2–${ar.range} hexes away`
       : '2+ hexes away';
-  const unitList = config.unitTypes
-    .map(u => {
-      let s = `<strong>${u.name}</strong> (${u.cost} PP, ${u.maxHp} HP, move ${u.movement}, base str ${u.strength}`;
-      if (u.range) s += `, ranged attack range ${u.range} hexes`;
-      s += ')';
-      return s;
-    })
-    .join(', ');
   const maxFlankBonus = Math.round(config.maxFlankingUnits * config.flankingBonus * 100);
   const brPct = Math.round(config.breakthroughEnemySectorStrengthMult * 100);
   const riverDefPct = Math.round(config.riverDefenseBonus * 100);
   return `
-    <h2>Game Rules</h2>
+    <div class="rules-layout">
+    <div class="rules-sheet-head">
+      <div class="settings-group-title rules-eyebrow">REFERENCE</div>
+      <div class="rules-title">FULL RULES</div>
+    </div>
 
-    <h3>Overview</h3>
-    <p>Turn-based hex strategy on a ${config.boardCols}×${config.boardRows} grid.
-       You play from the south (bottom row); the AI plays from the north (top row).
-       In custom match settings you can pick a <strong>map layout</strong> from maps that define both Conquest and Breakthrough control points in the map editor; otherwise the board is randomly generated.</p>
+    <div class="rules-main">
+    <nav class="rules-sidebar" aria-label="Rule sections">
+      <div class="rules-nav-group">
+        <div class="rules-nav-group-label">Introduction</div>
+        <a class="rules-nav-link" href="#rules-units">Units in this match</a>
+        <a class="rules-nav-link" href="#rules-overview">Overview</a>
+        <a class="rules-nav-link" href="#rules-turn-phases">Turn phases</a>
+      </div>
+      <div class="rules-nav-group">
+        <div class="rules-nav-group-label">Gameplay</div>
+        <a class="rules-nav-link" href="#rules-production">Production</a>
+        <a class="rules-nav-link" href="#rules-movement">Movement</a>
+        <a class="rules-nav-link" href="#rules-combat">Combat</a>
+        <a class="rules-nav-link" href="#rules-healing">Healing</a>
+        <a class="rules-nav-link" href="#rules-game-modes">Game modes</a>
+      </div>
+    </nav>
+    <div class="rules-doc" tabindex="-1">
+    <section id="rules-units" class="rules-anchor-section">
+      <div class="settings-group rules-section">
+      <div class="settings-group-title">Units in this match</div>
+      <p class="rules-prose rules-prose--lead">Production and combat use the stats below. Asymmetric matches list separate rosters for south and north.</p>
+      ${buildMatchUnitsRosterHtml()}
+      </div>
+    </section>
 
-    <h3>Turn Phases</h3>
-    <ol>
-      <li><strong>Production</strong> — spend PP to place units.</li>
-      <li><strong>Movement</strong> — move each of your units up to its movement range.</li>
-      <li><strong>End</strong> — AI takes its turn, then the turn counter advances.</li>
-    </ol>
+    <section id="rules-overview" class="rules-anchor-section">
+      <div class="settings-group rules-section">
+      <div class="settings-group-title">Overview</div>
+      <p class="rules-prose">Turn-based hex strategy on a ${config.boardCols}×${config.boardRows} grid.
+         You play from the south (bottom row); the opponent plays from the north (top row).
+         In custom match settings you can pick a <strong>map layout</strong> from maps that define both Conquest and Breakthrough control points in the map editor; otherwise the board is randomly generated.</p>
+      </div>
+    </section>
 
-    <h3>Production</h3>
-    <ul>
+    <section id="rules-turn-phases" class="rules-anchor-section">
+      <div class="settings-group rules-section">
+      <div class="settings-group-title">Turn phases</div>
+      <ol class="rules-list rules-list--ol">
+        <li><strong>Production</strong> — spend PP to place units.</li>
+        <li><strong>Movement</strong> — move each of your units up to its movement range.</li>
+        <li><strong>End</strong> — the opponent takes their turn, then the turn counter advances.</li>
+      </ol>
+      </div>
+    </section>
+
+    <section id="rules-production" class="rules-anchor-section">
+      <div class="settings-group rules-section">
+      <div class="settings-group-title">Production</div>
+      <ul class="rules-list">
       <li>Each turn you earn <strong>${config.productionPointsPerTurn} PP</strong> (production points).</li>
       <li><strong>Breakthrough:</strong> the <strong>southern attacker</strong> does not receive PP after the match starts (only the configured starting pool). The <strong>northern defender</strong> earns PP each turn as above.</li>
       <li><strong>Territory bonus:</strong> +${config.pointsPerQuota} PP for every ${config.territoryQuota} hexes you own.</li>
-      <li>Available units: ${unitList}.</li>
+      <li>Which units you can build is listed under <strong>Units in this match</strong> (north and south may differ).</li>
       <li>Valid placement: your <strong>home row</strong> (bottom), or any owned <strong>production hex</strong>.
         You must control <strong>at least one hex on your home row</strong> to produce anywhere; if the enemy takes
         every border hex, reconquer one before you can build again. You cannot place on home-row hexes the enemy controls
@@ -1839,19 +1979,27 @@ function buildRulesContent(): string {
         <strong>Breakthrough:</strong> sectors start pre-owned, so any owned hex already meeting this stability rule is available as a production hex from turn 1.</li>
       <li>You can place multiple units per turn as long as you have PP.</li>
     </ul>
+      </div>
+    </section>
 
-    <h3>Movement</h3>
-    <ul>
-      <li>Each unit may move up to its movement range per turn (see unit types). Moving onto an empty hex <strong>conquers</strong> it.</li>
+    <section id="rules-movement" class="rules-anchor-section">
+      <div class="settings-group rules-section">
+      <div class="settings-group-title">Movement</div>
+      <ul class="rules-list">
+      <li>Each unit may move up to its movement range per turn (see <strong>Units in this match</strong>). Moving onto an empty hex <strong>conquers</strong> it.</li>
       <li>Moving onto an enemy unit triggers <strong>combat</strong>. If you need more than one hex to reach them, you move along the path into the hex adjacent to the enemy first, then combat resolves.</li>
       <li><strong>Artillery:</strong> each turn you either <strong>move</strong> one hex or fire a <strong>ranged attack</strong> at an enemy ${arRanged} (not both). Ranged fire does not use movement into the target&rsquo;s hex.</li>
       <li><strong>Zone of Control (ZoC):</strong> a unit adjacent to an enemy is locked — it may only attack
         or retreat to a hex not itself adjacent to any enemy. ZoC limits movement and adjacent attacks; it does not block artillery ranged fire at longer range.</li>
       <li><strong>Domination — guarded home row:</strong> with ZoC enabled, you cannot move onto an <strong>empty</strong> hex on the opponent&rsquo;s <strong>home row</strong> if any enemy is adjacent to that hex (this stops fast units from bypassing ZoC with multi-hex moves). You can still move onto that hex to attack an enemy unit sitting on it.</li>
     </ul>
+      </div>
+    </section>
 
-    <h3>Combat</h3>
-    <ul>
+    <section id="rules-combat" class="rules-anchor-section">
+      <div class="settings-group rules-section">
+      <div class="settings-group-title">Combat</div>
+      <ul class="rules-list">
       <li><strong>Adjacent combat:</strong> both sides deal damage <strong>simultaneously</strong>. If the defender is destroyed, the attacker advances and conquers the hex.</li>
       <li><strong>Artillery ranged (2+ hexes):</strong> only the defender takes damage (no return fire). Destroying a unit with a ranged attack does <strong>not</strong> move the artillery or conquer that hex.</li>
       <li><strong>Limit Artillery</strong> (optional game setting): when enabled, if <strong>any</strong> enemy is adjacent to your artillery, it cannot use ranged attacks against other hexes until no adjacent enemies remain — use adjacent combat (move to attack) first.</li>
@@ -1866,12 +2014,14 @@ function buildRulesContent(): string {
       <li>If defender dies: attacker advances and conquers the hex. If both die: both removed.</li>
       <li>Hover over an enemy unit during movement to see a combat forecast.</li>
     </ul>
+    </div>
 
     <!-- Keep in sync with effectiveCS, resolveCombat, forecastCombat in game.ts and combat-related keys in gameconfig.ts -->
-    <h3>Combat in detail</h3>
-    <p><strong>Base strength</strong> (integer on the unit) is only the starting stat from the unit type. <strong>Effective combat strength (CS)</strong> multiplies that base by modifiers below. The engine uses full-precision numbers; the combat forecast shows <strong>CS to one decimal place</strong>.</p>
-    <p><strong>Effective CS</strong> = base strength × breakthrough sector mult × condition mult × flank mult × upgrade mult × river defense mult (when that role applies) × tank spearhead mult (attacking tank only, when applicable).</p>
-    <ul>
+      <div class="settings-group rules-section rules-section--tight">
+      <div class="settings-group-title">Combat in detail</div>
+      <p class="rules-prose"><strong>Base strength</strong> (integer on the unit) is only the starting stat from the unit type. <strong>Effective combat strength (CS)</strong> multiplies that base by modifiers below. The engine uses full-precision numbers; the combat forecast shows <strong>CS to one decimal place</strong>.</p>
+      <p class="rules-prose"><strong>Effective CS</strong> = base strength × breakthrough sector mult × condition mult × flank mult × upgrade mult × river defense mult (when that role applies) × tank spearhead mult (attacking tank only, when applicable).</p>
+      <ul class="rules-list">
       <li><strong>Condition mult</strong> = <code>0.5 + 0.5 × (current HP / max HP)</code> — from <strong>50%</strong> of full effectiveness at 0 HP up to <strong>100%</strong> at full HP (linear in HP fraction).</li>
       <li><strong>Flank mult</strong> (attacker only) = <code>1 + <em>f</em> × ${Math.round(config.flankingBonus * 100)}%</code> where <em>f</em> is the number of contributing adjacent friendlies next to the defender, capped at <strong>${config.maxFlankingUnits}</strong>, in fixed neighbor order, plus any per-unit-type <strong>extra flanking</strong> from those flankers (see short Combat section).</li>
       <li><strong>Breakthrough</strong> mult for a defender in a sector already captured by the attacker = <strong>${brPct}%</strong> (same setting as above).</li>
@@ -1879,21 +2029,29 @@ function buildRulesContent(): string {
       <li><strong>Upgrade</strong> mult: when attacking, stacks of attack upgrade add <strong>+${Math.round(config.upgradeBonusAttackPerStack * 100)}%</strong> CS each; with ${config.maxFlankingUnits} flankers, stacks of flanking upgrade add <strong>+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%</strong> CS each. When defending, defense upgrade stacks add <strong>+${Math.round(config.upgradeBonusDefensePerStack * 100)}%</strong> CS each.</li>
       <li><strong>Tank spearhead</strong> mult (melee attacker only) = <strong>${100 + Math.round(config.tankSpearheadAttackBonus * 100)}%</strong> when the attacker is a <strong>tank</strong>, it had <strong>not</strong> spent movement earlier this phase, and the move into adjacent combat costs <strong>exactly</strong> that unit&rsquo;s <strong>movement</strong> stat in path steps (scales if tanks later have movement 3+).</li>
     </ul>
-    <p>Let <strong>ΔCS</strong> = attacker CS − defender CS. <strong>Damage</strong> uses ΔCS, not percentages of HP directly: adjacent melee deals <code>max(1, floor(${config.combatDamageBase} × exp(ΔCS / ${config.combatStrengthScale})))</code> to the defender and <code>max(1, floor(${config.combatDamageBase} × exp(−ΔCS / ${config.combatStrengthScale})))</code> to the attacker at the same time. Ranged artillery uses the same formula for damage to the target only (no return fire). A percentage bonus to CS changes ΔCS and therefore damage through this curve — it is not a direct “+X% damage”.</p>
+      <p class="rules-prose">Let <strong>ΔCS</strong> = attacker CS − defender CS. <strong>Damage</strong> uses ΔCS, not percentages of HP directly: adjacent melee deals <code>max(1, floor(${config.combatDamageBase} × exp(ΔCS / ${config.combatStrengthScale})))</code> to the defender and <code>max(1, floor(${config.combatDamageBase} × exp(−ΔCS / ${config.combatStrengthScale})))</code> to the attacker at the same time. Ranged artillery uses the same formula for damage to the target only (no return fire). A percentage bonus to CS changes ΔCS and therefore damage through this curve — it is not a direct “+X% damage”.</p>
+      </div>
+    </section>
 
-    <h3>Healing</h3>
-    <ul>
+    <section id="rules-healing" class="rules-anchor-section">
+      <div class="settings-group rules-section">
+      <div class="settings-group-title">Healing</div>
+      <ul class="rules-list">
       <li>Units that did <strong>not</strong> fight this turn heal at end of turn.</li>
       <li>+${config.healOwnTerritory} HP on <strong>own territory</strong>.</li>
     </ul>
+      </div>
+    </section>
 
-    <h3>Game modes</h3>
-    <p>The match mode is chosen in <strong>Game settings</strong> before play.</p>
-    <ul>
+    <section id="rules-game-modes" class="rules-anchor-section">
+      <div class="settings-group rules-section">
+      <div class="settings-group-title">Game modes</div>
+      <p class="rules-prose">The match mode is chosen in <strong>Game settings</strong> before play.</p>
+      <ul class="rules-list">
       <li><strong>Domination:</strong> move a unit onto the <strong>opponent&rsquo;s home row</strong>, or <strong>eliminate all enemy units</strong>.</li>
       <li><strong>Conquest:</strong> marked <strong>control point</strong> hexes appear on the map (default ${config.controlPointCount} in current settings).
         Each side starts with <strong>Conquer Points</strong> (south ${config.conquestPointsPlayer}, north ${config.conquestPointsAi} — configurable).
-        After each full round, for every control point you <strong>own</strong>, the opponent loses 1 Conquer Point (multiple points stack).
+        After each side finishes its <strong>movement phase</strong>, for every control point you <strong>own</strong>, the opponent loses 1 Conquer Point (multiple points stack).
         The first side reduced to <strong>0</strong> Conquer Points loses.
         You also lose immediately if you have <strong>no units</strong> and <strong>no owned territory</strong> (even if your Conquer Points are still above 0).
         Reaching the opponent&rsquo;s home row alone does <strong>not</strong> end the match.
@@ -1904,6 +2062,11 @@ function buildRulesContent(): string {
         <strong>Defender units</strong> in a sector already captured by the attacker fight at <strong>${Math.round(config.breakthroughEnemySectorStrengthMult * 100)}%</strong> strength (configurable).
         <strong>Attacker wins</strong> by holding every sector; <strong>defender wins</strong> if the attacker has no units left.</li>
     </ul>
+      </div>
+    </section>
+    </div>
+    </div>
+    </div>
   `;
 }
 
@@ -2023,7 +2186,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     state = msg.state as GameState;
     syncUnitIdCounter(state);
     // Host runs end-turn cleanup
-    const { state: afterHeal, healFloats } = endTurnAfterAi(state);
+    const { state: afterHeal, healFloats } = endTurnAfterAi(state, { skipConquestDrain: true });
     state = afterHeal;
     applyImmediateAutoSkipProductionIfNeeded();
     turnSnapshots.push(structuredClone(state));
@@ -3070,6 +3233,19 @@ function runAiTurnWithAnimation(): void {
     clearMovePathPreview();
     const tPlanStart = performance.now();
     state = prepareAiTurn(state);
+    if (state.winner) {
+      aiPlaybackInProgress = false;
+      isAnimating = false;
+      render();
+      updateUI();
+      checkWinner();
+      maybeAutoEnd();
+      if (aiTurnPerfStartMs !== null) {
+        perfLog('phase.aiTurnTotal', performance.now() - aiTurnPerfStartMs);
+        aiTurnPerfStartMs = null;
+      }
+      return;
+    }
 
     const aiResult = aiMovement(state);
     perfLog('phase.aiPlanSync', performance.now() - tPlanStart);

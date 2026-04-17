@@ -1277,8 +1277,8 @@ function checkVictory(state: GameState): void {
   else if (noHuman)   { state.winner = AI; state.winReason = 'dom_annihilation'; }
 }
 
-/** Conquest: drain opponent Conquer Points for each control point they do not own. */
-function applyConquestEndOfRound(state: GameState): void {
+/** Conquest: drain opponent Conquer Points for each control point they do not own. Runs after each side completes movement (fair timing for first/second player). */
+function applyConquestDrainAfterMovement(state: GameState): void {
   if (state.gameMode !== 'conquest' || !state.conquestPoints) return;
   const cp = state.conquestPoints;
   let drainToAi = 0;
@@ -2555,6 +2555,7 @@ export function vsHumanEndMovement(state: GameState, localPlayer: Owner): GameSt
   state.activePlayer = other;
   state.selectedUnit = null;
   state.units.forEach(u => { if (u.owner === localPlayer) u.movesUsed = 0; });
+  applyConquestDrainAfterMovement(state);
   return state;
 }
 
@@ -2991,12 +2992,17 @@ export function prepareAiTurn(state: GameState): GameState {
   state.selectedUnit = null;
   // Clear exhaustion from the human's movement so pieces render at full opacity during AI play; AI counters also reset before aiMovement.
   state.units.forEach(u => { u.movesUsed = 0; });
+  applyConquestDrainAfterMovement(state);
   return state;
 }
 
 // Runs end-of-turn housekeeping after AI movement: heal, stability, turn counter, PP.
 // Call this after aiMovement has already been applied (used by the animation path).
-export function endTurnAfterAi(state: GameState): { state: GameState; healFloats: { col: number; row: number; amount: number }[] } {
+// In vs human, the guest already applied conquest drain in {@link vsHumanEndMovement}; pass skipConquestDrain when merging that state on the host.
+export function endTurnAfterAi(
+  state: GameState,
+  options?: { skipConquestDrain?: boolean },
+): { state: GameState; healFloats: { col: number; row: number; amount: number }[] } {
   const healFloats = healUnits(state);
   updateHexStability(state);
   state.units.forEach(u => { u.movesUsed = 0; });
@@ -3024,7 +3030,7 @@ export function endTurnAfterAi(state: GameState): { state: GameState; healFloats
     state.productionPoints[AI]     += config.productionPointsPerTurnAi + aiBonus;
     log(state, `Turn ${state.turn} — Production phase. PP: ${state.productionPoints[PLAYER]} (+${playerBonus} from territory).`);
   }
-  applyConquestEndOfRound(state);
+  if (!options?.skipConquestDrain) applyConquestDrainAfterMovement(state);
   if (state.gameMode === 'breakthrough') applyBreakthroughEndOfRound(state);
   return { state, healFloats };
 }
@@ -3043,6 +3049,7 @@ export function advancePhase(state: GameState): GameState {
   } else if (state.phase === 'movement') {
     if (state.activePlayer === PLAYER) {
       state = prepareAiTurn(state);
+      if (state.winner) return state;
       state = aiMovement(state).state;
       if (state.winner) return state;
       state = endTurnAfterAi(state).state;
