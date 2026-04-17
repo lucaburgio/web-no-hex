@@ -1121,8 +1121,8 @@ export function renderState(
       const iw = HEX_SIZE * Math.sqrt(3);
       const ih = HEX_SIZE * 2;
       for (const rh of riverHexes) {
-        // Board guest transform is scale(-1,-1); river art follows the hex — no separate Y-only asset path.
-        const { url, counterFlipUpright } = riverSegmentDisplay(rh.segment, false);
+        // Vs-human guest: prefer `river-hex-inverted/` when the board is flipped (dataset.boardFlipY).
+        const { url, counterFlipUpright } = riverSegmentDisplay(rh.segment, flipBoardY);
         if (!url) continue;
         const { x, y } = hexToPixel(rh.col, rh.row);
         const clipped = svgEl('g');
