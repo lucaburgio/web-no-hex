@@ -2707,6 +2707,10 @@ svg.addEventListener('click', (e: MouseEvent) => {
         render(); updateUI();
         if (didInterruptHumanMove) maybeAutoEnd();
       }
+    } else if (state.phase === 'production' && pendingProductionHex !== null) {
+      hideUnitPicker();
+      render();
+      updateUI();
     }
     return;
   }
@@ -3013,15 +3017,25 @@ svg.addEventListener('click', (e: MouseEvent) => {
 
 // Deselect when clicking outside the SVG (header, footer, game-area padding). Bubble order runs the
 // #board handler before this, so hex/unit clicks never hit this path. Movement HUD (unit card,
-// upgrade picker) is outside the SVG — exclude it so clicks there do not clear selection.
+// upgrade picker) and the production unit picker are outside the SVG — exclude them so clicks
+// there do not clear selection.
 document.body.addEventListener('click', (e: MouseEvent) => {
   if (state.winner) return;
   if (state.activePlayer !== localPlayer) return;
-  if (state.phase !== 'movement' || state.selectedUnit === null) return;
 
   const t = e.target;
   if (!(t instanceof Element)) return;
   if (svg.contains(t)) return;
+
+  if (state.phase === 'production' && pendingProductionHex !== null) {
+    if (unitPickerEl.contains(t)) return;
+    hideUnitPicker();
+    render();
+    updateUI();
+    return;
+  }
+
+  if (state.phase !== 'movement' || state.selectedUnit === null) return;
   if (movementHudStackEl.contains(t)) return;
 
   let didInterruptHumanMove = false;
