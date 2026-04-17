@@ -83,6 +83,7 @@
       <button id="menu-continue-btn" class="menu-btn hidden">CONTINUE</button>
       <button id="menu-new-game-btn" class="menu-btn">NEW GAME</button>
       <button id="menu-stories-btn" class="menu-btn">STORIES</button>
+      <button id="menu-achievements-btn" class="menu-btn">ACHIEVEMENTS</button>
       <button id="menu-host-btn" class="menu-btn">HOST GAME</button>
       <button id="menu-join-btn" class="menu-btn">JOIN GAME</button>
       <button id="menu-map-editor-btn" class="menu-btn">MAP EDITOR</button>
@@ -117,6 +118,22 @@
     <div id="stories-right">
       <div id="stories-list">
         <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Achievements overlay -->
+  <div id="achievements-overlay" class="hidden">
+    <div id="achievements-inner">
+      <div id="achievements-top-bar">
+        <button id="achievements-back-btn" class="back-link"><img src="icons/back-arrow.svg" alt="" class="back-arrow-icon"> BACK</button>
+        <h2 id="achievements-title">ACHIEVEMENTS</h2>
+        <p id="achievements-summary" aria-live="polite"></p>
+      </div>
+      <div id="achievements-list-wrap">
+        <div id="achievements-list">
+          <!-- Populated by JS -->
+        </div>
       </div>
     </div>
   </div>

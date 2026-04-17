@@ -81,6 +81,14 @@ import {
   hasStoryGameState,
   clearStoryGameState,
 } from './storyStorage';
+import { loadAchievementStats, recordVsAiVictory } from './achievementStorage';
+import {
+  ACHIEVEMENT_CATEGORY_ORDER,
+  categoryLabel,
+  getAchievementViews,
+  type AchievementCategory,
+  type AchievementView,
+} from './achievements';
 import { syncDimensions } from './game';
 import {
   hideGameEndScreen,
@@ -315,6 +323,7 @@ const mainMenuOverlayEl    = document.getElementById('main-menu-overlay') as HTM
 const menuContinueBtn      = document.getElementById('menu-continue-btn') as HTMLButtonElement;
 const menuNewGameBtn       = document.getElementById('menu-new-game-btn') as HTMLButtonElement;
 const menuStoriesBtn       = document.getElementById('menu-stories-btn') as HTMLButtonElement;
+const menuAchievementsBtn  = document.getElementById('menu-achievements-btn') as HTMLButtonElement;
 const menuHostBtn          = document.getElementById('menu-host-btn') as HTMLButtonElement;
 const menuJoinBtn          = document.getElementById('menu-join-btn') as HTMLButtonElement;
 const menuMapEditorBtn     = document.getElementById('menu-map-editor-btn') as HTMLButtonElement;
@@ -331,6 +340,10 @@ const storiesScenarioImgEl   = document.getElementById('stories-scenario-image')
 const storiesScenarioMiniTitleEl = document.getElementById('stories-scenario-mini-title') as HTMLDivElement;
 const storiesScenarioDescEl  = document.getElementById('stories-scenario-description') as HTMLParagraphElement;
 const storiesScenarioProgressEl = document.getElementById('stories-scenario-progress') as HTMLDivElement;
+const achievementsOverlayEl   = document.getElementById('achievements-overlay') as HTMLDivElement;
+const achievementsBackBtn     = document.getElementById('achievements-back-btn') as HTMLButtonElement;
+const achievementsSummaryEl   = document.getElementById('achievements-summary') as HTMLParagraphElement;
+const achievementsListEl      = document.getElementById('achievements-list') as HTMLDivElement;
 const newGameConfirmOverlay = document.getElementById('new-game-confirm-overlay') as HTMLDivElement;
 const confirmNewGameBtn    = document.getElementById('confirm-new-game-btn') as HTMLButtonElement;
 const cancelNewGameBtn     = document.getElementById('cancel-new-game-btn') as HTMLButtonElement;
@@ -632,6 +645,103 @@ function showStoriesOverlay(): void {
 function hideStoriesOverlay(): void {
   resetStoriesParallaxLayers();
   storiesOverlayEl.classList.add('hidden');
+}
+
+// ── Achievements ──────────────────────────────────────────────────────────────
+
+function buildAchievementsList(): void {
+  const progress = loadStoryProgress();
+  const stats = loadAchievementStats();
+  const views = getAchievementViews(progress, stats);
+  const nDone = views.filter(v => v.completed).length;
+  achievementsSummaryEl.textContent = `${nDone} / ${views.length} unlocked`;
+
+  achievementsListEl.innerHTML = '';
+  const byCat = new Map<AchievementCategory, AchievementView[]>();
+  for (const v of views) {
+    const arr = byCat.get(v.category) ?? [];
+    arr.push(v);
+    byCat.set(v.category, arr);
+  }
+  for (const cat of ACHIEVEMENT_CATEGORY_ORDER) {
+    const items = byCat.get(cat);
+    if (!items?.length) continue;
+    const h = document.createElement('h3');
+    h.className = 'achievements-section-title';
+    h.textContent = categoryLabel(cat);
+    achievementsListEl.appendChild(h);
+    for (const item of items) {
+      achievementsListEl.appendChild(createAchievementCardEl(item));
+    }
+  }
+}
+
+function createAchievementCardEl(v: AchievementView): HTMLElement {
+  const card = document.createElement('article');
+  card.className = 'achievement-card' + (v.completed ? ' achievement-card-complete' : '');
+
+  const media = document.createElement('div');
+  media.className = 'achievement-card-media';
+  const img = document.createElement('img');
+  img.className = 'achievement-card-image';
+  img.src = v.image;
+  img.alt = '';
+  const ic = document.createElement('img');
+  ic.className = 'achievement-card-icon';
+  ic.src = v.icon;
+  ic.alt = '';
+  media.appendChild(img);
+  media.appendChild(ic);
+
+  const body = document.createElement('div');
+  body.className = 'achievement-card-body';
+
+  const titleEl = document.createElement('h3');
+  titleEl.className = 'achievement-card-title';
+  titleEl.textContent = v.title;
+
+  const descEl = document.createElement('p');
+  descEl.className = 'achievement-card-desc';
+  descEl.textContent = v.description;
+
+  body.appendChild(titleEl);
+  body.appendChild(descEl);
+  if (v.sublabel) {
+    const subEl = document.createElement('p');
+    subEl.className = 'achievement-card-sublabel';
+    subEl.textContent = v.sublabel;
+    body.appendChild(subEl);
+  }
+
+  const prog = document.createElement('div');
+  prog.className = 'achievement-card-progress';
+  const pt = document.createElement('span');
+  pt.className = 'achievement-card-progress-text';
+  pt.textContent = `${v.current} / ${v.goal}`;
+  const bar = document.createElement('div');
+  bar.className = 'achievement-card-progress-bar';
+  const fill = document.createElement('div');
+  fill.className = 'achievement-card-progress-fill';
+  const pct = v.goal > 0 ? Math.min(100, (v.current / v.goal) * 100) : 0;
+  fill.style.width = `${pct}%`;
+  bar.appendChild(fill);
+  prog.appendChild(pt);
+  prog.appendChild(bar);
+  body.appendChild(prog);
+
+  card.appendChild(media);
+  card.appendChild(body);
+  return card;
+}
+
+function showAchievementsOverlay(): void {
+  hideMainMenu();
+  buildAchievementsList();
+  achievementsOverlayEl.classList.remove('hidden');
+}
+
+function hideAchievementsOverlay(): void {
+  achievementsOverlayEl.classList.add('hidden');
 }
 
 function resetStoriesParallaxLayers(): void {
@@ -950,6 +1060,15 @@ function startStory(storyIndex: number, savedState?: GameState): void {
 
 menuStoriesBtn.addEventListener('click', () => {
   showStoriesOverlay();
+});
+
+menuAchievementsBtn.addEventListener('click', () => {
+  showAchievementsOverlay();
+});
+
+achievementsBackBtn.addEventListener('click', () => {
+  hideAchievementsOverlay();
+  showMainMenu();
 });
 
 storiesBackBtn.addEventListener('click', () => {
@@ -3672,6 +3791,9 @@ function updateUI(): void {
 function checkWinner(): void {
   if (!state.winner) return;
   showGameEndScreenForOutcome(state.winner === localPlayer, state.winReason);
+  if (gameMode === 'vsAI' && state.winner === localPlayer) {
+    recordVsAiVictory(state.turn, state.gameMode, state.winReason);
+  }
   if (activeStoryIndex !== null && state.winner === localPlayer) {
     handleStoryWin();
     const story = STORIES[activeStoryIndex]!;

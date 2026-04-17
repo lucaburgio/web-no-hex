@@ -2593,6 +2593,198 @@ select.settings-input.settings-select option {
   font-size: 0.7rem !important;
 }
 
+/* ── Achievements overlay ───────────────────────────────────────────────────── */
+#achievements-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg);
+  z-index: 39;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+}
+#achievements-overlay.hidden { display: none; }
+
+#achievements-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-width: 920px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 48px 48px;
+  box-sizing: border-box;
+}
+
+#achievements-top-bar {
+  flex-shrink: 0;
+  padding: 40px 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+#achievements-title {
+  font-family: 'Disket Mono', monospace;
+  font-size: 1.45rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-dark);
+  margin: 0;
+}
+
+#achievements-summary {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-gray-500);
+  margin: 0;
+}
+
+#achievements-list-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.achievements-section-title {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-gray-500);
+  margin: 28px 0 14px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.achievements-section-title:first-child {
+  margin-top: 0;
+}
+
+#achievements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.achievement-card {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 18px;
+  padding: 18px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+}
+.achievement-card-media {
+  position: relative;
+  width: 120px;
+  flex-shrink: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--color-gray-100);
+}
+
+.achievement-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: grayscale(0.25) contrast(0.95);
+  transition: filter 0.2s ease;
+}
+
+.achievement-card-icon {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+}
+
+.achievement-card-complete .achievement-card-image {
+  filter: none;
+}
+
+.achievement-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.achievement-card-title {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-dark);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.achievement-card-desc {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.65rem;
+  line-height: 1.65;
+  color: var(--color-gray-600);
+  margin: 0;
+}
+
+.achievement-card-sublabel {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.6rem;
+  line-height: 1.5;
+  color: var(--color-gray-500);
+  margin: 0;
+}
+
+.achievement-card-progress {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.achievement-card-progress-text {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-dark);
+}
+
+.achievement-card-progress-bar {
+  height: 4px;
+  background: var(--color-gray-100);
+  position: relative;
+  max-width: 220px;
+}
+
+.achievement-card-progress-fill {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  background: var(--color-dark);
+  transition: width 0.35s ease;
+}
+
+.achievement-card:not(.achievement-card-complete) .achievement-card-progress-fill {
+  background: var(--color-gray-400);
+}
+
 /* ── Lobby overlay ─────────────────────────────────────────────────────────── */
 #lobby-overlay {
   position: fixed;
