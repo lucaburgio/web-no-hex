@@ -18,6 +18,7 @@ import type {
 import {
   getBreakthroughControlPointsForMap,
   getConquestControlPointsForMap,
+  mirrorStoryMapY,
 } from './storyMapLayouts';
 
 function perfEnabled(): boolean {
@@ -1650,6 +1651,11 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
         )
       : undefined;
 
+  const mapSource =
+    gm === 'breakthrough' && breakthroughAttackerOwnerForState === AI
+      ? mirrorStoryMapY(story.map, ROWS)
+      : story.map;
+
   const units: Unit[] = [];
   let playerStartingUnits = config.startingUnitsPlayer1;
   let aiStartingUnits = config.startingUnitsPlayer2;
@@ -1670,9 +1676,9 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
   }
 
   const reservedKeys = new Set(units.map(u => `${u.col},${u.row}`));
-  const mountainHexes = [...story.map.mountains];
+  const mountainHexes = [...mapSource.mountains];
   const mountainSet = new Set(mountainHexes);
-  const riverHexes: RiverHex[] = story.map.rivers ?? [];
+  const riverHexes: RiverHex[] = mapSource.rivers ?? [];
 
   const cpCandidates: string[] = [];
   for (let r = 1; r < ROWS - 1; r++) {
@@ -1718,7 +1724,7 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
     }
 
     const storyCpSet = new Set(
-      getBreakthroughControlPointsForMap(story.map).filter(k => assignable.includes(k)),
+      getBreakthroughControlPointsForMap(mapSource).filter(k => assignable.includes(k)),
     );
     sectorControlPointHex = sectorHexes.map(keys => {
       const storyCP = keys.find(k => storyCpSet.has(k));
@@ -1829,7 +1835,20 @@ export function createStoryState(story: StoryDef): GameState {
     hexStates[`${u.col},${u.row}`] = { owner: u.owner, stableFor: 0, isProduction: false };
   }
 
-  const mountainHexes = [...story.map.mountains];
+  let breakthroughAttackerOwner: Owner | undefined;
+  let mapForTerrain = story.map;
+  if (story.gameMode === 'breakthrough') {
+    const randomRoles = story.breakthroughRandomRoles ?? config.breakthroughRandomRoles;
+    const player1Role = story.breakthroughPlayer1Role ?? config.breakthroughPlayer1Role;
+    breakthroughAttackerOwner = randomRoles
+      ? (Math.random() < 0.5 ? PLAYER : AI)
+      : player1Role === 'attacker' ? PLAYER : AI;
+    if (breakthroughAttackerOwner === AI) {
+      mapForTerrain = mirrorStoryMapY(story.map, ROWS);
+    }
+  }
+
+  const mountainHexes = [...mapForTerrain.mountains];
   const mountainSet = new Set(mountainHexes);
   let controlPointHexes =
     story.gameMode === 'conquest' ? [...getConquestControlPointsForMap(story.map)] : [];
@@ -1839,16 +1858,9 @@ export function createStoryState(story: StoryDef): GameState {
   let sectorControlPointHex: string[] = [];
   let breakthroughCpOccupation: number[] = [];
   let sectorIndexByHex: Record<string, number> = {};
-  let breakthroughAttackerOwner: Owner | undefined;
 
   if (story.gameMode === 'breakthrough') {
-    // Determine attacker owner
-    const randomRoles = story.breakthroughRandomRoles ?? config.breakthroughRandomRoles;
-    const player1Role = story.breakthroughPlayer1Role ?? config.breakthroughPlayer1Role;
-    breakthroughAttackerOwner = randomRoles
-      ? (Math.random() < 0.5 ? PLAYER : AI)
-      : player1Role === 'attacker' ? PLAYER : AI;
-    const att = breakthroughAttackerOwner;
+    const att = breakthroughAttackerOwner!;
 
     // Build all assignable (non-mountain) hexes
     const assignable: string[] = [];
@@ -1860,7 +1872,7 @@ export function createStoryState(story: StoryDef): GameState {
     }
 
     // Sector count: explicit override > derived from map CPs+1 > config default
-    const storyMapCps = getBreakthroughControlPointsForMap(story.map);
+    const storyMapCps = getBreakthroughControlPointsForMap(mapForTerrain);
     const wantSectors = story.breakthroughSectorCount
       ?? (storyMapCps.length > 0 ? storyMapCps.length + 1 : config.breakthroughSectorCount);
     const nSectors = Math.max(2, Math.min(wantSectors, assignable.length));
@@ -1955,7 +1967,7 @@ export function createStoryState(story: StoryDef): GameState {
     units,
     hexStates,
     mountainHexes,
-    riverHexes: story.map.rivers ?? [],
+    riverHexes: mapForTerrain.rivers ?? [],
     gameMode: story.gameMode,
     controlPointHexes,
     conquestPoints,
