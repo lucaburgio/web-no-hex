@@ -26,7 +26,7 @@ import mountainHex04 from '../public/images/misc/mountain-hex/mountain-04.png';
 import mountainHex05 from '../public/images/misc/mountain-hex/mountain-05.png';
 import mountainHex06 from '../public/images/misc/mountain-hex/mountain-06.png';
 import mountainHex07 from '../public/images/misc/mountain-hex/mountain-07.png';
-import { riverSegmentUrl } from './rivers';
+import { riverSegmentDisplay } from './rivers';
 
 const MOUNTAIN_HEX_TEXTURES = [mountainHex01, mountainHex02, mountainHex03, mountainHex04, mountainHex05, mountainHex06, mountainHex07] as const;
 
@@ -1102,7 +1102,7 @@ export function renderState(
       const iw = HEX_SIZE * Math.sqrt(3);
       const ih = HEX_SIZE * 2;
       for (const rh of riverHexes) {
-        const url = riverSegmentUrl(rh.segment);
+        const { url, counterFlipUpright } = riverSegmentDisplay(rh.segment, flipBoardY);
         if (!url) continue;
         const { x, y } = hexToPixel(rh.col, rh.row);
         const clipped = svgEl('g');
@@ -1115,7 +1115,7 @@ export function renderState(
         img.setAttribute('width', String(iw));
         img.setAttribute('height', String(ih));
         img.setAttribute('pointer-events', 'none');
-        if (flipBoardY) {
+        if (counterFlipUpright) {
           const upright = svgUprightAt(x, y);
           upright.appendChild(img);
           clipped.appendChild(upright);

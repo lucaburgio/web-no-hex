@@ -17,6 +17,9 @@
  * Multiple variants of the same pair (e.g. A-D-01, A-D-02) can coexist
  * and are selected randomly during generation.
  *
+ * Optional `river-hex-inverted/` holds the same `{side}-{side}-{NN}.png` keys for Y-flipped boards
+ * (multiplayer guest); see {@link riverSegmentDisplay}.
+ *
  * Neighbor delta table (odd-r offset, same parity rules as hex.ts):
  *
  *   Even rows:  A=[0,-1]  B=[1,0]  C=[0,1]  D=[-1,1]  E=[-1,0]  F=[-1,-1]
@@ -30,6 +33,12 @@ import type { HexSide, RiverHex } from './types';
 
 const RIVER_HEX_URLS = import.meta.glob<string>(
   '../public/images/misc/river-hex/*.png',
+  { eager: true, import: 'default' },
+);
+
+/** Same segment keys as `river-hex/`; used when the board is Y-flipped (guest / mirrored view) instead of mirroring the standard texture. */
+const RIVER_HEX_INVERTED_URLS = import.meta.glob<string>(
+  '../public/images/misc/river-hex-inverted/*.png',
   { eager: true, import: 'default' },
 );
 
@@ -65,9 +74,9 @@ interface RiverSegmentDef {
 
 const SEGMENT_FILE_RE = /^([A-F])-([A-F])-(\d{2})\.png$/;
 
-function buildRiverSegmentDefs(): RiverSegmentDef[] {
+function buildRiverSegmentDefs(urlMap: Record<string, string>): RiverSegmentDef[] {
   const defs: RiverSegmentDef[] = [];
-  for (const [path, url] of Object.entries(RIVER_HEX_URLS)) {
+  for (const [path, url] of Object.entries(urlMap)) {
     const base = path.split('/').pop() ?? '';
     const m = base.match(SEGMENT_FILE_RE);
     if (!m) continue;
@@ -84,12 +93,20 @@ function buildRiverSegmentDefs(): RiverSegmentDef[] {
  * All registered river segment images (every matching PNG under `river-hex/`).
  * Drop new `{side1}-{side2}-{NN}.png` files into that folder to extend the set.
  */
-const RIVER_SEGMENT_DEFS: RiverSegmentDef[] = buildRiverSegmentDefs();
+const RIVER_SEGMENT_DEFS: RiverSegmentDef[] = buildRiverSegmentDefs(RIVER_HEX_URLS);
 
 /** Map from segment key → resolved image URL. */
 const SEGMENT_URL_MAP: Record<string, string> = {};
 for (const def of RIVER_SEGMENT_DEFS) {
   SEGMENT_URL_MAP[def.key] = def.url;
+}
+
+const RIVER_SEGMENT_DEFS_INVERTED: RiverSegmentDef[] = buildRiverSegmentDefs(RIVER_HEX_INVERTED_URLS);
+
+/** Inverted-board variants (same keys as {@link SEGMENT_URL_MAP}). */
+const SEGMENT_URL_MAP_INVERTED: Record<string, string> = {};
+for (const def of RIVER_SEGMENT_DEFS_INVERTED) {
+  SEGMENT_URL_MAP_INVERTED[def.key] = def.url;
 }
 
 /**
@@ -108,6 +125,26 @@ for (const def of RIVER_SEGMENT_DEFS) {
 /** Resolve a stored segment key to its bundled image URL. Returns empty string if unknown. */
 export function riverSegmentUrl(key: string): string {
   return SEGMENT_URL_MAP[key] ?? '';
+}
+
+/**
+ * River art for the main board when it may be Y-flipped (see `flipBoardY` in `initRenderer`).
+ * Prefer hand-authored `river-hex-inverted/` assets so the stream reads correctly; if a key is missing
+ * there, fall back to the standard PNG plus the same counter-flip used for mountains/units.
+ */
+export function riverSegmentDisplay(
+  segmentKey: string,
+  boardFlippedY: boolean,
+): { url: string; counterFlipUpright: boolean } {
+  const normal = SEGMENT_URL_MAP[segmentKey] ?? '';
+  if (!boardFlippedY) {
+    return { url: normal, counterFlipUpright: false };
+  }
+  const inverted = SEGMENT_URL_MAP_INVERTED[segmentKey];
+  if (inverted) {
+    return { url: inverted, counterFlipUpright: false };
+  }
+  return { url: normal, counterFlipUpright: true };
 }
 
 // ── Coordinate helpers ─────────────────────────────────────────────────────────
