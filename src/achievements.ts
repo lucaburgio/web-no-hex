@@ -1,5 +1,5 @@
 import type { AchievementStats } from './achievementStorage';
-import type { StoryProgress } from './types';
+import type { StoryProgress, WinReason } from './types';
 import { STORIES } from './stories';
 import { SCENARIOS } from './scenarios';
 import modeImgDomination from '../public/images/modes/domination.png';
@@ -10,14 +10,16 @@ import modeIconConquest from '../public/icons/modes/conquest.svg';
 import modeIconBreakthrough from '../public/icons/modes/breakthrough.svg';
 import starIcon from '../public/icons/star.svg';
 
-export type AchievementCategory = 'scenarios' | 'speed' | 'modes' | 'milestones';
+export type AchievementCategory = 'scenarios' | 'speed' | 'modes' | 'milestones' | 'victory';
 
 export type AchievementKind =
   | { type: 'scenario'; scenarioId: string }
   | { type: 'speed'; maxTurns: number }
+  | { type: 'long_campaign'; minTurns: number }
   | { type: 'modes_all' }
   | { type: 'wins'; count: number }
-  | { type: 'annihilation' };
+  | { type: 'annihilation' }
+  | { type: 'win_reason'; reason: WinReason };
 
 export interface AchievementDefinition {
   id: string;
@@ -55,6 +57,84 @@ function buildScenarioAchievements(): AchievementDefinition[] {
   });
 }
 
+function winReasonAchievementDefinitions(): AchievementDefinition[] {
+  const rows: {
+    reason: WinReason;
+    title: string;
+    description: string;
+    image: string;
+    icon: string;
+  }[] = [
+    {
+      reason: 'dom_breakthrough',
+      title: 'Deep penetration',
+      description: 'Win a vs AI Domination match by reaching the enemy home row.',
+      image: modeImgDomination,
+      icon: modeIconDomination,
+    },
+    {
+      reason: 'dom_annihilation',
+      title: 'Domination by elimination',
+      description: 'Win a vs AI Domination match by destroying every enemy unit.',
+      image: modeImgDomination,
+      icon: modeIconDomination,
+    },
+    {
+      reason: 'cq_elimination',
+      title: 'Conquest by arms',
+      description: 'Win a vs AI Conquest match by eliminating the opposing force.',
+      image: modeImgConquest,
+      icon: modeIconConquest,
+    },
+    {
+      reason: 'cq_both_eliminated',
+      title: 'Northern verdict',
+      description:
+        'Win a vs AI Conquest match after both armies were wiped (tiebreaker to the north).',
+      image: modeImgConquest,
+      icon: modeIconConquest,
+    },
+    {
+      reason: 'cq_cp_depleted',
+      title: 'Bankrupt the enemy',
+      description: "Win a vs AI Conquest match by reducing the opponent's Conquest Points to 0.",
+      image: modeImgConquest,
+      icon: modeIconConquest,
+    },
+    {
+      reason: 'cq_both_cp_depleted',
+      title: 'Mutual exhaustion',
+      description:
+        'Win a vs AI Conquest match when both sides hit 0 Conquest Points (territory tiebreak).',
+      image: modeImgConquest,
+      icon: modeIconConquest,
+    },
+    {
+      reason: 'bt_attacker_wiped',
+      title: 'Counteroffensive',
+      description: 'Win a vs AI Breakthrough match as defender by eliminating the attacker.',
+      image: modeImgBreakthrough,
+      icon: modeIconBreakthrough,
+    },
+    {
+      reason: 'bt_all_sectors',
+      title: 'Grand breakthrough',
+      description: 'Win a vs AI Breakthrough match as attacker by capturing every sector.',
+      image: modeImgBreakthrough,
+      icon: modeIconBreakthrough,
+    },
+  ];
+  return rows.map(r => ({
+    id: `win-reason-${r.reason}`,
+    title: r.title,
+    description: r.description,
+    image: r.image,
+    icon: r.icon,
+    category: 'victory' as const,
+    kind: { type: 'win_reason', reason: r.reason },
+  }));
+}
+
 const STATIC_ACHIEVEMENTS: AchievementDefinition[] = [
   {
     id: 'speed-40',
@@ -84,6 +164,24 @@ const STATIC_ACHIEVEMENTS: AchievementDefinition[] = [
     kind: { type: 'speed', maxTurns: 15 },
   },
   {
+    id: 'speed-10',
+    title: 'Do not worry. It is possible',
+    description: 'Win a vs AI match in 10 turns or fewer.',
+    image: modeImgBreakthrough,
+    icon: starIcon,
+    category: 'speed',
+    kind: { type: 'speed', maxTurns: 10 },
+  },
+  {
+    id: 'long-campaign-80',
+    title: 'War of endurance',
+    description: 'Win a vs AI match that lasts at least 80 turns.',
+    image: modeImgDomination,
+    icon: starIcon,
+    category: 'speed',
+    kind: { type: 'long_campaign', minTurns: 80 },
+  },
+  {
     id: 'modes-all',
     title: 'Well-rounded commander',
     description: 'Win at least one vs AI match in Domination, Conquest, and Breakthrough.',
@@ -111,6 +209,24 @@ const STATIC_ACHIEVEMENTS: AchievementDefinition[] = [
     kind: { type: 'wins', count: 10 },
   },
   {
+    id: 'wins-50',
+    title: 'Campaign veteran',
+    description: 'Win 50 vs AI matches.',
+    image: modeImgBreakthrough,
+    icon: starIcon,
+    category: 'milestones',
+    kind: { type: 'wins', count: 50 },
+  },
+  {
+    id: 'wins-100',
+    title: 'Supreme commander',
+    description: 'Win 100 vs AI matches.',
+    image: modeImgBreakthrough,
+    icon: starIcon,
+    category: 'milestones',
+    kind: { type: 'wins', count: 100 },
+  },
+  {
     id: 'annihilation',
     title: 'Total elimination',
     description: 'Win a vs AI match by wiping out the opposing force (or routing a breakthrough attacker).',
@@ -122,7 +238,7 @@ const STATIC_ACHIEVEMENTS: AchievementDefinition[] = [
 ];
 
 export function getAllAchievementDefinitions(): AchievementDefinition[] {
-  return [...buildScenarioAchievements(), ...STATIC_ACHIEVEMENTS];
+  return [...buildScenarioAchievements(), ...STATIC_ACHIEVEMENTS, ...winReasonAchievementDefinitions()];
 }
 
 function modesCompleted(stats: AchievementStats): number {
@@ -170,6 +286,25 @@ function computeView(
       sublabel,
     };
   }
+  if (k.type === 'long_campaign') {
+    const longest = stats.longestWinTurnsVsAi;
+    const done = longest !== null && longest >= k.minTurns;
+    let sublabel: string;
+    if (done) {
+      sublabel = `Met: longest win ${longest} turns (≥${k.minTurns})`;
+    } else if (longest != null) {
+      sublabel = `Longest victory: ${longest} turns — need ≥${k.minTurns}`;
+    } else {
+      sublabel = `Win a vs AI match in ${k.minTurns} turns or more`;
+    }
+    return {
+      ...def,
+      current: done ? 1 : 0,
+      goal: 1,
+      completed: done,
+      sublabel,
+    };
+  }
   if (k.type === 'modes_all') {
     const m = modesCompleted(stats);
     return {
@@ -196,6 +331,15 @@ function computeView(
       completed: stats.wonByAnnihilation,
     };
   }
+  if (k.type === 'win_reason') {
+    const done = stats.winReasonWon[k.reason] === true;
+    return {
+      ...def,
+      current: done ? 1 : 0,
+      goal: 1,
+      completed: done,
+    };
+  }
   return { ...def, current: 0, goal: 1, completed: false };
 }
 
@@ -212,6 +356,7 @@ export const ACHIEVEMENT_CATEGORY_ORDER: AchievementCategory[] = [
   'speed',
   'modes',
   'milestones',
+  'victory',
 ];
 
 export function categoryLabel(cat: AchievementCategory): string {
@@ -224,6 +369,8 @@ export function categoryLabel(cat: AchievementCategory): string {
       return 'Game modes';
     case 'milestones':
       return 'Milestones';
+    case 'victory':
+      return 'Victory conditions';
     default:
       return cat;
   }
