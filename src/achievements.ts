@@ -1,7 +1,7 @@
 import type { AchievementStats } from './achievementStorage';
 import type { StoryProgress } from './types';
 import { STORIES } from './stories';
-import { getScenarioById } from './scenarios';
+import { SCENARIOS } from './scenarios';
 import modeImgDomination from '../public/images/modes/domination.png';
 import modeImgConquest from '../public/images/modes/conquest.png';
 import modeImgBreakthrough from '../public/images/modes/breakthrough.png';
@@ -13,7 +13,7 @@ import starIcon from '../public/icons/star.svg';
 export type AchievementCategory = 'scenarios' | 'speed' | 'modes' | 'milestones';
 
 export type AchievementKind =
-  | { type: 'story'; storyId: string }
+  | { type: 'scenario'; scenarioId: string }
   | { type: 'speed'; maxTurns: number }
   | { type: 'modes_all' }
   | { type: 'wins'; count: number }
@@ -37,28 +37,22 @@ export interface AchievementView extends AchievementDefinition {
   sublabel?: string;
 }
 
-function storyAchievementFor(
-  storyId: string,
-  title: string,
-  description: string,
-  scenarioId: string,
-): AchievementDefinition {
-  const sc = getScenarioById(scenarioId);
-  return {
-    id: `story-${storyId}`,
-    title,
-    description: description.trim() || `Complete the scenario mission “${title}”.`,
-    image: sc?.image ?? modeImgDomination,
-    icon: sc?.icon ?? starIcon,
-    category: 'scenarios',
-    kind: { type: 'story', storyId },
-  };
-}
-
-function buildStoryAchievements(): AchievementDefinition[] {
-  return STORIES.map(s =>
-    storyAchievementFor(s.id, s.title, s.description, s.scenario),
-  );
+function buildScenarioAchievements(): AchievementDefinition[] {
+  return SCENARIOS.map(sc => {
+    const missionCount = STORIES.filter(s => s.scenario === sc.id).length;
+    return {
+      id: `scenario-${sc.id}`,
+      title: sc.title,
+      description:
+        missionCount > 0
+          ? `Complete all ${missionCount} missions in this scenario.`
+          : 'Complete every mission in this scenario.',
+      image: sc.image,
+      icon: sc.icon,
+      category: 'scenarios',
+      kind: { type: 'scenario', scenarioId: sc.id },
+    };
+  });
 }
 
 const STATIC_ACHIEVEMENTS: AchievementDefinition[] = [
@@ -128,7 +122,7 @@ const STATIC_ACHIEVEMENTS: AchievementDefinition[] = [
 ];
 
 export function getAllAchievementDefinitions(): AchievementDefinition[] {
-  return [...buildStoryAchievements(), ...STATIC_ACHIEVEMENTS];
+  return [...buildScenarioAchievements(), ...STATIC_ACHIEVEMENTS];
 }
 
 function modesCompleted(stats: AchievementStats): number {
@@ -145,13 +139,16 @@ function computeView(
   stats: AchievementStats,
 ): AchievementView {
   const k = def.kind;
-  if (k.type === 'story') {
-    const done = storyProgress.completedIds.includes(k.storyId);
+  if (k.type === 'scenario') {
+    const missions = STORIES.filter(s => s.scenario === k.scenarioId);
+    const goal = missions.length;
+    const current = missions.filter(s => storyProgress.completedIds.includes(s.id)).length;
+    const completed = goal > 0 && current >= goal;
     return {
       ...def,
-      current: done ? 1 : 0,
-      goal: 1,
-      completed: done,
+      current,
+      goal,
+      completed,
     };
   }
   if (k.type === 'speed') {
