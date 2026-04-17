@@ -31,14 +31,14 @@ export function storyMapHasFullCustomMatchSupport(map: StoryMapDef): boolean {
 }
 
 /**
- * Vertical mirror: `row' = rows - 1 - row` on every hex key. Used for Breakthrough when the
- * attacker is AI (player 1 defends): authored maps assume a south attacker, so mirroring
- * aligns sectors and CPs with the north-attacker layout.
+ * Mirror both grid axes: `col' = cols - 1 - col`, `row' = rows - 1 - row` on every hex key.
+ * Used for Breakthrough when the attacker is AI (player 1 defends): authored maps assume a
+ * south attacker, so mirroring aligns terrain, sectors, and CPs with the north-attacker layout.
  */
-export function mirrorStoryMapY(map: StoryMapDef, rows: number): StoryMapDef {
+export function mirrorStoryMapY(map: StoryMapDef, cols: number, rows: number): StoryMapDef {
   const mirrorKey = (key: string): string => {
     const [c, r] = key.split(',').map(Number);
-    return `${c},${rows - 1 - r}`;
+    return `${cols - 1 - c},${rows - 1 - r}`;
   };
 
   let rivers: ReturnType<typeof riverHexesFromPaintedKeys> | undefined;

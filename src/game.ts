@@ -1653,7 +1653,7 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
 
   const mapSource =
     gm === 'breakthrough' && breakthroughAttackerOwnerForState === AI
-      ? mirrorStoryMapY(story.map, ROWS)
+      ? mirrorStoryMapY(story.map, COLS, ROWS)
       : story.map;
 
   const units: Unit[] = [];
@@ -1664,8 +1664,10 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
     playerStartingUnits = att === PLAYER ? config.startingUnitsAttacker : config.startingUnitsDefender;
     aiStartingUnits = att === AI ? config.startingUnitsAttacker : config.startingUnitsDefender;
   }
-  const playerStartingCols = spreadCols(playerStartingUnits, COLS);
-  const aiStartingCols = spreadCols(aiStartingUnits, COLS);
+  const mirrorCols = gm === 'breakthrough' && breakthroughAttackerOwnerForState === AI;
+  const mirrorC = (c: number) => (mirrorCols ? COLS - 1 - c : c);
+  const playerStartingCols = spreadCols(playerStartingUnits, COLS).map(mirrorC);
+  const aiStartingCols = spreadCols(aiStartingUnits, COLS).map(mirrorC);
 
   for (const c of playerStartingCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
   for (const c of aiStartingCols) units.push(makeUnit(AI, c, 0));
@@ -1821,13 +1823,25 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
  */
 export function createStoryState(story: StoryDef): GameState {
   unitIdCounter = 0;
-  const units: Unit[] = [];
 
+  let breakthroughAttackerOwner: Owner | undefined;
+  if (story.gameMode === 'breakthrough') {
+    const randomRoles = story.breakthroughRandomRoles ?? config.breakthroughRandomRoles;
+    const player1Role = story.breakthroughPlayer1Role ?? config.breakthroughPlayer1Role;
+    breakthroughAttackerOwner = randomRoles
+      ? (Math.random() < 0.5 ? PLAYER : AI)
+      : player1Role === 'attacker' ? PLAYER : AI;
+  }
+
+  const mirrorSpawns = story.gameMode === 'breakthrough' && breakthroughAttackerOwner === AI;
+  const startCol = (c: number) => (mirrorSpawns ? COLS - 1 - c : c);
+
+  const units: Unit[] = [];
   for (const pos of story.map.playerStart) {
-    units.push(makeUnit(PLAYER, pos.col, ROWS - 1, pos.unitTypeId ?? 'infantry'));
+    units.push(makeUnit(PLAYER, startCol(pos.col), ROWS - 1, pos.unitTypeId ?? 'infantry'));
   }
   for (const pos of story.map.aiStart) {
-    units.push(makeUnit(AI, pos.col, 0, pos.unitTypeId ?? 'infantry'));
+    units.push(makeUnit(AI, startCol(pos.col), 0, pos.unitTypeId ?? 'infantry'));
   }
 
   let hexStates: Record<string, HexState> = {};
@@ -1835,17 +1849,9 @@ export function createStoryState(story: StoryDef): GameState {
     hexStates[`${u.col},${u.row}`] = { owner: u.owner, stableFor: 0, isProduction: false };
   }
 
-  let breakthroughAttackerOwner: Owner | undefined;
   let mapForTerrain = story.map;
-  if (story.gameMode === 'breakthrough') {
-    const randomRoles = story.breakthroughRandomRoles ?? config.breakthroughRandomRoles;
-    const player1Role = story.breakthroughPlayer1Role ?? config.breakthroughPlayer1Role;
-    breakthroughAttackerOwner = randomRoles
-      ? (Math.random() < 0.5 ? PLAYER : AI)
-      : player1Role === 'attacker' ? PLAYER : AI;
-    if (breakthroughAttackerOwner === AI) {
-      mapForTerrain = mirrorStoryMapY(story.map, ROWS);
-    }
+  if (story.gameMode === 'breakthrough' && breakthroughAttackerOwner === AI) {
+    mapForTerrain = mirrorStoryMapY(story.map, COLS, ROWS);
   }
 
   const mountainHexes = [...mapForTerrain.mountains];
