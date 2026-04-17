@@ -128,9 +128,10 @@ export function riverSegmentUrl(key: string): string {
 }
 
 /**
- * River art for the main board when it may be Y-flipped (see `flipBoardY` in `initRenderer`).
- * Prefer hand-authored `river-hex-inverted/` assets so the stream reads correctly; if a key is missing
- * there, fall back to the standard PNG plus the same counter-flip used for mountains/units.
+ * River art for the main board when a legacy Y-only guest flip was used (`boardFlippedY`).
+ * The renderer now uses scale(-1,-1) for vs-human guests and passes `false` here; inverted assets
+ * remain for other callers. If `boardFlippedY` is true: prefer `river-hex-inverted/` when present,
+ * else normal PNG plus counter-flip.
  */
 export function riverSegmentDisplay(
   segmentKey: string,

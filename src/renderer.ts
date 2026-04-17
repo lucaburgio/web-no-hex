@@ -40,15 +40,34 @@ function mountainHexTextureUrl(key: string): string {
 /** Margin in px between SVG edge and board origin (must match {@link initRenderer}). */
 export const BOARD_MARGIN = 100;
 
-/** Vertical midpoint of hex *centers* in board-local space (used for vs-human guest Y-mirror). */
+/** Vertical midpoint of hex *centers* in board-local space (used for vs-human guest view flip). */
 export function boardCenterY(): number {
   return (HEX_SIZE * 1.5 * (ROWS - 1)) / 2;
 }
 
-/** Mirror board-local Y so simulation row 0 (north) draws toward the bottom of the screen. */
+/** Horizontal midpoint of hex *centers* in board-local space (vs-human guest view flip). */
+export function boardCenterX(): number {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const x = hexToPixel(c, r).x;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+    }
+  }
+  return (minX + maxX) / 2;
+}
+
+/**
+ * Vs-human guest: reflect the board through the center so the northern home row reads toward the
+ * bottom of the screen and left/right match a full horizontal + vertical flip (same idea as
+ * defender map mirroring in solo / custom matches).
+ */
 export function boardViewFlipTransform(): string {
+  const xMid = boardCenterX();
   const yMid = boardCenterY();
-  return `translate(0,${yMid}) scale(1,-1) translate(0,${-yMid})`;
+  return `translate(${xMid},${yMid}) scale(-1,-1) translate(${-xMid},${-yMid})`;
 }
 
 function getBoardViewRoot(svg: SVGSVGElement): SVGGElement | null {
@@ -630,10 +649,10 @@ function svgEl<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameM
   return document.createElementNS('http://www.w3.org/2000/svg', tag);
 }
 
-/** Counter-flip upright content when the board is under {@link boardViewFlipTransform}. */
+/** Counter-flip upright content when the board is under {@link boardViewFlipTransform} (scale -1,-1). */
 function svgUprightAt(x: number, y: number): SVGGElement {
   const g = svgEl('g');
-  g.setAttribute('transform', `translate(${x},${y}) scale(1,-1) translate(${-x},${-y})`);
+  g.setAttribute('transform', `translate(${x},${y}) scale(-1,-1) translate(${-x},${-y})`);
   return g;
 }
 
@@ -653,7 +672,7 @@ interface RenderDomCache {
 const renderDomCacheBySvg = new WeakMap<SVGSVGElement, RenderDomCache>();
 
 export interface InitRendererOptions {
-  /** When true (vs-human guest), mirror the board vertically so local side appears at the bottom. */
+  /** When true (vs-human guest), mirror the board through its center (horizontal + vertical). */
   flipBoardY?: boolean;
 }
 
@@ -1102,7 +1121,8 @@ export function renderState(
       const iw = HEX_SIZE * Math.sqrt(3);
       const ih = HEX_SIZE * 2;
       for (const rh of riverHexes) {
-        const { url, counterFlipUpright } = riverSegmentDisplay(rh.segment, flipBoardY);
+        // Board guest transform is scale(-1,-1); river art follows the hex — no separate Y-only asset path.
+        const { url, counterFlipUpright } = riverSegmentDisplay(rh.segment, false);
         if (!url) continue;
         const { x, y } = hexToPixel(rh.col, rh.row);
         const clipped = svgEl('g');
@@ -1474,7 +1494,7 @@ export function animateMoves(
       barFill.setAttribute('fill', barColor);
 
       if (spriteRoot) {
-        spriteRoot.setAttribute('transform', `translate(${x},${y}) scale(1,-1) translate(${-x},${-y})`);
+        spriteRoot.setAttribute('transform', `translate(${x},${y}) scale(-1,-1) translate(${-x},${-y})`);
       }
       circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
       barBg.setAttribute('x',   String(x - animBarW / 2));
@@ -1635,7 +1655,7 @@ export function animateStrikeAndReturn(
     barFill.setAttribute('fill', barColor);
 
     if (spriteRoot) {
-      spriteRoot.setAttribute('transform', `translate(${x},${y}) scale(1,-1) translate(${-x},${-y})`);
+      spriteRoot.setAttribute('transform', `translate(${x},${y}) scale(-1,-1) translate(${-x},${-y})`);
     }
     circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
     barBg.setAttribute('x', String(x - animBarW / 2));
@@ -1751,7 +1771,7 @@ function showHexFloatBadges(
     g.appendChild(text);
     if (flipBoardY) {
       const upright = svgEl('g');
-      upright.setAttribute('transform', 'scale(1,-1)');
+      upright.setAttribute('transform', 'scale(-1,-1)');
       upright.appendChild(g);
       outer.appendChild(upright);
     } else {

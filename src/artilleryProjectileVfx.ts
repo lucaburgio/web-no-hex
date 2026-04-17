@@ -164,15 +164,15 @@ function hexFanShellEndpoints(
   return { from, impact };
 }
 
-/** Mirror Y across horizontal line through center so streak direction matches screen after board Y-flip. */
-function mirrorFanYAcrossCenter(
+/** Point-reflect streak endpoints through hex center so salvo direction matches screen after board scale(-1,-1) (vs-human guest). */
+function mirrorFanPointAcrossCenter(
   c: ArtilleryPoint,
   from: ArtilleryPoint,
   impact: ArtilleryPoint,
 ): { from: ArtilleryPoint; impact: ArtilleryPoint } {
   return {
-    from: { x: from.x, y: 2 * c.y - from.y },
-    impact: { x: impact.x, y: 2 * c.y - impact.y },
+    from: { x: 2 * c.x - from.x, y: 2 * c.y - from.y },
+    impact: { x: 2 * c.x - impact.x, y: 2 * c.y - impact.y },
   };
 }
 
@@ -188,7 +188,7 @@ function buildHexFanShuffleTimeline(
   FIRE_ORDER_SHUFFLE.forEach((shellIndex, step) => {
     let { from, impact } = hexFanShellEndpoints(shellIndex, c, R);
     if (mirrorFanY) {
-      ({ from, impact } = mirrorFanYAcrossCenter(c, from, impact));
+      ({ from, impact } = mirrorFanPointAcrossCenter(c, from, impact));
     }
     tl.add(directStreakSegment(root, from, impact, style, 0.4, 0.52), step * stagger);
   });
@@ -203,8 +203,7 @@ export interface PlayDefenderHexBarrageOptions {
   parent: SVGGElement;
   onComplete?: () => void;
   /**
-   * Mirror shell fan across the horizontal through `center` (swap vertical offset of from/impact).
-   * Use when the board is drawn with a parent Y-flip (vs-human guest) so shells still read as arriving from above.
+   * Mirror shell fan through `center` (point reflection). Use when the board uses scale(-1,-1) for the vs-human guest.
    */
   mirrorFanY?: boolean;
 }
