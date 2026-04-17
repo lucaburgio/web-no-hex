@@ -1,5 +1,6 @@
 import {
   createInitialState,
+  createInitialStatePreservingTerrain,
   createInitialStateFromPlayableStory,
   createStoryState,
   playerPlaceUnit,
@@ -3805,7 +3806,7 @@ pauseRestartBtn.addEventListener('click', () => {
   if (activeStoryIndex !== null) {
     startStory(activeStoryIndex);
   } else {
-    startGame(createInitialStateForMenu());
+    startGame(createInitialStatePreservingTerrain(state));
   }
 });
 

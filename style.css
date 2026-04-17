@@ -1384,14 +1384,12 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   padding-right: 60px;
 }
 
-#main-menu-title {
-  font-family: 'Disket Mono', monospace;
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: var(--color-dark);
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  line-height: 1.2;
+#main-menu-logo {
+  display: block;
+  width: min(100%, 360px);
+  height: auto;
+  max-height: 120px;
+  object-fit: contain;
 }
 
 #main-menu-right {

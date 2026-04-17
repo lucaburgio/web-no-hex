@@ -1591,6 +1591,150 @@ export function createInitialState(): GameState {
 }
 
 /**
+ * New match on the same generated (or fixed) layout: same mountains, rivers, conquest CP
+ * hexes, and breakthrough sector partition. Sector political ownership and CP markers are
+ * reset like {@link createInitialState}.
+ */
+export function createInitialStatePreservingTerrain(previous: GameState): GameState {
+  unitIdCounter = 0;
+  const gm = config.gameMode as GameMode;
+  const mountainHexes = [...previous.mountainHexes];
+  const riverHexes = previous.riverHexes.map(r => ({ ...r }));
+
+  const breakthroughAttackerOwnerForState: Owner | undefined =
+    gm === 'breakthrough'
+      ? (previous.breakthroughAttackerOwner ?? PLAYER)
+      : undefined;
+
+  const units: Unit[] = [];
+  let playerStartingUnits = config.startingUnitsPlayer1;
+  let aiStartingUnits = config.startingUnitsPlayer2;
+  if (gm === 'breakthrough' && breakthroughAttackerOwnerForState !== undefined) {
+    const att = breakthroughAttackerOwnerForState;
+    playerStartingUnits = att === PLAYER ? config.startingUnitsAttacker : config.startingUnitsDefender;
+    aiStartingUnits = att === AI ? config.startingUnitsAttacker : config.startingUnitsDefender;
+  }
+  const playerStartingCols = spreadCols(playerStartingUnits, COLS);
+  const aiStartingCols = spreadCols(aiStartingUnits, COLS);
+
+  for (const c of playerStartingCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
+  for (const c of aiStartingCols) units.push(makeUnit(AI, c, 0));
+
+  let hexStates: Record<string, HexState> = {};
+  for (const u of units) {
+    hexStates[`${u.col},${u.row}`] = { owner: u.owner, stableFor: 0, isProduction: false };
+  }
+
+  let sectorHexes: string[][] = [];
+  let sectorOwners: Owner[] = [];
+  let sectorControlPointHex: string[] = [];
+  let breakthroughCpOccupation: number[] = [];
+  let sectorIndexByHex: Record<string, number> = {};
+
+  let controlPointHexes: string[] = [];
+
+  if (gm === 'breakthrough' && breakthroughAttackerOwnerForState !== undefined) {
+    sectorHexes = previous.sectorHexes.map(s => [...s]);
+    const att: Owner = breakthroughAttackerOwnerForState;
+    const nSec = sectorHexes.length;
+    sectorOwners = sectorHexes.map((_, i) =>
+      att === PLAYER ? (i === 0 ? PLAYER : AI) : i === nSec - 1 ? AI : PLAYER,
+    );
+    sectorIndexByHex = {};
+    sectorHexes.forEach((keys, sid) => {
+      for (const k of keys) sectorIndexByHex[k] = sid;
+    });
+    hexStates = {};
+    for (let s = 0; s < sectorHexes.length; s++) {
+      const owner = sectorOwners[s]!;
+      for (const k of sectorHexes[s]!) {
+        hexStates[k] = { owner, stableFor: 0, isProduction: false };
+      }
+    }
+    sectorControlPointHex = sectorHexes.map(keys => pickBreakthroughSectorControlPoint(keys, COLS, ROWS));
+    breakthroughCpOccupation = Array(sectorHexes.length).fill(0);
+    const homeIdx = att === PLAYER ? 0 : nSec - 1;
+    const cpHome = sectorControlPointHex[homeIdx];
+    if (cpHome) {
+      sectorControlPointHex[homeIdx] = '';
+    }
+    const frontlineIdx = att === PLAYER
+      ? sectorOwners.findIndex(o => o !== att)
+      : (() => {
+          for (let i = sectorOwners.length - 1; i >= 0; i--) {
+            if (sectorOwners[i] !== att) return i;
+          }
+          return -1;
+        })();
+    controlPointHexes =
+      frontlineIdx >= 0 && sectorControlPointHex[frontlineIdx]
+        ? [sectorControlPointHex[frontlineIdx]!]
+        : [];
+    primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
+  } else if (gm === 'conquest') {
+    controlPointHexes = [...previous.controlPointHexes];
+  }
+
+  const conquestPoints =
+    gm === 'conquest'
+      ? ({
+          [PLAYER]: config.conquestPointsPlayer,
+          [AI]: config.conquestPointsAi,
+        } as Record<Owner, number>)
+      : null;
+
+  let ppPlayer: number;
+  let ppAi: number;
+  if (gm === 'breakthrough' && breakthroughAttackerOwnerForState !== undefined) {
+    const att = breakthroughAttackerOwnerForState;
+    const def: Owner = att === PLAYER ? AI : PLAYER;
+    const defHexCount = Object.values(hexStates).filter(h => h.owner === def).length;
+    const defBonus = territoryBonusForHexCount(defHexCount);
+    const defBasePP = def === AI ? config.productionPointsPerTurnAi : config.productionPointsPerTurn;
+    const defPP = defBasePP + defBonus;
+    const attPP = config.breakthroughAttackerStartingPP;
+    ppPlayer = att === PLAYER ? attPP : defPP;
+    ppAi = att === AI ? attPP : defPP;
+  } else {
+    ppPlayer = config.productionPointsPerTurn;
+    ppAi = config.productionPointsPerTurnAi;
+  }
+
+  const logMsg =
+    gm === 'breakthrough'
+      ? 'Game started — Breakthrough. Your turn — Production phase.'
+      : 'Game started. Your turn — Production phase.';
+
+  return {
+    units,
+    hexStates,
+    mountainHexes,
+    riverHexes,
+    gameMode: gm,
+    controlPointHexes,
+    conquestPoints,
+    sectorHexes,
+    sectorOwners,
+    sectorControlPointHex,
+    breakthroughCpOccupation,
+    sectorIndexByHex,
+    ...(gm === 'breakthrough' && breakthroughAttackerOwnerForState !== undefined
+      ? { breakthroughAttackerOwner: breakthroughAttackerOwnerForState }
+      : {}),
+    turn: 1,
+    phase: 'production',
+    activePlayer: PLAYER,
+    selectedUnit: null,
+    productionPoints: {
+      [PLAYER]: ppPlayer,
+      [AI]: ppAi,
+    } as Record<Owner, number>,
+    log: [logMsg],
+    winner: null,
+  };
+}
+
+/**
  * Conquest: merge authored story control points with {@link config.controlPointCount}
  * and spread placement (extra points picked like {@link pickControlPointHexes}).
  */
