@@ -77,8 +77,10 @@ img {
     --color-ai:     #845E5E; /* gray-600 */
     /* Movement: unit has no moves left this turn (“tired”) — body + HP bar */
     --color-player-tired: #8F8F8F;
-    --color-ai-tired:     var(--color-gray-400);
-  
+    --color-ai-tired:     #a89696;
+    /* Your production (placement focus): opponent units — body + HP bar (theme AI slot) */
+    --color-ai-during-production: var(--color-gray-200);
+
     /* ── Unit states ────────────────────────────────────────────────────────── */
     --color-unit-selected: var(--color-yellow-900);
   
@@ -659,7 +661,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   flex: 0 0 40px;
   width: 100%;
   box-sizing: border-box;
-  background: var(--color-hex-player);
+  background: var(--color-gray-200);
   display: flex;
   align-items: center;
   justify-content: flex-start;

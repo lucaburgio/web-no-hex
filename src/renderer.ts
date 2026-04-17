@@ -399,13 +399,19 @@ interface Colors {
   hpTired: string;
   playerTired: string;
   aiTired: string;
+  aiDuringProduction: string;
   rangedTarget: string;
   colorDark: string;
 }
 
+/** Local side uses theme `--color-player*`; opponent uses `--color-ai*` — same for P1 and P2 (no CSS guest swap). */
+function paletteBaseForOwner(owner: Owner, localPlayer: Owner, c: Colors): string {
+  return owner === localPlayer ? c.player : c.ai;
+}
+
 let C: Colors | null = null;
 
-/** Call after theme or guest identity CSS variables change so the next draw re-reads :root. */
+/** Call after theme CSS variables change so the next draw re-reads :root. */
 export function invalidateColorsCache(): void {
   C = null;
 }
@@ -439,6 +445,7 @@ function colors(): Colors {
     hpTired:         v('--color-hp-tired'),
     playerTired:     v('--color-player-tired'),
     aiTired:         v('--color-ai-tired'),
+    aiDuringProduction: v('--color-ai-during-production'),
     rangedTarget:    v('--color-red-700'),
     colorDark:       v('--color-dark'),
   };
@@ -989,7 +996,7 @@ export function renderState(
         fill   = c.hexCanPlace;
         stroke = c.hexStroke;
       } else if (isConquered) {
-        if (hexState.owner === PLAYER) {
+        if (hexState.owner === localPlayer) {
           fill = c.hexPlayer;
         } else {
           fill   = c.hexAi;
@@ -1007,9 +1014,9 @@ export function renderState(
 
       const hexOccupied = unitByHex.has(key);
       const hexDimmed = productionFocusHexes.size > 0 && isConquered && (!productionFocusHexes.has(key) || hexOccupied) && !isProdSelected;
-      if (hexDimmed) {
-        if (fill === c.hexPlayer) fill = c.hexPlayerDimmed;
-        else if (fill === c.hexAi) fill = c.hexAiDimmed;
+      if (hexDimmed && hexState) {
+        if (hexState.owner === localPlayer) fill = c.hexPlayerDimmed;
+        else fill = c.hexAiDimmed;
       }
       const opacityDimmed = hexDimmed && fill !== c.hexPlayerDimmed && fill !== c.hexAiDimmed;
       poly.setAttribute('fill', fill);
@@ -1054,7 +1061,7 @@ export function renderState(
         const s = HEX_SIZE * 0.18;
         const diamond = svgEl('polygon');
         diamond.setAttribute('points', `${x},${y - s} ${x + s},${y} ${x},${y + s} ${x - s},${y}`);
-        diamond.setAttribute('fill', hexState.owner === PLAYER ? c.player : c.ai);
+        diamond.setAttribute('fill', paletteBaseForOwner(hexState.owner, localPlayer, c));
         diamond.setAttribute('opacity', hexDimmed ? '0.08' : '0.4');
         diamond.setAttribute('pointer-events', 'none');
         diamond.setAttribute('id', `marker-${col}-${r}`);
@@ -1254,7 +1261,7 @@ export function renderState(
       if (state.gameMode === 'breakthrough' && state.sectorOwners?.length && state.sectorIndexByHex) {
         const sid = state.sectorIndexByHex[key];
         if (sid !== undefined && state.sectorOwners[sid] !== undefined) {
-          ringStroke = state.sectorOwners[sid] === PLAYER ? c.player : c.ai;
+          ringStroke = paletteBaseForOwner(state.sectorOwners[sid]!, localPlayer, c);
         }
       }
       ring.setAttribute('stroke', ringStroke);
@@ -1307,8 +1314,7 @@ export function renderState(
     const displayHp  = displayHpByUnit.get(unit.id) ?? unit.hp;
     const hpRatio    = displayHp / unit.maxHp;
 
-    const baseColor = unit.owner === PLAYER ? c.player : c.ai;
-    const tiredBase = unit.owner === PLAYER ? c.playerTired : c.aiTired;
+    const baseColor = paletteBaseForOwner(unit.owner, localPlayer, c);
     const isRangedTarget = rangedTargetKeys.has(`${dc},${dr}`);
     const movementTired =
       state.phase === 'movement' &&
@@ -1317,6 +1323,12 @@ export function renderState(
     const productionTiredVisual =
       state.phase === 'production' && productionFocusHexes.size > 0;
     const tired = movementTired || productionTiredVisual;
+    const tiredBase =
+      unit.owner === localPlayer
+        ? c.playerTired
+        : productionTiredVisual
+          ? c.aiDuringProduction
+          : c.aiTired;
     const fill =
       isRangedTarget ? c.rangedTarget : isSelected ? c.unitSelected : tired ? tiredBase : baseColor;
     const opacity = '1';
@@ -1397,6 +1409,7 @@ export function animateMoves(
   liveStateForHp?: GameState | null,
   /** False = draw below `#unit-layer` (e.g. losing attacker); true = above units, under hex hits. */
   stackAboveStaticUnits: boolean = true,
+  localPlayer: Owner = PLAYER,
 ): { cancel: () => void } {
   const noopCancel = (): void => {};
 
@@ -1432,7 +1445,7 @@ export function animateMoves(
 
   for (const anim of animations) {
     const pixelPath = pixelPathForAnimation(anim);
-    const baseColor = anim.unit.owner === PLAYER ? c.player : c.ai;
+    const baseColor = paletteBaseForOwner(anim.unit.owner, localPlayer, c);
 
     const spriteRoot = flipBoardY ? svgEl('g') : null;
     const layer: SVGGElement = spriteRoot ?? animLayer!;
@@ -1545,6 +1558,7 @@ export function animateStrikeAndReturn(
   /** When set, HP bar on the sprite uses live state + board HP tween each frame. */
   liveStateForHp?: GameState | null,
   stackAboveStaticUnits: boolean = true,
+  localPlayer: Owner = PLAYER,
 ): { cancel: () => void } {
   const noopCancel = (): void => {};
   const { unit, fromCol, fromRow, enemyCol, enemyRow, durationMs, onHit } = params;
@@ -1590,7 +1604,7 @@ export function animateStrikeAndReturn(
   const layer: SVGGElement = spriteRoot ?? animLayer!;
   if (spriteRoot) animLayer.appendChild(spriteRoot);
 
-  const baseColor = unit.owner === PLAYER ? c.player : c.ai;
+  const baseColor = paletteBaseForOwner(unit.owner, localPlayer, c);
   const live0 = liveStateForHp ? getUnitById(liveStateForHp, unit.id) : null;
   const maxHp0 = live0?.maxHp ?? unit.maxHp;
   const displayHp0 = live0 ? getBoardVisualHp(live0, performance.now()) : unit.hp;

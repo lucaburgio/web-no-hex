@@ -506,7 +506,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
     const { cancel } = animateMoves(svg, [anim], config.unitMoveSpeed, () => {
       syncAnimStaticHidden([]);
       onDone();
-    }, state);
+    }, state, true, localPlayer);
     humanMoveAnimCancel = combineAnimCancels(cancel);
     return;
   }
@@ -561,6 +561,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
         runFloats,
         state,
         stackAboveUnits,
+        localPlayer,
       );
       humanMoveAnimCancel = combineAnimCancels(cSt);
     } else {
@@ -573,7 +574,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
   updateUI();
 
   if (moves.length > 0) {
-    const { cancel } = animateMoves(svg, moves, config.unitMoveSpeed, runStrike, state, stackAboveUnits);
+    const { cancel } = animateMoves(svg, moves, config.unitMoveSpeed, runStrike, state, stackAboveUnits, localPlayer);
     humanMoveAnimCancel = combineAnimCancels(cancel);
   } else {
     runStrike();
@@ -586,66 +587,9 @@ function render(): void {
 
 setBoardRenderCallback(() => render());
 
-/** CSS vars swapped for vs-human guest so "your" side uses the theme's player palette and the opponent the AI palette. */
-const GUEST_IDENTITY_SWAP_PROPS = [
-  '--color-player',
-  '--color-ai',
-  '--color-player-tired',
-  '--color-ai-tired',
-  '--color-hex-player',
-  '--color-hex-ai',
-  '--color-hex-player-dimmed',
-  '--color-hex-ai-dimmed',
-] as const;
-
-function clearGuestIdentityColorOverrides(): void {
-  const root = document.documentElement;
-  for (const p of GUEST_IDENTITY_SWAP_PROPS) {
-    root.style.removeProperty(p);
-  }
-  invalidateColorsCache();
-}
-
-/**
- * For multiplayer guest, swap player/AI theme hues so local side matches the normal "player" colors.
- * No change to game logic — only how `--color-*` resolve. Clears overrides when not guest.
- */
-function syncGuestIdentityColors(): void {
-  const root = document.documentElement;
-  for (const p of GUEST_IDENTITY_SWAP_PROPS) {
-    root.style.removeProperty(p);
-  }
-  invalidateColorsCache();
-
-  if (gameMode !== 'vsHuman' || localPlayer !== AI) {
-    return;
-  }
-
-  const s = getComputedStyle(root);
-  const player = s.getPropertyValue('--color-player').trim();
-  const ai = s.getPropertyValue('--color-ai').trim();
-  const playerTired = s.getPropertyValue('--color-player-tired').trim();
-  const aiTired = s.getPropertyValue('--color-ai-tired').trim();
-  const hexPlayer = s.getPropertyValue('--color-hex-player').trim();
-  const hexAi = s.getPropertyValue('--color-hex-ai').trim();
-  const hexPlayerDimmed = s.getPropertyValue('--color-hex-player-dimmed').trim();
-  const hexAiDimmed = s.getPropertyValue('--color-hex-ai-dimmed').trim();
-
-  root.style.setProperty('--color-player', ai);
-  root.style.setProperty('--color-ai', player);
-  root.style.setProperty('--color-player-tired', aiTired);
-  root.style.setProperty('--color-ai-tired', playerTired);
-  root.style.setProperty('--color-hex-player', hexAi);
-  root.style.setProperty('--color-hex-ai', hexPlayer);
-  root.style.setProperty('--color-hex-player-dimmed', hexAiDimmed);
-  root.style.setProperty('--color-hex-ai-dimmed', hexPlayerDimmed);
-  invalidateColorsCache();
-}
-
 // ── Main menu ─────────────────────────────────────────────────────────────────
 
 function showMainMenu(): void {
-  clearGuestIdentityColorOverrides();
   mainMenuOverlayEl.classList.remove('hidden');
   if (hasSaveGame()) {
     menuContinueBtn.classList.remove('hidden');
@@ -2210,7 +2154,6 @@ function startGame(initialState: GameState): void {
   aiTurnPendingStart = false;
   turnSnapshots = [structuredClone(state)];
   initRenderer(svg, { flipBoardY: gameMode === 'vsHuman' && localPlayer === AI });
-  syncGuestIdentityColors();
   render();
   updateUI();
   checkWinner();
@@ -2903,6 +2846,8 @@ svg.addEventListener('click', (e: MouseEvent) => {
               config.unitMoveSpeed,
               finishHumanAnim,
               state,
+              true,
+              localPlayer,
             );
             humanMoveAnimCancel = combineAnimCancels(cancel);
           } else {
@@ -2972,6 +2917,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
                     runFloatsOnly,
                     state,
                     stackAboveUnits,
+                    localPlayer,
                   );
                   humanMoveAnimCancel = combineAnimCancels(cSt);
                 } else {
@@ -2980,6 +2926,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
               },
               state,
               stackAboveUnits,
+              localPlayer,
             );
             humanMoveAnimCancel = combineAnimCancels(cancel);
           } else if (sr) {
@@ -2999,6 +2946,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
                 runFloatsOnly,
                 state,
                 stackAboveUnits,
+                localPlayer,
               );
               humanMoveAnimCancel = combineAnimCancels(cancel);
             }
@@ -3255,6 +3203,7 @@ function runAiTurnWithAnimation(): void {
           () => runFloats(true),
           aiReplayState(state, ub),
           vfx.attackerAnimAboveUnits ?? true,
+          localPlayer,
         );
         humanMoveAnimCancel = combineAnimCancels(cancel);
       } else {
@@ -3286,6 +3235,7 @@ function runAiTurnWithAnimation(): void {
           () => runStep(index + 1),
           aiReplayState(state, before),
           stackAbove,
+          localPlayer,
         );
         humanMoveAnimCancel = combineAnimCancels(cancel);
       } else {
@@ -3498,14 +3448,10 @@ function updateUI(): void {
   playerConquerLabel.textContent = 'YOU';
   aiConquerLabel.textContent     = localPlayer === PLAYER && gameMode !== 'vsHuman' ? 'AI' : 'OPPONENT';
 
-  // Two-color bar: left = local player, right = opponent
+  // Two-color bar: left = you (--color-player), right = opponent (--color-ai); renderer uses the same mapping.
   const style = getComputedStyle(document.documentElement);
-  const localColor    = localPlayer === PLAYER
-    ? style.getPropertyValue('--color-player').trim()
-    : style.getPropertyValue('--color-ai').trim();
-  const opponentColor = localPlayer === PLAYER
-    ? style.getPropertyValue('--color-ai').trim()
-    : style.getPropertyValue('--color-player').trim();
+  const localColor    = style.getPropertyValue('--color-player').trim();
+  const opponentColor = style.getPropertyValue('--color-ai').trim();
   conquerBarEl.style.background = '';
   const rightGrow = 100 - leftPct;
   conquerBarLocalEl.style.flex = `${leftPct} 1 0`;

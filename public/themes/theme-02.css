@@ -7,6 +7,7 @@
   --color-ai:     #bc4949;
   --color-player-tired: #6b8fc4;
   --color-ai-tired:     #c97a7a;
+  --color-ai-during-production: #b88888;
 
   /* ── Unit states ────────────────────────────────────────────────────────── */
   --color-unit-selected: #C77E00;
