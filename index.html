@@ -373,6 +373,15 @@
         </div>
       </div>
 
+      <div class="settings-group">
+        <div class="settings-group-title">RULES</div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-rulesPreset">Rules</label>
+          <select class="settings-input settings-select" id="cfg-rulesPreset"></select>
+        </div>
+        <div id="cfg-rulesPreset-note" class="settings-note neutral" role="note"></div>
+      </div>
+
       <div class="settings-group" id="settings-board-section">
         <div class="settings-group-title">BOARD</div>
         <div id="settings-board-group" class="settings-board-group">
@@ -384,6 +393,12 @@
           <label class="settings-label" for="cfg-boardRows">Height</label>
           <input class="settings-input" type="number" id="cfg-boardRows" min="4" max="48" step="1" />
         </div>
+        </div>
+      </div>
+
+      <div id="settings-rules-detail">
+      <div class="settings-group">
+        <div class="settings-group-title">TERRAIN</div>
         <div class="settings-row">
           <label class="settings-label" for="cfg-mountainPct">Mountain hexes (%)</label>
           <input class="settings-input" type="number" id="cfg-mountainPct" min="0" max="50" step="1" />
@@ -395,7 +410,6 @@
         <div class="settings-row">
           <label class="settings-label" for="cfg-riverMaxLengthBoardWidthMult">Max river length (% of board width)</label>
           <input class="settings-input" type="number" id="cfg-riverMaxLengthBoardWidthMult" min="50" max="500" step="10" />
-        </div>
         </div>
       </div>
 
@@ -454,6 +468,7 @@
           <input class="settings-input" type="number" id="cfg-healOwnTerritory" min="0" max="10" step="1" />
         </div>
       </div>
+      </div><!-- end settings-rules-detail -->
 
       <div class="settings-group">
         <div class="settings-group-title">AUTOMATION</div>

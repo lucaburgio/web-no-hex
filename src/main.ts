@@ -60,6 +60,14 @@ import config, {
   setActiveUnitPackagePlayer2,
   getAvailableUnitTypes,
 } from './gameconfig';
+import {
+  RULES_PRESETS,
+  RULES_PRESET_CUSTOM,
+  findMatchingRulesPresetId,
+  getRulesPresetById,
+  getRulesPresetDescriptionForSelectValue,
+  type RulesPresetValues,
+} from './rulesPresets';
 import gsap from 'gsap';
 import type { GameState, Unit, UnitType, CombatForecast, Owner, CombatVfxPayload, GameMode, UnitUpgradeKind } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
@@ -1274,6 +1282,26 @@ const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'limitArtillery' | 'autoEn
   ['cfg-enableRivers',       'enableRivers'],
 ];
 
+const RULES_PRESET_NUM_FIELDS: Array<[string, keyof RulesPresetValues, number]> = [
+  ['cfg-mountainPct', 'mountainPct', 100],
+  ['cfg-riverMaxLengthBoardWidthMult', 'riverMaxLengthBoardWidthMult', 100],
+  ['cfg-productionPointsPerTurn', 'productionPointsPerTurn', 1],
+  ['cfg-productionPointsPerTurnAi', 'productionPointsPerTurnAi', 1],
+  ['cfg-territoryQuota', 'territoryQuota', 1],
+  ['cfg-pointsPerQuota', 'pointsPerQuota', 1],
+  ['cfg-productionTurns', 'productionTurns', 1],
+  ['cfg-productionSafeDistance', 'productionSafeDistance', 1],
+  ['cfg-flankingBonus', 'flankingBonus', 100],
+  ['cfg-maxFlankingUnits', 'maxFlankingUnits', 1],
+  ['cfg-healOwnTerritory', 'healOwnTerritory', 1],
+];
+
+const RULES_PRESET_TOGGLES: Array<[string, 'zoneOfControl' | 'limitArtillery' | 'enableRivers']> = [
+  ['cfg-enableRivers', 'enableRivers'],
+  ['cfg-zoneOfControl', 'zoneOfControl'],
+  ['cfg-limitArtillery', 'limitArtillery'],
+];
+
 class SettingsOnOffToggle {
   private readonly buttonEl: HTMLButtonElement;
 
@@ -1396,6 +1424,13 @@ function populateSettings(): void {
   }
   clampStartingUnitsInputsToBoardWidth(vals.boardCols);
   lastCommittedBoardCols = vals.boardCols;
+
+  const rulesPresetEl = document.getElementById('cfg-rulesPreset') as HTMLSelectElement | null;
+  if (rulesPresetEl) {
+    rulesPresetEl.value = findMatchingRulesPresetId(config);
+    rulesPresetEl.dispatchEvent(new Event('settings-select-sync'));
+    syncRulesDetailVisibility();
+  }
 }
 
 function syncBreakthroughRoleControls(): void {
@@ -1451,6 +1486,47 @@ function updateModeSpecificSettingsVisibility(): void {
   territoryQuotaRowEl?.toggleAttribute('disabled', isBreakthrough);
   pointsPerQuotaRowEl?.toggleAttribute('disabled', isBreakthrough);
   lastSettingsGameModeForQuota = v;
+}
+
+function syncRulesFieldsFromConfig(): void {
+  for (const [elId, key, scale] of RULES_PRESET_NUM_FIELDS) {
+    const el = document.getElementById(elId) as HTMLInputElement;
+    const v = config[key] as number;
+    el.value = String(Math.round(v * scale));
+  }
+  for (const [elId, key] of RULES_PRESET_TOGGLES) {
+    const t = settingsOnOffToggles.get(elId);
+    if (t) t.setValue(config[key] as boolean);
+  }
+}
+
+function syncRulesPresetNote(): void {
+  const sel = document.getElementById('cfg-rulesPreset') as HTMLSelectElement | null;
+  const note = document.getElementById('cfg-rulesPreset-note');
+  if (!sel || !note) return;
+  note.textContent = getRulesPresetDescriptionForSelectValue(sel.value);
+}
+
+function syncRulesDetailVisibility(): void {
+  const sel = document.getElementById('cfg-rulesPreset') as HTMLSelectElement | null;
+  const wrap = document.getElementById('settings-rules-detail');
+  if (!sel || !wrap) return;
+  wrap.classList.toggle('hidden', sel.value !== RULES_PRESET_CUSTOM);
+  syncRulesPresetNote();
+}
+
+function applyRulesPreset(id: string): void {
+  if (id === RULES_PRESET_CUSTOM) {
+    syncRulesDetailVisibility();
+    return;
+  }
+  const preset = getRulesPresetById(id);
+  if (!preset) return;
+  const { id: _pid, label: _label, description: _desc, ...values } = preset;
+  updateConfig(values);
+  syncRulesFieldsFromConfig();
+  updateModeSpecificSettingsVisibility();
+  syncRulesDetailVisibility();
 }
 
 function clampNumericInputToBounds(el: HTMLInputElement): number {
@@ -1694,10 +1770,30 @@ boardColsSettingsEl.addEventListener('change', () => {
   }
   pkgEl2.value = 'standard';
 })();
+(function initRulesPresetSelectOptions(): void {
+  const sel = document.getElementById('cfg-rulesPreset') as HTMLSelectElement | null;
+  if (!sel) return;
+  sel.innerHTML = '';
+  for (const p of RULES_PRESETS) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.label;
+    sel.appendChild(opt);
+  }
+  const customOpt = document.createElement('option');
+  customOpt.value = RULES_PRESET_CUSTOM;
+  customOpt.textContent = '[Custom]';
+  sel.appendChild(customOpt);
+})();
+initCustomSettingsSelect('cfg-rulesPreset');
 initCustomSettingsSelect('cfg-unitPackage');
 initCustomSettingsSelect('cfg-unitPackagePlayer2');
 initCustomSettingsSelect('cfg-breakthroughPlayer1Role');
 initCustomSettingsSelect('cfg-customMap');
+document.getElementById('cfg-rulesPreset')?.addEventListener('change', () => {
+  const sel = document.getElementById('cfg-rulesPreset') as HTMLSelectElement;
+  applyRulesPreset(sel.value);
+});
 document.getElementById('cfg-customMap')?.addEventListener('change', () => {
   const sel = document.getElementById('cfg-customMap') as HTMLSelectElement;
   const story = sel.value ? STORIES.find(s => s.id === sel.value && storyMapHasFullCustomMatchSupport(s.map)) : undefined;
