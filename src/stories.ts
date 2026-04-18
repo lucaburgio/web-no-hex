@@ -509,6 +509,36 @@ export const STORIES: StoryDef[] = [
     ],
   },
   productionPointsPerTurn: 20,
+},
+{
+  id: 'ww2-24',
+  title: 'Storm of Steel',
+  description: 'Description.',
+  scenario: 'ww2ru',
+  unitPackage: 'ru-ww2',
+  unitPackagePlayer2: 'de-ww2',
+  gameMode: 'breakthrough',
+  breakthroughPlayer1Role: 'defender',
+  map: {
+    cols: 8,
+    rows: 8,
+    mountains: ['0,5', '1,5', '2,4', '5,2', '5,3', '6,1', '7,1', '7,2'],
+    aiStart: [{ col: 2, unitTypeId: 'tank' }, { col: 3, unitTypeId: 'tank' }],
+    playerStart: [{ col: 0 }, { col: 2 }, { col: 3 }, { col: 4 }],
+    conquestControlPoints: ['1,2'],
+    breakthroughControlPoints: ['3,2', '6,5'],
+    rivers: [
+      { col: 5, row: 0, segment: 'A-C-10', entrySide: 'C', exitSide: 'A' },
+      { col: 5, row: 1, segment: 'F-C-07', entrySide: 'C', exitSide: 'F' },
+      { col: 6, row: 2, segment: 'F-C-06', entrySide: 'C', exitSide: 'F' },
+      { col: 6, row: 3, segment: 'F-D-09', entrySide: 'D', exitSide: 'F' },
+      { col: 6, row: 4, segment: 'D-A-09', entrySide: 'D', exitSide: 'A' },
+      { col: 5, row: 5, segment: 'A-C-02', entrySide: 'C', exitSide: 'A' },
+      { col: 6, row: 6, segment: 'F-C-01', entrySide: 'C', exitSide: 'F' },
+      { col: 6, row: 7, segment: 'F-C-10', entrySide: 'C', exitSide: 'F' },
+    ],
+  },
+  productionPointsPerTurn: 20,
 }
 ];
 
