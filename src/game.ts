@@ -2354,7 +2354,7 @@ function scoreAiProductionPlacement(
         score += 55;
         if (tn < Math.max(1, inf * 0.6)) score += 40;
       } else if (utClass === 'artillery') {
-        score -= 130;
+        score -= 80;
       }
     } else {
       // Defender holds the line — reinforce existing artillery/infantry preference
