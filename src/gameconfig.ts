@@ -287,11 +287,11 @@ const config: GameConfig = {
     {
       id: 'tank',
       name: 'T34 Tank',
-      cost: 40,
+      cost: 36,
       movement: 2,
       maxHp: 14,
       strength: 11,
-      extraFlanking: 0.05,
+      extraFlanking: 0.04,
       icon: 'icons/units/tank.svg',
       package: 'ru-ww2',
       upgradePointsToLevel: 10,
@@ -306,6 +306,48 @@ const config: GameConfig = {
       range: 3,
       icon: 'icons/units/artillery.svg',
       package: 'ru-ww2',
+      upgradePointsToLevel: 20,
+    },
+
+
+
+
+
+
+
+    {
+      id: 'infantry',
+      name: 'Imperial Guard',
+      cost: 20,
+      movement: 1,
+      maxHp: 10,
+      strength: 10,
+      icon: 'icons/units/ru-infantry.svg',
+      package: 'jp-ww2',
+      upgradePointsToLevel: 8,
+    },
+    {
+      id: 'tank',
+      name: 'Type 97 Chi-Ha Tank',
+      cost: 34,
+      movement: 2,
+      maxHp: 13,
+      strength: 11,
+      extraFlanking: 0.03,
+      icon: 'icons/units/tank.svg',
+      package: 'jp-ww2',
+      upgradePointsToLevel: 10,
+    },
+    {
+      id: 'artillery',
+      name: 'Type 91 Howitzer',
+      cost: 34,
+      movement: 1,
+      maxHp: 9,
+      strength: 8,
+      range: 3,
+      icon: 'icons/units/artillery.svg',
+      package: 'jp-ww2',
       upgradePointsToLevel: 20,
     }
   ],

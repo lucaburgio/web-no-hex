@@ -454,6 +454,7 @@ export const STORIES: StoryDef[] = [
     ],
   },
   productionPointsPerTurn: 20,
+  breakthroughAttackerStartingPP: 100,
 },
 {
   id: 'ww2-22',

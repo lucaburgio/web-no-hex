@@ -689,7 +689,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   flex-direction: column;
   justify-content: flex-start;
   gap: 6px;
-  padding: 6px 8px 7px;
+  padding: 8px;
   background: #010101;
 }
 
