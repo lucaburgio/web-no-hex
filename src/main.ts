@@ -1294,6 +1294,9 @@ const RULES_PRESET_NUM_FIELDS: Array<[string, keyof RulesPresetValues, number]> 
   ['cfg-flankingBonus', 'flankingBonus', 100],
   ['cfg-maxFlankingUnits', 'maxFlankingUnits', 1],
   ['cfg-healOwnTerritory', 'healOwnTerritory', 1],
+  ['cfg-breakthroughAttackerStartingPP', 'breakthroughAttackerStartingPP', 1],
+  ['cfg-breakthroughEnemySectorStrengthMult', 'breakthroughEnemySectorStrengthMult', 100],
+  ['cfg-breakthroughSectorCaptureBonusPP', 'breakthroughSectorCaptureBonusPP', 1],
 ];
 
 const RULES_PRESET_TOGGLES: Array<[string, 'zoneOfControl' | 'limitArtillery' | 'enableRivers']> = [

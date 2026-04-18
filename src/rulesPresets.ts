@@ -20,13 +20,16 @@ export type RulesPresetValues = Pick<
   | 'zoneOfControl'
   | 'limitArtillery'
   | 'healOwnTerritory'
+  | 'breakthroughAttackerStartingPP'
+  | 'breakthroughEnemySectorStrengthMult'
+  | 'breakthroughSectorCaptureBonusPP'
 >;
 
 export type RulesPreset = { id: string; label: string; description: string } & RulesPresetValues;
 
 /** Shown under the Rules select when [Custom] is active. */
 export const RULES_PRESET_CUSTOM_DESCRIPTION =
-  'Terrain, economy, combat, and healing use the values in the sections below.';
+  'Terrain, economy, combat, healing, and Breakthrough balance use the values in the sections below.';
 
 const FLANKING_EPS = 1e-5;
 const FRAC_EPS = 1e-5;
@@ -46,7 +49,10 @@ function rulesValuesMatchConfig(cfg: GameConfig, p: RulesPresetValues): boolean 
     cfg.maxFlankingUnits === p.maxFlankingUnits &&
     cfg.zoneOfControl === p.zoneOfControl &&
     cfg.limitArtillery === p.limitArtillery &&
-    cfg.healOwnTerritory === p.healOwnTerritory
+    cfg.healOwnTerritory === p.healOwnTerritory &&
+    cfg.breakthroughAttackerStartingPP === p.breakthroughAttackerStartingPP &&
+    Math.abs(cfg.breakthroughEnemySectorStrengthMult - p.breakthroughEnemySectorStrengthMult) < FRAC_EPS &&
+    cfg.breakthroughSectorCaptureBonusPP === p.breakthroughSectorCaptureBonusPP
   );
 }
 
@@ -55,7 +61,7 @@ export const RULES_PRESETS: RulesPreset[] = [
     id: 'standard',
     label: 'Standard',
     description:
-      'Default pacing: moderate mountains and rivers, baseline income and territory bonuses, standard flanking and healing. Artillery is not limited by adjacency.',
+      'Default pacing: moderate mountains and rivers, baseline income and territory bonuses, standard flanking and healing. Artillery is not limited by adjacency. Breakthrough uses default attacker PP, sector capture bonus, and defender malus in captured sectors.',
     mountainPct: 0.12,
     enableRivers: true,
     riverMaxLengthBoardWidthMult: 1.5,
@@ -70,12 +76,15 @@ export const RULES_PRESETS: RulesPreset[] = [
     zoneOfControl: true,
     limitArtillery: false,
     healOwnTerritory: 2,
+    breakthroughAttackerStartingPP: 120,
+    breakthroughEnemySectorStrengthMult: 0.5,
+    breakthroughSectorCaptureBonusPP: 120,
   },
   {
     id: 'high_tempo',
     label: 'High tempo',
     description:
-      'Faster rounds: lighter terrain, higher production and territory payouts, quicker production hexes, stronger flanks, and limit artillery until adjacent threats are cleared. Slower healing.',
+      'Faster rounds: lighter terrain, higher production and territory payouts, quicker production hexes, stronger flanks, and limit artillery until adjacent threats are cleared. Slower healing. Breakthrough: more attacker PP, slightly harsher defender malus, and a larger per-sector PP bonus.',
     mountainPct: 0.08,
     enableRivers: true,
     riverMaxLengthBoardWidthMult: 1.2,
@@ -90,6 +99,9 @@ export const RULES_PRESETS: RulesPreset[] = [
     zoneOfControl: true,
     limitArtillery: true,
     healOwnTerritory: 1,
+    breakthroughAttackerStartingPP: 150,
+    breakthroughEnemySectorStrengthMult: 0.45,
+    breakthroughSectorCaptureBonusPP: 140,
   },
 ];
 

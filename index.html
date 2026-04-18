@@ -285,6 +285,15 @@
       <div id="settings-right-scroll">
 
       <div class="settings-group">
+        <div class="settings-group-title">RULES</div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-rulesPreset">Rules</label>
+          <select class="settings-input settings-select" id="cfg-rulesPreset"></select>
+        </div>
+        <div id="cfg-rulesPreset-note" class="settings-note neutral" role="note"></div>
+      </div>
+        
+      <div class="settings-group">
         <div class="settings-group-title">MATCH</div>
         <div class="settings-row">
           <label class="settings-label" for="cfg-unitPackage">Unit package P1</label>
@@ -328,20 +337,8 @@
             <input class="settings-input" type="checkbox" id="cfg-breakthroughRandomRoles" />
           </div>
           <div class="settings-row">
-            <label class="settings-label" for="cfg-breakthroughAttackerStartingPP">Attacker starting PP</label>
-            <input class="settings-input" type="number" id="cfg-breakthroughAttackerStartingPP" min="1" max="9999" step="1" />
-          </div>
-          <div class="settings-row">
             <label class="settings-label" for="cfg-breakthroughSectorCount">Sectors (map split)</label>
             <input class="settings-input" type="number" id="cfg-breakthroughSectorCount" min="2" max="24" step="1" />
-          </div>
-          <div class="settings-row">
-            <label class="settings-label" for="cfg-breakthroughEnemySectorStrengthMult">Defender strength in captured sector (%)</label>
-            <input class="settings-input" type="number" id="cfg-breakthroughEnemySectorStrengthMult" min="1" max="100" step="1" />
-          </div>
-          <div class="settings-row">
-            <label class="settings-label" for="cfg-breakthroughSectorCaptureBonusPP">PP bonus per captured sector (attacker)</label>
-            <input class="settings-input" type="number" id="cfg-breakthroughSectorCaptureBonusPP" min="0" max="9999" step="1" />
           </div>
         </div>
         <div id="settings-conquest-only" class="hidden">
@@ -371,15 +368,6 @@
             max units at start is defined by the width of the map
           </div>
         </div>
-      </div>
-
-      <div class="settings-group">
-        <div class="settings-group-title">RULES</div>
-        <div class="settings-row">
-          <label class="settings-label" for="cfg-rulesPreset">Rules</label>
-          <select class="settings-input settings-select" id="cfg-rulesPreset"></select>
-        </div>
-        <div id="cfg-rulesPreset-note" class="settings-note neutral" role="note"></div>
       </div>
 
       <div class="settings-group" id="settings-board-section">
@@ -466,6 +454,23 @@
         <div class="settings-row">
           <label class="settings-label" for="cfg-healOwnTerritory">HP/turn on own territory</label>
           <input class="settings-input" type="number" id="cfg-healOwnTerritory" min="0" max="10" step="1" />
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">BREAKTHROUGH</div>
+        <div class="settings-note neutral" role="note">Used in Breakthrough mode: attacker PP pool, defender malus in captured sectors, and PP granted per sector capture.</div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-breakthroughAttackerStartingPP">Attacker starting PP</label>
+          <input class="settings-input" type="number" id="cfg-breakthroughAttackerStartingPP" min="1" max="9999" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-breakthroughEnemySectorStrengthMult">Defender strength in captured sector (%)</label>
+          <input class="settings-input" type="number" id="cfg-breakthroughEnemySectorStrengthMult" min="1" max="100" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-breakthroughSectorCaptureBonusPP">PP bonus per captured sector (attacker)</label>
+          <input class="settings-input" type="number" id="cfg-breakthroughSectorCaptureBonusPP" min="0" max="9999" step="1" />
         </div>
       </div>
       </div><!-- end settings-rules-detail -->
