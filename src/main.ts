@@ -2790,7 +2790,7 @@ function buildMovementUnitCardInner(unit: Unit, unitType: UnitType, isEnemy = fa
 
   function addStat(
     modClass: string,
-    kind: 'move' | 'str' | 'hp',
+    kind: 'move' | 'str' | 'hp' | 'range',
     iconSrc: string,
   ): HTMLSpanElement {
     const row = document.createElement('div');
