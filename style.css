@@ -2019,6 +2019,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 .settings-label {
   font-family: 'Disket Mono', monospace;
   font-size: 0.72rem;
+  width: 100%;
   font-weight: 700;
   color: var(--color-dark);
   text-transform: uppercase;
@@ -2035,7 +2036,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   border: none;
   outline: none;
   width: 64px;
-  text-align: right;
+  text-align: center;
   padding: 10px;
   cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
@@ -2208,11 +2209,11 @@ select.settings-input.settings-select option {
 
 .settings-toggle {
   font-family: 'Disket Mono', monospace;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 11px 14px;
+  text-rendering: geometricPrecision;
+  padding: 10px;
   border: 0;
   background: var(--color-input);
   color: var(--color-beige-500);
