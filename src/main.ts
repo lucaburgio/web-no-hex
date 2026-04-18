@@ -2912,7 +2912,7 @@ function syncMovementUnitCard(): void {
   }
 
   const unit = getUnitById(state, state.selectedUnit!);
-  if (!unit || unit.owner !== localPlayer) {
+  if (!unit) {
     movementUnitCardEl.innerHTML = '';
     upgradePickerPanelEl.innerHTML = '';
     upgradePickerPanelEl.classList.add('hidden');
@@ -2932,6 +2932,14 @@ function syncMovementUnitCard(): void {
   } else {
     patchMovementUnitCardStats(unit, unitType);
   }
+
+  if (unit.owner !== localPlayer) {
+    // Enemy unit inspected: show card only, no upgrades
+    upgradePickerPanelEl.innerHTML = '';
+    upgradePickerPanelEl.classList.add('hidden');
+    return;
+  }
+
   syncUpgradePickerPanel(unit, unitType);
 }
 
@@ -2989,10 +2997,19 @@ svg.addEventListener('click', (e: MouseEvent) => {
     }
     render();
   } else if (state.phase === 'movement' && state.activePlayer === localPlayer) {
+    const enemyOwner: Owner = localPlayer === PLAYER ? AI : PLAYER;
     if (state.selectedUnit === null) {
-      state = playerSelectUnit(state, col, row, localPlayer);
-      render(); updateUI();
-      sendStateUpdate();
+      const clickedUnit = getUnit(state, col, row);
+      if (clickedUnit && clickedUnit.owner === enemyOwner) {
+        // Select enemy unit for inspection (show unit card only, no movement highlights)
+        state.selectedUnit = clickedUnit.id;
+        render(); updateUI();
+        sendStateUpdate();
+      } else {
+        state = playerSelectUnit(state, col, row, localPlayer);
+        render(); updateUI();
+        sendStateUpdate();
+      }
     } else {
       const target = getUnit(state, col, row);
       if (target && target.owner === localPlayer) {
@@ -3001,11 +3018,24 @@ svg.addEventListener('click', (e: MouseEvent) => {
         render(); updateUI();
         sendStateUpdate();
       } else {
-        // Deselect if clicked hex is not a valid move destination (unless ranged attack on enemy)
         const selUnit = getUnitById(state, state.selectedUnit)!;
+
+        // If inspecting an enemy unit, clicking non-own unit switches inspection or deselects
+        if (selUnit.owner === enemyOwner) {
+          clearMovePathPreview();
+          if (target && target.owner === enemyOwner) {
+            state.selectedUnit = target.id;
+          } else {
+            state.selectedUnit = null;
+          }
+          render(); updateUI();
+          sendStateUpdate();
+          return;
+        }
+
+        // Deselect if clicked hex is not a valid move destination (unless ranged attack on enemy)
         const validMoves = getValidMoves(state, selUnit);
         const clickTarget = getUnit(state, col, row);
-        const enemyOwner: Owner = localPlayer === PLAYER ? AI : PLAYER;
         const canRanged =
           clickTarget &&
           clickTarget.owner === enemyOwner &&
@@ -3062,7 +3092,12 @@ svg.addEventListener('click', (e: MouseEvent) => {
             return;
           }
           clearMovePathPreview();
-          state.selectedUnit = null;
+          // If clicking an enemy unit that's not a valid target, switch to inspecting it
+          if (clickTarget && clickTarget.owner === enemyOwner) {
+            state.selectedUnit = clickTarget.id;
+          } else {
+            state.selectedUnit = null;
+          }
           render(); updateUI();
           if (didInterruptHumanMove) maybeAutoEnd();
           return;
