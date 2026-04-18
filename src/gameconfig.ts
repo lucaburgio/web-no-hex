@@ -245,7 +245,7 @@ const config: GameConfig = {
       unitClass: 'tank',
       name: 'Tiger Tank',
       cost: 60,
-      movement: 1,
+      movement: 2,
       maxHp: 16,
       strength: 12,
       extraFlanking: 0.1,

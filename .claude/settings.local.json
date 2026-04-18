@@ -26,7 +26,8 @@
       "Bash(npx tauri:*)",
       "Bash(cargo check:*)",
       "Bash(bash:*)",
-      "Bash(create-dmg --version)"
+      "Bash(create-dmg --version)",
+      "Bash(git stash *)"
     ]
   }
 }
