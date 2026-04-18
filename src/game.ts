@@ -2346,6 +2346,22 @@ function scoreAiProductionPlacement(
     }
   }
 
+  if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
+    const isAiAttacker = getBreakthroughAttackerOwner(state) === AI;
+    if (isAiAttacker) {
+      // Attacker needs mobile punch — tanks strongly preferred, artillery stalls the advance
+      if (utClass === 'tank') {
+        score += 55;
+        if (tn < Math.max(1, inf * 0.6)) score += 40;
+      } else if (utClass === 'artillery') {
+        score -= 130;
+      }
+    } else {
+      // Defender holds the line — reinforce existing artillery/infantry preference
+      if (utClass === 'artillery') score += 20;
+    }
+  }
+
   return score;
 }
 
@@ -2710,6 +2726,8 @@ function scoreEmptyMove(
   }
   if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
     const defOw = getBreakthroughDefenderOwner(state);
+    const isAiAttacker = getBreakthroughAttackerOwner(state) === AI;
+    const cpApproachMult = isAiAttacker ? 1.8 : 1.0;
     const beforeC = minBfsToCpWhereFn(unit.col, unit.row, key => {
       const sid = state.sectorIndexByHex[key];
       return sid !== undefined && state.sectorOwners[sid] === defOw;
@@ -2718,13 +2736,17 @@ function scoreEmptyMove(
       const sid = state.sectorIndexByHex[key];
       return sid !== undefined && state.sectorOwners[sid] === defOw;
     });
-    s += (beforeC - afterC) * 40;
+    s += (beforeC - afterC) * 40 * cpApproachMult;
+    if (isAiAttacker) {
+      // Extra forward pressure: attacker must close distance every turn
+      s += (before - after) * 16;
+    }
     const tk = `${toCol},${toRow}`;
     if ((state.controlPointHexes ?? []).includes(tk)) {
       const sid = state.sectorIndexByHex[tk];
       if (sid !== undefined && state.sectorOwners[sid] === defOw) {
         const hx = state.hexStates[tk];
-        if (!hx || hx.owner !== defOw) s += 240;
+        if (!hx || hx.owner !== defOw) s += isAiAttacker ? 340 : 240;
       }
     }
   }
