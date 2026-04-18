@@ -858,6 +858,8 @@ export function renderState(
    * Skips HP bar tween sync so bars match the snapshot, not end-of-turn state.
    */
   unitDrawOverride?: Unit[] | null,
+  /** vs human only: local-only unit id highlight while waiting for your turn (not synced). */
+  localSpectatorInspectUnitId?: number | null,
 ): void {
   const tRenderStart = performance.now();
   const trackHpBars = svgElement.id === 'board' && !unitDrawOverride;
@@ -883,6 +885,7 @@ export function renderState(
 
   /** Tint for unit shape only — hex/move overlays use `selectedUnit` above. */
   const isUnitVisuallySelected = (unit: Unit): boolean => {
+    if (localSpectatorInspectUnitId != null && unit.id === localSpectatorInspectUnitId) return true;
     if (state.selectedUnit !== unit.id) return false;
     if (state.activePlayer === localPlayer) return true;
     // Opponent's turn: show their selection only on units they own (moving), not when they inspect yours

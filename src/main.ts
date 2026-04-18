@@ -532,7 +532,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
   syncDamageFloatCssDuration();
   if (isLegacySingleMoveAnimation(anim)) {
     syncAnimStaticHidden([anim.unit.id]);
-    renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer);
+    renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, undefined, spectatorInspectIdForBoard());
     updateUI();
     const { cancel } = animateMoves(svg, [anim], config.unitMoveSpeed, () => {
       syncAnimStaticHidden([]);
@@ -559,7 +559,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
 
   const runFloats = (): void => {
     syncAnimStaticHidden([]);
-    renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer);
+    renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, undefined, spectatorInspectIdForBoard());
     updateUI();
     if (floats.length === 0) finish();
     else {
@@ -601,7 +601,7 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
   };
 
   syncAnimStaticHidden(hidden);
-  renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer);
+  renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, undefined, spectatorInspectIdForBoard());
   updateUI();
 
   if (moves.length > 0) {
@@ -613,7 +613,10 @@ function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, o
 }
 
 function render(): void {
-  renderState(svg, state, pendingProductionHex, animStaticHiddenUnitIds, localPlayer);
+  if (state.winner || gameMode !== 'vsHuman' || state.activePlayer === localPlayer) {
+    vsHumanOffTurnInspectUnitId = null;
+  }
+  renderState(svg, state, pendingProductionHex, animStaticHiddenUnitIds, localPlayer, undefined, spectatorInspectIdForBoard());
 }
 
 setBoardRenderCallback(() => render());
@@ -2447,6 +2450,8 @@ function startGame(initialState: GameState): void {
   state = initialState;
   syncUnitIdCounter(state);
   pendingProductionHex = null;
+  vsHumanOffTurnInspectUnitId = null;
+  movementUnitCardBoundId = null;
   humanMoveAnimCancel?.();
   humanMoveAnimCancel = null;
   animStaticHiddenUnitIds.clear();
@@ -2624,6 +2629,14 @@ function hideUnitPicker(): void {
 
 /** Last unit id rendered into the movement-phase card (for enter animation + partial updates). */
 let movementUnitCardBoundId: number | null = null;
+
+/** vs human: inspect opponent units while waiting (not synced — does not touch `state.selectedUnit`). */
+let vsHumanOffTurnInspectUnitId: number | null = null;
+
+function spectatorInspectIdForBoard(): number | null {
+  if (state.winner || gameMode !== 'vsHuman' || state.activePlayer === localPlayer) return null;
+  return vsHumanOffTurnInspectUnitId;
+}
 
 function totalUpgradeTiers(unit: Unit): number {
   return (unit.upgradeFlanking ?? 0) + (unit.upgradeAttack ?? 0) + (unit.upgradeDefense ?? 0);
@@ -2898,13 +2911,19 @@ function buildMovementUnitCardInner(unit: Unit, unitType: UnitType, isEnemy = fa
 }
 
 function syncMovementUnitCard(): void {
-  const eligible =
+  const offTurnInspect =
+    gameMode === 'vsHuman' &&
+    state.activePlayer !== localPlayer &&
+    !state.winner &&
+    vsHumanOffTurnInspectUnitId !== null;
+
+  const onTurnEligible =
     !state.winner &&
     state.phase === 'movement' &&
     state.activePlayer === localPlayer &&
     state.selectedUnit !== null;
 
-  if (!eligible) {
+  if (!offTurnInspect && !onTurnEligible) {
     movementUnitCardEl.innerHTML = '';
     upgradePickerPanelEl.innerHTML = '';
     upgradePickerPanelEl.classList.add('hidden');
@@ -2913,8 +2932,10 @@ function syncMovementUnitCard(): void {
     return;
   }
 
-  const unit = getUnitById(state, state.selectedUnit!);
+  const unitId = offTurnInspect ? vsHumanOffTurnInspectUnitId! : state.selectedUnit!;
+  const unit = getUnitById(state, unitId);
   if (!unit) {
+    if (offTurnInspect) vsHumanOffTurnInspectUnitId = null;
     movementUnitCardEl.innerHTML = '';
     upgradePickerPanelEl.innerHTML = '';
     upgradePickerPanelEl.classList.add('hidden');
@@ -2929,7 +2950,7 @@ function syncMovementUnitCard(): void {
 
   movementHudStackEl.classList.add('movement-hud-stack--visible');
 
-  const isEnemy = unit.owner !== localPlayer;
+  const isEnemy = offTurnInspect || unit.owner !== localPlayer;
 
   if (isNewSelection) {
     buildMovementUnitCardInner(unit, unitType, isEnemy);
@@ -2951,8 +2972,33 @@ function syncMovementUnitCard(): void {
 
 svg.addEventListener('click', (e: MouseEvent) => {
   if (state.winner) return;
-  if (state.activePlayer !== localPlayer) return;
+
   const hex = getHexFromEvent(e);
+  const offTurnInspect =
+    gameMode === 'vsHuman' &&
+    state.activePlayer !== localPlayer &&
+    (state.phase === 'movement' || state.phase === 'production');
+
+  if (offTurnInspect) {
+    if (!hex) {
+      vsHumanOffTurnInspectUnitId = null;
+      render();
+      updateUI();
+      return;
+    }
+    const enemyOwner: Owner = localPlayer === PLAYER ? AI : PLAYER;
+    const clickedUnit = getUnit(state, hex.col, hex.row);
+    if (clickedUnit && clickedUnit.owner === enemyOwner) {
+      vsHumanOffTurnInspectUnitId = clickedUnit.id;
+    } else {
+      vsHumanOffTurnInspectUnitId = null;
+    }
+    render();
+    updateUI();
+    return;
+  }
+
+  if (state.activePlayer !== localPlayer) return;
   if (!hex) {
     // Empty SVG margin / background (no hex under cursor): clear selection
     if (state.phase === 'movement' && state.selectedUnit !== null) {
@@ -3170,7 +3216,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
           // Strike/move anims hide units on the static layer; redraw resolved state before floats.
           // Losing attackers are not re-added as ghosts — only post-combat state.units (damage floats are enough).
           syncAnimStaticHidden([]);
-          renderState(svg, state, pendingProductionHex, animStaticHiddenUnitIds, localPlayer);
+          renderState(svg, state, pendingProductionHex, animStaticHiddenUnitIds, localPlayer, undefined, spectatorInspectIdForBoard());
           updateUI();
           if (floats.length === 0) finishHumanAnim();
           else {
@@ -3185,7 +3231,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
           if (needsApproach) {
             isAnimating = true;
             syncAnimStaticHidden([movingUnitId]);
-            renderState(svg, state, pendingProductionHex, animStaticHiddenUnitIds, localPlayer);
+            renderState(svg, state, pendingProductionHex, animStaticHiddenUnitIds, localPlayer, undefined, spectatorInspectIdForBoard());
             updateUI();
             sendStateUpdate({
               moves: [{ unit: movingUnit, fromCol, fromRow, toCol, toRow, pathHexes: pathForAnim }],
@@ -3215,7 +3261,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
           if (sr) hidden.add(sr.attackerId);
 
           syncAnimStaticHidden(hidden);
-          renderState(svg, state, pendingProductionHex, animStaticHiddenUnitIds, localPlayer);
+          renderState(svg, state, pendingProductionHex, animStaticHiddenUnitIds, localPlayer, undefined, spectatorInspectIdForBoard());
           updateUI();
 
           const wsPayload: WsAnimationPayload = {};
@@ -3320,11 +3366,23 @@ svg.addEventListener('click', (e: MouseEvent) => {
 // there do not clear selection.
 document.body.addEventListener('click', (e: MouseEvent) => {
   if (state.winner) return;
-  if (state.activePlayer !== localPlayer) return;
 
   const t = e.target;
   if (!(t instanceof Element)) return;
   if (svg.contains(t)) return;
+
+  if (state.activePlayer !== localPlayer) {
+    if (
+      gameMode === 'vsHuman' &&
+      vsHumanOffTurnInspectUnitId !== null &&
+      !movementHudStackEl.contains(t)
+    ) {
+      vsHumanOffTurnInspectUnitId = null;
+      render();
+      updateUI();
+    }
+    return;
+  }
 
   if (state.phase === 'production' && pendingProductionHex !== null) {
     if (unitPickerEl.contains(t)) return;
@@ -3512,12 +3570,12 @@ function runAiTurnWithAnimation(): void {
         const { pick, hiddenUnitIds } = aiDamageFloatDrawParams(unitsBefore, unitsAfter, afterStrike);
         const initial = cloneUnits(pick === 'after' ? unitsAfter : unitsBefore);
         syncAnimStaticHidden(hiddenUnitIds);
-        renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, initial);
+        renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, initial, spectatorInspectIdForBoard());
         updateUI();
         if (floats.length === 0) {
           const ua = cloneUnits(unitsAfter);
           syncAnimStaticHidden([]);
-          renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, ua);
+          renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, ua, spectatorInspectIdForBoard());
           updateUI();
           onDone();
           return;
@@ -3525,7 +3583,7 @@ function runAiTurnWithAnimation(): void {
         const afterDamageFloats = (): void => {
           const ua = cloneUnits(unitsAfter);
           syncAnimStaticHidden([]);
-          renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, ua);
+          renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, ua, spectatorInspectIdForBoard());
           updateUI();
           onDone();
         };
@@ -3552,7 +3610,7 @@ function runAiTurnWithAnimation(): void {
         }
         const ub = cloneUnits(unitsBefore);
         syncAnimStaticHidden([sr.attackerId]);
-        renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, ub);
+        renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, ub, spectatorInspectIdForBoard());
         updateUI();
         const { cancel } = animateStrikeAndReturn(
           svg,
@@ -3590,7 +3648,7 @@ function runAiTurnWithAnimation(): void {
           stackAbove = nextStep.vfx.attackerAnimAboveUnits ?? true;
         }
         syncAnimStaticHidden([a.unit.id]);
-        renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, before);
+        renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, before, spectatorInspectIdForBoard());
         updateUI();
         const { cancel } = animateMoves(
           svg,
