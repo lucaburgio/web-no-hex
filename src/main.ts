@@ -1050,7 +1050,16 @@ function startStory(storyIndex: number, savedState?: GameState): void {
     clearStoryGameState();
   }
 
-  const initialState = savedState ?? createStoryState(story);
+  let initialState: GameState;
+  if (!savedState) {
+    initialState = createStoryState(story);
+  } else if (savedState.unitPackage == null) {
+    const p1 = story.unitPackage ?? 'standard';
+    const p2 = story.unitPackagePlayer2 ?? p1;
+    initialState = { ...savedState, unitPackage: p1, unitPackagePlayer2: p2 };
+  } else {
+    initialState = savedState;
+  }
 
   gameMode = 'vsAI';
   localPlayer = PLAYER;
@@ -2423,8 +2432,18 @@ lobbyOverlayEl.addEventListener('click', (e: MouseEvent) => {
 
 // ── Game start ────────────────────────────────────────────────────────────────
 
+function applyUnitPackagesFromGameState(s: GameState): void {
+  const p1 = s.unitPackage ?? 'standard';
+  const p2 = s.unitPackagePlayer2 ?? p1;
+  setActiveUnitPackage(p1);
+  setActiveUnitPackagePlayer2(p2 !== p1 ? p2 : null);
+  settingsUnitPackage = p1;
+  settingsUnitPackagePlayer2 = p2;
+}
+
 function startGame(initialState: GameState): void {
   hideGameEndScreen();
+  applyUnitPackagesFromGameState(initialState);
   state = initialState;
   syncUnitIdCounter(state);
   pendingProductionHex = null;
@@ -2721,6 +2740,7 @@ function patchMovementUnitCardStats(unit: Unit, unitType: UnitType): void {
 
 function buildMovementUnitCardInner(unit: Unit, unitType: UnitType): void {
   const statIconMove = 'icons/movement.svg';
+  const statIconRange = 'icons/range.svg';
   const statIconStr = 'icons/strength.svg';
   const statIconHp = 'icons/hp.svg';
 
@@ -2797,6 +2817,9 @@ function buildMovementUnitCardInner(unit: Unit, unitType: UnitType): void {
           r === 0
             ? 'No movement left this turn.'
             : `Hexes this unit can still move this turn (${r} remaining).`;
+      } else if (kind === 'range') {
+        ttTitle = 'Range';
+        ttDesc = 'Maximum hex distance for ranged fire. Move or shoot in one turn, not both.';
       } else if (kind === 'str') {
         ttTitle = 'Strength';
         ttDesc = 'Base combat strength; condition and flanking modify it in battle.';
@@ -2818,6 +2841,10 @@ function buildMovementUnitCardInner(unit: Unit, unitType: UnitType): void {
 
   const rem = Math.max(0, unit.movement - unit.movesUsed);
   const vMove = addStat('unit-card-stat--move', 'move', statIconMove);
+  if (unitType.range != null) {
+    const vRange = addStat('unit-card-stat--range', 'range', statIconRange);
+    vRange.textContent = String(unitType.range);
+  }
   const vStr = addStat('unit-card-stat--str', 'str', statIconStr);
   const vHp = addStat('unit-card-stat--hp', 'hp', statIconHp);
   vMove.textContent = String(rem);
