@@ -17,6 +17,16 @@ export function setActiveUnitPackagePlayer2(pkg: string | null): void {
   _activeUnitPackagePlayer2 = pkg;
 }
 
+/** Snapshot effective packages for embedding in {@link import('./types').GameState} when saving. */
+export function snapshotActiveUnitPackagesForSave(): {
+  unitPackage: string;
+  unitPackagePlayer2: string;
+} {
+  const p1 = _activeUnitPackage ?? 'standard';
+  const p2 = _activeUnitPackagePlayer2 ?? _activeUnitPackage ?? 'standard';
+  return { unitPackage: p1, unitPackagePlayer2: p2 };
+}
+
 /** Returns unit types available for production for the given owner (1 = player/south, 2 = AI/north). Filtered by the owner's active package (falls back to player 1 package, then 'standard'). */
 export function getAvailableUnitTypes(owner: 1 | 2 = 1): UnitType[] {
   const pkg = owner === 2
@@ -186,7 +196,8 @@ const config: GameConfig = {
       upgradePointsToLevel: 20,
     },
     {
-      id: 'artillery',
+      id: 'artillery-heavy',
+      unitClass: 'artillery',
       name: 'M1 155mm Long Tom',
       cost: 46,
       movement: 1,
@@ -230,6 +241,19 @@ const config: GameConfig = {
       upgradePointsToLevel: 10,
     },
     {
+      id: 'tiger-tank',
+      unitClass: 'tank',
+      name: 'Tiger Tank',
+      cost: 60,
+      movement: 1,
+      maxHp: 16,
+      strength: 12,
+      extraFlanking: 0.1,
+      icon: 'icons/units/tiger-tank.svg',
+      package: 'de-ww2',
+      upgradePointsToLevel: 10,
+    },
+    {
       id: 'artillery',
       name: 'LEFH 18',
       cost: 34,
@@ -256,7 +280,7 @@ const config: GameConfig = {
       movement: 1,
       maxHp: 10,
       strength: 10,
-      icon: 'icons/units/infantry.svg',
+      icon: 'icons/units/ru-infantry.svg',
       package: 'ru-ww2',
       upgradePointsToLevel: 8,
     },

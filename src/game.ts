@@ -1,5 +1,5 @@
 import { getNeighbors, hexDistance } from './hex';
-import config, { getAvailableUnitTypes } from './gameconfig';
+import config, { getAvailableUnitTypes, snapshotActiveUnitPackagesForSave } from './gameconfig';
 import { generateRiver, getAllBorderEntries, riverMaxHexesFromBoardWidth } from './rivers';
 import type { RiverHex } from './types';
 import type {
@@ -768,6 +768,11 @@ export function unitTypeForUnit(unit: Unit): UnitType {
   );
 }
 
+/** Behavioral class of a unit type: unitClass when set, otherwise falls back to id. */
+function unitClassOf(ut: UnitType): string {
+  return ut.unitClass ?? ut.id;
+}
+
 /** Upgrade points for a unit that dealt damage in combat (attacker or defender in melee). */
 function awardUpgradePointsForCombatDamage(
   dealer: Unit,
@@ -869,7 +874,7 @@ function effectiveCS(
 
 /** Melee only: tank charges using full movement allowance in one approach (path steps = movement, started with no MP spent this turn). */
 function tankSpearheadFromApproach(unit: Unit, stepsCost: number, movesUsedBefore: number): boolean {
-  return unit.unitTypeId === 'tank' && movesUsedBefore === 0 && stepsCost === unit.movement;
+  return unitClassOf(unitTypeForUnit(unit)) === 'tank' && movesUsedBefore === 0 && stepsCost === unit.movement;
 }
 
 /** True when limit-artillery mode blocks ranged fire (any enemy adjacent to this ranged unit). */
@@ -1118,7 +1123,7 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
         : attacker;
   const spearhead =
     !ranged &&
-    attacker.unitTypeId === 'tank' &&
+    unitClassOf(unitTypeForUnit(attacker)) === 'tank' &&
     attacker.movesUsed === 0 &&
     approachSteps === attacker.movement;
   const { count: flanking, extraSum, extraFlankingFrom } = analyzeFlanking(state, attackerForFlank, defender);
@@ -1587,6 +1592,7 @@ export function createInitialState(): GameState {
     } as Record<Owner, number>,
     log: [logMsg],
     winner: null,
+    ...snapshotActiveUnitPackagesForSave(),
   };
 }
 
@@ -1731,6 +1737,12 @@ export function createInitialStatePreservingTerrain(previous: GameState): GameSt
     } as Record<Owner, number>,
     log: [logMsg],
     winner: null,
+    ...(previous.unitPackage != null
+      ? {
+          unitPackage: previous.unitPackage,
+          unitPackagePlayer2: previous.unitPackagePlayer2 ?? previous.unitPackage,
+        }
+      : snapshotActiveUnitPackagesForSave()),
   };
 }
 
@@ -1956,6 +1968,7 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
     } as Record<Owner, number>,
     log: [logMsg],
     winner: null,
+    ...snapshotActiveUnitPackagesForSave(),
   };
 }
 
@@ -2136,6 +2149,7 @@ export function createStoryState(story: StoryDef): GameState {
     productionPoints: { [PLAYER]: ppPlayer, [AI]: ppAi } as Record<Owner, number>,
     log: [logMsg],
     winner: null,
+    ...snapshotActiveUnitPackagesForSave(),
   };
 }
 
@@ -2237,7 +2251,8 @@ function aiUnitCountsByType(state: GameState): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const u of state.units) {
     if (u.owner !== AI) continue;
-    counts[u.unitTypeId] = (counts[u.unitTypeId] ?? 0) + 1;
+    const cls = unitClassOf(unitTypeForUnit(u));
+    counts[cls] = (counts[cls] ?? 0) + 1;
   }
   return counts;
 }
@@ -2298,11 +2313,12 @@ function scoreAiProductionPlacement(
   score += pressure * (ROWS - 1 - row) * 18;
   score += pressure * adjacentEnemy * 28;
 
-  if (ut.id === 'tank') {
+  const utClass = unitClassOf(ut);
+  if (utClass === 'tank') {
     score += row * 6 * (1 - pressure * 0.55);
     if (adjacentEnemy > 0) score -= 55 * (1 - pressure * 0.65);
     if (tn < Math.max(1, inf * 0.25)) score += 45;
-  } else if (ut.id === 'artillery') {
+  } else if (utClass === 'artillery') {
     score += (ROWS - 1 - row) * 14;
     if (adjacentEnemy > 0) score -= 85 * (1 - pressure * 0.45);
     else score += 35;
@@ -2313,7 +2329,7 @@ function scoreAiProductionPlacement(
     if (inf / total > 0.65) score -= 25;
   }
 
-  if (state.productionPoints[AI] >= 60 && (ut.id === 'tank' || ut.id === 'artillery')) {
+  if (state.productionPoints[AI] >= 60 && (utClass === 'tank' || utClass === 'artillery')) {
     score += 8;
   }
 
@@ -2795,8 +2811,8 @@ export function aiMovement(state: GameState): {
       const db = bfsFn(b.col, b.row, threat.col, threat.row);
       if (da !== db) return da - db;
     }
-    const oa = AI_MOVE_TYPE_ORDER[a.unitTypeId] ?? 9;
-    const ob = AI_MOVE_TYPE_ORDER[b.unitTypeId] ?? 9;
+    const oa = AI_MOVE_TYPE_ORDER[unitClassOf(unitTypeForUnit(a))] ?? 9;
+    const ob = AI_MOVE_TYPE_ORDER[unitClassOf(unitTypeForUnit(b))] ?? 9;
     if (oa !== ob) return oa - ob;
     return b.row - a.row;
   });

@@ -80,6 +80,10 @@ export interface GameState {
   riverHexes: RiverHex[];
   /** Set at match start from config; used for saves / multiplayer. */
   gameMode: GameMode;
+  /** Unit type packages for production (P1 / south); persisted so saves restore the correct roster. */
+  unitPackage?: string;
+  /** Unit type packages for P2 / AI (north); when omitted, matches {@link unitPackage}. */
+  unitPackagePlayer2?: string;
   /** Hex keys `col,row` that are control points (Conquest). Empty in Domination. */
   controlPointHexes: string[];
   /** Remaining Conquer Points per side (Conquest only; null in Domination). */
@@ -181,6 +185,12 @@ export interface CombatForecast {
 
 export interface UnitType {
   id: string;
+  /**
+   * Behavioral class used by game logic (e.g. 'infantry', 'tank', 'artillery').
+   * When omitted, defaults to `id`. Set this when a variant unit has a different `id`
+   * but should behave identically to its base class (e.g. 'artillery-heavy' → class 'artillery').
+   */
+  unitClass?: string;
   name: string;
   cost: number;
   movement: number;
