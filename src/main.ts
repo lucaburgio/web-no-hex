@@ -2738,7 +2738,7 @@ function patchMovementUnitCardStats(unit: Unit, unitType: UnitType): void {
   patchMovementUnitCardStars(unit);
 }
 
-function buildMovementUnitCardInner(unit: Unit, unitType: UnitType): void {
+function buildMovementUnitCardInner(unit: Unit, unitType: UnitType, isEnemy = false): void {
   const statIconMove = 'icons/movement.svg';
   const statIconRange = 'icons/range.svg';
   const statIconStr = 'icons/strength.svg';
@@ -2757,7 +2757,9 @@ function buildMovementUnitCardInner(unit: Unit, unitType: UnitType): void {
   );
 
   const sidebar = document.createElement('div');
-  sidebar.className = 'movement-unit-card-sidebar';
+  sidebar.className = isEnemy
+    ? 'movement-unit-card-sidebar movement-unit-card-sidebar--enemy'
+    : 'movement-unit-card-sidebar';
   const sidebarIcon = document.createElement('img');
   sidebarIcon.className = 'movement-unit-card-sidebar-icon';
   sidebarIcon.src = unitType.icon ? `${unitType.icon}` : `icons/${unitType.id}.svg`;
@@ -2927,13 +2929,15 @@ function syncMovementUnitCard(): void {
 
   movementHudStackEl.classList.add('movement-hud-stack--visible');
 
+  const isEnemy = unit.owner !== localPlayer;
+
   if (isNewSelection) {
-    buildMovementUnitCardInner(unit, unitType);
+    buildMovementUnitCardInner(unit, unitType, isEnemy);
   } else {
     patchMovementUnitCardStats(unit, unitType);
   }
 
-  if (unit.owner !== localPlayer) {
+  if (isEnemy) {
     // Enemy unit inspected: show card only, no upgrades
     upgradePickerPanelEl.innerHTML = '';
     upgradePickerPanelEl.classList.add('hidden');
@@ -4020,7 +4024,7 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
   }
 
   const attacker = getUnitById(state, state.selectedUnit);
-  if (!attacker) {
+  if (!attacker || attacker.owner === enemyOwner) {
     clearMovePathPreview();
     tooltipEl.classList.add('hidden');
     svg.classList.remove('cursor-fight');

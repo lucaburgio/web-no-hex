@@ -922,6 +922,10 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   justify-content: center;
 }
 
+.movement-unit-card-sidebar--enemy {
+  background: var(--color-hex-ai);
+}
+
 .movement-unit-card-sidebar-icon {
   width: 28px;
   height: 28px;
