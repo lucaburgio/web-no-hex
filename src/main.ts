@@ -2970,6 +2970,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
         clearMovePathPreview();
         state.selectedUnit = null;
         render(); updateUI();
+        sendStateUpdate();
         if (didInterruptHumanMove) maybeAutoEnd();
       }
     } else if (state.phase === 'production' && pendingProductionHex !== null) {
@@ -3103,6 +3104,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
             state.selectedUnit = null;
           }
           render(); updateUI();
+          sendStateUpdate();
           if (didInterruptHumanMove) maybeAutoEnd();
           return;
         }
@@ -3350,6 +3352,7 @@ document.body.addEventListener('click', (e: MouseEvent) => {
   clearMovePathPreview();
   state.selectedUnit = null;
   render(); updateUI();
+  sendStateUpdate();
   if (didInterruptHumanMove) maybeAutoEnd();
 });
 

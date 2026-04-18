@@ -875,6 +875,19 @@ export function renderState(
 
   let selectedUnit = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
   if (selectedUnit && selectedUnit.owner !== localPlayer) selectedUnit = null;
+  // Opponent's turn + our unit id in selectedUnit: active player is inspecting our unit (multiplayer).
+  // Do not show move highlights / selection on our board — that reads like we're moving.
+  if (selectedUnit && state.activePlayer !== localPlayer && selectedUnit.owner === localPlayer) {
+    selectedUnit = null;
+  }
+
+  /** Tint for unit shape only — hex/move overlays use `selectedUnit` above. */
+  const isUnitVisuallySelected = (unit: Unit): boolean => {
+    if (state.selectedUnit !== unit.id) return false;
+    if (state.activePlayer === localPlayer) return true;
+    // Opponent's turn: show their selection only on units they own (moving), not when they inspect yours
+    return unit.owner === state.activePlayer;
+  };
 
   const rangedTargetKeys = new Set<string>();
   if (selectedUnit && state.phase === 'movement' && state.activePlayer === localPlayer) {
@@ -1310,7 +1323,7 @@ export function renderState(
     const dc = unit.col;
     const dr = unit.row;
     const { x, y } = hexToPixel(dc, dr);
-    const isSelected = state.selectedUnit === unit.id;
+    const isSelected = isUnitVisuallySelected(unit);
     const displayHp  = displayHpByUnit.get(unit.id) ?? unit.hp;
     const hpRatio    = displayHp / unit.maxHp;
 
