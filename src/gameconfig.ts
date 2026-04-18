@@ -204,7 +204,7 @@ const config: GameConfig = {
       maxHp: 7,
       strength: 9,
       range: 4,
-      icon: 'icons/units/artillery.svg',
+      icon: 'icons/units/artillery-heavy.svg',
       package: 'us-ww2',
       upgradePointsToLevel: 20,
     },

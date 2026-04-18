@@ -571,7 +571,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   }
 }
 
-/* Production unit card — outer frame per Figma card-v2 */
+/* Production unit card */
 .unit-card {
   display: flex;
   flex-direction: column;
@@ -923,7 +923,11 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 .movement-unit-card-sidebar--enemy {
-  background: var(--color-hex-ai);
+  background: var(--color-ai);
+}
+.movement-unit-card-sidebar--enemy .movement-unit-card-sidebar-icon {
+  filter: invert(1);
+  opacity: 0.8;
 }
 
 .movement-unit-card-sidebar-icon {
@@ -931,7 +935,6 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   height: 28px;
   object-fit: contain;
   opacity: 0.55;
-  filter: brightness(0);
 }
 
 .movement-unit-card-main {
