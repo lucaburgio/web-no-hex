@@ -753,6 +753,12 @@ function removeUnit(state: GameState, id: number): void {
   state.units = state.units.filter(u => u.id !== id);
 }
 
+function drainConquestPointForKill(state: GameState, killedOwner: Owner): void {
+  if (state.gameMode !== 'conquest' || !state.conquestPoints) return;
+  state.conquestPoints[killedOwner] = Math.max(0, state.conquestPoints[killedOwner] - 1);
+  log(state, `Conquest: ${killedOwner === PLAYER ? 'South' : 'North'} loses 1 CP for unit lost (now ${state.conquestPoints[killedOwner]}).`);
+}
+
 function log(state: GameState, msg: string): void {
   state.log = [msg, ...state.log.slice(0, 49)];
 }
@@ -962,6 +968,7 @@ function resolveCombat(
     awardUpgradePointsForCombatDamage(attacker, defenderHpBefore, dmgToDefender, defenderDied);
     if (defenderDied) {
       log(state, `Unit #${defender.id} was destroyed.`);
+      drainConquestPointForKill(state, defender.owner);
       removeUnit(state, defender.id);
     } else {
       log(state, `Defender has ${defender.hp} HP remaining.`);
@@ -993,6 +1000,7 @@ function resolveCombat(
 
   if (defenderDied) {
     log(state, `Unit #${defender.id} was destroyed.`);
+    drainConquestPointForKill(state, defender.owner);
     removeUnit(state, defender.id);
     if (!attackerDied) {
       attacker.col = defender.col;
@@ -1002,6 +1010,7 @@ function resolveCombat(
   }
   if (attackerDied) {
     log(state, `Unit #${attacker.id} was destroyed.`);
+    drainConquestPointForKill(state, attacker.owner);
     removeUnit(state, attacker.id);
   }
   if (!attackerDied && !defenderDied) {
