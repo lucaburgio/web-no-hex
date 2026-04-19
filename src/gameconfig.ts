@@ -72,8 +72,8 @@ export const DEFAULT_TERRITORY_ECONOMY = { territoryQuota: 8, pointsPerQuota: 3 
 const config: GameConfig = {
   gameMode: 'domination' as GameMode,
   controlPointCount: 1,
-  conquestPointsPlayer: 14,
-  conquestPointsAi: 14,
+  conquestPointsPlayer: 40,
+  conquestPointsAi: 40,
 
   breakthroughAttackerStartingPP: 120,
   breakthroughSectorCount: 3,
