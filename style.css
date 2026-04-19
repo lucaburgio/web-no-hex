@@ -1351,7 +1351,6 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 .game-end-stat-num {
   font-weight: 600;
-  font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
 }
 
