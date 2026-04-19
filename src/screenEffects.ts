@@ -10,9 +10,9 @@ import gsap from 'gsap';
 /** Config for the full-screen band-displacement glitch burst. */
 export const GLITCH_CONFIG = {
   /** Total burst duration in seconds. */
-  duration: 0.9,
+  duration: 0.5,
   /** Max number of displaced bands drawn per frame during peak intensity. */
-  maxBands: 9,
+  maxBands: 4,
   /**
    * Max height of a single band in pixels.
    * Bands are power-distributed so most are thin; a few are thick.
@@ -21,9 +21,9 @@ export const GLITCH_CONFIG = {
   /** Max horizontal pixel displacement of a band (positive = right, negative = left). */
   maxDisplacement: 160,
   /** Primary band color (dark bands). CSS color string. */
-  bandColor: 'rgba(0, 0, 0, 0.95)',
+  bandColor: 'rgba(210, 210, 210, 0.95)',
   /** Accent band color (occasional bright/colored flash). CSS color string. */
-  accentColor: 'rgba(189, 78, 78, 0.88)',
+  accentColor: 'rgba(118, 118, 118, 0.88)',
   /** 0–1 probability that a given band uses the accent color instead of the primary. */
   accentChance: 0.2,
   /**
@@ -41,7 +41,7 @@ export const GLITCH_CONFIG = {
 /** Config for the slow cinematic zoom-out on text elements. */
 export const SLOW_ZOOM_CONFIG = {
   /** Starting scale (zoomed in). E.g. 1.2 = 20% larger than normal. */
-  fromScale: 1.4,
+  fromScale: 1.2,
   /** Ending scale (normal). */
   toScale: 1,
   /** Zoom duration in seconds — keep high for a slow-motion feel. */
@@ -49,7 +49,7 @@ export const SLOW_ZOOM_CONFIG = {
   /** GSAP ease string for the zoom curve. */
   ease: 'power1.out',
   /** Delay before the zoom begins, in seconds. */
-  delay: 0.45,
+  delay: 0.05,
 };
 
 // ── Internal state ───────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ export function playGlitchEffect(config = GLITCH_CONFIG): void {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
   canvas.style.cssText =
-    'position:fixed;inset:0;width:100%;height:100%;z-index:9999;pointer-events:none;';
+    'position:fixed;inset:0;width:200%;margin-left:-50%;height:100%;z-index:9999;pointer-events:none;';
   document.body.appendChild(canvas);
 
   const ctx = canvas.getContext('2d')!;
