@@ -1229,41 +1229,6 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   display: inline-block;
 }
 
-/* ── Screen effects (glitch, slow zoom — reusable, from screenEffects.ts) ── */
-.glitch-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.glitch-channel {
-  position: absolute;
-  inset: 0;
-}
-
-.glitch-channel--red {
-  background: rgba(255, 30, 30, 0.18);
-  mix-blend-mode: screen;
-}
-
-.glitch-channel--blue {
-  background: rgba(30, 80, 255, 0.18);
-  mix-blend-mode: screen;
-}
-
-.glitch-scanlines {
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 3px,
-    rgba(0, 0, 0, 0.12) 3px,
-    rgba(0, 0, 0, 0.12) 5px
-  );
-}
 
 /* ── Replay overlay ─────────────────────────────────────────────────────────── */
 #recap-overlay {
