@@ -53,7 +53,7 @@ const STAT_ROWS: { label: string; prefer: Prefer; pick: (s: BattleStatsSide) => 
 function headlineForOutcome(reason: WinReason | undefined, won: boolean): string {
   switch (reason) {
     case 'dom_breakthrough':
-      return won ? 'You reach the enemy front line' : 'The enemy reaches your front line';
+      return won ? 'You reached the enemy front line' : 'The enemy reached your front line';
     case 'dom_annihilation':
       return won ? 'All enemy units eliminated' : 'You lost all your units';
     case 'cq_elimination':
