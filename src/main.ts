@@ -381,6 +381,15 @@ const lobbyCancelBtn    = document.getElementById('lobby-cancel-btn') as HTMLBut
 const lobbyCancelJoinBtn = document.getElementById('lobby-cancel-join-btn') as HTMLButtonElement;
 const lobbyJoinConfirm  = document.getElementById('lobby-join-confirm') as HTMLButtonElement;
 
+// ── P2 waiting overlay DOM refs ───────────────────────────────────────────────
+const p2WaitingOverlayEl      = document.getElementById('p2-waiting-overlay') as HTMLDivElement;
+const p2WaitingModeImgEl      = document.getElementById('p2-waiting-mode-img') as HTMLImageElement;
+const p2WaitingModeIconEl     = document.getElementById('p2-waiting-mode-icon') as HTMLImageElement;
+const p2WaitingModeNameEl     = document.getElementById('p2-waiting-mode-name') as HTMLDivElement;
+const p2WaitingModeDescEl     = document.getElementById('p2-waiting-mode-desc') as HTMLParagraphElement;
+const p2WaitingSettingsListEl = document.getElementById('p2-waiting-settings-list') as HTMLDivElement;
+const p2WaitingBackBtn        = document.getElementById('p2-waiting-back-btn') as HTMLButtonElement;
+
 // ── Game mode state ───────────────────────────────────────────────────────────
 
 let gameMode: 'vsAI' | 'vsHuman' = 'vsAI';
@@ -1983,6 +1992,22 @@ settingsBackBtn.addEventListener('click', () => {
   showMainMenu();
 });
 
+// Broadcast settings changes to P2 in real-time when hosting a multiplayer game
+settingsOverlayEl.addEventListener('change', broadcastSettingsPreview);
+settingsOverlayEl.addEventListener('click', (e: MouseEvent) => {
+  const target = e.target as HTMLElement;
+  if (target.closest('.mode-pager-btn') || target.closest('[data-value]')) {
+    broadcastSettingsPreview();
+  }
+});
+
+// P2 waiting overlay back button: disconnect and return to main menu
+p2WaitingBackBtn.addEventListener('click', () => {
+  closeLobbyWs();
+  hideP2WaitingOverlay();
+  showMainMenu();
+});
+
 // ── Intro story ───────────────────────────────────────────────────────────────
 
 const INTRO_PAGES = [
@@ -2320,6 +2345,94 @@ function hideLobby(): void {
   lobbyOverlayEl.classList.add('hidden');
 }
 
+function showP2WaitingOverlay(): void {
+  hideLobby();
+  p2WaitingOverlayEl.classList.remove('hidden');
+}
+
+function hideP2WaitingOverlay(): void {
+  p2WaitingOverlayEl.classList.add('hidden');
+}
+
+type SettingsPreviewRow = { label: string; value: string };
+interface SettingsPreview {
+  gameMode: string;
+  modeName: string;
+  modeDesc: string;
+  rows: SettingsPreviewRow[];
+}
+
+function updateP2WaitingOverlay(preview: SettingsPreview): void {
+  const modeDef = MODE_DEFS.find(m => m.id === preview.gameMode);
+  if (modeDef) {
+    p2WaitingModeImgEl.src = modeDef.image;
+    p2WaitingModeIconEl.src = modeDef.icon;
+  }
+  p2WaitingModeNameEl.textContent = preview.modeName;
+  p2WaitingModeDescEl.textContent = preview.modeDesc;
+
+  p2WaitingSettingsListEl.innerHTML = '';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'p2-waiting-section-title';
+  titleEl.textContent = 'SETTINGS';
+  p2WaitingSettingsListEl.appendChild(titleEl);
+  for (const row of preview.rows) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'p2-waiting-row';
+    const labelEl = document.createElement('span');
+    labelEl.className = 'p2-waiting-row-label';
+    labelEl.textContent = row.label;
+    const valueEl = document.createElement('span');
+    valueEl.className = 'p2-waiting-row-value';
+    valueEl.textContent = row.value;
+    rowEl.appendChild(labelEl);
+    rowEl.appendChild(valueEl);
+    p2WaitingSettingsListEl.appendChild(rowEl);
+  }
+}
+
+function broadcastSettingsPreview(): void {
+  if (!ws || ws.readyState !== WebSocket.OPEN || localPlayer !== PLAYER) return;
+  const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
+  const gameMode = gameModeEl?.value ?? 'domination';
+  const modeDef = MODE_DEFS.find(m => m.id === gameMode);
+  const pkgEl = document.getElementById('cfg-unitPackage') as HTMLSelectElement;
+  const pkgEl2 = document.getElementById('cfg-unitPackagePlayer2') as HTMLSelectElement;
+  const mapEl = document.getElementById('cfg-customMap') as HTMLSelectElement;
+  const presetEl = document.getElementById('cfg-rulesPreset') as HTMLSelectElement;
+
+  const rows: SettingsPreviewRow[] = [
+    { label: 'Rules', value: presetEl?.options[presetEl.selectedIndex]?.text ?? 'Standard' },
+    { label: 'Unit package P1', value: pkgEl?.value || 'standard' },
+    { label: 'Unit package P2', value: pkgEl2?.value || 'standard' },
+    { label: 'Map', value: mapEl?.options[mapEl.selectedIndex]?.text ?? '[generate]' },
+  ];
+
+  if (gameMode === 'conquest') {
+    const cpEl = document.getElementById('cfg-controlPointCount') as HTMLInputElement;
+    const cp1El = document.getElementById('cfg-conquestPointsPlayer') as HTMLInputElement;
+    const cp2El = document.getElementById('cfg-conquestPointsAi') as HTMLInputElement;
+    if (cpEl) rows.push({ label: 'Control points', value: cpEl.value });
+    if (cp1El) rows.push({ label: 'Conquer pts P1', value: cp1El.value });
+    if (cp2El) rows.push({ label: 'Conquer pts P2', value: cp2El.value });
+  } else if (gameMode === 'breakthrough') {
+    const roleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement;
+    const randEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement;
+    const sectEl = document.getElementById('cfg-breakthroughSectorCount') as HTMLInputElement;
+    const role = randEl?.checked ? 'Random' : (roleEl?.value ?? 'attacker');
+    rows.push({ label: 'P1 role', value: role });
+    if (sectEl) rows.push({ label: 'Sectors', value: sectEl.value });
+  }
+
+  const preview: SettingsPreview = {
+    gameMode,
+    modeName: modeDef?.name ?? gameMode.toUpperCase(),
+    modeDesc: modeDef?.desc ?? '',
+    rows,
+  };
+  ws.send(JSON.stringify({ type: 'settings-preview', ...preview }));
+}
+
 function sendStateUpdate(anim?: WsAnimationPayload | MoveAnimation): void {
   if (gameMode === 'vsHuman' && ws && ws.readyState === WebSocket.OPEN) {
     const payload: Record<string, unknown> = { type: 'state-update', state };
@@ -2365,6 +2478,7 @@ function connectWs(onOpen: (socket: WebSocket) => void): void {
     if (state.winner) return; // game already ended
     showDisconnected();
   };
+
 }
 
 function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
@@ -2380,15 +2494,14 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
       if (ws) ws.send(JSON.stringify({ type: 'game-start', state, settings: { ...settings, unitPackage: settingsUnitPackage, unitPackagePlayer2: settingsUnitPackagePlayer2 } }));
       startGame(state);
     }, 'PLAYER 2 CONNECTED');
+    // Send an initial preview so P2 sees the current settings immediately
+    setTimeout(broadcastSettingsPreview, 50);
   } else if (msg.type === 'joined') {
-    // Guest: successfully joined, wait for game-start
-    lobbyMenuEl.classList.add('hidden');
-    lobbyHostWaitEl.classList.add('hidden');
-    lobbyJoinFormEl.classList.add('hidden');
-    const waitEl = document.createElement('div');
-    waitEl.className = 'lobby-hint';
-    waitEl.textContent = 'Joined! Waiting for host to start...';
-    (document.getElementById('lobby-modal') as HTMLDivElement).appendChild(waitEl);
+    // Guest: successfully joined — show full-screen waiting room while host configures
+    showP2WaitingOverlay();
+  } else if (msg.type === 'settings-preview') {
+    // Guest: host changed settings — update waiting overlay in real-time
+    updateP2WaitingOverlay(msg as unknown as SettingsPreview);
   } else if (msg.type === 'game-start') {
     // Guest receives initial state from host
     const syncedSettings = msg.settings as (Parameters<typeof updateConfig>[0] & { unitPackage?: string; unitPackagePlayer2?: string }) | undefined;
@@ -2401,6 +2514,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     }
     state = msg.state as GameState;
     syncUnitIdCounter(state);
+    hideP2WaitingOverlay();
     hideLobby();
     hideMainMenu();
     startGame(state);
@@ -2460,6 +2574,12 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
 }
 
 function showDisconnected(): void {
+  if (!p2WaitingOverlayEl.classList.contains('hidden')) {
+    // Game hasn't started — guest was in waiting room; go back to main menu
+    hideP2WaitingOverlay();
+    showMainMenu();
+    return;
+  }
   showGameEndScreenDisconnected();
 }
 

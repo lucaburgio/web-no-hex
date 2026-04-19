@@ -547,6 +547,32 @@
     </div>
   </div>
 
+  <!-- P2 waiting room: shown to guest after joining, while host configures the match -->
+  <div id="p2-waiting-overlay" class="hidden">
+    <div id="p2-waiting-left">
+      <div id="p2-waiting-top-bar">
+        <button id="p2-waiting-back-btn" class="back-link"><img src="icons/back-arrow.svg" alt="" class="back-arrow-icon"> BACK</button>
+        <span class="settings-group-title">GAME LOBBY</span>
+      </div>
+      <div id="p2-waiting-mode-group">
+        <div id="p2-waiting-mode-display">
+          <div id="p2-waiting-mode-img-wrap">
+            <img id="p2-waiting-mode-img" alt="" />
+          </div>
+          <div id="p2-waiting-mode-display-footer">
+            <img id="p2-waiting-mode-icon" alt="" />
+            <div id="p2-waiting-mode-name">—</div>
+          </div>
+          <p id="p2-waiting-mode-desc"></p>
+        </div>
+      </div>
+    </div>
+    <div id="p2-waiting-right">
+      <div id="p2-waiting-status">Waiting for host to configure the match…</div>
+      <div id="p2-waiting-settings-list"></div>
+    </div>
+  </div>
+
   <!-- End-of-match (vs AI + multiplayer): one screen, GSAP intro from mpResultOverlay.ts -->
   <div id="game-end-overlay" class="hidden" aria-live="polite">
     <div id="game-end-inner">
