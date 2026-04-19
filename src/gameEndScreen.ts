@@ -7,6 +7,7 @@ import {
   revertMpResultIntro,
   DEFAULT_MP_RESULT_VARIANT,
 } from './mpResultOverlay';
+import { playGlitchEffect, playSlowZoomOut, revertScreenEffects } from './screenEffects';
 import type { WinReason } from './types';
 
 const overlayEl = document.getElementById('game-end-overlay') as HTMLDivElement;
@@ -59,6 +60,7 @@ export function configureStoryEndButtons(show: boolean, hasNext: boolean): void 
 
 export function hideGameEndScreen(): void {
   revertMpResultIntro();
+  revertScreenEffects();
   overlayEl.classList.add('hidden');
   configureStoryEndButtons(false, false);
   gameEndRestartBtn.classList.remove('hidden');
@@ -86,6 +88,8 @@ export function showGameEndScreenForOutcome(won: boolean, reason?: WinReason): v
     text: msgEl,
     actions: actionsEl,
   });
+  playGlitchEffect();
+  playSlowZoomOut([msgEl, subtitleEl]);
 }
 
 export function showGameEndScreenDisconnected(): void {
@@ -102,4 +106,6 @@ export function showGameEndScreenDisconnected(): void {
     text: msgEl,
     actions: actionsEl,
   });
+  playGlitchEffect();
+  playSlowZoomOut([msgEl, subtitleEl]);
 }
