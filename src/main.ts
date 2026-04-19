@@ -2271,7 +2271,7 @@ function buildRulesContent(): string {
         (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%), in fixed neighbor order.
         Some unit types add <strong>extra flanking</strong> when they are among those adjacent flankers.</li>
       <li><strong>Damage:</strong> <code>floor(${config.combatDamageBase} × exp(±ΔCS / ${config.combatStrengthScale}))</code>, min 1 per side.</li>
-      <li><strong>Upgrade points:</strong> in <strong>adjacent combat</strong>, each side earns <strong>${config.upgradePointsPerDamageDealt}</strong> point per HP of damage it actually deals to the other, plus <strong>${config.upgradePointsKillBonus}</strong> extra if it destroys that unit. <strong>Ranged fire</strong> only damages the target (no return shot), so only the firing unit earns points from that exchange. Required points to level up depend on unit type (shown on the movement unit card). When you have enough points during movement, choose one upgrade: <strong>+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%</strong> CS when attacking with ${config.maxFlankingUnits} flankers, <strong>+${Math.round(config.upgradeBonusAttackPerStack * 100)}%</strong> CS when attacking, or <strong>+${Math.round(config.upgradeBonusDefensePerStack * 100)}%</strong> CS when defending (stacks if you pick the same option again).</li>
+      <li><strong>Upgrade points:</strong> in <strong>adjacent combat</strong>, each side earns <strong>${config.upgradePointsPerDamageDealt}</strong> point per HP of damage it actually deals to the other, plus <strong>${config.upgradePointsKillBonus}</strong> extra if it destroys that unit. <strong>Ranged fire</strong> only damages the target (no return shot), so only the firing unit earns points from that exchange. Required points to level up depend on unit type (shown on the movement unit card). When you have enough points during movement, choose one upgrade: <strong>+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%</strong> CS per flanker when attacking (up to <strong>${Math.round(config.upgradeBonusFlankingPerStack * config.maxFlankingUnits * 100)}%</strong> with ${config.maxFlankingUnits} flankers), <strong>+${Math.round(config.upgradeBonusAttackPerStack * 100)}%</strong> CS when attacking, <strong>+${Math.round(config.upgradeBonusDefensePerStack * 100)}%</strong> CS when defending, or <strong>+${config.upgradeBonusHealPerStack}</strong> HP to your end-of-turn heal on own territory (stacks if you pick the same option again).</li>
       <li>If defender dies: attacker advances and conquers the hex. If both die: both removed.</li>
       <li>Hover over an enemy unit during movement to see a combat forecast.</li>
     </ul>
@@ -2287,7 +2287,7 @@ function buildRulesContent(): string {
       <li><strong>Flank mult</strong> (attacker only) = <code>1 + <em>f</em> × ${Math.round(config.flankingBonus * 100)}%</code> where <em>f</em> is the number of contributing adjacent friendlies next to the defender, capped at <strong>${config.maxFlankingUnits}</strong>, in fixed neighbor order, plus any per-unit-type <strong>extra flanking</strong> from those flankers (see short Combat section).</li>
       <li><strong>Breakthrough</strong> mult for a defender in a sector already captured by the attacker = <strong>${brPct}%</strong> (same setting as above).</li>
       <li><strong>River defense</strong> mult for a defender whose unit is on a river hex = <strong>${100 + riverDefPct}%</strong> (additive +${riverDefPct}% to CS).</li>
-      <li><strong>Upgrade</strong> mult: when attacking, stacks of attack upgrade add <strong>+${Math.round(config.upgradeBonusAttackPerStack * 100)}%</strong> CS each; with ${config.maxFlankingUnits} flankers, stacks of flanking upgrade add <strong>+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%</strong> CS each. When defending, defense upgrade stacks add <strong>+${Math.round(config.upgradeBonusDefensePerStack * 100)}%</strong> CS each.</li>
+      <li><strong>Upgrade</strong> mult: when attacking, stacks of attack upgrade add <strong>+${Math.round(config.upgradeBonusAttackPerStack * 100)}%</strong> CS each; each stack of flanking upgrade adds <strong>+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%</strong> CS per contributing flanker (capped at ${config.maxFlankingUnits}). When defending, defense upgrade stacks add <strong>+${Math.round(config.upgradeBonusDefensePerStack * 100)}%</strong> CS each. The healing upgrade adds <strong>+${config.upgradeBonusHealPerStack}</strong> HP per stack to end-of-turn healing on own territory (not part of CS).</li>
       <li><strong>Tank spearhead</strong> mult (melee attacker only) = <strong>${100 + Math.round(config.tankSpearheadAttackBonus * 100)}%</strong> when the attacker is a <strong>tank</strong>, it had <strong>not</strong> spent movement earlier this phase, and the move into adjacent combat costs <strong>exactly</strong> that unit&rsquo;s <strong>movement</strong> stat in path steps (scales if tanks later have movement 3+).</li>
     </ul>
       <p class="rules-prose">Let <strong>ΔCS</strong> = attacker CS − defender CS. <strong>Damage</strong> uses ΔCS, not percentages of HP directly: adjacent melee deals <code>max(1, floor(${config.combatDamageBase} × exp(ΔCS / ${config.combatStrengthScale})))</code> to the defender and <code>max(1, floor(${config.combatDamageBase} × exp(−ΔCS / ${config.combatStrengthScale})))</code> to the attacker at the same time. Ranged artillery uses the same formula for damage to the target only (no return fire). A percentage bonus to CS changes ΔCS and therefore damage through this curve — it is not a direct “+X% damage”.</p>
@@ -2299,7 +2299,7 @@ function buildRulesContent(): string {
       <div class="settings-group-title">Healing</div>
       <ul class="rules-list">
       <li>Units that did <strong>not</strong> fight this turn heal at end of turn.</li>
-      <li>+${config.healOwnTerritory} HP on <strong>own territory</strong>.</li>
+      <li>Base <strong>+${config.healOwnTerritory} HP</strong> on <strong>own territory</strong>, plus <strong>+${config.upgradeBonusHealPerStack} HP</strong> per stack of the healing upgrade.</li>
     </ul>
       </div>
     </section>
@@ -2652,7 +2652,7 @@ function showDisconnected(): void {
     showMainMenu();
     return;
   }
-  showGameEndScreenDisconnected();
+  showGameEndScreenDisconnected(state, localPlayer);
 }
 
 // ── Lobby button handlers ─────────────────────────────────────────────────────
@@ -2947,7 +2947,12 @@ function spectatorInspectIdForBoard(): number | null {
 }
 
 function totalUpgradeTiers(unit: Unit): number {
-  return (unit.upgradeFlanking ?? 0) + (unit.upgradeAttack ?? 0) + (unit.upgradeDefense ?? 0);
+  return (
+    (unit.upgradeFlanking ?? 0) +
+    (unit.upgradeAttack ?? 0) +
+    (unit.upgradeDefense ?? 0) +
+    (unit.upgradeHeal ?? 0)
+  );
 }
 
 function patchMovementUnitCardStars(unit: Unit): void {
@@ -2972,12 +2977,13 @@ function buildUpgradePickerPanel(unit: Unit): void {
   const pctFlank = `+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%`;
   const pctAttack = `+${Math.round(config.upgradeBonusAttackPerStack * 100)}%`;
   const pctDefense = `+${Math.round(config.upgradeBonusDefensePerStack * 100)}%`;
+  const pctHeal = `+${config.upgradeBonusHealPerStack}HP`;
   const defs: { kind: UnitUpgradeKind; icon: string; pct: string; desc: string }[] = [
     {
       kind: 'flanking',
       icon: 'icons/upgrade/flank.svg',
       pct: pctFlank,
-      desc: 'ATTACK WHEN FLANKING WITH 2 MORE UNITS',
+      desc: 'COMBAT STRENGTH PER FLANKER WHEN ATTACKING',
     },
     {
       kind: 'attack',
@@ -2990,6 +2996,12 @@ function buildUpgradePickerPanel(unit: Unit): void {
       icon: 'icons/upgrade/defense.svg',
       pct: pctDefense,
       desc: 'COMBAT STRENGTH WHEN DEFENDING',
+    },
+    {
+      kind: 'heal',
+      icon: 'icons/upgrade/heal.svg',
+      pct: pctHeal,
+      desc: 'END-OF-TURN HEAL ON OWN TERRITORY (BASE)',
     },
   ];
   for (const d of defs) {
@@ -4260,7 +4272,7 @@ function updateUI(): void {
 
 function checkWinner(): void {
   if (!state.winner) return;
-  showGameEndScreenForOutcome(state.winner === localPlayer, state.winReason);
+  showGameEndScreenForOutcome(state.winner === localPlayer, state.winReason, state, localPlayer);
   if (gameMode === 'vsAI' && state.winner === localPlayer) {
     recordVsAiVictory(state.turn, state.gameMode, state.winReason);
   }
@@ -4611,13 +4623,13 @@ showMainMenu();
   if (!dev) return;
   switch (dev) {
     case 'winner':
-      showGameEndScreenForOutcome(true, 'dom_breakthrough');
+      showGameEndScreenForOutcome(true, 'dom_breakthrough', state, localPlayer);
       break;
     case 'loser':
-      showGameEndScreenForOutcome(false, 'dom_annihilation');
+      showGameEndScreenForOutcome(false, 'dom_annihilation', state, localPlayer);
       break;
     case 'disconnected':
-      showGameEndScreenDisconnected();
+      showGameEndScreenDisconnected(state, localPlayer);
       break;
   }
 })();

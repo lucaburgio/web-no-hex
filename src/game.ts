@@ -14,6 +14,7 @@ import type {
   GameMode,
   StoryDef,
   UnitUpgradeKind,
+  BattleStatsSide,
 } from './types';
 import {
   getBreakthroughControlPointsForMap,
@@ -73,6 +74,66 @@ function maybeTrimPathCaches(): void {
   if (minHomeStepsCache.size > PATH_CACHE_LIMIT) minHomeStepsCache.clear();
 }
 
+function emptyBattleStatsSide(): BattleStatsSide {
+  return {
+    damageDealt: 0,
+    damageTaken: 0,
+    enemyUnitsDestroyed: 0,
+    unitsLost: 0,
+    unitsDeployed: 0,
+  };
+}
+
+function initBattleStatsFromUnits(units: Unit[]): Record<Owner, BattleStatsSide> {
+  const out: Record<Owner, BattleStatsSide> = {
+    1: emptyBattleStatsSide(),
+    2: emptyBattleStatsSide(),
+  };
+  for (const u of units) {
+    out[u.owner].unitsDeployed++;
+  }
+  return out;
+}
+
+/** Normalize stats for older saves or missing field. */
+export function normalizeBattleStats(state: GameState): Record<Owner, BattleStatsSide> {
+  if (state.battleStats) return state.battleStats;
+  state.battleStats = initBattleStatsFromUnits(state.units);
+  return state.battleStats;
+}
+
+function recordCombatBattleStats(
+  state: GameState,
+  attacker: Unit,
+  defender: Unit,
+  res: CombatResolveResult,
+): void {
+  const bs = normalizeBattleStats(state);
+  const a = attacker.owner;
+  const d = defender.owner;
+  if (res.ranged) {
+    bs[a].damageDealt += res.dmgToDefender;
+    bs[d].damageTaken += res.dmgToDefender;
+    if (res.defenderDied) {
+      bs[a].enemyUnitsDestroyed++;
+      bs[d].unitsLost++;
+    }
+    return;
+  }
+  bs[a].damageDealt += res.dmgToDefender;
+  bs[a].damageTaken += res.dmgToAttacker;
+  bs[d].damageDealt += res.dmgToAttacker;
+  bs[d].damageTaken += res.dmgToDefender;
+  if (res.defenderDied) {
+    bs[a].enemyUnitsDestroyed++;
+    bs[d].unitsLost++;
+  }
+  if (res.attackerDied) {
+    bs[d].enemyUnitsDestroyed++;
+    bs[a].unitsLost++;
+  }
+}
+
 function makeUnit(owner: Owner, col: number, row: number, unitTypeId = 'infantry'): Unit {
   const unitType = getAvailableUnitTypes(owner).find(u => u.id === unitTypeId)
     ?? config.unitTypes.find(u => u.id === unitTypeId)
@@ -94,6 +155,7 @@ function makeUnit(owner: Owner, col: number, row: number, unitTypeId = 'infantry
     upgradeFlanking: 0,
     upgradeAttack: 0,
     upgradeDefense: 0,
+    upgradeHeal: 0,
   };
 }
 
@@ -862,8 +924,8 @@ function effectiveCS(
   const uD = unit.upgradeDefense ?? 0;
   if (combatRole === 'attacker') {
     upgradeMult += uA * config.upgradeBonusAttackPerStack;
-    if (flankingCount >= config.maxFlankingUnits) {
-      upgradeMult += uF * config.upgradeBonusFlankingPerStack;
+    if (flankingCount > 0) {
+      upgradeMult += uF * config.upgradeBonusFlankingPerStack * flankingCount;
     }
   } else {
     upgradeMult += uD * config.upgradeBonusDefensePerStack;
@@ -973,7 +1035,7 @@ function resolveCombat(
     } else {
       log(state, `Defender has ${defender.hp} HP remaining.`);
     }
-    return {
+    const rangedResult: CombatResolveResult = {
       ranged: true,
       dmgToAttacker: 0,
       dmgToDefender,
@@ -982,6 +1044,8 @@ function resolveCombat(
       attackerDied: false,
       defenderDied,
     };
+    recordCombatBattleStats(state, attacker, defender, rangedResult);
+    return rangedResult;
   }
 
   // Melee: apply damage simultaneously
@@ -1017,7 +1081,7 @@ function resolveCombat(
     log(state, `Both units survived (${attacker.hp}/${defender.hp} HP remaining).`);
   }
 
-  return {
+  const meleeResult: CombatResolveResult = {
     ranged: false,
     dmgToAttacker,
     dmgToDefender,
@@ -1026,6 +1090,8 @@ function resolveCombat(
     attackerDied,
     defenderDied,
   };
+  recordCombatBattleStats(state, attacker, defender, meleeResult);
+  return meleeResult;
 }
 
 /** Hex centers for damage floats (melee). Both-survive: separate tiles; all other fights: both badges on defender hex so they stack. */
@@ -1103,9 +1169,9 @@ function attackerUpgradeForecastLines(unit: Unit, flankingCount: number): string
       `Attack upgrade: +${Math.round(uA * config.upgradeBonusAttackPerStack * 100)}%`,
     );
   }
-  if (uF > 0 && flankingCount >= config.maxFlankingUnits) {
+  if (uF > 0 && flankingCount > 0) {
     lines.push(
-      `Flanking upgrade ×${config.maxFlankingUnits}: +${Math.round(uF * config.upgradeBonusFlankingPerStack * 100)}%`,
+      `Flanking upgrade (×${flankingCount}): +${Math.round(uF * config.upgradeBonusFlankingPerStack * flankingCount * 100)}%`,
     );
   }
   return lines;
@@ -1186,7 +1252,8 @@ export function playerApplyUnitUpgrade(
   unit.upgradePoints -= ut.upgradePointsToLevel;
   if (kind === 'flanking') unit.upgradeFlanking += 1;
   else if (kind === 'attack') unit.upgradeAttack += 1;
-  else unit.upgradeDefense += 1;
+  else if (kind === 'defense') unit.upgradeDefense += 1;
+  else unit.upgradeHeal += 1;
   log(state, `Unit #${unit.id} upgraded (${kind}).`);
   return state;
 }
@@ -1389,7 +1456,10 @@ function healUnits(state: GameState): { col: number; row: number; amount: number
     }
     const hexState = state.hexStates[`${unit.col},${unit.row}`];
     const owner: Owner | null = hexState ? hexState.owner : null;
-    const heal = owner === unit.owner ? config.healOwnTerritory : 0;
+    const heal =
+      owner === unit.owner
+        ? config.healOwnTerritory + (unit.upgradeHeal ?? 0) * config.upgradeBonusHealPerStack
+        : 0;
     const before = unit.hp;
     unit.hp = Math.min(unit.maxHp, unit.hp + heal);
     const gained = unit.hp - before;
@@ -1601,6 +1671,7 @@ export function createInitialState(): GameState {
     } as Record<Owner, number>,
     log: [logMsg],
     winner: null,
+    battleStats: initBattleStatsFromUnits(units),
     ...snapshotActiveUnitPackagesForSave(),
   };
 }
@@ -1746,6 +1817,7 @@ export function createInitialStatePreservingTerrain(previous: GameState): GameSt
     } as Record<Owner, number>,
     log: [logMsg],
     winner: null,
+    battleStats: initBattleStatsFromUnits(units),
     ...(previous.unitPackage != null
       ? {
           unitPackage: previous.unitPackage,
@@ -1977,6 +2049,7 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
     } as Record<Owner, number>,
     log: [logMsg],
     winner: null,
+    battleStats: initBattleStatsFromUnits(units),
     ...snapshotActiveUnitPackagesForSave(),
   };
 }
@@ -2158,6 +2231,7 @@ export function createStoryState(story: StoryDef): GameState {
     productionPoints: { [PLAYER]: ppPlayer, [AI]: ppAi } as Record<Owner, number>,
     log: [logMsg],
     winner: null,
+    battleStats: initBattleStatsFromUnits(units),
     ...snapshotActiveUnitPackagesForSave(),
   };
 }
@@ -2176,7 +2250,9 @@ export function playerPlaceUnit(state: GameState, col: number, row: number, unit
     return state;
   }
 
-  const unitType = config.unitTypes.find(u => u.id === unitTypeId);
+  const unitType =
+    getAvailableUnitTypes(localPlayer).find(u => u.id === unitTypeId) ??
+    config.unitTypes.find(u => u.id === unitTypeId);
   if (!unitType) return state;
 
   if (state.productionPoints[localPlayer] < unitType.cost) {
@@ -2186,6 +2262,7 @@ export function playerPlaceUnit(state: GameState, col: number, row: number, unit
 
   state.productionPoints[localPlayer] -= unitType.cost;
   state.units.push(makeUnit(localPlayer, col, row, unitType.id));
+  normalizeBattleStats(state)[localPlayer].unitsDeployed++;
   conquerHex(state, col, row, localPlayer);
   log(state, `Placed ${unitType.name} at (${col}, ${row}). PP: ${state.productionPoints[localPlayer]}.`);
   return state;
@@ -2430,6 +2507,7 @@ export function aiProduction(state: GameState): GameState {
 
     state.productionPoints[AI] -= best.ut.cost;
     state.units.push(makeUnit(AI, best.col, best.row, best.ut.id));
+    normalizeBattleStats(state)[AI].unitsDeployed++;
     conquerHex(state, best.col, best.row, AI);
     log(state, `AI placed ${best.ut.name} at (${best.col}, ${best.row}). PP: ${state.productionPoints[AI]}.`);
     placed++;

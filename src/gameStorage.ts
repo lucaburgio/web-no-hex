@@ -1,4 +1,5 @@
 import config from './gameconfig';
+import { normalizeBattleStats } from './game';
 import type { GameState } from './types';
 
 const STORAGE_KEY = 'web-strategic-save';
@@ -59,7 +60,10 @@ export function loadGameState(): GameState | null {
       if (unit.upgradeFlanking == null) unit.upgradeFlanking = 0;
       if (unit.upgradeAttack == null) unit.upgradeAttack = 0;
       if (unit.upgradeDefense == null) unit.upgradeDefense = 0;
+      if (unit.upgradeHeal == null) unit.upgradeHeal = 0;
     }
+
+    normalizeBattleStats(state);
 
     return state;
   } catch (error) {

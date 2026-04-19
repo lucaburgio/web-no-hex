@@ -574,16 +574,30 @@
     </div>
   </div>
 
-  <!-- End-of-match (vs AI + multiplayer): one screen, GSAP intro from mpResultOverlay.ts -->
+  <!-- End-of-match (vs AI + multiplayer): flat tactical summary + stats -->
   <div id="game-end-overlay" class="hidden" aria-live="polite">
     <div id="game-end-inner">
-      <p id="game-end-msg"></p>
-      <p id="game-end-subtitle"></p>
-      <div id="game-end-actions">
+      <div class="game-end-hero">
+        <div id="game-end-icon" class="game-end-icon" aria-hidden="true">
+          <img width="42" height="42" viewBox="0 0 28 28" src="icons/logo-icon.svg" xmlns="http://www.w3.org/2000/svg"></img>
+        </div>
+        <p id="game-end-kicker" class="game-end-kicker"></p>
+        <h1 id="game-end-title" class="game-end-title"></h1>
+        <p id="game-end-subtitle" class="game-end-subtitle"></p>
+      </div>
+      <div id="game-end-stats" class="game-end-stats">
+        <div class="game-end-stats-bar">
+          <span class="game-end-stats-bar-label">Stats</span>
+          <span id="game-end-col-you" class="game-end-stats-bar-col">You</span>
+          <span id="game-end-col-enemy" class="game-end-stats-bar-col">Enemy</span>
+        </div>
+        <div id="game-end-stats-rows" class="game-end-stats-rows"></div>
+      </div>
+      <div id="game-end-actions" class="game-end-actions">
         <button type="button" id="game-end-restart-btn" class="button-primary">Back to menu</button>
         <button type="button" id="game-end-next-story-btn" class="button-primary hidden">Next story</button>
-        <button type="button" id="game-end-back-menu-btn" class="button-secondary hidden">Back to menu</button>
-        <button type="button" id="game-end-recap-btn" class="button-secondary">View Replay</button>
+        <button type="button" id="game-end-back-menu-btn" class="button-primary hidden">Back to menu</button>
+        <button type="button" id="game-end-recap-btn" class="button-secondary">Replay</button>
       </div>
     </div>
   </div>

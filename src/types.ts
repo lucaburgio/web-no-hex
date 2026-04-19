@@ -55,21 +55,37 @@ export interface Unit {
   movement: number;
   /** Accumulated upgrade points from dealing damage and scoring kills (see gameconfig). */
   upgradePoints: number;
-  /** Stacks of the flanking upgrade (+CS when attacking with max flankers). */
+  /** Stacks of the flanking upgrade (+CS per contributing flanker when attacking). */
   upgradeFlanking: number;
   /** Stacks of the attack upgrade (+CS when attacking). */
   upgradeAttack: number;
   /** Stacks of the defense upgrade (+CS when defending). */
   upgradeDefense: number;
+  /** Stacks of the healing upgrade (+HP to end-of-turn heal on own territory per stack). */
+  upgradeHeal: number;
 }
 
 /** Per-level upgrade choice (movement-phase level-up picker). */
-export type UnitUpgradeKind = 'flanking' | 'attack' | 'defense';
+export type UnitUpgradeKind = 'flanking' | 'attack' | 'defense' | 'heal';
 
 export interface HexState {
   owner: Owner;
   stableFor: number;
   isProduction: boolean;
+}
+
+/** Cumulative combat and deployment stats per side (for end-of-match screen). */
+export interface BattleStatsSide {
+  /** HP damage dealt to enemy units (combat). */
+  damageDealt: number;
+  /** HP damage taken from enemy attacks (combat). */
+  damageTaken: number;
+  /** Enemy units this side destroyed. */
+  enemyUnitsDestroyed: number;
+  /** Own units lost. */
+  unitsLost: number;
+  /** Units spawned: starting roster plus every production placement. */
+  unitsDeployed: number;
 }
 
 export interface GameState {
@@ -109,6 +125,8 @@ export interface GameState {
   winner: Owner | null;
   /** Reason the match ended; set alongside {@link winner}. */
   winReason?: WinReason;
+  /** Match statistics; omitted in older saves — normalized on load. */
+  battleStats?: Record<Owner, BattleStatsSide>;
 }
 
 /** One AI turn animation step, in chronological order (same order as aiMovement resolves). */
@@ -340,10 +358,12 @@ export interface GameConfig {
   upgradePointsKillBonus: number;
   /** Per stack: multiplier added to CS when attacking (upgrade choice). */
   upgradeBonusAttackPerStack: number;
-  /** Per stack: extra multiplier when attacking with max flankers adjacent to defender. */
+  /** Per stack: CS multiplier added per contributing flanker when attacking (capped by maxFlankingUnits). */
   upgradeBonusFlankingPerStack: number;
   /** Per stack: multiplier added to CS when defending. */
   upgradeBonusDefensePerStack: number;
+  /** Per stack: extra HP healed at end of turn on own territory (added to healOwnTerritory). */
+  upgradeBonusHealPerStack: number;
   /** Tank melee: additive fraction to attacker CS when the approach uses the full movement allowance in one charge (path steps = movement, from rest that turn). */
   tankSpearheadAttackBonus: number;
   autoEndProduction: boolean;

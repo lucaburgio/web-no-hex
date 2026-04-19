@@ -123,6 +123,7 @@ const config: GameConfig = {
   unitTypes: [
     {
       id: 'infantry',
+      unitClass: 'infantry',
       name: 'Infantry',
       cost: 20,
       movement: 1,
@@ -134,6 +135,7 @@ const config: GameConfig = {
     },
     {
       id: 'tank',
+      unitClass: 'tank',
       name: 'Tank',
       cost: 40,
       movement: 2,
@@ -146,6 +148,7 @@ const config: GameConfig = {
     },
     {
       id: 'artillery',
+      unitClass: 'artillery',
       name: 'Artillery',
       cost: 34,
       movement: 1,
@@ -162,6 +165,7 @@ const config: GameConfig = {
 
     {
       id: 'infantry',
+      unitClass: 'infantry',
       name: 'US Marines',
       cost: 20,
       movement: 1,
@@ -173,6 +177,7 @@ const config: GameConfig = {
     },
     {
       id: 'tank',
+      unitClass: 'tank',
       name: 'Sherman Tank',
       cost: 40,
       movement: 2,
@@ -185,6 +190,7 @@ const config: GameConfig = {
     },
     {
       id: 'artillery',
+      unitClass: 'artillery',
       name: 'M2 105mm Howitzer',
       cost: 34,
       movement: 1,
@@ -219,6 +225,7 @@ const config: GameConfig = {
 
     {
       id: 'infantry',
+      unitClass: 'infantry',
       name: 'Panzergrenadiers',
       cost: 20,
       movement: 1,
@@ -230,6 +237,7 @@ const config: GameConfig = {
     },
     {
       id: 'tank',
+      unitClass: 'tank',
       name: 'Panzer IV',
       cost: 40,
       movement: 2,
@@ -255,6 +263,7 @@ const config: GameConfig = {
     },
     {
       id: 'artillery',
+      unitClass: 'artillery',
       name: 'LEFH 18',
       cost: 34,
       movement: 1,
@@ -275,6 +284,7 @@ const config: GameConfig = {
 
     {
       id: 'infantry',
+      unitClass: 'infantry',
       name: 'Conscript Squad',
       cost: 20,
       movement: 1,
@@ -286,6 +296,7 @@ const config: GameConfig = {
     },
     {
       id: 'tank',
+      unitClass: 'tank',
       name: 'T34 Tank',
       cost: 36,
       movement: 2,
@@ -298,6 +309,7 @@ const config: GameConfig = {
     },
     {
       id: 'artillery',
+      unitClass: 'artillery',
       name: 'ML20 152mm Howitzer',
       cost: 34,
       movement: 1,
@@ -317,6 +329,7 @@ const config: GameConfig = {
 
     {
       id: 'infantry',
+      unitClass: 'infantry',
       name: 'Imperial Guard',
       cost: 20,
       movement: 1,
@@ -328,6 +341,7 @@ const config: GameConfig = {
     },
     {
       id: 'tank',
+      unitClass: 'tank',
       name: 'Type 97 Chi-Ha Tank',
       cost: 34,
       movement: 2,
@@ -340,6 +354,7 @@ const config: GameConfig = {
     },
     {
       id: 'artillery',
+      unitClass: 'artillery',
       name: 'Type 91 Howitzer',
       cost: 34,
       movement: 1,
@@ -385,10 +400,13 @@ const config: GameConfig = {
   upgradePointsPerDamageDealt: 1,
   upgradePointsKillBonus: 1,
 
-  // Per-level upgrade combat multipliers (stack when the same upgrade is chosen again)
+  // Per-level upgrade bonuses (stack when the same upgrade is chosen again)
   upgradeBonusAttackPerStack: 0.05,
+  /** CS fraction per flanker when attacking (× flank count, capped by maxFlankingUnits). */
   upgradeBonusFlankingPerStack: 0.05,
   upgradeBonusDefensePerStack: 0.1,
+  /** Added to healOwnTerritory for end-of-turn heal on own territory. */
+  upgradeBonusHealPerStack: 1,
 
   // ── Automation ───────────────────────────────────────────────────────────────
 
