@@ -2419,6 +2419,10 @@ function broadcastSettingsPreview(): void {
   const isConquest = gameMode === 'conquest';
   const isBreakthrough = gameMode === 'breakthrough';
 
+  // Mirror exactly what P1 sees: check which sections are visible in the settings overlay
+  const showRulesDetail = !document.getElementById('settings-rules-detail')?.classList.contains('hidden');
+  const showBoard = !document.getElementById('settings-board-section')?.classList.contains('hidden');
+
   const items: SettingsPreviewItem[] = [];
   const sec = (title: string): void => { items.push({ kind: 'section', title }); };
   const row = (label: string, value: string): void => { items.push({ kind: 'row', label, value }); };
@@ -2447,37 +2451,41 @@ function broadcastSettingsPreview(): void {
     row('Starting units (host)', v('cfg-startingUnitsPlayer1'));
   }
 
-  sec('BOARD');
-  row('Width', v('cfg-boardCols'));
-  row('Height', v('cfg-boardRows'));
+  if (showBoard) {
+    sec('BOARD');
+    row('Width', v('cfg-boardCols'));
+    row('Height', v('cfg-boardRows'));
+  }
 
-  sec('TERRAIN');
-  row('Mountain hexes (%)', v('cfg-mountainPct'));
-  row('Rivers', tog('cfg-enableRivers'));
-  row('Max river length (%)', v('cfg-riverMaxLengthBoardWidthMult'));
+  if (showRulesDetail) {
+    sec('TERRAIN');
+    row('Mountain hexes (%)', v('cfg-mountainPct'));
+    row('Rivers', tog('cfg-enableRivers'));
+    row('Max river length (%)', v('cfg-riverMaxLengthBoardWidthMult'));
 
-  sec('ECONOMY');
-  row('PP per turn (host)', v('cfg-productionPointsPerTurn'));
-  row('PP per turn (you)', v('cfg-productionPointsPerTurnAi'));
-  row('Territory quota (hexes)', v('cfg-territoryQuota'));
-  row('Bonus PP per quota', v('cfg-pointsPerQuota'));
-  row('Turns to production hex', v('cfg-productionTurns'));
-  row('Production safe distance', v('cfg-productionSafeDistance'));
+    sec('ECONOMY');
+    row('PP per turn (host)', v('cfg-productionPointsPerTurn'));
+    row('PP per turn (you)', v('cfg-productionPointsPerTurnAi'));
+    row('Territory quota (hexes)', v('cfg-territoryQuota'));
+    row('Bonus PP per quota', v('cfg-pointsPerQuota'));
+    row('Turns to production hex', v('cfg-productionTurns'));
+    row('Production safe distance', v('cfg-productionSafeDistance'));
 
-  sec('COMBAT');
-  row('Flanking bonus (%)', v('cfg-flankingBonus'));
-  row('Max flanking units', v('cfg-maxFlankingUnits'));
-  row('Zone of control', tog('cfg-zoneOfControl'));
-  row('Limit artillery', tog('cfg-limitArtillery'));
+    sec('COMBAT');
+    row('Flanking bonus (%)', v('cfg-flankingBonus'));
+    row('Max flanking units', v('cfg-maxFlankingUnits'));
+    row('Zone of control', tog('cfg-zoneOfControl'));
+    row('Limit artillery', tog('cfg-limitArtillery'));
 
-  sec('HEALING');
-  row('HP/turn on own territory', v('cfg-healOwnTerritory'));
+    sec('HEALING');
+    row('HP/turn on own territory', v('cfg-healOwnTerritory'));
 
-  if (isBreakthrough) {
-    sec('BREAKTHROUGH RULES');
-    row('Attacker starting PP', v('cfg-breakthroughAttackerStartingPP'));
-    row('Defender str. in captured sector (%)', v('cfg-breakthroughEnemySectorStrengthMult'));
-    row('PP bonus per captured sector', v('cfg-breakthroughSectorCaptureBonusPP'));
+    if (isBreakthrough) {
+      sec('BREAKTHROUGH RULES');
+      row('Attacker starting PP', v('cfg-breakthroughAttackerStartingPP'));
+      row('Defender str. in captured sector (%)', v('cfg-breakthroughEnemySectorStrengthMult'));
+      row('PP bonus per captured sector', v('cfg-breakthroughSectorCaptureBonusPP'));
+    }
   }
 
   sec('AUTOMATION');
