@@ -1917,6 +1917,7 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
     const next = Math.min(idx + 1, modeIds.length - 1);
     if (next === idx) return;
     selectMode(modeIds[next]!, { animated: true, direction: 1 });
+    broadcastSettingsPreview();
     return;
   }
   if (e.key === 'ArrowLeft') {
@@ -1924,6 +1925,7 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
     const prev = Math.max(idx - 1, 0);
     if (prev === idx) return;
     selectMode(modeIds[prev]!, { animated: true, direction: -1 });
+    broadcastSettingsPreview();
   }
 });
 
