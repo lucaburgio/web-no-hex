@@ -2405,8 +2405,8 @@ function broadcastSettingsPreview(): void {
 
   const rows: SettingsPreviewRow[] = [
     { label: 'Rules', value: presetEl?.options[presetEl.selectedIndex]?.text ?? 'Standard' },
-    { label: 'Unit package P1', value: pkgEl?.value || 'standard' },
-    { label: 'Unit package P2', value: pkgEl2?.value || 'standard' },
+    { label: 'Host unit package', value: pkgEl?.value || 'standard' },
+    { label: 'Your unit package', value: pkgEl2?.value || 'standard' },
     { label: 'Map', value: mapEl?.options[mapEl.selectedIndex]?.text ?? '[generate]' },
   ];
 
@@ -2415,8 +2415,8 @@ function broadcastSettingsPreview(): void {
     const cp1El = document.getElementById('cfg-conquestPointsPlayer') as HTMLInputElement;
     const cp2El = document.getElementById('cfg-conquestPointsAi') as HTMLInputElement;
     if (cpEl) rows.push({ label: 'Control points', value: cpEl.value });
-    if (cp1El) rows.push({ label: 'Conquer pts P1', value: cp1El.value });
-    if (cp2El) rows.push({ label: 'Conquer pts P2', value: cp2El.value });
+    if (cp1El) rows.push({ label: 'Conquer pts host', value: cp1El.value });
+    if (cp2El) rows.push({ label: 'Your conquer pts', value: cp2El.value });
   } else if (gameMode === 'breakthrough') {
     const roleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement;
     const randEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement;
