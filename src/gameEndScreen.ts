@@ -61,6 +61,9 @@ export function hideGameEndScreen(): void {
   revertMpResultIntro();
   overlayEl.classList.add('hidden');
   configureStoryEndButtons(false, false);
+  gameEndRestartBtn.classList.remove('hidden');
+  gameEndRecapBtn.classList.remove('hidden');
+  gameEndBackMenuBtn.classList.add('secondary');
 }
 
 /** Hide only for replay; preserves GSAP state so closing recap can restore without replaying intro. */
@@ -86,6 +89,10 @@ export function showGameEndScreenForOutcome(won: boolean, reason?: WinReason): v
 
 export function showGameEndScreenDisconnected(): void {
   msgEl.textContent = 'opponent disconnected';
+  subtitleEl.textContent = '';
+  gameEndRestartBtn.classList.add('hidden');
+  gameEndRecapBtn.classList.add('hidden');
+  gameEndBackMenuBtn.classList.remove('hidden', 'secondary');
   if (!overlayEl.classList.contains('hidden')) return;
   overlayEl.classList.remove('hidden');
   playMpResultIntro(DEFAULT_MP_RESULT_VARIANT, {
