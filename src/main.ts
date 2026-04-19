@@ -194,6 +194,7 @@ autoEndMovementEl.checked   = config.autoEndMovement;
 
 const rulesOverlayEl = document.getElementById('rules-overlay') as HTMLDivElement;
 const rulesContentEl = document.getElementById('rules-content') as HTMLDivElement;
+const headerModeLabelEl = document.getElementById('header-mode-label') as HTMLElement;
 document.getElementById('rules-btn')!.addEventListener('click', () => {
   rulesContentEl.innerHTML = buildRulesContent();
   rulesOverlayEl.classList.remove('hidden');
@@ -2559,10 +2560,26 @@ function startGame(initialState: GameState): void {
   aiTurnPendingStart = false;
   turnSnapshots = [structuredClone(state)];
   initRenderer(svg, { flipBoardY: gameMode === 'vsHuman' && localPlayer === AI });
+  updateHeaderModeLabel(initialState);
   render();
   updateUI();
   checkWinner();
   maybeAutoEnd();
+}
+
+function updateHeaderModeLabel(s: GameState): void {
+  const mode = s.gameMode;
+  const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
+
+  let mapName = '';
+  if (activeStoryIndex !== null) {
+    mapName = STORIES[activeStoryIndex]!.title;
+  } else if (config.customMatchMapId) {
+    const story = STORIES.find(st => st.id === config.customMatchMapId);
+    if (story) mapName = story.title;
+  }
+
+  headerModeLabelEl.textContent = mapName ? `${modeLabel}\n${mapName}` : modeLabel;
 }
 
 // ── Unit picker ───────────────────────────────────────────────────────────────

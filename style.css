@@ -489,20 +489,30 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   list-style: none;
 }
 
-/* ── Rules button ──────────────────────────────────────────────────────────── */
-#rules-btn {
-  background: transparent;
-  border: none;
-  padding: 0;
-  color: #23251E;
-  font-family: inherit;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  text-decoration: underline;
-  cursor: url('/icons/pointer.svg') 13 14, pointer;
-  font-weight: bold;
+/* ── Header right (mode label + rules button) ─────────────────────────────── */
+#header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
-#rules-btn:hover { opacity: 0.65; }
+
+#header-mode-label {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-gray-500);
+  text-align: right;
+  line-height: 1.3;
+  white-space: pre-line;
+}
+
+#rules-btn {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  padding: 10px 16px;
+}
 
 /* ── Unit picker ─────────────────────────────────────────────────────────────── */
 /* Must stack above #game-footer (z-index: 20). Otherwise the footer’s hit target
