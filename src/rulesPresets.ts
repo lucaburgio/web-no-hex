@@ -20,6 +20,8 @@ export type RulesPresetValues = Pick<
   | 'zoneOfControl'
   | 'limitArtillery'
   | 'healOwnTerritory'
+  | 'conquestPointsPlayer'
+  | 'conquestPointsAi'
   | 'breakthroughAttackerStartingPP'
   | 'breakthroughEnemySectorStrengthMult'
   | 'breakthroughSectorCaptureBonusPP'
@@ -50,6 +52,8 @@ function rulesValuesMatchConfig(cfg: GameConfig, p: RulesPresetValues): boolean 
     cfg.zoneOfControl === p.zoneOfControl &&
     cfg.limitArtillery === p.limitArtillery &&
     cfg.healOwnTerritory === p.healOwnTerritory &&
+    cfg.conquestPointsPlayer === p.conquestPointsPlayer &&
+    cfg.conquestPointsAi === p.conquestPointsAi &&
     cfg.breakthroughAttackerStartingPP === p.breakthroughAttackerStartingPP &&
     Math.abs(cfg.breakthroughEnemySectorStrengthMult - p.breakthroughEnemySectorStrengthMult) < FRAC_EPS &&
     cfg.breakthroughSectorCaptureBonusPP === p.breakthroughSectorCaptureBonusPP
@@ -76,6 +80,8 @@ export const RULES_PRESETS: RulesPreset[] = [
     zoneOfControl: true,
     limitArtillery: false,
     healOwnTerritory: 2,
+    conquestPointsPlayer: 14,
+    conquestPointsAi: 14,
     breakthroughAttackerStartingPP: 120,
     breakthroughEnemySectorStrengthMult: 0.5,
     breakthroughSectorCaptureBonusPP: 120,
@@ -99,6 +105,8 @@ export const RULES_PRESETS: RulesPreset[] = [
     zoneOfControl: true,
     limitArtillery: true,
     healOwnTerritory: 1,
+    conquestPointsPlayer: 10,
+    conquestPointsAi: 10,
     breakthroughAttackerStartingPP: 150,
     breakthroughEnemySectorStrengthMult: 0.45,
     breakthroughSectorCaptureBonusPP: 140,
