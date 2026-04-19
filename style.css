@@ -58,6 +58,7 @@ img {
   --color-beige-400: #c4bab7;
   --color-beige-300: #d3cbc9;
   --color-dark: #000;
+  --color-red-900: #932C2C;
   --color-red-700: #BD4E4E;
   --color-red-500: #ff6b6b;
   --color-green-500: #81e2a0;
@@ -367,27 +368,25 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   transform: translate(-50%, 100%);
   z-index: 6;
   padding: 6px 16px;
-  font-family: var(--font-mono, monospace);
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  font-size: 12px;
   text-transform: uppercase;
   white-space: nowrap;
   pointer-events: none;
 }
 
 #breakthrough-toast.toast-gray {
-  background: #9e9e9e;
-  color: #fff;
+  background: var(--color-gray-200);
+  color: var(--color-gray-600);
 }
 
 #breakthrough-toast.toast-yellow {
-  background: var(--color-yellow-500, #f5b200);
-  color: #3a2a00;
+  background: var(--color-yellow-500);
+  color: var(--color-yellow-900);
 }
 
 #breakthrough-toast.toast-red {
-  background: #d32f2f;
-  color: #fff;
+  background: var(--color-red-500);
+  color: var(--color-red-900);
 }
 
 #game-area {
