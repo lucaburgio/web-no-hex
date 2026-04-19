@@ -276,7 +276,7 @@ function territoryBonusForHexCount(hexCount: number): number {
 }
 
 /** Breakthrough: defender sector currently on the border with attacker-held sectors (frontline objective). */
-function breakthroughActiveFrontlineSectorIndex(state: GameState): number | null {
+export function breakthroughActiveFrontlineSectorIndex(state: GameState): number | null {
   if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return null;
   const att = getBreakthroughAttackerOwner(state);
   const n = state.sectorOwners.length;

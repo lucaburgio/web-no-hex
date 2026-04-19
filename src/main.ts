@@ -28,6 +28,8 @@ import {
   COLS,
   ROWS,
   getBreakthroughAttackerOwner,
+  getBreakthroughDefenderOwner,
+  breakthroughActiveFrontlineSectorIndex,
   isInEnemyZoC,
   isHexBlockedByOpponentHomeGuardOnly,
   playerApplyUnitUpgrade,
@@ -180,6 +182,7 @@ const aiConquerLabel      = document.getElementById('ai-conquer-label') as HTMLE
 const conquerBarEl = document.getElementById('conquer-bar-line') as HTMLElement;
 const conquerBarLocalEl      = conquerBarEl.querySelector('.conquer-bar-local') as HTMLElement;
 const conquerBarOpponentEl   = conquerBarEl.querySelector('.conquer-bar-opponent') as HTMLElement;
+const breakthroughToastEl = document.getElementById('breakthrough-toast') as HTMLDivElement;
 const ppTooltipEl         = document.getElementById('pp-tooltip') as HTMLDivElement;
 const unitStatTooltipEl   = document.getElementById('unit-stat-tooltip') as HTMLDivElement;
 const settingsTooltipEl   = document.getElementById('settings-tooltip') as HTMLDivElement;
@@ -4185,6 +4188,41 @@ function updateUI(): void {
   conquerBarLocalEl.style.background = localColor;
   conquerBarOpponentEl.style.flex = `${rightGrow} 1 0`;
   conquerBarOpponentEl.style.background = opponentColor;
+
+  // Breakthrough toast
+  if (isBreakthrough) {
+    const attOwner = getBreakthroughAttackerOwner(state);
+    const defOwner = getBreakthroughDefenderOwner(state);
+    const youAreAttacker = localPlayer === attOwner;
+    const activeSid = breakthroughActiveFrontlineSectorIndex(state);
+    const cpOccupation = activeSid !== null ? (state.breakthroughCpOccupation?.[activeSid] ?? 0) : 0;
+    const defUnitsOnAttackerSector = state.units.some(u => {
+      if (u.owner !== defOwner) return false;
+      const sid = state.sectorIndexByHex?.[`${u.col},${u.row}`];
+      return sid !== undefined && state.sectorOwners![sid] === attOwner;
+    });
+    let toastText: string;
+    let toastVariant: 'gray' | 'yellow' | 'red';
+    if (!youAreAttacker && defUnitsOnAttackerSector) {
+      toastText = "You lost the sector. Your units have a combat malus if they do not retreat";
+      toastVariant = 'red';
+    } else if (cpOccupation > 0) {
+      if (youAreAttacker) {
+        toastText = "We're taking the sector, keep your unit to hold it";
+      } else {
+        const turns = 2 - cpOccupation;
+        toastText = `They're taking the sector, remove their units before ${turns} turn${turns !== 1 ? 's' : ''}`;
+      }
+      toastVariant = 'yellow';
+    } else {
+      toastText = youAreAttacker ? "You're the attacker" : "You're the defender";
+      toastVariant = 'gray';
+    }
+    breakthroughToastEl.textContent = toastText;
+    breakthroughToastEl.className = `toast-${toastVariant}`;
+  } else {
+    breakthroughToastEl.className = 'hidden';
+  }
 
   const isMyTurn = state.activePlayer === localPlayer;
   const showAiWaitingStatus = gameMode === 'vsAI' && aiTurnPendingStart;
