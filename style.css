@@ -3087,7 +3087,11 @@ select.settings-input.settings-select option {
   color: var(--color-gray-500);
   padding-bottom: 10px;
   border-bottom: 1px solid rgba(0,0,0,0.12);
+  margin-top: 20px;
   margin-bottom: 4px;
+}
+#p2-waiting-settings-list > .p2-waiting-section-title:first-child {
+  margin-top: 0;
 }
 
 .p2-waiting-row {

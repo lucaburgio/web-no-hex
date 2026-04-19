@@ -2356,12 +2356,15 @@ function hideP2WaitingOverlay(): void {
   p2WaitingOverlayEl.classList.add('hidden');
 }
 
-type SettingsPreviewRow = { label: string; value: string };
+type SettingsPreviewItem =
+  | { kind: 'section'; title: string }
+  | { kind: 'row'; label: string; value: string };
+
 interface SettingsPreview {
   gameMode: string;
   modeName: string;
   modeDesc: string;
-  rows: SettingsPreviewRow[];
+  items: SettingsPreviewItem[];
 }
 
 function updateP2WaitingOverlay(preview: SettingsPreview): void {
@@ -2374,63 +2377,118 @@ function updateP2WaitingOverlay(preview: SettingsPreview): void {
   p2WaitingModeDescEl.textContent = preview.modeDesc;
 
   p2WaitingSettingsListEl.innerHTML = '';
-  const titleEl = document.createElement('div');
-  titleEl.className = 'p2-waiting-section-title';
-  titleEl.textContent = 'SETTINGS';
-  p2WaitingSettingsListEl.appendChild(titleEl);
-  for (const row of preview.rows) {
-    const rowEl = document.createElement('div');
-    rowEl.className = 'p2-waiting-row';
-    const labelEl = document.createElement('span');
-    labelEl.className = 'p2-waiting-row-label';
-    labelEl.textContent = row.label;
-    const valueEl = document.createElement('span');
-    valueEl.className = 'p2-waiting-row-value';
-    valueEl.textContent = row.value;
-    rowEl.appendChild(labelEl);
-    rowEl.appendChild(valueEl);
-    p2WaitingSettingsListEl.appendChild(rowEl);
+  for (const item of preview.items) {
+    if (item.kind === 'section') {
+      const el = document.createElement('div');
+      el.className = 'p2-waiting-section-title';
+      el.textContent = item.title;
+      p2WaitingSettingsListEl.appendChild(el);
+    } else {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'p2-waiting-row';
+      const labelEl = document.createElement('span');
+      labelEl.className = 'p2-waiting-row-label';
+      labelEl.textContent = item.label;
+      const valueEl = document.createElement('span');
+      valueEl.className = 'p2-waiting-row-value';
+      valueEl.textContent = item.value;
+      rowEl.appendChild(labelEl);
+      rowEl.appendChild(valueEl);
+      p2WaitingSettingsListEl.appendChild(rowEl);
+    }
   }
 }
 
 function broadcastSettingsPreview(): void {
   if (!ws || ws.readyState !== WebSocket.OPEN || localPlayer !== PLAYER) return;
+
+  const v = (id: string): string =>
+    (document.getElementById(id) as HTMLInputElement | null)?.value ?? '';
+  const selectText = (id: string): string => {
+    const el = document.getElementById(id) as HTMLSelectElement | null;
+    return el?.options[el.selectedIndex]?.text ?? '';
+  };
+  const tog = (id: string): string => {
+    const t = settingsOnOffToggles.get(id);
+    return t ? (t.getValue() ? 'ON' : 'OFF') : '';
+  };
+
   const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
   const gameMode = gameModeEl?.value ?? 'domination';
   const modeDef = MODE_DEFS.find(m => m.id === gameMode);
-  const pkgEl = document.getElementById('cfg-unitPackage') as HTMLSelectElement;
-  const pkgEl2 = document.getElementById('cfg-unitPackagePlayer2') as HTMLSelectElement;
-  const mapEl = document.getElementById('cfg-customMap') as HTMLSelectElement;
-  const presetEl = document.getElementById('cfg-rulesPreset') as HTMLSelectElement;
+  const isConquest = gameMode === 'conquest';
+  const isBreakthrough = gameMode === 'breakthrough';
 
-  const rows: SettingsPreviewRow[] = [
-    { label: 'Rules', value: presetEl?.options[presetEl.selectedIndex]?.text ?? 'Standard' },
-    { label: 'Host unit package', value: pkgEl?.value || 'standard' },
-    { label: 'Your unit package', value: pkgEl2?.value || 'standard' },
-    { label: 'Map', value: mapEl?.options[mapEl.selectedIndex]?.text ?? '[generate]' },
-  ];
+  const items: SettingsPreviewItem[] = [];
+  const sec = (title: string): void => { items.push({ kind: 'section', title }); };
+  const row = (label: string, value: string): void => { items.push({ kind: 'row', label, value }); };
 
-  if (gameMode === 'conquest') {
-    const cpEl = document.getElementById('cfg-controlPointCount') as HTMLInputElement;
-    const cp1El = document.getElementById('cfg-conquestPointsPlayer') as HTMLInputElement;
-    const cp2El = document.getElementById('cfg-conquestPointsAi') as HTMLInputElement;
-    if (cpEl) rows.push({ label: 'Control points', value: cpEl.value });
-    if (cp1El) rows.push({ label: 'Conquer pts host', value: cp1El.value });
-    if (cp2El) rows.push({ label: 'Your conquer pts', value: cp2El.value });
-  } else if (gameMode === 'breakthrough') {
-    const roleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement;
-    const randEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement;
-    const sectEl = document.getElementById('cfg-breakthroughSectorCount') as HTMLInputElement;
-    const role = randEl?.checked ? 'Random' : (roleEl?.value ?? 'attacker');
-    rows.push({ label: 'P1 role', value: role });
-    if (sectEl) rows.push({ label: 'Sectors', value: sectEl.value });
+  sec('MATCH');
+  row('Rules', selectText('cfg-rulesPreset') || 'Standard');
+  row('Host unit package', v('cfg-unitPackage') || 'standard');
+  row('Your unit package', v('cfg-unitPackagePlayer2') || 'standard');
+  row('Map', selectText('cfg-customMap') || '[generate]');
+
+  if (isConquest) {
+    row('Control points', v('cfg-controlPointCount'));
+    row('Conquer pts host', v('cfg-conquestPointsPlayer'));
+    row('Your conquer pts', v('cfg-conquestPointsAi'));
   }
+
+  if (isBreakthrough) {
+    const roleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement | null;
+    const randEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement | null;
+    row('Sectors', v('cfg-breakthroughSectorCount'));
+    row('P1 role', randEl?.checked ? 'Random' : (roleEl?.value ?? 'attacker'));
+    row('Starting units (defender)', v('cfg-startingUnitsDefender'));
+    row('Starting units (attacker)', v('cfg-startingUnitsAttacker'));
+  } else {
+    row('Starting units (you)', v('cfg-startingUnitsPlayer2'));
+    row('Starting units (host)', v('cfg-startingUnitsPlayer1'));
+  }
+
+  sec('BOARD');
+  row('Width', v('cfg-boardCols'));
+  row('Height', v('cfg-boardRows'));
+
+  sec('TERRAIN');
+  row('Mountain hexes (%)', v('cfg-mountainPct'));
+  row('Rivers', tog('cfg-enableRivers'));
+  row('Max river length (%)', v('cfg-riverMaxLengthBoardWidthMult'));
+
+  sec('ECONOMY');
+  row('PP per turn (host)', v('cfg-productionPointsPerTurn'));
+  row('PP per turn (you)', v('cfg-productionPointsPerTurnAi'));
+  row('Territory quota (hexes)', v('cfg-territoryQuota'));
+  row('Bonus PP per quota', v('cfg-pointsPerQuota'));
+  row('Turns to production hex', v('cfg-productionTurns'));
+  row('Production safe distance', v('cfg-productionSafeDistance'));
+
+  sec('COMBAT');
+  row('Flanking bonus (%)', v('cfg-flankingBonus'));
+  row('Max flanking units', v('cfg-maxFlankingUnits'));
+  row('Zone of control', tog('cfg-zoneOfControl'));
+  row('Limit artillery', tog('cfg-limitArtillery'));
+
+  sec('HEALING');
+  row('HP/turn on own territory', v('cfg-healOwnTerritory'));
+
+  if (isBreakthrough) {
+    sec('BREAKTHROUGH RULES');
+    row('Attacker starting PP', v('cfg-breakthroughAttackerStartingPP'));
+    row('Defender str. in captured sector (%)', v('cfg-breakthroughEnemySectorStrengthMult'));
+    row('PP bonus per captured sector', v('cfg-breakthroughSectorCaptureBonusPP'));
+  }
+
+  sec('AUTOMATION');
+  row('Auto-end production', tog('cfg-autoEndProduction'));
+  row('Auto-end movement', tog('cfg-autoEndMovement'));
 
   const preview: SettingsPreview = {
     gameMode,
     modeName: modeDef?.name ?? gameMode.toUpperCase(),
     modeDesc: modeDef?.desc ?? '',
-    rows,
+    items,
   };
   ws.send(JSON.stringify({ type: 'settings-preview', ...preview }));
 }
