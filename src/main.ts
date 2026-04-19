@@ -4565,3 +4565,20 @@ recapCloseBtn.addEventListener('click', () => {
 
 loadIconDefs(config.unitTypes.map(t => t.icon).filter((i): i is string => !!i));
 showMainMenu();
+
+// ── Dev shortcuts (URL param ?dev=<screen>) ───────────────────────────────────
+(function applyDevScreen() {
+  const dev = new URLSearchParams(window.location.search).get('dev');
+  if (!dev) return;
+  switch (dev) {
+    case 'winner':
+      showGameEndScreenForOutcome(true, 'dom_breakthrough');
+      break;
+    case 'loser':
+      showGameEndScreenForOutcome(false, 'dom_annihilation');
+      break;
+    case 'disconnected':
+      showGameEndScreenDisconnected();
+      break;
+  }
+})();
