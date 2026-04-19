@@ -66,7 +66,7 @@ export function hideGameEndScreen(): void {
   gameEndRestartBtn.classList.remove('hidden');
   gameEndRecapBtn.classList.remove('hidden');
   gameEndBackMenuBtn.classList.remove('button-primary');
-  gameEndBackMenuBtn.classList.add('menu-btn', 'secondary');
+  gameEndBackMenuBtn.classList.add('button-secondary');
 }
 
 /** Hide only for replay; preserves GSAP state so closing recap can restore without replaying intro. */
@@ -97,7 +97,7 @@ export function showGameEndScreenDisconnected(): void {
   subtitleEl.textContent = '';
   gameEndRestartBtn.classList.add('hidden');
   gameEndRecapBtn.classList.add('hidden');
-  gameEndBackMenuBtn.classList.remove('hidden', 'menu-btn', 'secondary');
+  gameEndBackMenuBtn.classList.remove('hidden', 'button-secondary');
   gameEndBackMenuBtn.classList.add('button-primary');
   if (!overlayEl.classList.contains('hidden')) return;
   overlayEl.classList.remove('hidden');

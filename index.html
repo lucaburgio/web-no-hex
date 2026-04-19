@@ -551,8 +551,8 @@
   <div id="p2-waiting-overlay" class="hidden">
     <div id="p2-waiting-left">
       <div id="p2-waiting-top-bar">
-        <button id="p2-waiting-back-btn" class="back-link"><img src="icons/back-arrow.svg" alt="" class="back-arrow-icon"> BACK</button>
-        <span class="settings-group-title">GAME LOBBY</span>
+        <button id="p2-waiting-back-btn" class="back-link"><img src="icons/back-arrow.svg" alt="" class="back-arrow-icon"> DISCONNECT</button>
+        <span id="settings-mp-status">GAME LOBBY</span>
       </div>
       <div id="p2-waiting-mode-group">
         <div id="p2-waiting-mode-display">
@@ -568,7 +568,7 @@
       </div>
     </div>
     <div id="p2-waiting-right">
-      <div id="p2-waiting-status">Waiting for host to configure the match…</div>
+      <div class="settings-note neutral">Waiting for host to configure and start the match…</div>
       <div id="p2-waiting-settings-list"></div>
     </div>
   </div>
@@ -579,10 +579,10 @@
       <p id="game-end-msg"></p>
       <p id="game-end-subtitle"></p>
       <div id="game-end-actions">
-        <button type="button" id="game-end-restart-btn" class="menu-btn">Restart</button>
-        <button type="button" id="game-end-next-story-btn" class="menu-btn hidden">Next story</button>
-        <button type="button" id="game-end-back-menu-btn" class="menu-btn secondary hidden">Back to menu</button>
-        <button type="button" id="game-end-recap-btn" class="menu-btn secondary">View Replay</button>
+        <button type="button" id="game-end-restart-btn" class="button-primary">Restart</button>
+        <button type="button" id="game-end-next-story-btn" class="button-primary hidden">Next story</button>
+        <button type="button" id="game-end-back-menu-btn" class="button-secondary hidden">Back to menu</button>
+        <button type="button" id="game-end-recap-btn" class="button-secondary">View Replay</button>
       </div>
     </div>
   </div>
