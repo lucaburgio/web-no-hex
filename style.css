@@ -75,7 +75,7 @@ img {
 
     /* ── Player / AI identity colors ────────────────────────────────────────── */
     --color-player: var(--color-dark);
-    --color-ai:     #845E5E; /* gray-600 */
+    --color-ai:     #9D5555; /* gray-600 845E5E */
     /* Movement: unit has no moves left this turn (“tired”) — body + HP bar */
     --color-player-tired: #8F8F8F;
     --color-ai-tired:     #a89696;
@@ -89,7 +89,7 @@ img {
     --color-hex-selected:      var(--color-yellow-500);
     --color-hex-valid-move:    #ECDBAA;
     --color-hex-player:        var(--color-gray-200);
-    --color-hex-ai:            #C3B3B3; /* gray-100 */
+    --color-hex-ai:            #e0c5c5; /* gray-100 C3B3B3 e0c5c5 */
     /* Production phase: owned territory not in focus (replaces opacity dimming) */
     --color-hex-player-dimmed: var(--color-gray-200);
     --color-hex-ai-dimmed:     var(--color-gray-100);

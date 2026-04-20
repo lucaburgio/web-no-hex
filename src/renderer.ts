@@ -1214,7 +1214,7 @@ export function renderState(
       mountainLayer.appendChild(clipped);
     }
   }
-
+/* breakthrought sector outline border, frontline */
   const sectorOutlineLayerEl = domCache?.sectorOutlineLayer ?? (svgElement.querySelector('#sector-outline-layer') as SVGGElement | null);
   if (sectorOutlineLayerEl) {
     sectorOutlineLayerEl.innerHTML = '';
@@ -1235,9 +1235,9 @@ export function renderState(
         const pDef = svgEl('path');
         pDef.setAttribute('d', dDef);
         pDef.setAttribute('fill', 'none');
-        pDef.setAttribute('stroke', '#000');
-        pDef.setAttribute('stroke-opacity', '0.1');
-        pDef.setAttribute('stroke-width', '3.5');
+        pDef.setAttribute('stroke', 'var(--color-ai)');
+        pDef.setAttribute('stroke-opacity', '0.3');
+        pDef.setAttribute('stroke-width', '2.5');
         pDef.setAttribute('stroke-linejoin', 'round');
         pDef.setAttribute('stroke-linecap', 'round');
         pDef.setAttribute('pointer-events', 'none');
@@ -1249,8 +1249,8 @@ export function renderState(
         const path = svgEl('path');
         path.setAttribute('d', d);
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', 'rgba(15,15,18,0.72)');
-        path.setAttribute('stroke-width', '3.5');
+        path.setAttribute('stroke', 'var(--color-dark)');
+        path.setAttribute('stroke-width', '2.5');
         path.setAttribute('stroke-linejoin', 'round');
         path.setAttribute('stroke-linecap', 'round');
         path.setAttribute('pointer-events', 'none');
@@ -1281,7 +1281,7 @@ export function renderState(
         }
       }
       ring.setAttribute('stroke', ringStroke);
-      ring.setAttribute('stroke-width', state.gameMode === 'breakthrough' ? '3.5' : '2.5');
+      ring.setAttribute('stroke-width', state.gameMode === 'breakthrough' ? '2.5' : '2.5');
       ring.setAttribute('stroke-linejoin', 'round');
       ring.setAttribute('pointer-events', 'none');
       ring.setAttribute('class', 'control-point-ring');
