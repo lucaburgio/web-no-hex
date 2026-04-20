@@ -169,7 +169,7 @@ img {
 body {
   background: var(--color-bg);
   text-rendering:geometricPrecision;
-  color: #cccccc;
+  color: var(--color-gray-200);
   font-family: 'Disket Mono', 'Courier New', monospace;
   min-height: 100vh;
   font-size: 14px;
@@ -1180,7 +1180,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #game-end-overlay {
   position: fixed;
   inset: 0;
-  background: #f2f2f2;
+  background: var(--color-bg);
   color: #0a0a0a;
   display: flex;
   align-items: center;
@@ -1208,6 +1208,19 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 .game-end-hero {
   text-align: center;
+  animation: game-end-hero-enter 3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes game-end-hero-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-80px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .game-end-icon {
@@ -1215,6 +1228,20 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   justify-content: center;
   margin-bottom: 40px;
   color: #0a0a0a;
+  animation: game-end-icon-enter 1.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes game-end-icon-enter {
+  from {
+    opacity: 0;
+    transform: translateY(80px);
+    scale: 0.2;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    scale: 1;
+  }
 }
 
 .game-end-icon.game-end-icon--warn {
