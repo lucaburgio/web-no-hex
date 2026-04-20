@@ -1538,7 +1538,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 .rules-main {
   display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
+  grid-template-columns: 200px minmax(0, 1fr);
   gap: 0 1.5rem;
   align-items: stretch;
   min-height: 0;
@@ -1581,14 +1581,14 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 .rules-nav-link {
   font-family: 'Disket Mono', monospace;
-  font-size: 0.6rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: var(--color-gray-600);
   text-decoration: none;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   line-height: 1.25;
-  padding: 7px 10px;
+  padding: 12px;
   border-radius: 2px;
   transition: color 0.15s, background 0.15s;
 }
@@ -1604,9 +1604,21 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   scroll-behavior: smooth;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 80px;
   padding: 4px 4px 12px 8px;
   -webkit-overflow-scrolling: touch;
+}
+
+.rules-group-title {
+  font-family: 'Disket Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-gray-600);
+  background: var(--color-gray-100);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  padding: 8px 16px;
+  margin-bottom: 20px;
 }
 
 .rules-anchor-section {
@@ -1615,7 +1627,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 #rules-modal .rules-section--tight {
   margin-top: 1.25rem;
-  padding-top: 1rem;
+  padding-top: 80px;
   border-top: 1px dashed rgba(0, 0, 0, 0.1);
 }
 
@@ -1698,11 +1710,6 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   margin: 0 0 0.5rem;
 }
 
-.rules-prose--lead {
-  margin-bottom: 1rem;
-  color: var(--color-gray-500);
-}
-
 .rules-prose--muted {
   color: var(--color-gray-400);
   font-style: normal;
@@ -1754,13 +1761,14 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   right: 20px;
   z-index: 1;
   width: auto;
-  min-width: 88px;
-  padding: 10px 16px !important;
   font-family: 'Disket Mono', monospace;
-  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  flex-shrink: 0;
+  min-width: 88px;
+  padding: 10px 16px;
+  font-size: 0.7rem;
 }
 
 /* Dynamic unit roster (top of rules) */
@@ -1787,19 +1795,21 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 .rules-unit-row {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px;
+  align-items: center;
+  gap: 20px;
+  padding: 18px;
   background: var(--color-gray-100);
-  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .rules-unit-icon {
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
   object-fit: contain;
   display: block;
+  background: rgba(0, 0, 0, 0.1);
+  height: 40px;
+  width: 40px;
+  padding: 10px;
+  border-radius: 12px;
 }
 
 .rules-unit-body {
@@ -1817,7 +1827,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   color: var(--color-dark);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  line-height: 1.2;
+  line-height: 2;
 }
 
 .rules-unit-stats {
@@ -1834,7 +1844,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   font-family: 'Disket Mono', monospace;
   font-size: 0.62rem;
   font-weight: 700;
-  color: var(--color-gray-600);
+  color: var(--color-dark);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -1851,7 +1861,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 .rules-unit-stat--extra {
-  color: var(--color-green-700);
+  color: var(--color-gray-500);
 }
 
 .rules-units-split {
@@ -1871,10 +1881,12 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   font-family: 'Disket Mono', monospace;
   font-size: 0.68rem;
   font-weight: 700;
+  background: var(--color-gray-150);
   color: var(--color-dark);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   margin-bottom: 8px;
+  padding: 8px;
 }
 
 /* ── Main menu overlay ────────────────────────────────────────────────────── */

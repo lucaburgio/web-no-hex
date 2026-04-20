@@ -2098,7 +2098,7 @@ function buildUnitRowHtml(u: UnitType): string {
       <div class="rules-unit-body">
         <div class="rules-unit-name">${escapeHtmlRules(u.name)}</div>
         <div class="rules-unit-stats">
-          <span class="rules-unit-stat"><img src="icons/points-yellow.svg" alt="" width="14" height="14" /> ${u.cost} PP</span>
+          <span class="rules-unit-stat"><img src="icons/points.svg" alt="" width="14" height="14" /> ${u.cost} PP</span>
           <span class="rules-unit-stat"><img src="icons/movement.svg" alt="" width="14" height="14" /> Move ${u.movement}</span>
           <span class="rules-unit-stat"><img src="icons/strength.svg" alt="" width="14" height="14" /> Str ${u.strength}</span>
           <span class="rules-unit-stat"><img src="icons/hp.svg" alt="" width="14" height="14" /> ${u.maxHp} HP</span>
@@ -2171,7 +2171,6 @@ function buildRulesContent(): string {
   return `
     <div class="rules-layout">
     <div class="rules-sheet-head">
-      <div class="settings-group-title rules-eyebrow">REFERENCE</div>
       <div class="rules-title">FULL RULES</div>
     </div>
 
@@ -2195,15 +2194,15 @@ function buildRulesContent(): string {
     <div class="rules-doc" tabindex="-1">
     <section id="rules-units" class="rules-anchor-section">
       <div class="settings-group rules-section">
-      <div class="settings-group-title">Units in this match</div>
-      <p class="rules-prose rules-prose--lead">Production and combat use the stats below. Asymmetric matches list separate rosters for south and north.</p>
+      <div class="rules-group-title">Units in this match</div>
+      <p class="rules-prose rules-prose">Production and combat use the stats below. Asymmetric matches list separate rosters for south and north.</p>
       ${buildMatchUnitsRosterHtml()}
       </div>
     </section>
 
     <section id="rules-overview" class="rules-anchor-section">
       <div class="settings-group rules-section">
-      <div class="settings-group-title">Overview</div>
+      <div class="rules-group-title">Overview</div>
       <p class="rules-prose">Turn-based hex strategy on a ${config.boardCols}×${config.boardRows} grid.
          You play from the south (bottom row); the opponent plays from the north (top row).
          In custom match settings you can pick a <strong>map layout</strong> from maps that define both Conquest and Breakthrough control points in the map editor; otherwise the board is randomly generated.</p>
@@ -2212,7 +2211,7 @@ function buildRulesContent(): string {
 
     <section id="rules-turn-phases" class="rules-anchor-section">
       <div class="settings-group rules-section">
-      <div class="settings-group-title">Turn phases</div>
+      <div class="rules-group-title">Turn phases</div>
       <ol class="rules-list rules-list--ol">
         <li><strong>Production</strong> — spend PP to place units.</li>
         <li><strong>Movement</strong> — move each of your units up to its movement range.</li>
@@ -2223,7 +2222,7 @@ function buildRulesContent(): string {
 
     <section id="rules-production" class="rules-anchor-section">
       <div class="settings-group rules-section">
-      <div class="settings-group-title">Production</div>
+      <div class="rules-group-title">Production</div>
       <ul class="rules-list">
       <li>Each turn you earn <strong>${config.productionPointsPerTurn} PP</strong> (production points).</li>
       <li><strong>Breakthrough:</strong> the <strong>southern attacker</strong> does not receive PP after the match starts (only the configured starting pool). The <strong>northern defender</strong> earns PP each turn as above.</li>
@@ -2245,7 +2244,7 @@ function buildRulesContent(): string {
 
     <section id="rules-movement" class="rules-anchor-section">
       <div class="settings-group rules-section">
-      <div class="settings-group-title">Movement</div>
+      <div class="rules-group-title">Movement</div>
       <ul class="rules-list">
       <li>Each unit may move up to its movement range per turn (see <strong>Units in this match</strong>). Moving onto an empty hex <strong>conquers</strong> it.</li>
       <li>Moving onto an enemy unit triggers <strong>combat</strong>. If you need more than one hex to reach them, you move along the path into the hex adjacent to the enemy first, then combat resolves.</li>
@@ -2259,7 +2258,7 @@ function buildRulesContent(): string {
 
     <section id="rules-combat" class="rules-anchor-section">
       <div class="settings-group rules-section">
-      <div class="settings-group-title">Combat</div>
+      <div class="rules-group-title">Combat</div>
       <ul class="rules-list">
       <li><strong>Adjacent combat:</strong> both sides deal damage <strong>simultaneously</strong>. If the defender is destroyed, the attacker advances and conquers the hex.</li>
       <li><strong>Artillery ranged (2+ hexes):</strong> only the defender takes damage (no return fire). Destroying a unit with a ranged attack does <strong>not</strong> move the artillery or conquer that hex.</li>
@@ -2279,7 +2278,7 @@ function buildRulesContent(): string {
 
     <!-- Keep in sync with effectiveCS, resolveCombat, forecastCombat in game.ts and combat-related keys in gameconfig.ts -->
       <div class="settings-group rules-section rules-section--tight">
-      <div class="settings-group-title">Combat in detail</div>
+      <div class="rules-group-title">Combat in detail</div>
       <p class="rules-prose"><strong>Base strength</strong> (integer on the unit) is only the starting stat from the unit type. <strong>Effective combat strength (CS)</strong> multiplies that base by modifiers below. The engine uses full-precision numbers; the combat forecast shows <strong>CS to one decimal place</strong>.</p>
       <p class="rules-prose"><strong>Effective CS</strong> = base strength × breakthrough sector mult × condition mult × flank mult × upgrade mult × river defense mult (when that role applies) × tank spearhead mult (attacking tank only, when applicable).</p>
       <ul class="rules-list">
@@ -2296,7 +2295,7 @@ function buildRulesContent(): string {
 
     <section id="rules-healing" class="rules-anchor-section">
       <div class="settings-group rules-section">
-      <div class="settings-group-title">Healing</div>
+      <div class="rules-group-title">Healing</div>
       <ul class="rules-list">
       <li>Units that did <strong>not</strong> fight this turn heal at end of turn.</li>
       <li>Base <strong>+${config.healOwnTerritory} HP</strong> on <strong>own territory</strong>, plus <strong>+${config.upgradeBonusHealPerStack} HP</strong> per stack of the healing upgrade.</li>
@@ -2306,7 +2305,7 @@ function buildRulesContent(): string {
 
     <section id="rules-game-modes" class="rules-anchor-section">
       <div class="settings-group rules-section">
-      <div class="settings-group-title">Game modes</div>
+      <div class="rules-group-title">Game modes</div>
       <p class="rules-prose">The match mode is chosen in <strong>Game settings</strong> before play.</p>
       <ul class="rules-list">
       <li><strong>Domination:</strong> move a unit onto the <strong>opponent&rsquo;s home row</strong>, or <strong>eliminate all enemy units</strong>.</li>
