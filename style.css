@@ -1779,7 +1779,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   color: var(--color-gray-500);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin: 0 0 12px;
+  margin: 0 0 32px;
 }
 
 .rules-units-package strong {
@@ -1790,22 +1790,20 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 .rules-units-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 32px;
 }
 
 .rules-unit-row {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 18px;
-  background: var(--color-gray-100);
 }
 
 .rules-unit-icon {
   flex-shrink: 0;
   object-fit: contain;
   display: block;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.08);
   height: 40px;
   width: 40px;
   padding: 10px;
@@ -1853,7 +1851,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 .rules-unit-stat img {
   flex-shrink: 0;
   display: block;
-  opacity: 0.85;
+  opacity: 1;
 }
 
 .rules-unit-stat--lvl {
@@ -1867,26 +1865,26 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 .rules-units-split {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1.5rem;
+  gap: 4.5rem;
+  margin-top: 40px;
 }
 
 @media (min-width: 520px) {
   .rules-units-split {
     grid-template-columns: 1fr 1fr;
-    gap: 1.25rem;
+    gap: 4.5rem;
+    margin-top: 40px;
   }
 }
 
 .rules-units-faction-title {
   font-family: 'Disket Mono', monospace;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  background: var(--color-gray-150);
   color: var(--color-dark);
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  margin-bottom: 8px;
-  padding: 8px;
+  margin-bottom: 8px;;
 }
 
 /* ── Main menu overlay ────────────────────────────────────────────────────── */

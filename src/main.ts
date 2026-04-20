@@ -2145,12 +2145,12 @@ function buildMatchUnitsRosterHtml(): string {
   return `
     <div class="rules-units-split">
       <div class="rules-units-faction">
-        <div class="rules-units-faction-title">Player 1 · South</div>
+        <div class="rules-units-faction-title">Player 1</div>
         ${pkgNote1}
         ${listHtml(p1)}
       </div>
       <div class="rules-units-faction">
-        <div class="rules-units-faction-title">Player 2 · North</div>
+        <div class="rules-units-faction-title">Player 2</div>
         ${pkgNote2}
         ${listHtml(p2)}
       </div>
