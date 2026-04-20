@@ -31,7 +31,7 @@ export type RulesPreset = { id: string; label: string; description: string } & R
 
 /** Shown under the Rules select when [Custom] is active. */
 export const RULES_PRESET_CUSTOM_DESCRIPTION =
-  'Terrain, economy, combat, healing, and Breakthrough balance use the values in the sections below.';
+  'Set custom rules for your game.';
 
 const FLANKING_EPS = 1e-5;
 const FRAC_EPS = 1e-5;
@@ -65,7 +65,7 @@ export const RULES_PRESETS: RulesPreset[] = [
     id: 'standard',
     label: 'Standard',
     description:
-      'Default pacing: moderate mountains and rivers, baseline income and territory bonuses, standard flanking and healing. Artillery is not limited by adjacency. Breakthrough uses default attacker PP, sector capture bonus, and defender malus in captured sectors.',
+      'The standard ruleset of the game. A good earning base for Production points, but earnings by territory are limited. Battles are challenging till the end.',
     mountainPct: 0.12,
     enableRivers: true,
     riverMaxLengthBoardWidthMult: 1.5,
@@ -87,29 +87,29 @@ export const RULES_PRESETS: RulesPreset[] = [
     breakthroughSectorCaptureBonusPP: 120,
   },
   {
-    id: 'high_tempo',
-    label: 'High tempo',
+    id: 'blitz',
+    label: 'Blitz',
     description:
-      'Faster rounds: lighter terrain, higher production and territory payouts, quicker production hexes, stronger flanks, and limit artillery until adjacent threats are cleared. Slower healing. Breakthrough: more attacker PP, slightly harsher defender malus, and a larger per-sector PP bonus.',
-    mountainPct: 0.08,
+      'Low earning base, but each hex contributes to the production points earnings. Owning territory is crucial and even a small progress through enemy lines could quickly end the battle.',
+    mountainPct: 0.12,
     enableRivers: true,
-    riverMaxLengthBoardWidthMult: 1.2,
-    productionPointsPerTurn: 28,
-    productionPointsPerTurnAi: 28,
-    territoryQuota: 6,
-    pointsPerQuota: 4,
-    productionTurns: 1,
+    riverMaxLengthBoardWidthMult: 1.5,
+    productionPointsPerTurn: 6,
+    productionPointsPerTurnAi: 6,
+    territoryQuota: 1,
+    pointsPerQuota: 1,
+    productionTurns: 2,
     productionSafeDistance: 2,
-    flankingBonus: 0.2,
-    maxFlankingUnits: 3,
+    flankingBonus: 0.15,
+    maxFlankingUnits: 2,
     zoneOfControl: true,
-    limitArtillery: true,
-    healOwnTerritory: 1,
+    limitArtillery: false,
+    healOwnTerritory: 2,
     conquestPointsPlayer: 40,
     conquestPointsAi: 40,
-    breakthroughAttackerStartingPP: 150,
-    breakthroughEnemySectorStrengthMult: 0.45,
-    breakthroughSectorCaptureBonusPP: 140,
+    breakthroughAttackerStartingPP: 40,
+    breakthroughEnemySectorStrengthMult: 0.5,
+    breakthroughSectorCaptureBonusPP: 40,
   },
 ];
 
