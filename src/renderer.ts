@@ -1006,7 +1006,8 @@ export function renderState(
       boundary.setAttribute('d', buildBoundaryPath(moveAreaHexes));
       boundary.setAttribute('stroke', c.moveBorder);
       boundary.setAttribute('stroke-width', '2');
-      boundary.setAttribute('stroke-dasharray', '5 4');
+      boundary.setAttribute('stroke-dasharray', '4 4');
+      boundary.setAttribute('stroke-linecap', 'butt');
     } else {
       boundary.setAttribute('d', '');
     }

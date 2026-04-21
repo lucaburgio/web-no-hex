@@ -58,7 +58,7 @@ export function initGameAreaBoardTexture(gameArea: HTMLElement, board: HTMLEleme
       return;
     }
 
-    texEl.style.opacity = '1';
+    texEl.style.opacity = '0.4';
 
     const L = br.left - ar.left;
     const T = br.top - ar.top;

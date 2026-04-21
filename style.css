@@ -422,7 +422,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #recap-board {
   --board-perimeter-stroke: rgba(0, 0, 0, 0.2);
   --board-perimeter-stroke-width: 2px;
-  --board-perimeter-dasharray: 6 4;
+  --board-perimeter-dasharray: 4 4;
 }
 
 #board {
