@@ -45,7 +45,8 @@ type Prefer = 'higher' | 'lower';
 const STAT_ROWS: { label: string; prefer: Prefer; pick: (s: BattleStatsSide) => number }[] = [
   { label: 'Enemy units destroyed', prefer: 'higher', pick: s => s.enemyUnitsDestroyed },
   { label: 'Total damage inflicted', prefer: 'higher', pick: s => s.damageDealt },
-  { label: 'Total damage received', prefer: 'lower', pick: s => s.damageTaken },
+  { label: 'Damage from ranged attacks', prefer: 'higher', pick: s => s.rangedDamageDealt },
+  { label: 'Attacks launched', prefer: 'higher', pick: s => s.attacksInitiated },
   { label: 'Units lost', prefer: 'lower', pick: s => s.unitsLost },
   { label: 'Total units used on the battlefield', prefer: 'higher', pick: s => s.unitsDeployed },
 ];

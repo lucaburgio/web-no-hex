@@ -80,6 +80,10 @@ export interface BattleStatsSide {
   damageDealt: number;
   /** HP damage taken from enemy attacks (combat). */
   damageTaken: number;
+  /** HP damage dealt via ranged attacks (subset of {@link damageDealt}). */
+  rangedDamageDealt: number;
+  /** Combats where this side was the attacker (initiated the fight). */
+  attacksInitiated: number;
   /** Enemy units this side destroyed. */
   enemyUnitsDestroyed: number;
   /** Own units lost. */

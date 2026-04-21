@@ -78,6 +78,8 @@ function emptyBattleStatsSide(): BattleStatsSide {
   return {
     damageDealt: 0,
     damageTaken: 0,
+    rangedDamageDealt: 0,
+    attacksInitiated: 0,
     enemyUnitsDestroyed: 0,
     unitsLost: 0,
     unitsDeployed: 0,
@@ -97,8 +99,15 @@ function initBattleStatsFromUnits(units: Unit[]): Record<Owner, BattleStatsSide>
 
 /** Normalize stats for older saves or missing field. */
 export function normalizeBattleStats(state: GameState): Record<Owner, BattleStatsSide> {
-  if (state.battleStats) return state.battleStats;
-  state.battleStats = initBattleStatsFromUnits(state.units);
+  if (!state.battleStats) {
+    state.battleStats = initBattleStatsFromUnits(state.units);
+  } else {
+    for (const o of [1, 2] as Owner[]) {
+      const s = state.battleStats[o];
+      if (s.rangedDamageDealt == null) s.rangedDamageDealt = 0;
+      if (s.attacksInitiated == null) s.attacksInitiated = 0;
+    }
+  }
   return state.battleStats;
 }
 
@@ -111,8 +120,10 @@ function recordCombatBattleStats(
   const bs = normalizeBattleStats(state);
   const a = attacker.owner;
   const d = defender.owner;
+  bs[a].attacksInitiated++;
   if (res.ranged) {
     bs[a].damageDealt += res.dmgToDefender;
+    bs[a].rangedDamageDealt += res.dmgToDefender;
     bs[d].damageTaken += res.dmgToDefender;
     if (res.defenderDied) {
       bs[a].enemyUnitsDestroyed++;
