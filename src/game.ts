@@ -2596,6 +2596,44 @@ export function playerSelectUnit(state: GameState, col: number, row: number, loc
   return state;
 }
 
+/**
+ * Whether the board should show pointer-hover emphasis (e.g. chromatic halo) on this unit.
+ * Mirrors click affordances: movable friendlies, inspectable / attack-relevant enemies in movement.
+ */
+export function unitShowsBoardPointerHover(
+  state: GameState,
+  unit: Unit,
+  localPlayer: Owner,
+  matchIsVsHuman: boolean,
+): boolean {
+  if (state.winner) return false;
+
+  const enemyOwner: Owner = localPlayer === PLAYER ? AI : PLAYER;
+
+  if (
+    matchIsVsHuman &&
+    state.activePlayer !== localPlayer &&
+    (state.phase === 'movement' || state.phase === 'production')
+  ) {
+    return unit.owner === enemyOwner;
+  }
+
+  if (state.activePlayer !== localPlayer || state.phase !== 'movement') return false;
+
+  if (unit.owner === localPlayer) {
+    return unit.movesUsed < unit.movement;
+  }
+
+  if (unit.owner !== enemyOwner) return false;
+
+  if (state.selectedUnit === null) return true;
+  const sel = getUnitById(state, state.selectedUnit);
+  if (!sel) return false;
+  if (sel.owner === enemyOwner) return true;
+  if (sel.owner === localPlayer) return true;
+  return false;
+}
+
 export function playerMoveUnit(
   state: GameState,
   col: number,

@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Unit hover — 20 proposals (board shape)</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e8ecf1;
+      --muted: #8b9aab;
+      --accent: #4a9eff;
+      --unit-fill: #3d6ea8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 1.5rem clamp(1rem, 4vw, 2.5rem);
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin: 0 0 0.35rem;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 0 0 1.75rem;
+      max-width: 58ch;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      gap: 1rem;
+      max-width: 900px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 1rem;
+      background: var(--panel);
+      border-radius: 10px;
+      padding: 0.85rem 1.1rem;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    @media (max-width: 640px) {
+      .row {
+        grid-template-columns: 1fr;
+        justify-items: start;
+      }
+    }
+
+    .meta {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .meta strong {
+      font-size: 0.95rem;
+    }
+
+    .meta span {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      margin-bottom: 0.15rem;
+    }
+
+    /* Same geometry as renderer.ts: HEX_SIZE 40, scale (HEX_SIZE*1.1)/50 */
+    svg.unit-preview {
+      display: block;
+      flex-shrink: 0;
+      justify-self: end;
+    }
+
+    @media (max-width: 640px) {
+      svg.unit-preview {
+        justify-self: start;
+      }
+    }
+
+    svg.unit-preview .unit-hover {
+      cursor: pointer;
+      transform-box: fill-box;
+      transform-origin: 50% 50%;
+      pointer-events: all;
+    }
+
+    /* 1 — Subtle: brightness + tiny lift */
+    svg.unit-preview .u1 {
+      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+    svg.unit-preview .u1:hover {
+      filter: brightness(1.14);
+      transform: translate(0, -2px);
+    }
+
+    /* 2 — Soft outer glow */
+    svg.unit-preview .u2 {
+      transition: filter 0.25s ease, transform 0.2s ease;
+    }
+    svg.unit-preview .u2:hover {
+      filter: drop-shadow(0 0 6px rgba(74, 158, 255, 0.45)) drop-shadow(0 0 14px rgba(74, 158, 255, 0.25));
+    }
+
+    /* 3 — Accent “ground” shadow */
+    svg.unit-preview .u3 {
+      transition: filter 0.2s ease;
+    }
+    svg.unit-preview .u3:hover {
+      filter: drop-shadow(0 5px 0 var(--accent)) brightness(1.1);
+    }
+
+    /* 4 — Classic scale */
+    svg.unit-preview .u4 {
+      transition: transform 0.2s cubic-bezier(0.34, 1.2, 0.64, 1);
+    }
+    svg.unit-preview .u4:hover {
+      transform: scale(1.08);
+    }
+
+    /* 5 — Pulsing outline on the shield */
+    svg.unit-preview .u5 path.u5-ring {
+      transition: stroke-opacity 0.2s ease;
+      stroke-opacity: 0;
+    }
+    svg.unit-preview .u5:hover path.u5-ring {
+      stroke-opacity: 1;
+      animation: u5-ring-pulse 1.15s ease-in-out infinite;
+    }
+    @keyframes u5-ring-pulse {
+      0%, 100% { stroke-opacity: 0.85; stroke-width: 2.5; }
+      50% { stroke-opacity: 0.35; stroke-width: 4; }
+    }
+
+    /* 6 — Lift + glow */
+    svg.unit-preview .u6 {
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.22s ease;
+    }
+    svg.unit-preview .u6:hover {
+      transform: translate(0, -5px) scale(1.06);
+      filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 18px rgba(74, 158, 255, 0.5));
+    }
+
+    /* 7 — Spring bounce */
+    svg.unit-preview .u7:hover {
+      animation: u7-spring 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes u7-spring {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.14); }
+      70% { transform: scale(0.96); }
+      100% { transform: scale(1.06); }
+    }
+
+    /* 8 — Wiggle */
+    svg.unit-preview .u8:hover {
+      animation: u8-wiggle 0.45s ease-in-out;
+    }
+    @keyframes u8-wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      20% { transform: rotate(-9deg) scale(1.05); }
+      40% { transform: rotate(9deg) scale(1.05); }
+      60% { transform: rotate(-5deg); }
+      80% { transform: rotate(5deg); }
+    }
+
+    /* 9 — Continuous pulse */
+    svg.unit-preview .u9:hover {
+      animation: u9-pulse 0.48s ease-in-out infinite;
+    }
+    @keyframes u9-pulse {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+      50% { transform: scale(1.12); filter: drop-shadow(0 0 12px rgba(74, 158, 255, 0.55)); }
+    }
+
+    /* 10 — Extreme */
+    svg.unit-preview .u10 path.u10-rainbow {
+      stroke-opacity: 0;
+      transition: stroke-opacity 0.15s ease;
+    }
+    svg.unit-preview .u10:hover path.u10-rainbow {
+      stroke-opacity: 1;
+      animation: u10-rainbow-stroke 0.9s linear infinite;
+    }
+    svg.unit-preview .u10:hover {
+      animation: u10-spin 0.75s linear infinite;
+      filter: brightness(1.2) drop-shadow(0 0 14px rgba(255, 120, 200, 0.75));
+    }
+    @keyframes u10-spin {
+      to { transform: rotate(360deg) scale(1.1); }
+    }
+    @keyframes u10-rainbow-stroke {
+      0% { stroke: #ff5e5e; }
+      20% { stroke: #ffd93d; }
+      40% { stroke: #6bcb77; }
+      60% { stroke: #4d96ff; }
+      80% { stroke: #c77dff; }
+      100% { stroke: #ff5e5e; }
+    }
+
+    /* —— Batch 2: proposals 11–20 —— */
+
+    /* 11 — Subtle skew */
+    svg.unit-preview .u11 {
+      transition: transform 0.22s ease, filter 0.22s ease;
+    }
+    svg.unit-preview .u11:hover {
+      transform: skewX(-4deg) translate(0, -2px) scale(1.03);
+      filter: brightness(1.08);
+    }
+
+    /* 12 — Saturation / contrast pop (no motion) */
+    svg.unit-preview .u12 {
+      transition: filter 0.28s ease;
+    }
+    svg.unit-preview .u12:hover {
+      filter: saturate(1.45) contrast(1.12) brightness(1.06);
+    }
+
+    /* 13 — Fine white rim */
+    svg.unit-preview .u13 path.u13-rim {
+      stroke-opacity: 0;
+      transition: stroke-opacity 0.2s ease;
+    }
+    svg.unit-preview .u13:hover path.u13-rim {
+      stroke-opacity: 1;
+    }
+
+    /* 14 — Card tilt */
+    svg.unit-preview .u14 {
+      transition: transform 0.25s cubic-bezier(0.34, 1.3, 0.64, 1);
+    }
+    svg.unit-preview .u14:hover {
+      transform: rotate(-6deg) scale(1.07) translate(3px, -4px);
+      filter: drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.4));
+    }
+
+    /* 15 — Soft bob while hovered */
+    svg.unit-preview .u15:hover {
+      animation: u15-bob 1.8s ease-in-out infinite;
+    }
+    @keyframes u15-bob {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(0, -5px); }
+    }
+
+    /* 16 — Heartbeat pulse */
+    svg.unit-preview .u16:hover {
+      animation: u16-heart 0.9s ease-in-out infinite;
+    }
+    @keyframes u16-heart {
+      0%, 100% { transform: scale(1); }
+      15% { transform: scale(1.1); }
+      30% { transform: scale(1); }
+      45% { transform: scale(1.08); }
+      60% { transform: scale(1); }
+    }
+
+    /* 17 — Jelly squash */
+    svg.unit-preview .u17:hover {
+      animation: u17-jelly 0.55s ease-in-out infinite;
+    }
+    @keyframes u17-jelly {
+      0%, 100% { transform: scale(1, 1); }
+      25% { transform: scale(1.12, 0.9); }
+      50% { transform: scale(0.94, 1.1); }
+      75% { transform: scale(1.06, 0.96); }
+    }
+
+    /* 18 — Marching stroke (ants) */
+    svg.unit-preview .u18 path.u18-march {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.9);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 10 14;
+      stroke-dashoffset: 0;
+      stroke-opacity: 0;
+      pointer-events: none;
+    }
+    svg.unit-preview .u18:hover path.u18-march {
+      stroke-opacity: 1;
+      animation: u18-march 1s linear infinite;
+    }
+    @keyframes u18-march {
+      to { stroke-dashoffset: -48; }
+    }
+
+    /* 19 — Chromatic offset (RGB split) */
+    svg.unit-preview .u19 {
+      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+    svg.unit-preview .u19:hover {
+      transform: scale(1.06);
+      filter:
+        drop-shadow(3px 0 0 rgba(255, 80, 120, 0.75))
+        drop-shadow(-3px 0 0 rgba(80, 220, 255, 0.7))
+        brightness(1.08);
+    }
+
+    /* 20 — Heavy: hue dance + blur + shake */
+    svg.unit-preview .u20:hover {
+      animation: u20-heavy 0.42s ease-in-out infinite;
+    }
+    @keyframes u20-heavy {
+      0%, 100% {
+        transform: translate(0, 0) rotate(0deg) scale(1);
+        filter: hue-rotate(0deg) blur(0) drop-shadow(0 0 12px rgba(255, 200, 80, 0.6));
+      }
+      25% {
+        transform: translate(-2px, -3px) rotate(-4deg) scale(1.12);
+        filter: hue-rotate(40deg) blur(0.4px) drop-shadow(0 0 20px rgba(255, 100, 255, 0.75));
+      }
+      50% {
+        transform: translate(2px, 1px) rotate(4deg) scale(1.08);
+        filter: hue-rotate(-30deg) blur(0.2px) drop-shadow(0 0 16px rgba(100, 255, 200, 0.65));
+      }
+      75% {
+        transform: translate(1px, -2px) rotate(-2deg) scale(1.1);
+        filter: hue-rotate(20deg) blur(0.35px) drop-shadow(0 0 22px rgba(120, 180, 255, 0.7));
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Unit hover — board silhouette + HP + icon</h1>
+  <p class="sub">
+    Same path as in <code>renderer.ts</code> (<code>UNIT_PATH_D</code>), HP bar layout, and a sample
+    <code>icons/units/infantry.svg</code>. Hover the whole piece — shape, bar, and icon move together.
+    <strong>1–10</strong> are the first batch; <strong>11–20</strong> add another ladder from subtle to extreme.
+  </p>
+
+  <div class="grid">
+    <!-- path d = M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z ; offset scale matches renderState -->
+    <div class="row">
+      <div class="meta">
+        <span class="badge">1 · Subtle</span>
+        <strong>Brightness + 2px lift</strong>
+        <span>Quiet feedback; good for a dense board.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u1">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="17.5" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">2 · Soft</span>
+        <strong>Blue glow</strong>
+        <span>Highlights interactivity without changing size.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u2">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="12" height="4" rx="1" fill="#ffd93d" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">3 · Minimal accent</span>
+        <strong>Accent drop-shadow</strong>
+        <span>Reads like a selection stripe under the unit.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u3">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="8" height="4" rx="1" fill="#ff6b6b" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">4 · Classic</span>
+        <strong>Scale 108%</strong>
+        <span>Common tactics-game affordance.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u4">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="20" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">5 · Medium</span>
+        <strong>Pulsing stroke on shield</strong>
+        <span>Extra “selectable” signal when tiles are busy.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u5">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path class="u5-ring" fill="none" stroke="rgba(74, 158, 255, 0.9)" stroke-width="2.5" stroke-linejoin="round"
+                d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="15" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">6 · Strong</span>
+        <strong>Lift + shadow + glow</strong>
+        <span>Strong depth; pops off the hex.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u6">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="18" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">7 · Playful</span>
+        <strong>Spring overshoot</strong>
+        <span>Bouncy; fits lighter tone.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u7">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="22" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">8 · Loud</span>
+        <strong>Wiggle</strong>
+        <span>Hard to miss; noisy if every unit does it.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u8">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="10" height="4" rx="1" fill="#ffd93d" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">9 · Very loud</span>
+        <strong>Endless pulse + glow</strong>
+        <span>While hovered only; still strong.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u9">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="14" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">10 · Extreme</span>
+        <strong>Rainbow stroke + spin + bloom</strong>
+        <span>Joke / debug tier — not for default gameplay.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u10">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path class="u10-rainbow" fill="none" stroke="#ff5e5e" stroke-width="3" stroke-linejoin="round"
+                d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="19" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">11 · Subtle</span>
+        <strong>Skew + tiny scale</strong>
+        <span>Slight diagonal lean; feels tactile without growing much.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u11">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="16" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">12 · Soft</span>
+        <strong>Saturation + contrast</strong>
+        <span>Color “wakes up”; zero translation — good if motion is restricted.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u12">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="11" height="4" rx="1" fill="#ffd93d" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">13 · Minimal</span>
+        <strong>Hairline white rim</strong>
+        <span>Crisp focus ring on the shield only (stroke path under fill).</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u13">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path class="u13-rim" fill="none" stroke="rgba(255, 255, 255, 0.95)" stroke-width="1.5" stroke-linejoin="round"
+                d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="9" height="4" rx="1" fill="#ff6b6b" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">14 · Medium</span>
+        <strong>3D card tilt</strong>
+        <span>Rotation + offset shadow; reads like picking up a token.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u14">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="21" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">15 · Calm motion</span>
+        <strong>Floating bob</strong>
+        <span>Smooth up/down loop while hovered — noticeable but not frantic.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u15">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="13" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">16 · Strong rhythm</span>
+        <strong>Double heartbeat</strong>
+        <span>Two quick beats then rest — grabs attention without endless vibration.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u16">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="18" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">17 · Playful</span>
+        <strong>Jelly squash & stretch</strong>
+        <span>Non-uniform scale wobble; cartoon / mobile energy.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u17">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="20" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">18 · Loud</span>
+        <strong>Marching “ants” outline</strong>
+        <span>Animated dashed stroke; very “tooling / selection” vibes.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u18">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+              <path class="u18-march" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="10" height="4" rx="1" fill="#ffd93d" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">19 · Very loud</span>
+        <strong>Chromatic split + scale</strong>
+        <span>Offset RGB shadows; glitchy without spinning.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u19">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="15" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">20 · Extreme</span>
+        <strong>Hue dance + blur + jitter scale</strong>
+        <span>Overload tier for comparison — not a shipping default.</span>
+      </div>
+      <svg class="unit-preview" width="130" height="150" viewBox="0 0 130 150" aria-hidden="true">
+        <g transform="translate(65, 78)">
+          <g class="unit-hover u20">
+            <g transform="translate(-22, -28.16) scale(0.88)">
+              <path fill="var(--unit-fill)" d="M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z" />
+            </g>
+            <rect x="-11.6" y="5.2" width="23.2" height="4" rx="1" fill="#222" />
+            <rect x="-11.6" y="5.2" width="19" height="4" rx="1" fill="#6bcb77" />
+            <image href="icons/units/infantry.svg" x="-8" y="-21.6" width="16" height="16" />
+          </g>
+        </g>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

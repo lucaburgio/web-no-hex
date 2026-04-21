@@ -35,6 +35,7 @@ import {
   playerApplyUnitUpgrade,
   resolvePendingAiUpgradeChoices,
   unitTypeForUnit,
+  unitShowsBoardPointerHover,
   type EndProductionOptions,
 } from './game';
 import {
@@ -42,6 +43,8 @@ import {
   loadIconDefs,
   renderState,
   setBoardRenderCallback,
+  setBoardPostPaintCallback,
+  queueBoardUnitPointerHoverApply,
   animateMoves,
   animateStrikeAndReturn,
   showDamageFloats,
@@ -465,6 +468,44 @@ let saveStateTimer: number | null = null;
  */
 let animStaticHiddenUnitIds = new Set<number>();
 
+/** Hex under the pointer when it qualifies for unit hover emphasis (see {@link unitShowsBoardPointerHover}). */
+let boardPointerHoverHex: { col: number; row: number } | null = null;
+
+function applyBoardPointerHoverClasses(): void {
+  if (svg.id !== 'board') return;
+  const want = boardPointerHoverHex;
+  for (const node of svg.querySelectorAll('#unit-layer g.board-unit')) {
+    const el = node as SVGGElement;
+    const col = parseInt(el.dataset.col ?? '', 10);
+    const row = parseInt(el.dataset.row ?? '', 10);
+    if (Number.isNaN(col) || Number.isNaN(row)) continue;
+    const unit = getUnit(state, col, row);
+    const isTarget =
+      want !== null &&
+      want.col === col &&
+      want.row === row &&
+      unit !== undefined &&
+      unitShowsBoardPointerHover(state, unit, localPlayer, gameMode === 'vsHuman');
+    el.classList.toggle('board-unit--pointer-hover-chromatic', isTarget);
+  }
+}
+
+function syncBoardPointerHoverFromEvent(e: MouseEvent): void {
+  const hex = getHexFromEvent(e);
+  let next: { col: number; row: number } | null = null;
+  if (hex) {
+    const unit = getUnit(state, hex.col, hex.row);
+    if (unit && unitShowsBoardPointerHover(state, unit, localPlayer, gameMode === 'vsHuman')) {
+      next = hex;
+    }
+  }
+  const nextSig = next ? `${next.col},${next.row}` : '';
+  const prevSig = boardPointerHoverHex ? `${boardPointerHoverHex.col},${boardPointerHoverHex.row}` : '';
+  if (nextSig === prevSig) return;
+  boardPointerHoverHex = next;
+  queueBoardUnitPointerHoverApply();
+}
+
 function syncAnimStaticHidden(hidden: Iterable<number>): void {
   animStaticHiddenUnitIds.clear();
   for (const id of hidden) animStaticHiddenUnitIds.add(id);
@@ -641,10 +682,17 @@ function render(): void {
   if (state.winner || gameMode !== 'vsHuman' || state.activePlayer === localPlayer) {
     vsHumanOffTurnInspectUnitId = null;
   }
+  if (boardPointerHoverHex !== null) {
+    const hu = getUnit(state, boardPointerHoverHex.col, boardPointerHoverHex.row);
+    if (!hu || !unitShowsBoardPointerHover(state, hu, localPlayer, gameMode === 'vsHuman')) {
+      boardPointerHoverHex = null;
+    }
+  }
   renderState(svg, state, pendingProductionHex, animStaticHiddenUnitIds, localPlayer, undefined, spectatorInspectIdForBoard());
 }
 
 setBoardRenderCallback(() => render());
+setBoardPostPaintCallback(() => applyBoardPointerHoverClasses());
 
 // ── Main menu ─────────────────────────────────────────────────────────────────
 
@@ -4433,6 +4481,8 @@ function positionTooltip(pageX: number, pageY: number): void {
 }
 
 svg.addEventListener('mousemove', (e: MouseEvent) => {
+  syncBoardPointerHoverFromEvent(e);
+
   const enemyOwner: Owner = localPlayer === PLAYER ? AI : PLAYER;
 
   if (state.phase !== 'movement' || state.activePlayer !== localPlayer || state.selectedUnit === null) {
@@ -4514,6 +4564,10 @@ svg.addEventListener('mouseleave', () => {
   svg.classList.remove('cursor-fight');
   renderMovePath(svg, []);
   movePathPreviewKey = null;
+  if (boardPointerHoverHex !== null) {
+    boardPointerHoverHex = null;
+    queueBoardUnitPointerHoverApply();
+  }
 });
 
 const pauseOverlayEl   = document.getElementById('pause-overlay') as HTMLDivElement;

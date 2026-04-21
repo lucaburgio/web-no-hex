@@ -136,6 +136,10 @@ let hpBarAnim = new Map<number, { fromHp: number; toHp: number; maxHp: number; s
 let boardRenderCallback: (() => void) | null = null;
 let hpBarRafScheduled = false;
 
+/** Runs after `#board` unit layer paints so hover classes can be applied on the next frame (CSS transitions). */
+let boardPostPaintCallback: (() => void) | null = null;
+let boardPostPaintRaf = 0;
+
 type PerfSection =
   | 'render.total'
   | 'render.productionEligibility'
@@ -182,6 +186,23 @@ function perfMaybeFlush(): void {
 /** Wire the main board redraw (e.g. `() => render()`) so HP bars can tick after damage/healing. */
 export function setBoardRenderCallback(cb: (() => void) | null): void {
   boardRenderCallback = cb;
+}
+
+/** Wire post-paint work for the main board (e.g. pointer-hover class toggles). */
+export function setBoardPostPaintCallback(cb: (() => void) | null): void {
+  boardPostPaintCallback = cb;
+}
+
+/**
+ * Schedule {@link setBoardPostPaintCallback} for the next animation frame (coalesced).
+ * Used after repainting units and on pointer moves so hover styles can transition from a real baseline.
+ */
+export function queueBoardUnitPointerHoverApply(): void {
+  if (boardPostPaintRaf !== 0) return;
+  boardPostPaintRaf = requestAnimationFrame(() => {
+    boardPostPaintRaf = 0;
+    boardPostPaintCallback?.();
+  });
 }
 
 function scheduleHpBarFrame(): void {
@@ -1354,6 +1375,12 @@ export function renderState(
     if (unitRoot) unitLayer.appendChild(unitRoot);
     const uParent: SVGGElement = unitRoot ?? unitLayer;
 
+    const unitWrap = svgEl('g');
+    unitWrap.setAttribute('class', 'board-unit');
+    unitWrap.setAttribute('data-col', String(dc));
+    unitWrap.setAttribute('data-row', String(dr));
+    uParent.appendChild(unitWrap);
+
     const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
     const sc = (HEX_SIZE * 1.1) / 50;
     const unitEl = svgEl('path');
@@ -1365,7 +1392,7 @@ export function renderState(
     unitEl.setAttribute('data-row', String(dr));
     unitEl.setAttribute('transform', `translate(${x - 25 * sc},${y - 32 * sc}) scale(${sc})`);
     unitEl.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
-    uParent.appendChild(unitEl);
+    unitWrap.appendChild(unitEl);
 
     // HP bar (inside shape)
     const barW = HEX_SIZE * 0.58;
@@ -1379,7 +1406,7 @@ export function renderState(
     barBg.setAttribute('fill', '#222'); barBg.setAttribute('rx', '1');
     barBg.setAttribute('pointer-events', 'none');
     barBg.setAttribute('opacity', opacity);
-    uParent.appendChild(barBg);
+    unitWrap.appendChild(barBg);
 
     const barColor = tired ? c.hpTired : hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
     const barFill = svgEl('rect');
@@ -1388,13 +1415,13 @@ export function renderState(
     barFill.setAttribute('fill', barColor); barFill.setAttribute('rx', '1');
     barFill.setAttribute('pointer-events', 'none');
     barFill.setAttribute('opacity', opacity);
-    uParent.appendChild(barFill);
+    unitWrap.appendChild(barFill);
 
     // Icon (shifted up inside shape)
     const icon = unit.icon ?? unitIcon(unit.unitTypeId);
     const iconColor = isRangedTarget ? '#ffffff' : c.unitIconColor;
     const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.34, HEX_SIZE * 0.4, iconColor, iconOpacity);
-    if (iconEl) uParent.appendChild(iconEl);
+    if (iconEl) unitWrap.appendChild(iconEl);
 
     if (isRangedTarget) {
       const aim = inlineIcon('icons/artillery.svg', x, y - HEX_SIZE * 1, HEX_SIZE * 0.5, c.rangedTarget, opacity);
@@ -1403,13 +1430,14 @@ export function renderState(
         aimWrap.setAttribute('class', 'ranged-target-aim');
         aimWrap.setAttribute('pointer-events', 'none');
         aimWrap.appendChild(aim);
-        uParent.appendChild(aimWrap);
+        unitWrap.appendChild(aimWrap);
       }
     }
   }
   perfRecord('render.unitsPass', performance.now() - tUnitsStart);
   perfRecord('render.total', performance.now() - tRenderStart);
   perfMaybeFlush();
+  if (svgElement.id === 'board') queueBoardUnitPointerHoverApply();
 }
 
 // Animate a list of unit moves in parallel, then call onDone once.

@@ -429,6 +429,24 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   display: block;
 }
 
+/* Chromatic pointer-hover on selectable units (proposal 19 in public/unit-hover-proposals.html).
+   Baseline transform/filter on `.board-unit` so transitions always have from/to values after DOM repaints. */
+#board .board-unit {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  transition: transform 0.2s ease, filter 0.2s ease;
+  transform: scale(1);
+  filter: brightness(1);
+}
+
+#board .board-unit--pointer-hover-chromatic {
+  transform: scale(1.06);
+  filter:
+    drop-shadow(3px 0 0 rgba(255, 80, 120, 0.75))
+    drop-shadow(-3px 0 0 rgba(80, 220, 255, 0.7))
+    brightness(1.08);
+}
+
 #board .board-perimeter-outline,
 #recap-board .board-perimeter-outline {
   fill: none;
