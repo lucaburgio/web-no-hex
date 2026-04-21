@@ -2255,6 +2255,77 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   margin: 0;
 }
 
+/* Custom steppers replace native number spinners */
+.settings-number-wrap {
+  display: inline-flex;
+  align-items: stretch;
+  vertical-align: middle;
+  width: 86px;
+  flex-shrink: 0;
+}
+
+.settings-number-wrap .settings-input[type="number"] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.settings-number-spin {
+  display: flex;
+  flex-direction: column;
+  width: 22px;
+  flex-shrink: 0;
+  border-left: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.settings-number-btn {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: var(--color-input);
+  cursor: url('/icons/pointer.svg') 13 14, pointer;
+  display: grid;
+  place-content: center;
+  line-height: 0;
+}
+
+.settings-number-btn + .settings-number-btn {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.settings-number-btn:hover {
+  background: var(--color-input-hover);
+}
+
+.settings-number-btn:active {
+  background: var(--color-input-focus);
+}
+
+.settings-number-arrow {
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+}
+
+.settings-number-arrow-up {
+  border-bottom: 5px solid var(--color-dark);
+  margin-bottom: 1px;
+}
+
+.settings-number-arrow-down {
+  border-top: 5px solid var(--color-dark);
+  margin-top: 1px;
+}
+
+.settings-number-wrap:has(.settings-input:disabled) .settings-number-spin {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .settings-input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;

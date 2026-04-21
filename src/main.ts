@@ -113,6 +113,7 @@ import {
   gameEndRecapBtn,
 } from './gameEndScreen';
 import { initMapEditor, showMapEditor, hideMapEditor } from './mapEditor';
+import { initSettingsNumberSpinners } from './settingsNumberSpinners';
 import { initGameAreaBoardTexture } from './gameAreaBoardTexture';
 
 document.addEventListener('contextmenu', (e) => e.preventDefault(), { capture: true });
@@ -1726,6 +1727,8 @@ for (const [id] of TOGGLE_FIELDS) {
   if (!buttonEl) continue;
   settingsOnOffToggles.set(id, new SettingsOnOffToggle(buttonEl));
 }
+
+initSettingsNumberSpinners();
 
 for (const [id] of NUM_FIELDS) {
   const el = document.getElementById(id) as HTMLInputElement;
