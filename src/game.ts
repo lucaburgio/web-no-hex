@@ -2319,12 +2319,13 @@ function minPlayerRowProgressTowardAiHome(state: GameState): number {
 }
 
 /**
- * 0 = calm, 1 = player is deep in the northern quarter of the map (past 75% of the march from
- * south to north). Ramps linearly from 75% → 100% progress.
+ * 0 = calm, 1 = player is deep toward the AI home row. Ramps from a mode-specific threshold → 100%
+ * progress. Domination uses a later threshold so the AI keeps pushing for the player's home row
+ * and map control instead of turtling while the player is still mid-map.
  */
 function aiDefensivePressure(state: GameState): number {
   const progress = minPlayerRowProgressTowardAiHome(state);
-  const RAMP_START = 0.75;
+  const RAMP_START = state.gameMode === 'domination' ? 0.88 : 0.75;
   if (progress <= RAMP_START) return 0;
   return (progress - RAMP_START) / (1 - RAMP_START);
 }
@@ -2401,19 +2402,23 @@ function scoreAiProductionPlacement(
   const tn = counts.tank ?? 0;
   const ar = counts.artillery ?? 0;
   const total = Math.max(1, inf + tn + ar);
+  const domination = state.gameMode === 'domination';
+  /** Domination: prioritize placements that march toward the player's home row and grab open ground. */
+  const domProd = domination ? 1.28 : 1;
 
   // Closer to the human home row, more neutral/enemy neighbors to expand territory
   let score =
-    -distToGoal * 18 * (1 - pressure * 0.72) +
-    expandNeighbor * 6 * (1 - pressure * 0.55) +
-    row * 5 * (1 - pressure * 0.65);
+    -distToGoal * 18 * (1 - pressure * 0.72) * domProd +
+    expandNeighbor * 6 * (1 - pressure * 0.55) * domProd +
+    row * 5 * (1 - pressure * 0.65) * domProd;
+  if (domination && adjacentEnemy > 0) score += adjacentEnemy * 9 * (1 - pressure * 0.5);
   score += pressure * (ROWS - 1 - row) * 18;
   score += pressure * adjacentEnemy * 28;
 
   const utClass = unitClassOf(ut);
   if (utClass === 'tank') {
-    score += row * 6 * (1 - pressure * 0.55);
-    if (adjacentEnemy > 0) score -= 55 * (1 - pressure * 0.65);
+    score += row * 6 * (1 - pressure * 0.55) * (domination ? 1.15 : 1);
+    if (adjacentEnemy > 0) score -= 55 * (1 - pressure * 0.65) * (domination ? 0.92 : 1);
     if (tn < Math.max(1, inf * 0.25)) score += 45;
   } else if (utClass === 'artillery') {
     score += (ROWS - 1 - row) * 14;
@@ -2422,8 +2427,8 @@ function scoreAiProductionPlacement(
     if (ar < Math.max(1, inf * 0.35)) score += 40;
     score += pressure * 22;
   } else {
-    score += row * 4 * (1 - pressure * 0.55);
-    if (inf / total > 0.65) score -= 25;
+    score += row * 4 * (1 - pressure * 0.55) * (domination ? 1.2 : 1);
+    if (inf / total > 0.65) score -= domination ? 18 : 25;
   }
 
   if (state.productionPoints[AI] >= 60 && (utClass === 'tank' || utClass === 'artillery')) {
@@ -2717,6 +2722,9 @@ function pickBestRangedTarget(
     s += t.row * 22 * (1 - pressure * 0.85);
     const distGoal = minHomeStepsFn(t.col, t.row, AI);
     s -= distGoal * 2 * (1 - pressure * 0.7);
+    if (state.gameMode === 'domination') {
+      s += t.row * 12 * (1 - pressure * 0.55);
+    }
     if (state.gameMode === 'conquest' && state.conquestPoints) {
       const k = `${t.col},${t.row}`;
       if ((state.controlPointHexes ?? []).includes(k)) s += 220;
@@ -2760,7 +2768,11 @@ function scoreMeleeAttack(
   const favorable =
     fc.defenderDies ||
     (!fc.attackerDies && fc.dmgToDefender > fc.dmgToAttacker + 1);
-  if (!favorable) s -= 85 * (1 - pressure * 0.35);
+  const unfavorablePenalty = state.gameMode === 'domination' ? 68 : 85;
+  if (!favorable) s -= unfavorablePenalty * (1 - pressure * 0.35);
+  if (state.gameMode === 'domination' && fc.defenderDies && !fc.attackerDies) {
+    s += 42;
+  }
   if (state.gameMode === 'conquest' && state.conquestPoints && defenderOnPlayerControlPoint(state, defender)) {
     s += 190;
   }
@@ -2797,6 +2809,11 @@ function scoreEmptyMove(
   s += terr * (1 - pressure * 0.55);
   s += toRow * 1.5 * (1 - pressure * 0.65);
   s += pressure * (ROWS - 1 - toRow) * 10;
+  if (state.gameMode === 'domination') {
+    s += (before - after) * 11;
+    s += terr * 3.2 * (1 - pressure * 0.5);
+    if (hex && hex.owner === PLAYER) s += 22 * (1 - pressure * 0.45);
+  }
   if (threat && pressure > 0) {
     const beforeT = bfsFn(unit.col, unit.row, threat.col, threat.row);
     const afterT = bfsFn(toCol, toRow, threat.col, threat.row);
