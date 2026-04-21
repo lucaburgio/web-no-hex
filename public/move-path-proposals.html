@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Movement path preview — 20 proposals</title>
+  <title>Movement path preview — 30 proposals</title>
   <style>
     :root {
       --bg: #0f1419;
@@ -265,6 +265,7 @@
       stroke: rgba(199, 126, 0, 0.45);
       stroke-width: 6;
       stroke-dasharray: 8 10;
+      stroke-linecap: square;
       animation: path-dash-flow 0.75s linear infinite;
     }
 
@@ -284,16 +285,57 @@
     .glow-chev {
       filter: drop-shadow(0 0 3px rgba(255, 200, 80, 0.95)) drop-shadow(0 0 8px rgba(199, 126, 0, 0.5));
     }
+
+    /* ── Batch 3 (21–30): variants of #17 “glowing chevron train” ── */
+
+    .glow-chev-soft {
+      filter: drop-shadow(0 0 2px rgba(255, 210, 140, 0.65)) drop-shadow(0 0 5px rgba(199, 126, 0, 0.28));
+    }
+
+    .glow-chev-strong {
+      filter: drop-shadow(0 0 4px rgba(255, 230, 160, 1)) drop-shadow(0 0 10px rgba(255, 150, 50, 0.7)) drop-shadow(0 0 18px rgba(199, 126, 0, 0.35));
+    }
+
+    .glow-chev-blue {
+      filter: drop-shadow(0 0 3px rgba(180, 240, 255, 0.95)) drop-shadow(0 0 10px rgba(80, 180, 255, 0.55));
+    }
+
+    .glow-chev-neon {
+      filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 6px rgba(255, 245, 200, 1)) drop-shadow(0 0 14px rgba(255, 200, 100, 0.75));
+    }
+
+    .glow-chev-magenta-gold {
+      filter: drop-shadow(0 0 5px rgba(255, 130, 210, 0.8)) drop-shadow(0 0 12px rgba(255, 200, 90, 0.7));
+    }
+
+    .glow-chev-pulse {
+      animation: chev-train-glow-pulse 1.85s ease-in-out infinite;
+    }
+
+    @keyframes chev-train-glow-pulse {
+      0%, 100% {
+        filter: drop-shadow(0 0 2px rgba(255, 200, 80, 0.75)) drop-shadow(0 0 6px rgba(199, 126, 0, 0.38));
+      }
+      50% {
+        filter: drop-shadow(0 0 5px rgba(255, 230, 140, 1)) drop-shadow(0 0 14px rgba(255, 160, 60, 0.62));
+      }
+    }
+
+    .flow-track-faint-17v {
+      stroke: rgba(199, 126, 0, 0.18);
+      stroke-width: 5;
+    }
   </style>
 </head>
 <body>
-  <h1>Movement path preview — 20 proposals</h1>
+  <h1>Movement path preview — 30 proposals</h1>
   <p class="sub">
     Polyline preview like <code>#move-path-line</code> in the game: pointy-top odd-r hex centers with
     <code>hexSize = 40</code>, path <code>(0,0) → (1,0) → (2,0) → (2,1) → (1,2)</code>.
     Game defaults from <code>gameconfig</code>: stroke <code>#C77E00</code>, width <code>6</code>, draw uses GSAP
     <code>stroke-dashoffset</code> — here each row is a static or CSS-animated stand-in for comparison.
     <strong>11–20</strong> add <strong>animated flow</strong>: chevrons and dash patterns that move along the route (SVG <code>animateMotion</code> + CSS).
+    <strong>21–30</strong> are <strong>variants of #17</strong> (glowing chevron train): same idea, different glow, palette, density, and rhythm.
   </p>
 
   <svg width="0" height="0" aria-hidden="true" style="position:absolute">
@@ -322,6 +364,16 @@
       >
         <path d="M 0 0 L 10 5 L 0 10 z" fill="#c77e00" />
       </marker>
+      <linearGradient id="chev-grad-warm" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#fffef5" />
+        <stop offset="45%" stop-color="#ffe08a" />
+        <stop offset="100%" stop-color="#d9880a" />
+      </linearGradient>
+      <linearGradient id="chev-grad-sunset" x1="0%" y1="50%" x2="100%" y2="50%">
+        <stop offset="0%" stop-color="#ffd27a" />
+        <stop offset="50%" stop-color="#ff8a5c" />
+        <stop offset="100%" stop-color="#c94b7a" />
+      </linearGradient>
     </defs>
   </svg>
 
@@ -696,6 +748,344 @@
             <mpath href="#flow-line-20" />
           </animateMotion>
         </polygon>
+      </svg>
+    </div>
+
+    <!-- —— 21–30: glowing chevron train (#17 family) —— -->
+    <div class="row">
+      <div class="meta">
+        <span class="badge">21 · Train v1</span>
+        <strong>Soft bloom, wide pair</strong>
+        <span>Only two chevrons, gentler <code>drop-shadow</code>, longer gap — calmer than #17.</span>
+      </div>
+      <svg class="path-demo" viewBox="-24 -24 200 168" aria-hidden="true">
+        <defs>
+          <path id="flow-line-21" d="M0,0 L69.28,0 L138.56,0 L138.56,60 L69.28,120" />
+        </defs>
+        <polyline class="path-pts flow-track-faint-17v" points="0,0 69.28,0 138.56,0 138.56,60 69.28,120" />
+        <g class="glow-chev-soft">
+          <polygon class="flow-chev" fill="#ffecc4" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2.5s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-21" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffecc4" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2.5s" begin="-1.25s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-21" />
+            </animateMotion>
+          </polygon>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">22 · Train v2</span>
+        <strong>Four tight runners</strong>
+        <span>Same warm glow as #17 but a denser convoy (shorter period + quarter stagger).</span>
+      </div>
+      <svg class="path-demo" viewBox="-24 -24 200 168" aria-hidden="true">
+        <defs>
+          <path id="flow-line-22" d="M0,0 L69.28,0 L138.56,0 L138.56,60 L69.28,120" />
+        </defs>
+        <polyline class="path-pts flow-track-faint" points="0,0 69.28,0 138.56,0 138.56,60 69.28,120" />
+        <g class="glow-chev">
+          <polygon class="flow-chev" fill="#ffe08a" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="1.55s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-22" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffe08a" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="1.55s" begin="-0.39s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-22" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffe08a" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="1.55s" begin="-0.78s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-22" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffe08a" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="1.55s" begin="-1.16s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-22" />
+            </animateMotion>
+          </polygon>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">23 · Train v3</span>
+        <strong>Sunburst core</strong>
+        <span>Richer amber fill + stronger triple-layer glow — “hotter” without more chevrons.</span>
+      </div>
+      <svg class="path-demo" viewBox="-24 -24 200 168" aria-hidden="true">
+        <defs>
+          <path id="flow-line-23" d="M0,0 L69.28,0 L138.56,0 L138.56,60 L69.28,120" />
+        </defs>
+        <polyline class="path-pts p18-base" points="0,0 69.28,0 138.56,0 138.56,60 69.28,120" />
+        <g class="glow-chev-strong">
+          <polygon class="flow-chev" fill="#ffcf4a" points="-15,-10 -6,-10 6,0 -6,10 -15,10 -3,0">
+            <animateMotion dur="2.4s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-23" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffcf4a"  points="-15,-10 -6,-10 6,0 -6,10 -15,10 -3,0">
+            <animateMotion dur="2.4s" begin="-0.3s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-23" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffcf4a"  points="-15,-10 -6,-10 6,0 -6,10 -15,10 -3,0">
+            <animateMotion dur="2.4s" begin="-0.6s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-23" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffcf4a"  points="-15,-10 -6,-10 6,0 -6,10 -15,10 -3,0">
+            <animateMotion dur="2.4s" begin="-0.9s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-23" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffcf4a"  points="-15,-10 -6,-10 6,0 -6,10 -15,10 -3,0">
+            <animateMotion dur="2.4s" begin="-1.2s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-23" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffcf4a"  points="-15,-10 -6,-10 6,0 -6,10 -15,10 -3,0">
+            <animateMotion dur="2.4s" begin="-1.5s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-23" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffcf4a" points="-15,-10 -6,-10 6,0 -6,10 -15,10 -3,0">
+            <animateMotion dur="2.4s" begin="-1.8s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-23" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffcf4a" points="-15,-10 -6,-10 6,0 -6,10 -15,10 -3,0">
+            <animateMotion dur="2.4s" begin="-2.1s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-23" />
+            </animateMotion>
+          </polygon>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">24 · Train v4</span>
+        <strong>Frost / HUD</strong>
+        <span>Cyan-white chevrons + cool blue bloom — same motion language, tactical sci-fi palette.</span>
+      </div>
+      <svg class="path-demo" viewBox="-24 -24 200 168" aria-hidden="true">
+        <defs>
+          <path id="flow-line-24" d="M0,0 L69.28,0 L138.56,0 L138.56,60 L69.28,120" />
+        </defs>
+        <polyline class="path-pts flow-track-faint-17v" points="0,0 69.28,0 138.56,0 138.56,60 69.28,120" />
+        <g class="glow-chev-blue">
+          <polygon class="flow-chev" fill="#e8fbff" stroke="rgba(80, 180, 255, 0.5)" stroke-width="1" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2.1s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-24" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#e8fbff" stroke="rgba(80, 180, 255, 0.5)" stroke-width="1" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2.1s" begin="-0.7s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-24" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#e8fbff" stroke="rgba(80, 180, 255, 0.5)" stroke-width="1" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2.1s" begin="-1.4s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-24" />
+            </animateMotion>
+          </polygon>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">25 · Train v5</span>
+        <strong>White-hot tips</strong>
+        <span>Bright white fill + tight neon halo; high contrast on dark terrain.</span>
+      </div>
+      <svg class="path-demo" viewBox="-24 -24 200 168" aria-hidden="true">
+        <defs>
+          <path id="flow-line-25" d="M0,0 L69.28,0 L138.56,0 L138.56,60 L69.28,120" />
+        </defs>
+        <polyline class="path-pts flow-track-faint" points="0,0 69.28,0 138.56,0 138.56,60 69.28,120" />
+        <g class="glow-chev-neon">
+          <polygon class="flow-chev" fill="#ffffff" points="-5,-4.5 10,0 -5,4.5">
+            <animateMotion dur="1.85s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-25" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffffff" points="-5,-4.5 10,0 -5,4.5">
+            <animateMotion dur="1.85s" begin="-0.62s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-25" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffffff" points="-5,-4.5 10,0 -5,4.5">
+            <animateMotion dur="1.85s" begin="-1.23s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-25" />
+            </animateMotion>
+          </polygon>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">26 · Train v6</span>
+        <strong>Crisp rim</strong>
+        <span>Dark amber stroke on each chevron + standard glow — sharper silhouette than #17.</span>
+      </div>
+      <svg class="path-demo" viewBox="-24 -24 200 168" aria-hidden="true">
+        <defs>
+          <path id="flow-line-26" d="M0,0 L69.28,0 L138.56,0 L138.56,60 L69.28,120" />
+        </defs>
+        <polyline class="path-pts flow-track-faint" points="0,0 69.28,0 138.56,0 138.56,60 69.28,120" />
+        <g class="glow-chev">
+          <polygon class="flow-chev" fill="#ffe08a" stroke="#6b4200" stroke-width="1.3" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-26" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffe08a" stroke="#6b4200" stroke-width="1.3" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2s" begin="-0.67s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-26" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffe08a" stroke="#6b4200" stroke-width="1.3" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2s" begin="-1.33s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-26" />
+            </animateMotion>
+          </polygon>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">27 · Train v7</span>
+        <strong>Gradient wedges</strong>
+        <span>Fill <code>url(#chev-grad-warm)</code> on each chevron; glow stays in the #17 family.</span>
+      </div>
+      <svg class="path-demo" viewBox="-24 -24 200 168" aria-hidden="true">
+        <defs>
+          <path id="flow-line-27" d="M0,0 L69.28,0 L138.56,0 L138.56,60 L69.28,120" />
+        </defs>
+        <polyline class="path-pts flow-track-faint" points="0,0 69.28,0 138.56,0 138.56,60 69.28,120" />
+        <g class="glow-chev">
+          <polygon class="flow-chev" fill="url(#chev-grad-warm)" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-27" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="url(#chev-grad-warm)" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2s" begin="-0.67s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-27" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="url(#chev-grad-warm)" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2s" begin="-1.33s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-27" />
+            </animateMotion>
+          </polygon>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">28 · Train v8</span>
+        <strong>Pulsing bloom</strong>
+        <span>Whole train’s <code>filter</code> eases in/out — “breathing” energy while chevrons loop.</span>
+      </div>
+      <svg class="path-demo" viewBox="-24 -24 200 168" aria-hidden="true">
+        <defs>
+          <path id="flow-line-28" d="M0,0 L69.28,0 L138.56,0 L138.56,60 L69.28,120" />
+        </defs>
+        <polyline class="path-pts flow-track-faint" points="0,0 69.28,0 138.56,0 138.56,60 69.28,120" />
+        <g class="glow-chev-pulse">
+          <polygon class="flow-chev" fill="#ffe08a" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-28" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffe08a" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2s" begin="-0.67s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-28" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffe08a" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="2s" begin="-1.33s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-28" />
+            </animateMotion>
+          </polygon>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">29 · Train v9</span>
+        <strong>Leader + escorts</strong>
+        <span>One large glowing chevron + two smaller followers (same path, offset timing).</span>
+      </div>
+      <svg class="path-demo" viewBox="-24 -24 200 168" aria-hidden="true">
+        <defs>
+          <path id="flow-line-29" d="M0,0 L69.28,0 L138.56,0 L138.56,60 L69.28,120" />
+        </defs>
+        <polyline class="path-pts flow-track-faint" points="0,0 69.28,0 138.56,0 138.56,60 69.28,120" />
+        <g class="glow-chev-strong">
+          <polygon class="flow-chev" fill="#ffdf7a" points="-8,-6.5 14,0 -8,6.5">
+            <animateMotion dur="2.2s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-29" />
+            </animateMotion>
+          </polygon>
+        </g>
+        <g class="glow-chev">
+          <polygon class="flow-chev" fill="#ffe8a8" points="-4.5,-3.5 8,0 -4.5,3.5">
+            <animateMotion dur="2.2s" begin="-0.5s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-29" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="#ffe8a8" points="-4.5,-3.5 8,0 -4.5,3.5">
+            <animateMotion dur="2.2s" begin="-1s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-29" />
+            </animateMotion>
+          </polygon>
+        </g>
+      </svg>
+    </div>
+
+    <div class="row">
+      <div class="meta">
+        <span class="badge">30 · Train v10</span>
+        <strong>Sunset gradient + pink fringe</strong>
+        <span>Fill shifts gold→coral→wine; magenta-gold double bloom — still the #17 motion recipe.</span>
+      </div>
+      <svg class="path-demo" viewBox="-24 -24 200 168" aria-hidden="true">
+        <defs>
+          <path id="flow-line-30" d="M0,0 L69.28,0 L138.56,0 L138.56,60 L69.28,120" />
+        </defs>
+        <polyline class="path-pts flow-track-faint-17v" points="0,0 69.28,0 138.56,0 138.56,60 69.28,120" />
+        <g class="glow-chev-magenta-gold">
+          <polygon class="flow-chev" fill="url(#chev-grad-sunset)" stroke="rgba(255, 255, 255, 0.35)" stroke-width="0.8" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="1.75s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-30" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="url(#chev-grad-sunset)" stroke="rgba(255, 255, 255, 0.35)" stroke-width="0.8" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="1.75s" begin="-0.58s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-30" />
+            </animateMotion>
+          </polygon>
+          <polygon class="flow-chev" fill="url(#chev-grad-sunset)" stroke="rgba(255, 255, 255, 0.35)" stroke-width="0.8" points="-6,-5 11,0 -6,5">
+            <animateMotion dur="1.75s" begin="-1.17s" repeatCount="indefinite" rotate="auto" calcMode="linear" keyPoints="0;1" keyTimes="0;1">
+              <mpath href="#flow-line-30" />
+            </animateMotion>
+          </polygon>
+        </g>
       </svg>
     </div>
   </div>
