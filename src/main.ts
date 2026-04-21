@@ -490,7 +490,14 @@ function applyBoardPointerHoverClasses(): void {
   }
 }
 
+function clearBoardPointerHover(): void {
+  if (boardPointerHoverHex === null) return;
+  boardPointerHoverHex = null;
+  queueBoardUnitPointerHoverApply();
+}
+
 function syncBoardPointerHoverFromEvent(e: MouseEvent): void {
+  if (isAnimating) { clearBoardPointerHover(); return; }
   const hex = getHexFromEvent(e);
   let next: { col: number; row: number } | null = null;
   if (hex) {
@@ -575,6 +582,7 @@ function playEndTurnHealFloats(
     return;
   }
   isAnimating = true;
+  clearBoardPointerHover();
   animStaticHiddenUnitIds.clear();
   render();
   updateUI();
@@ -2688,6 +2696,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
       };
       if (anim && !isAnimating) {
         isAnimating = true;
+        clearBoardPointerHover();
         runOpponentAnimationPayload(anim, () => {
           isAnimating = false;
           afterOpponentState();
@@ -3480,6 +3489,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
             checkWinner();
             if (combatVfx && combatVfx.damageFloats.length > 0) {
               isAnimating = true;
+              clearBoardPointerHover();
               animStaticHiddenUnitIds.clear();
               render();
               const floats = combatVfx.damageFloats;
@@ -3608,6 +3618,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
         if (!combatVfx) {
           if (needsApproach) {
             isAnimating = true;
+            clearBoardPointerHover();
             syncAnimStaticHidden([movingUnitId]);
             renderState(svg, state, pendingProductionHex, animStaticHiddenUnitIds, localPlayer, undefined, spectatorInspectIdForBoard());
             updateUI();
@@ -3634,6 +3645,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
           }
         } else {
           isAnimating = true;
+          clearBoardPointerHover();
           const hidden = new Set<number>();
           if (needsMoveAnim) hidden.add(movingUnitId);
           if (sr) hidden.add(sr.attackerId);
@@ -3846,6 +3858,7 @@ function runAiTurnWithAnimation(): void {
   if (isAnimating) return;
   aiTurnPendingStart = true;
   isAnimating = true;
+  clearBoardPointerHover();
   updateUI();
   // Use a macrotask so the "Waiting for AI.." label gets a chance to paint first.
   setTimeout(() => {
