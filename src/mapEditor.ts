@@ -210,6 +210,7 @@ let onBackCb: () => void = () => {};
 
 // DOM refs (set in initMapEditor)
 let overlayEl: HTMLDivElement;
+let canvasScrollEl: HTMLDivElement;
 let svgEl: SVGSVGElement;
 let tooltipEl: HTMLDivElement;
 let colsInput: HTMLInputElement;
@@ -229,6 +230,7 @@ export function initMapEditor(onBack: () => void): void {
   onBackCb = onBack;
 
   overlayEl        = document.getElementById('map-editor-overlay') as HTMLDivElement;
+  canvasScrollEl   = document.getElementById('map-editor-canvas-scroll') as HTMLDivElement;
   svgEl            = document.getElementById('map-editor-board') as unknown as SVGSVGElement;
 
   // Tooltip element for unit hover
@@ -307,6 +309,7 @@ export function initMapEditor(onBack: () => void): void {
     else edState.rows = clamped;
     cleanOOB();
     renderBoard();
+    scheduleCenterMapEditorCanvas();
   }
 
   function commitMapDimension(which: 'cols' | 'rows'): void {
@@ -316,6 +319,7 @@ export function initMapEditor(onBack: () => void): void {
     else edState.rows = w;
     cleanOOB();
     renderBoard();
+    scheduleCenterMapEditorCanvas();
   }
 
   colsInput.addEventListener('input', () => { onMapDimensionInput('cols'); });
@@ -333,6 +337,7 @@ export function initMapEditor(onBack: () => void): void {
     }
     refreshToolbar();
     renderBoard();
+    scheduleCenterMapEditorCanvas();
   });
 
   unitPackageSelect.addEventListener('change', () => {
@@ -406,6 +411,10 @@ export function initMapEditor(onBack: () => void): void {
     tooltipEl.classList.remove('me-unit-tooltip-visible');
   });
   window.addEventListener('mouseup', () => { painting = false; });
+
+  window.addEventListener('resize', () => {
+    if (!overlayEl.classList.contains('hidden')) scheduleCenterMapEditorCanvas();
+  });
 }
 
 /** Keeps custom settings dropdown labels in sync after programmatic value changes. */
@@ -576,6 +585,22 @@ function hexToPixelLocal(col: number, row: number): { x: number; y: number } {
     x: s * Math.sqrt(3) * (col + (Math.abs(row) % 2 === 1 ? 0.5 : 0)),
     y: s * 1.5 * row,
   };
+}
+
+/** Scroll so the board is centered when it overflows the canvas area (after layout). */
+function centerMapEditorCanvasScroll(): void {
+  if (!canvasScrollEl || overlayEl.classList.contains('hidden')) return;
+  const { scrollWidth, clientWidth, scrollHeight, clientHeight } = canvasScrollEl;
+  const maxX = Math.max(0, scrollWidth - clientWidth);
+  const maxY = Math.max(0, scrollHeight - clientHeight);
+  canvasScrollEl.scrollLeft = maxX / 2;
+  canvasScrollEl.scrollTop = maxY / 2;
+}
+
+function scheduleCenterMapEditorCanvas(): void {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => centerMapEditorCanvasScroll());
+  });
 }
 
 function renderBoard(): void {
@@ -1006,6 +1031,7 @@ function applyLoadedCode(raw: string): string | null {
   refreshToolbar();
   renderBoard();
   syncMapEditorSelectWidgets();
+  scheduleCenterMapEditorCanvas();
   return null;
 }
 
@@ -1111,6 +1137,7 @@ export function showMapEditor(): void {
   renderBoard();
   syncMapEditorSelectWidgets();
   overlayEl.classList.remove('hidden');
+  scheduleCenterMapEditorCanvas();
 }
 
 export function hideMapEditor(): void {

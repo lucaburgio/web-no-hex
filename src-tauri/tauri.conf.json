@@ -12,13 +12,13 @@
   "app": {
     "windows": [
       {
-        "title": "Web Strategic",
+        "title": "About Frontlines",
         "width": 1280,
         "height": 800,
         "minWidth": 900,
         "minHeight": 600,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": true
       }
     ],
     "security": {

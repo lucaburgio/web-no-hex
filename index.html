@@ -151,63 +151,65 @@
       <div id="map-editor-toolbar"></div>
     </div>
     <div id="map-editor-right">
-      <div id="map-editor-title">MAP<br>EDITOR</div>
+      <div id="map-editor-right-body">
+        <div id="map-editor-title">MAP<br>EDITOR</div>
 
-      <div class="settings-group">
-        <div class="settings-group-title">MAP SIZE</div>
-        <div class="settings-row">
-          <label class="settings-label" for="me-cols">Width</label>
-          <input class="settings-input" type="number" id="me-cols" min="4" max="48" value="8" />
+        <div class="settings-group">
+          <div class="settings-group-title">MAP SIZE</div>
+          <div class="settings-row">
+            <label class="settings-label" for="me-cols">Width</label>
+            <input class="settings-input" type="number" id="me-cols" min="4" max="48" value="8" />
+          </div>
+          <div class="settings-row">
+            <label class="settings-label" for="me-rows">Height</label>
+            <input class="settings-input" type="number" id="me-rows" min="4" max="48" value="8" />
+          </div>
         </div>
-        <div class="settings-row">
-          <label class="settings-label" for="me-rows">Height</label>
-          <input class="settings-input" type="number" id="me-rows" min="4" max="48" value="8" />
-        </div>
-      </div>
 
-      <div class="settings-group">
-        <div class="settings-group-title">SCENARIO</div>
-        <div class="settings-row">
-          <label class="settings-label" for="me-scenario">Scenario</label>
-          <select class="settings-input settings-select" id="me-scenario">
-            <option value="">None</option>
-          </select>
+        <div class="settings-group">
+          <div class="settings-group-title">SCENARIO</div>
+          <div class="settings-row">
+            <label class="settings-label" for="me-scenario">Scenario</label>
+            <select class="settings-input settings-select" id="me-scenario">
+              <option value="">None</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <button type="button" class="button-secondary settings-input" id="me-generate-river-btn" disabled>
+              Generate river (from painted hexes)
+            </button>
+          </div>
         </div>
-        <div class="settings-row">
-          <button type="button" class="button-secondary settings-input" id="me-generate-river-btn" disabled>
-            Generate river (from painted hexes)
-          </button>
-        </div>
-      </div>
 
-      <div class="settings-group">
-        <div class="settings-group-title">EDIT LAYER</div>
-        <div class="settings-row">
-          <label class="settings-label" for="me-game-mode">Terrain / modes</label>
-          <select class="settings-input settings-select" id="me-game-mode">
-            <option value="domination">Domination (terrain &amp; rivers)</option>
-            <option value="conquest">Conquest (control points)</option>
-            <option value="breakthrough">Breakthrough (sectors &amp; CPs)</option>
-          </select>
+        <div class="settings-group">
+          <div class="settings-group-title">EDIT LAYER</div>
+          <div class="settings-row">
+            <label class="settings-label" for="me-game-mode">Terrain / modes</label>
+            <select class="settings-input settings-select" id="me-game-mode">
+              <option value="domination">Domination (terrain &amp; rivers)</option>
+              <option value="conquest">Conquest (control points)</option>
+              <option value="breakthrough">Breakthrough (sectors &amp; CPs)</option>
+            </select>
+          </div>
+          <div class="settings-note neutral" role="note">
+            Switch layers to paint mountains, rivers, conquest CPs, and breakthrough CPs separately. Rivers paint like mountains (NORMAL clears). Custom match presets require both conquest and breakthrough CPs.
+          </div>
         </div>
-        <div class="settings-note neutral" role="note">
-          Switch layers to paint mountains, rivers, conquest CPs, and breakthrough CPs separately. Rivers paint like mountains (NORMAL clears). Custom match presets require both conquest and breakthrough CPs.
-        </div>
-      </div>
 
-      <div class="settings-group">
-        <div class="settings-group-title">UNIT PACKAGE</div>
-        <div class="settings-row">
-          <label class="settings-label" for="me-unit-package">Player 1 (Host)</label>
-          <select class="settings-input settings-select" id="me-unit-package">
-            <option value="">None</option>
-          </select>
-        </div>
-        <div class="settings-row">
-          <label class="settings-label" for="me-unit-package-player2">Player 2 (AI/Guest)</label>
-          <select class="settings-input settings-select" id="me-unit-package-player2">
-            <option value="">Same as Player 1</option>
-          </select>
+        <div class="settings-group">
+          <div class="settings-group-title">UNIT PACKAGE</div>
+          <div class="settings-row">
+            <label class="settings-label" for="me-unit-package">Player 1 (Host)</label>
+            <select class="settings-input settings-select" id="me-unit-package">
+              <option value="">None</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label" for="me-unit-package-player2">Player 2 (AI/Guest)</label>
+            <select class="settings-input settings-select" id="me-unit-package-player2">
+              <option value="">Same as Player 1</option>
+            </select>
+          </div>
         </div>
       </div>
 
