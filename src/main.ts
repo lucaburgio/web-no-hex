@@ -115,6 +115,7 @@ import {
 import { initMapEditor, showMapEditor, hideMapEditor } from './mapEditor';
 import { initSettingsNumberSpinners } from './settingsNumberSpinners';
 import { initGameAreaBoardTexture } from './gameAreaBoardTexture';
+import { playMainMenuEnterAnimation } from './mainMenuEnterAnimation';
 
 document.addEventListener('contextmenu', (e) => e.preventDefault(), { capture: true });
 
@@ -333,6 +334,8 @@ function positionFixedTooltipBelow(tooltip: HTMLElement, anchor: DOMRect): void 
 // ── Main menu DOM refs ────────────────────────────────────────────────────────
 
 const mainMenuOverlayEl    = document.getElementById('main-menu-overlay') as HTMLDivElement;
+const mainMenuLogoEl       = document.getElementById('main-menu-logo') as HTMLImageElement;
+const mainMenuRightColEl   = document.getElementById('main-menu-right') as HTMLDivElement;
 const menuContinueBtn      = document.getElementById('menu-continue-btn') as HTMLButtonElement;
 const menuNewGameBtn       = document.getElementById('menu-new-game-btn') as HTMLButtonElement;
 const menuStoriesBtn       = document.getElementById('menu-stories-btn') as HTMLButtonElement;
@@ -652,6 +655,11 @@ function showMainMenu(): void {
   } else {
     menuContinueBtn.classList.add('hidden');
   }
+  playMainMenuEnterAnimation({
+    overlay: mainMenuOverlayEl,
+    logo: mainMenuLogoEl,
+    menuColumn: mainMenuRightColEl,
+  });
 }
 
 function hideMainMenu(): void {

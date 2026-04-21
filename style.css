@@ -1919,6 +1919,47 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   object-fit: contain;
 }
 
+#main-menu-logo.main-menu-enter-anim {
+  animation: main-menu-logo-enter var(--main-menu-enter-duration) var(--main-menu-enter-easing) both;
+  animation-delay: 0ms;
+}
+
+#main-menu-right.main-menu-enter-anim {
+  animation: main-menu-menu-enter var(--main-menu-enter-duration) var(--main-menu-enter-easing) both;
+  animation-delay: var(--main-menu-enter-menu-delay);
+}
+
+@keyframes main-menu-logo-enter {
+  from {
+    opacity: var(--main-menu-logo-o0);
+    transform: translateX(var(--main-menu-logo-x0));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes main-menu-menu-enter {
+  from {
+    opacity: var(--main-menu-menu-o0);
+    transform: translateX(var(--main-menu-menu-x0));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #main-menu-logo.main-menu-enter-anim,
+  #main-menu-right.main-menu-enter-anim {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 #main-menu-right {
   flex: 1;
   display: flex;
