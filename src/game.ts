@@ -409,6 +409,34 @@ function conquerHex(state: GameState, col: number, row: number, owner: Owner): v
   }
 }
 
+/**
+ * Map edge (north vs south) — which side is "at home" on that border row. Interior rows: undefined.
+ * Used to decide who holds an empty home-border hex when it is cleared without a unit moving in
+ * (ranged kill or mutual kill), so a border garrison can no longer count for supply/respawn until
+ * the native side reclaims the edge (when applicable).
+ */
+function borderRowNativeOwner(row: number): Owner | undefined {
+  if (row === 0) return AI;
+  if (row === ROWS - 1) return PLAYER;
+  return undefined;
+}
+
+/**
+ * When a border-row hex is cleared, who should own the empty cell?
+ * — Native garrison lost: killer's side (attacker) takes the border.
+ * — Invader on the opposite home row: the edge reverts to that map side's owner.
+ * Interior rows: undefined (use normal conquest: attacker when they survive).
+ */
+function ownerForEmptyBorderAfterDefenderRemoved(
+  defRow: number,
+  defOwner: Owner,
+  attackerOwner: Owner,
+): Owner | undefined {
+  const native = borderRowNativeOwner(defRow);
+  if (native === undefined) return undefined;
+  return defOwner === native ? attackerOwner : native;
+}
+
 function getHexesWithinDistance(col: number, row: number, dist: number, cols: number, rows: number): [number, number][] {
   const visited = new Set<string>([`${col},${row}`]);
   let frontier: [number, number][] = [[col, row]];
@@ -1042,7 +1070,14 @@ function resolveCombat(
     if (defenderDied) {
       log(state, `Unit #${defender.id} was destroyed.`);
       drainConquestPointForKill(state, defender.owner);
+      const dc = defender.col;
+      const dr = defender.row;
+      const dOwner = defender.owner;
       removeUnit(state, defender.id);
+      const borderOwner = ownerForEmptyBorderAfterDefenderRemoved(dr, dOwner, attacker.owner);
+      if (borderOwner !== undefined) {
+        conquerHex(state, dc, dr, borderOwner);
+      }
     } else {
       log(state, `Defender has ${defender.hp} HP remaining.`);
     }
@@ -1076,11 +1111,21 @@ function resolveCombat(
   if (defenderDied) {
     log(state, `Unit #${defender.id} was destroyed.`);
     drainConquestPointForKill(state, defender.owner);
+    const dc = defender.col;
+    const dr = defender.row;
+    const dOwner = defender.owner;
+    const attOwner = attacker.owner;
     removeUnit(state, defender.id);
     if (!attackerDied) {
-      attacker.col = defender.col;
-      attacker.row = defender.row;
-      conquerHex(state, attacker.col, attacker.row, attacker.owner);
+      attacker.col = dc;
+      attacker.row = dr;
+      const o = ownerForEmptyBorderAfterDefenderRemoved(dr, dOwner, attOwner) ?? attOwner;
+      conquerHex(state, dc, dr, o);
+    } else {
+      const o = ownerForEmptyBorderAfterDefenderRemoved(dr, dOwner, attOwner);
+      if (o !== undefined) {
+        conquerHex(state, dc, dr, o);
+      }
     }
   }
   if (attackerDied) {
