@@ -465,10 +465,10 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 #board .board-unit--pointer-hover-chromatic {
-  transform: scale(1.06);
+  transform: scale(1.16);
   filter:
-    drop-shadow(3px 0 0 rgba(255, 80, 120, 0.75))
-    drop-shadow(-3px 0 0 rgba(80, 220, 255, 0.7))
+    drop-shadow(3px 0 0 rgba(255, 80, 120, 0))
+    drop-shadow(-3px 0 0 rgba(80, 220, 255, 0))
     brightness(1.08);
 }
 
