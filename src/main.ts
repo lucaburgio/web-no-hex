@@ -503,7 +503,7 @@ function applyBoardPointerHoverClasses(): void {
       want !== null &&
       want.col === col &&
       want.row === row &&
-      unit !== undefined &&
+      unit != null &&
       unitShowsBoardPointerHover(state, unit, localPlayer, gameMode === 'vsHuman');
     el.classList.toggle('board-unit--pointer-hover-chromatic', isTarget);
   }
