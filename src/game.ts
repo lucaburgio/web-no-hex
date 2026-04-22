@@ -422,10 +422,11 @@ function borderRowNativeOwner(row: number): Owner | undefined {
 }
 
 /**
- * When a border-row hex is cleared, who should own the empty cell?
+ * When a border-row hex is cleared and the attacker survives, who should own the empty cell?
  * — Native garrison lost: killer's side (attacker) takes the border.
  * — Invader on the opposite home row: the edge reverts to that map side's owner.
  * Interior rows: undefined (use normal conquest: attacker when they survive).
+ * Melee mutual kill: caller does not use this — ownership is left unchanged.
  */
 function ownerForEmptyBorderAfterDefenderRemoved(
   defRow: number,
@@ -530,11 +531,9 @@ export function isValidProductionPlacement(state: GameState, col: number, row: n
   if (getUnit(state, col, row)) return false;
   if (!hasHomeProductionAccess(state, localPlayer)) return false;
   const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
-  const enemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
   if (row === homeRow) {
     const hex = state.hexStates[`${col},${row}`];
-    if (hex && hex.owner === enemy) return false;
-    return true;
+    return !!(hex && hex.owner === localPlayer);
   }
   const hex = state.hexStates[`${col},${row}`];
   return !!(hex && hex.isProduction && hex.owner === localPlayer);
@@ -1078,6 +1077,7 @@ function resolveCombat(
       if (borderOwner !== undefined) {
         conquerHex(state, dc, dr, borderOwner);
       }
+      noteDominationBreakthroughIfHomeRowCleared(state, dOwner, dr, attacker.owner, false);
     } else {
       log(state, `Defender has ${defender.hp} HP remaining.`);
     }
@@ -1121,12 +1121,10 @@ function resolveCombat(
       attacker.row = dr;
       const o = ownerForEmptyBorderAfterDefenderRemoved(dr, dOwner, attOwner) ?? attOwner;
       conquerHex(state, dc, dr, o);
-    } else {
-      const o = ownerForEmptyBorderAfterDefenderRemoved(dr, dOwner, attOwner);
-      if (o !== undefined) {
-        conquerHex(state, dc, dr, o);
-      }
     }
+    // Mutual kill: no survivor — do not run border "empty hex" conquest; hex ownership stays as it was
+    // (matches interior mutual kills and player experience when defending home).
+    noteDominationBreakthroughIfHomeRowCleared(state, dOwner, dr, attOwner, attackerDied);
   }
   if (attackerDied) {
     log(state, `Unit #${attacker.id} was destroyed.`);
@@ -1329,6 +1327,25 @@ export function resolvePendingAiUpgradeChoices(state: GameState): void {
 
 // ── Victory check ─────────────────────────────────────────────────────────────
 
+/**
+ * Domination: if this kill emptied the defender's home row and the attacker survived, record a
+ * breakthrough claim (covers ranged clears without stepping onto the row). Adjacent invaders alone
+ * do not count — only occupation or this combat outcome.
+ */
+function noteDominationBreakthroughIfHomeRowCleared(
+  state: GameState,
+  defenderOwner: Owner,
+  defenderRow: number,
+  attackerOwner: Owner,
+  attackerDied: boolean,
+): void {
+  if (state.gameMode !== 'domination' || attackerDied) return;
+  const defenderHomeRow = defenderOwner === PLAYER ? ROWS - 1 : 0;
+  if (defenderRow !== defenderHomeRow) return;
+  if (state.units.some(u => u.owner === defenderOwner && u.row === defenderHomeRow)) return;
+  state.dominationBreakthroughClaim = attackerOwner;
+}
+
 /** No units and no owned (non-mountain) hexes — used for Conquest map elimination. */
 function sideFullyEliminated(state: GameState, owner: Owner): boolean {
   if (state.units.some(u => u.owner === owner)) return false;
@@ -1403,15 +1420,20 @@ function checkVictory(state: GameState): void {
     return;
   }
 
-  const humanAtNorth = state.units.some(u => u.owner === PLAYER && u.row === 0);
-  const aiAtSouth    = state.units.some(u => u.owner === AI && u.row === ROWS - 1);
-  const noHuman      = !state.units.some(u => u.owner === PLAYER);
-  const noAI         = !state.units.some(u => u.owner === AI);
+  const claim = state.dominationBreakthroughClaim;
+  state.dominationBreakthroughClaim = undefined;
 
-  if (humanAtNorth) { state.winner = PLAYER; state.winReason = 'dom_breakthrough'; }
-  else if (noAI)    { state.winner = PLAYER; state.winReason = 'dom_annihilation'; }
-  else if (aiAtSouth) { state.winner = AI; state.winReason = 'dom_breakthrough'; }
-  else if (noHuman)   { state.winner = AI; state.winReason = 'dom_annihilation'; }
+  const humanAtNorth = state.units.some(u => u.owner === PLAYER && u.row === 0);
+  const aiAtSouth = state.units.some(u => u.owner === AI && u.row === ROWS - 1);
+  const playerBreakthrough = humanAtNorth || claim === PLAYER;
+  const aiBreakthrough = aiAtSouth || claim === AI;
+  const noHuman = !state.units.some(u => u.owner === PLAYER);
+  const noAI = !state.units.some(u => u.owner === AI);
+
+  if (playerBreakthrough) { state.winner = PLAYER; state.winReason = 'dom_breakthrough'; }
+  else if (noAI) { state.winner = PLAYER; state.winReason = 'dom_annihilation'; }
+  else if (aiBreakthrough) { state.winner = AI; state.winReason = 'dom_breakthrough'; }
+  else if (noHuman) { state.winner = AI; state.winReason = 'dom_annihilation'; }
 }
 
 /** Conquest: drain opponent Conquer Points for each control point they do not own. Runs after each side completes movement (fair timing for first/second player). */
@@ -2336,8 +2358,13 @@ export function playerEndProduction(state: GameState, options?: EndProductionOpt
 
 function collectAiProductionCandidates(state: GameState, occupied: Set<string>): [number, number][] {
   const candidates: [number, number][] = [];
+  const mountains = state.mountainHexes ?? [];
   for (let c = 0; c < COLS; c++) {
-    if (!occupied.has(`${c},0`)) candidates.push([c, 0]);
+    const key = `${c},0`;
+    if (mountains.includes(key)) continue;
+    if (occupied.has(key)) continue;
+    const hex = state.hexStates[key];
+    if (hex && hex.owner === AI) candidates.push([c, 0]);
   }
   for (const [key, hex] of Object.entries(state.hexStates)) {
     if (hex.owner === AI && hex.isProduction) {
@@ -3209,8 +3236,10 @@ export function aiMovement(state: GameState): {
         },
       });
       animUnitsAfter.push(snapshotUnits(state));
+      checkVictory(state);
     }
   }
+  checkVictory(state);
   log(state, 'AI completed movement.');
   perfLog('ai.movement.total', performance.now() - tStart);
   return { state, combatVfx, animSteps, animUnitsBefore, animUnitsAfter };

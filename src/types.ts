@@ -127,6 +127,11 @@ export interface GameState {
   productionPoints: Record<Owner, number>;
   log: string[];
   winner: Owner | null;
+  /**
+   * Domination only: set when an attack removes the last defender from the opponent's home row
+   * (e.g. ranged kill without advancing). Consumed by {@link checkVictory}. Omitted in older saves.
+   */
+  dominationBreakthroughClaim?: Owner | null;
   /** Reason the match ended; set alongside {@link winner}. */
   winReason?: WinReason;
   /** Match statistics; omitted in older saves — normalized on load. */

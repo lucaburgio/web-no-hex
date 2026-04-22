@@ -10,6 +10,7 @@ import {
   getUnit,
   getUnitById,
   hasHomeProductionAccess,
+  isValidProductionPlacement,
   getValidMoves,
   getRangedAttackTargets,
   isInEnemyZoC,
@@ -973,24 +974,16 @@ export function renderState(
   const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
   if (state.phase === 'production' && state.activePlayer === localPlayer) {
     const tProdStart = performance.now();
-    const hasHomeAccess = hasHomeProductionAccess(state, localPlayer);
-    const enemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
     for (let r = 0; r < ROWS; r++) {
       for (let col = 0; col < COLS; col++) {
         const key = `${col},${r}`;
-        const isMountain = mountainSet.has(key);
-        const occupied = unitByHex.has(key);
         const hex = state.hexStates[key];
-        const placeable =
-          hasHomeAccess &&
-          !isMountain &&
-          !occupied &&
-          (
-            (r === homeRow && !(hex && hex.owner === enemy)) ||
-            !!(hex && hex.isProduction && hex.owner === localPlayer)
-          );
-        if (placeable) canPlaceHexes.add(key);
-        if (r === homeRow) productionFocusHexes.add(`${col},${r}`);
+        if (isValidProductionPlacement(state, col, r, localPlayer)) {
+          canPlaceHexes.add(key);
+        }
+        if (r === homeRow && hex && hex.owner === localPlayer) {
+          productionFocusHexes.add(key);
+        }
       }
     }
     for (const [key, hex] of Object.entries(state.hexStates)) {
