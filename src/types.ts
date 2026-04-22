@@ -134,6 +134,10 @@ export interface GameState {
   dominationBreakthroughClaim?: Owner | null;
   /** Reason the match ended; set alongside {@link winner}. */
   winReason?: WinReason;
+  /** Wall-clock ms when the match began (client); omitted in older saves. */
+  matchStartedAtMs?: number;
+  /** Wall-clock play duration in ms; set when {@link winner} is decided. */
+  matchDurationMs?: number;
   /** Match statistics; omitted in older saves — normalized on load. */
   battleStats?: Record<Owner, BattleStatsSide>;
 }

@@ -88,19 +88,51 @@ function valTone(
   return youBetter ? 'game-end-stat-num--muted' : 'game-end-stat-num--strong';
 }
 
+const BRACKET_CORNERS_HTML =
+  '<span class="game-end-bracket-corner game-end-bracket-corner--tl" aria-hidden="true"></span>'
+  + '<span class="game-end-bracket-corner game-end-bracket-corner--tr" aria-hidden="true"></span>'
+  + '<span class="game-end-bracket-corner game-end-bracket-corner--bl" aria-hidden="true"></span>'
+  + '<span class="game-end-bracket-corner game-end-bracket-corner--br" aria-hidden="true"></span>';
+
 function bracketedValue(n: number, tone: string): HTMLElement {
   const wrap = document.createElement('span');
   wrap.className = 'game-end-bracket';
-  wrap.innerHTML =
-    '<span class="game-end-bracket-corner game-end-bracket-corner--tl" aria-hidden="true"></span>'
-    + '<span class="game-end-bracket-corner game-end-bracket-corner--tr" aria-hidden="true"></span>'
-    + '<span class="game-end-bracket-corner game-end-bracket-corner--bl" aria-hidden="true"></span>'
-    + '<span class="game-end-bracket-corner game-end-bracket-corner--br" aria-hidden="true"></span>';
+  wrap.innerHTML = BRACKET_CORNERS_HTML;
   const num = document.createElement('span');
   num.className = `game-end-stat-num ${tone}`;
   num.textContent = String(n);
   wrap.appendChild(num);
   return wrap;
+}
+
+function bracketedText(text: string, tone: string): HTMLElement {
+  const wrap = document.createElement('span');
+  wrap.className = 'game-end-bracket game-end-bracket--span';
+  wrap.innerHTML = BRACKET_CORNERS_HTML;
+  const num = document.createElement('span');
+  num.className = `game-end-stat-num ${tone}`;
+  num.textContent = text;
+  wrap.appendChild(num);
+  return wrap;
+}
+
+/** Wall-clock play time for the match (frozen at end); falls back to elapsed since start if needed. */
+function displayPlayTimeMs(state: GameState): number | undefined {
+  if (state.matchDurationMs != null) return state.matchDurationMs;
+  if (state.matchStartedAtMs != null) {
+    return Math.max(0, Date.now() - state.matchStartedAtMs);
+  }
+  return undefined;
+}
+
+function formatPlayTime(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+  return `${pad(m)}:${pad(s)}`;
 }
 
 function fillStatsTable(state: GameState, you: Owner): void {
@@ -123,6 +155,21 @@ function fillStatsTable(state: GameState, you: Owner): void {
     rowEl.appendChild(bracketedValue(ev, valTone(yv, ev, row.prefer, 'enemy')));
     statsRowsEl.appendChild(rowEl);
   }
+
+  const playedMs = displayPlayTimeMs(state);
+  const timeRowEl = document.createElement('div');
+  timeRowEl.className = 'game-end-stat-row game-end-stat-row--full';
+  const timeLabel = document.createElement('span');
+  timeLabel.className = 'game-end-stat-label';
+  timeLabel.textContent = 'Time played';
+  timeRowEl.appendChild(timeLabel);
+  timeRowEl.appendChild(
+    bracketedText(
+      playedMs != null ? formatPlayTime(playedMs) : '—',
+      'game-end-stat-num--tie',
+    ),
+  );
+  statsRowsEl.appendChild(timeRowEl);
 }
 
 export const gameEndRestartBtn = document.getElementById(

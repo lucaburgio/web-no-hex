@@ -15,6 +15,7 @@ import type {
   StoryDef,
   UnitUpgradeKind,
   BattleStatsSide,
+  WinReason,
 } from './types';
 import {
   getBreakthroughControlPointsForMap,
@@ -1355,6 +1356,13 @@ function sideFullyEliminated(state: GameState, owner: Owner): boolean {
   return true;
 }
 
+function endMatch(state: GameState, winner: Owner, reason: WinReason): void {
+  state.winner = winner;
+  state.winReason = reason;
+  const start = state.matchStartedAtMs;
+  state.matchDurationMs = start != null ? Math.max(0, Date.now() - start) : 0;
+}
+
 function checkVictory(state: GameState): void {
   if (state.winner) return;
 
@@ -1362,14 +1370,12 @@ function checkVictory(state: GameState): void {
     const att = getBreakthroughAttackerOwner(state);
     const def = getBreakthroughDefenderOwner(state);
     if (!state.units.some(u => u.owner === att)) {
-      state.winner = def;
-      state.winReason = 'bt_attacker_wiped';
+      endMatch(state, def, 'bt_attacker_wiped');
       log(state, 'Breakthrough: attacker eliminated — defender wins.');
       return;
     }
     if (state.sectorOwners.length > 0 && state.sectorOwners.every(o => o === att)) {
-      state.winner = att;
-      state.winReason = 'bt_all_sectors';
+      endMatch(state, att, 'bt_all_sectors');
       log(state, 'Breakthrough: all sectors captured — attacker wins.');
       return;
     }
@@ -1383,20 +1389,17 @@ function checkVictory(state: GameState): void {
     const playerGone = sideFullyEliminated(state, PLAYER);
     const aiGone = sideFullyEliminated(state, AI);
     if (playerGone && aiGone) {
-      state.winner = AI;
-      state.winReason = 'cq_both_eliminated';
+      endMatch(state, AI, 'cq_both_eliminated');
       log(state, 'Conquest: both sides wiped from the map — tie goes to the northern player.');
       return;
     }
     if (aiGone) {
-      state.winner = PLAYER;
-      state.winReason = 'cq_elimination';
+      endMatch(state, PLAYER, 'cq_elimination');
       log(state, 'Conquest: opponent has no units and no territory.');
       return;
     }
     if (playerGone) {
-      state.winner = AI;
-      state.winReason = 'cq_elimination';
+      endMatch(state, AI, 'cq_elimination');
       log(state, 'Conquest: you have no units and no territory.');
       return;
     }
@@ -1405,18 +1408,16 @@ function checkVictory(state: GameState): void {
       const playerHexes = Object.values(state.hexStates).filter(h => h.owner === PLAYER).length;
       const aiHexes = Object.values(state.hexStates).filter(h => h.owner === AI).length;
       if (playerHexes > aiHexes) {
-        state.winner = PLAYER;
-        state.winReason = 'cq_both_cp_depleted';
+        endMatch(state, PLAYER, 'cq_both_cp_depleted');
         log(state, `Both sides reached 0 Conquer Points — player wins on territory (${playerHexes} vs ${aiHexes} hexes).`);
       } else {
-        state.winner = AI;
-        state.winReason = 'cq_both_cp_depleted';
+        endMatch(state, AI, 'cq_both_cp_depleted');
         log(state, `Both sides reached 0 Conquer Points — northern player wins on territory (${aiHexes} vs ${playerHexes} hexes).`);
       }
       return;
     }
-    if (cp[AI] <= 0) { state.winner = PLAYER; state.winReason = 'cq_cp_depleted'; }
-    else if (cp[PLAYER] <= 0) { state.winner = AI; state.winReason = 'cq_cp_depleted'; }
+    if (cp[AI] <= 0) endMatch(state, PLAYER, 'cq_cp_depleted');
+    else if (cp[PLAYER] <= 0) endMatch(state, AI, 'cq_cp_depleted');
     return;
   }
 
@@ -1430,10 +1431,10 @@ function checkVictory(state: GameState): void {
   const noHuman = !state.units.some(u => u.owner === PLAYER);
   const noAI = !state.units.some(u => u.owner === AI);
 
-  if (playerBreakthrough) { state.winner = PLAYER; state.winReason = 'dom_breakthrough'; }
-  else if (noAI) { state.winner = PLAYER; state.winReason = 'dom_annihilation'; }
-  else if (aiBreakthrough) { state.winner = AI; state.winReason = 'dom_breakthrough'; }
-  else if (noHuman) { state.winner = AI; state.winReason = 'dom_annihilation'; }
+  if (playerBreakthrough) endMatch(state, PLAYER, 'dom_breakthrough');
+  else if (noAI) endMatch(state, PLAYER, 'dom_annihilation');
+  else if (aiBreakthrough) endMatch(state, AI, 'dom_breakthrough');
+  else if (noHuman) endMatch(state, AI, 'dom_annihilation');
 }
 
 /** Conquest: drain opponent Conquer Points for each control point they do not own. Runs after each side completes movement (fair timing for first/second player). */

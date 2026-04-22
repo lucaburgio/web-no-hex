@@ -2649,6 +2649,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     hideMainMenu();
     showSettings((settings) => {
       state = createInitialStateForMenu();
+      state.matchStartedAtMs = Date.now();
       if (ws) ws.send(JSON.stringify({ type: 'game-start', state, settings: { ...settings, unitPackage: settingsUnitPackage, unitPackagePlayer2: settingsUnitPackagePlayer2 } }));
       startGame(state);
     }, 'PLAYER 2 CONNECTED');
@@ -2827,6 +2828,10 @@ function startGame(initialState: GameState): void {
   hideGameEndScreen();
   applyUnitPackagesFromGameState(initialState);
   state = initialState;
+  if (!state.winner) {
+    state.matchDurationMs = undefined;
+    if (state.matchStartedAtMs == null) state.matchStartedAtMs = Date.now();
+  }
   syncUnitIdCounter(state);
   pendingProductionHex = null;
   vsHumanOffTurnInspectUnitId = null;

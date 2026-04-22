@@ -1374,12 +1374,17 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   padding-right: 0.25rem;
 }
 
+.game-end-stat-row--full .game-end-bracket--span {
+  grid-column: 2 / span 2;
+  justify-self: center;
+}
+
 .game-end-bracket {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2.75rem;
+  width: 100%;
   padding: 0.8rem;
   box-sizing: border-box;
   justify-self: center;
