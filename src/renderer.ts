@@ -116,7 +116,7 @@ const MOVE_PATH_CHEVRON_POINTS = '-20,-10 -6,-10 3,0 -6,10 -20,10 -10,0';
 /** Chevrons per hex edge along the route (1 hex step → this many; 2 steps → 2×, etc.). */
 const MOVE_PATH_CHEVRONS_PER_HEX_STEP = 2;
 /** Phase gap between consecutive chevrons; one loop duration = chevronCount × this. */
-const MOVE_PATH_CHEVRON_STAGGER_SEC = 0.8;
+const MOVE_PATH_CHEVRON_STAGGER_SEC = 0.4;
 
 export interface MoveAnimation {
   unit: Unit;      // snapshot of the unit before moving (owner/hp for colour)

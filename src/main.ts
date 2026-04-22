@@ -122,8 +122,27 @@ import { playMainMenuEnterAnimation } from './mainMenuEnterAnimation';
 
 document.addEventListener('contextmenu', (e) => e.preventDefault(), { capture: true });
 
-const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-const WS_URL = `${wsProtocol}//${location.hostname}:3001`;
+/** WebSocket URL for the relay in `server/`. See vite.config proxy `/relay`. */
+function relayWebSocketUrl(): string {
+  const isSecure = location.protocol === 'https:';
+  const wsProto = isSecure ? 'wss:' : 'ws:';
+  const explicit = import.meta.env.VITE_RELAY_URL as string | undefined;
+  if (explicit) return explicit;
+
+  const port = location.port;
+  const useViteProxy =
+    import.meta.env.DEV ||
+    port === '5173' ||
+    port === '4173' ||
+    location.hostname.endsWith('.trycloudflare.com');
+
+  if (useViteProxy) {
+    return `${wsProto}//${location.host}/relay`;
+  }
+  return `${wsProto}//${location.hostname}:3001`;
+}
+
+const WS_URL = relayWebSocketUrl();
 
 const svg        = document.getElementById('board') as unknown as SVGSVGElement;
 const gameAreaEl = document.getElementById('game-area') as HTMLElement | null;
