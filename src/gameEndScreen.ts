@@ -137,15 +137,20 @@ export const gameEndBackMenuBtn = document.getElementById(
 export const gameEndRecapBtn = document.getElementById(
   'game-end-recap-btn',
 ) as HTMLButtonElement;
+export const gameEndRetryBtn = document.getElementById(
+  'game-end-retry-btn',
+) as HTMLButtonElement;
 
 /** Show story-specific navigation buttons (win screen). Call with false to reset. */
 export function configureStoryEndButtons(show: boolean, hasNext: boolean): void {
+  gameEndRetryBtn.classList.add('hidden');
   gameEndRestartBtn.classList.toggle('hidden', show);
   gameEndNextStoryBtn.classList.toggle('hidden', !show || !hasNext);
   gameEndBackMenuBtn.classList.toggle('hidden', !show);
 }
 
 function resetDisconnectedButtonState(): void {
+  gameEndRetryBtn.classList.add('hidden');
   gameEndRestartBtn.classList.remove('hidden');
   gameEndRecapBtn.classList.remove('hidden');
   gameEndBackMenuBtn.classList.add('hidden');
@@ -205,6 +210,7 @@ export function showGameEndScreenForOutcome(
   reason: WinReason | undefined,
   state: GameState,
   perspectiveOwner: Owner,
+  options?: { showRetry?: boolean },
 ): void {
   overlayEl.classList.remove('game-end-overlay--disconnected');
   kickerEl.textContent = won ? 'Victory' : 'Defeat';
@@ -215,6 +221,7 @@ export function showGameEndScreenForOutcome(
   statsSectionEl.classList.remove('hidden');
   fillStatsTable(state, perspectiveOwner);
   iconEl.classList.remove('game-end-icon--warn');
+  gameEndRetryBtn.classList.toggle('hidden', !options?.showRetry);
   if (!overlayEl.classList.contains('hidden')) return;
   overlayEl.classList.remove('hidden');
   playGameEndOpeningAnimation();
@@ -230,6 +237,7 @@ export function showGameEndScreenDisconnected(state: GameState, perspectiveOwner
   statsSectionEl.classList.remove('hidden');
   fillStatsTable(state, perspectiveOwner);
   iconEl.classList.add('game-end-icon--warn');
+  gameEndRetryBtn.classList.add('hidden');
   gameEndRestartBtn.classList.add('hidden');
   gameEndRecapBtn.classList.add('hidden');
   gameEndBackMenuBtn.classList.remove('hidden', 'button-secondary');

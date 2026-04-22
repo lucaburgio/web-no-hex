@@ -114,6 +114,7 @@ import {
   gameEndNextStoryBtn,
   gameEndBackMenuBtn,
   gameEndRecapBtn,
+  gameEndRetryBtn,
 } from './gameEndScreen';
 import { initMapEditor, showMapEditor, hideMapEditor } from './mapEditor';
 import { initSettingsNumberSpinners } from './settingsNumberSpinners';
@@ -4096,6 +4097,17 @@ function leaveEndGameToMainMenu(): void {
 
 gameEndRestartBtn.addEventListener('click', leaveEndGameToMainMenu);
 
+gameEndRetryBtn.addEventListener('click', () => {
+  if (gameMode !== 'vsAI' || state.winner === localPlayer) return;
+  hideGameEndScreen();
+  hideUnitPicker();
+  if (activeStoryIndex !== null) {
+    startStory(activeStoryIndex);
+  } else {
+    startGame(createInitialStatePreservingTerrain(state));
+  }
+});
+
 gameEndNextStoryBtn.addEventListener('click', () => {
   if (pendingNextStoryIndex === null) return;
   const idx = pendingNextStoryIndex;
@@ -4362,7 +4374,10 @@ function updateUI(): void {
 
 function checkWinner(): void {
   if (!state.winner) return;
-  showGameEndScreenForOutcome(state.winner === localPlayer, state.winReason, state, localPlayer);
+  const showRetry = gameMode === 'vsAI' && state.winner !== localPlayer;
+  showGameEndScreenForOutcome(state.winner === localPlayer, state.winReason, state, localPlayer, {
+    showRetry,
+  });
   if (gameMode === 'vsAI' && state.winner === localPlayer) {
     recordVsAiVictory(state.turn, state.gameMode, state.winReason);
   }
