@@ -43,14 +43,18 @@ function hexTerrainFillForOwner(owner: Owner, localPlayer: Owner, c: Colors): st
   return owner === localPlayer ? c.hexPlayer : c.hexAi;
 }
 
+function hexTerrainDimmedFillForOwner(owner: Owner, localPlayer: Owner, c: Colors): string {
+  return owner === localPlayer ? c.hexPlayerDimmed : c.hexAiDimmed;
+}
+
 /** Resolved mountain tint faction (visual-only). */
 type MountainTerritoryCategory = 'p1' | 'p2' | 'neutral';
 
+/** Strict plurality: the side with the highest count wins; any tie (including 2,2,2) → neutral. */
 function mountainTerritoryCategoryFromCounts(nP1: number, nP2: number, nNeutral: number): MountainTerritoryCategory {
   const max = Math.max(nP1, nP2, nNeutral);
-  if (max <= 2) return 'neutral';
-  const atMax = (nP1 === max ? 1 : 0) + (nP2 === max ? 1 : 0) + (nNeutral === max ? 1 : 0);
-  if (atMax !== 1) return 'neutral';
+  const tieCount = (nP1 === max ? 1 : 0) + (nP2 === max ? 1 : 0) + (nNeutral === max ? 1 : 0);
+  if (tieCount !== 1) return 'neutral';
   if (nP1 === max) return 'p1';
   if (nP2 === max) return 'p2';
   return 'neutral';
@@ -84,14 +88,17 @@ function countMountainNeighborSides(
 }
 
 /**
- * Visual-only mountain tints: same win/tie rules per hex, but adjacent mountains contribute their
+ * Visual-only mountain tints: majority per hex (ties → neutral); adjacent mountains contribute their
  * **current** resolved category so color propagates along ridges (Jacobi iteration to fixed point).
+ * Production focus uses the same dimmed player/AI hex colors as owned territory in {@link renderState}.
  */
 function computeMountainTerritoryFillByKey(
   state: GameState,
   mountainSet: Set<string>,
   localPlayer: Owner,
   c: Colors,
+  productionFocusHexes: Set<string>,
+  unitByHex: Map<string, Unit>,
 ): Map<string, string> {
   const out = new Map<string, string>();
   if (mountainSet.size === 0) return out;
@@ -136,12 +143,20 @@ function computeMountainTerritoryFillByKey(
 
   for (const key of keys) {
     const cat = prev.get(key) ?? 'neutral';
+    const ownerForTint: Owner | null = cat === 'p1' ? PLAYER : cat === 'p2' ? AI : null;
+    const hexOccupied = unitByHex.has(key);
+    const mountainDimmed =
+      productionFocusHexes.size > 0 &&
+      state.phase === 'production' &&
+      state.activePlayer === localPlayer &&
+      ownerForTint != null &&
+      (!productionFocusHexes.has(key) || hexOccupied);
     const fill =
-      cat === 'p1'
-        ? hexTerrainFillForOwner(PLAYER, localPlayer, c)
-        : cat === 'p2'
-          ? hexTerrainFillForOwner(AI, localPlayer, c)
-          : c.hexNeutral;
+      ownerForTint == null
+        ? c.hexNeutral
+        : mountainDimmed
+          ? hexTerrainDimmedFillForOwner(ownerForTint, localPlayer, c)
+          : hexTerrainFillForOwner(ownerForTint, localPlayer, c);
     out.set(key, fill);
   }
   return out;
@@ -1022,10 +1037,41 @@ export function renderState(
   unitLayer.innerHTML = '';
 
   const mountainSet = new Set(state.mountainHexes ?? []);
-  /** Per mountain key: territory-adjacency tint after propagating along mountain adjacency. */
-  const mountainTerritoryFillByKey = computeMountainTerritoryFillByKey(state, mountainSet, localPlayer, c);
   const unitByHex = new Map<string, Unit>();
   for (const u of state.units) unitByHex.set(`${u.col},${u.row}`, u);
+
+  const canPlaceHexes = new Set<string>();
+  const productionFocusHexes = new Set<string>();
+  const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
+  if (state.phase === 'production' && state.activePlayer === localPlayer) {
+    const tProdStart = performance.now();
+    for (let r = 0; r < ROWS; r++) {
+      for (let col = 0; col < COLS; col++) {
+        const key = `${col},${r}`;
+        const hex = state.hexStates[key];
+        if (isValidProductionPlacement(state, col, r, localPlayer)) {
+          canPlaceHexes.add(key);
+        }
+        if (r === homeRow && hex && hex.owner === localPlayer) {
+          productionFocusHexes.add(key);
+        }
+      }
+    }
+    for (const [key, hex] of Object.entries(state.hexStates)) {
+      if (hex.owner === localPlayer && hex.isProduction) productionFocusHexes.add(key);
+    }
+    perfRecord('render.productionEligibility', performance.now() - tProdStart);
+  }
+
+  /** Per mountain key: territory-adjacency tint after propagating along mountain adjacency. */
+  const mountainTerritoryFillByKey = computeMountainTerritoryFillByKey(
+    state,
+    mountainSet,
+    localPlayer,
+    c,
+    productionFocusHexes,
+    unitByHex,
+  );
 
   let selectedUnit = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
   if (selectedUnit && selectedUnit.owner !== localPlayer) selectedUnit = null;
@@ -1077,30 +1123,6 @@ export function renderState(
     for (const [c, r] of getOpponentHomeGuardBlockedHexes(state, selectedUnit)) {
       zocHexes.add(`${c},${r}`);
     }
-  }
-
-  const canPlaceHexes = new Set<string>();
-  // Focus set: home row + owned production hexes (regardless of occupation) — used for dimming
-  const productionFocusHexes = new Set<string>();
-  const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
-  if (state.phase === 'production' && state.activePlayer === localPlayer) {
-    const tProdStart = performance.now();
-    for (let r = 0; r < ROWS; r++) {
-      for (let col = 0; col < COLS; col++) {
-        const key = `${col},${r}`;
-        const hex = state.hexStates[key];
-        if (isValidProductionPlacement(state, col, r, localPlayer)) {
-          canPlaceHexes.add(key);
-        }
-        if (r === homeRow && hex && hex.owner === localPlayer) {
-          productionFocusHexes.add(key);
-        }
-      }
-    }
-    for (const [key, hex] of Object.entries(state.hexStates)) {
-      if (hex.owner === localPlayer && hex.isProduction) productionFocusHexes.add(key);
-    }
-    perfRecord('render.productionEligibility', performance.now() - tProdStart);
   }
 
   // Update move area perimeter outline

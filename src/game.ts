@@ -423,6 +423,28 @@ function borderRowNativeOwner(row: number): Owner | undefined {
 }
 
 /**
+ * Domination/Conquest: we only add hexStates for cells with starting units, so other home-row
+ * cells were missing from the map (looked "neutral") and were invalid for production. Seed
+ * empty, non-mountain border cells to the native owner for that edge.
+ * Breakthrough already assigns every playable hex via sectors — skip.
+ */
+function seedEmptyHomeRowHexStates(hexStates: Record<string, HexState>, mountainHexes: string[]): void {
+  const mountains = new Set(mountainHexes);
+  for (let c = 0; c < COLS; c++) {
+    for (const [row, owner] of [
+      [0, AI] as const,
+      [ROWS - 1, PLAYER] as const,
+    ]) {
+      const key = `${c},${row}`;
+      if (mountains.has(key)) continue;
+      if (!hexStates[key]) {
+        hexStates[key] = { owner, stableFor: 0, isProduction: false };
+      }
+    }
+  }
+}
+
+/**
  * When a border-row hex is cleared and the attacker survives, who should own the empty cell?
  * — Native garrison lost: killer's side (attacker) takes the border.
  * — Invader on the opposite home row: the edge reverts to that map side's owner.
@@ -521,8 +543,14 @@ export function hasHomeProductionAccess(state: GameState, localPlayer: Owner): b
   const mountains = state.mountainHexes ?? [];
   for (let c = 0; c < COLS; c++) {
     if (mountains.includes(`${c},${homeRow}`)) continue;
-    const hex = state.hexStates[`${c},${homeRow}`];
-    if (hex && hex.owner === localPlayer) return true;
+    const key = `${c},${homeRow}`;
+    const hex = state.hexStates[key];
+    if (hex) {
+      if (hex.owner === localPlayer) return true;
+    } else if (borderRowNativeOwner(homeRow) === localPlayer) {
+      // Unseeded home cell (e.g. old save): still your map edge
+      return true;
+    }
   }
   return false;
 }
@@ -533,8 +561,11 @@ export function isValidProductionPlacement(state: GameState, col: number, row: n
   if (!hasHomeProductionAccess(state, localPlayer)) return false;
   const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
   if (row === homeRow) {
-    const hex = state.hexStates[`${col},${row}`];
-    return !!(hex && hex.owner === localPlayer);
+    const key = `${col},${row}`;
+    const hex = state.hexStates[key];
+    if (hex) return hex.owner === localPlayer;
+    // Unseeded empty home border (legacy) — only the native side may build here
+    return borderRowNativeOwner(homeRow) === localPlayer;
   }
   const hex = state.hexStates[`${col},${row}`];
   return !!(hex && hex.isProduction && hex.owner === localPlayer);
@@ -1689,6 +1720,10 @@ export function createInitialState(): GameState {
     controlPointHexes = pickControlPointHexes(cpCandidates, config.controlPointCount, COLS, ROWS);
   }
 
+  if (gm !== 'breakthrough') {
+    seedEmptyHomeRowHexStates(hexStates, mountainHexes);
+  }
+
   const conquestPoints =
     gm === 'conquest'
       ? ({
@@ -1838,6 +1873,10 @@ export function createInitialStatePreservingTerrain(previous: GameState): GameSt
     primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
   } else if (gm === 'conquest') {
     controlPointHexes = [...previous.controlPointHexes];
+  }
+
+  if (gm !== 'breakthrough') {
+    seedEmptyHomeRowHexStates(hexStates, mountainHexes);
   }
 
   const conquestPoints =
@@ -2072,6 +2111,10 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
     controlPointHexes = resolveConquestCpsForPlayableStory(story, cpCandidates, COLS, ROWS);
   }
 
+  if (gm !== 'breakthrough') {
+    seedEmptyHomeRowHexStates(hexStates, mountainHexes);
+  }
+
   const conquestPoints =
     gm === 'conquest'
       ? ({
@@ -2252,6 +2295,10 @@ export function createStoryState(story: StoryDef): GameState {
     primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
   }
 
+  if (story.gameMode !== 'breakthrough') {
+    seedEmptyHomeRowHexStates(hexStates, mountainHexes);
+  }
+
   const conquestPoints =
     story.gameMode === 'conquest'
       ? ({
@@ -2365,7 +2412,11 @@ function collectAiProductionCandidates(state: GameState, occupied: Set<string>):
     if (mountains.includes(key)) continue;
     if (occupied.has(key)) continue;
     const hex = state.hexStates[key];
-    if (hex && hex.owner === AI) candidates.push([c, 0]);
+    if (hex) {
+      if (hex.owner === AI) candidates.push([c, 0]);
+    } else {
+      if (borderRowNativeOwner(0) === AI) candidates.push([c, 0]);
+    }
   }
   for (const [key, hex] of Object.entries(state.hexStates)) {
     if (hex.owner === AI && hex.isProduction) {
