@@ -408,14 +408,6 @@ const config: GameConfig = {
   /** Added to healOwnTerritory for end-of-turn heal on own territory. */
   upgradeBonusHealPerStack: 1,
 
-  // ── Automation ───────────────────────────────────────────────────────────────
-
-  // Automatically end the production phase when the player can no longer afford any unit
-  autoEndProduction: true,
-
-  // Automatically end the movement phase when no player unit has a valid move
-  autoEndMovement: true,
-
   // Duration in ms for the unit move animation (0 = instant)
   unitMoveSpeed: 480,
 

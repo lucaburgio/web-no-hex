@@ -15,6 +15,18 @@
   padding: 0;
   cursor: url('/icons/pointer.svg') 13 14, default;
 }
+
+/* Hide scrollbars on all scrollable elements; scrolling still works (wheel, trackpad, touch). */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 html {
   cursor: url('/icons/pointer.svg') 13 14, default;
   -webkit-user-select: none;
@@ -613,22 +625,6 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 8px;
-  scrollbar-width:none;
-  scrollbar-color: rgba(0, 0, 0, 0) rgba(0, 0, 0, 0);
-}
-
-#unit-picker-list::-webkit-scrollbar {
-  height: 8px;
-}
-
-#unit-picker-list::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 4px;
-}
-
-#unit-picker-list::-webkit-scrollbar-thumb {
-  background: rgba(90, 138, 90, 0.55);
-  border-radius: 4px;
 }
 
 @keyframes unit-card-enter {
@@ -3639,10 +3635,8 @@ select.settings-input.settings-select option {
   align-items: stretch;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: none;
   padding: 0 4px;
 }
-#map-editor-toolbar::-webkit-scrollbar { display: none; }
 
 .me-tool-group {
   display: flex;

@@ -18,7 +18,6 @@ import {
   playerRangedAttack,
   isValidProductionPlacement,
   hasAnyValidProductionPlacement,
-  hasHomeProductionAccess,
   forecastCombat,
   vsHumanEndProduction,
   vsHumanEndMovement,
@@ -214,11 +213,6 @@ const settingsTooltipEl   = document.getElementById('settings-tooltip') as HTMLD
 const conquestTooltipEl   = document.getElementById('conquest-tooltip') as HTMLDivElement;
 const ppInfoEl            = document.getElementById('pp-info') as HTMLDivElement;
 const headerTerritoryEl   = document.getElementById('header-territory') as HTMLDivElement;
-
-const autoEndProductionEl = document.getElementById('auto-end-production') as HTMLInputElement;
-const autoEndMovementEl   = document.getElementById('auto-end-movement') as HTMLInputElement;
-autoEndProductionEl.checked = config.autoEndProduction;
-autoEndMovementEl.checked   = config.autoEndMovement;
 
 const rulesOverlayEl = document.getElementById('rules-overlay') as HTMLDivElement;
 const rulesContentEl = document.getElementById('rules-content') as HTMLDivElement;
@@ -1372,11 +1366,9 @@ declare const _cfgNumProxy: {
   // enableRivers is a toggle, handled separately via TOGGLE_FIELDS
 };
 
-const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'limitArtillery' | 'autoEndProduction' | 'autoEndMovement' | 'enableRivers']> = [
+const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'limitArtillery' | 'enableRivers']> = [
   ['cfg-zoneOfControl',      'zoneOfControl'],
   ['cfg-limitArtillery',     'limitArtillery'],
-  ['cfg-autoEndProduction',  'autoEndProduction'],
-  ['cfg-autoEndMovement',    'autoEndMovement'],
   ['cfg-enableRivers',       'enableRivers'],
 ];
 
@@ -2304,6 +2296,7 @@ function buildRulesContent(): string {
         <li><strong>Movement</strong> — move each of your units up to its movement range.</li>
         <li><strong>End</strong> — the opponent takes their turn, then the turn counter advances.</li>
       </ol>
+      <p class="rules-prose">Press <strong>NEXT</strong> to end the current phase whenever you want. The game also advances automatically when production has nothing left to do (no valid placement or you cannot afford any unit) or when no unit can move or make a ranged attack.</p>
       </div>
     </section>
 
@@ -2577,10 +2570,6 @@ function broadcastSettingsPreview(): void {
       row('PP bonus per captured sector', v('cfg-breakthroughSectorCaptureBonusPP'));
     }
   }
-
-  sec('AUTOMATION');
-  row('Auto-end production', tog('cfg-autoEndProduction'));
-  row('Auto-end movement', tog('cfg-autoEndMovement'));
 
   const preview: SettingsPreview = {
     gameMode,
@@ -4142,12 +4131,10 @@ function hasAnyValidMove(): boolean {
 
 function shouldAutoSkipProductionPhase(): boolean {
   if (state.phase !== 'production' || state.activePlayer !== localPlayer) return false;
-  // No empty legal hex: nothing to do in production — always skip (even if auto-end is off).
+  // No legal empty production hex: skip production.
   if (!hasAnyValidProductionPlacement(state, localPlayer)) return true;
-  return (
-    autoEndProductionEl.checked &&
-    (!canAffordAnyUnit() || !hasHomeProductionAccess(state, localPlayer))
-  );
+  // Otherwise skip when nothing can be purchased (player can still press NEXT to pass early).
+  return !canAffordAnyUnit();
 }
 
 function productionEndOptionsForAutoSkip(): EndProductionOptions | undefined {
@@ -4191,7 +4178,7 @@ function maybeAutoEnd(): void {
     render();
     updateUI();
     checkWinner();
-  } else if (state.phase === 'movement' && autoEndMovementEl.checked && !hasAnyValidMove()) {
+  } else if (state.phase === 'movement' && !hasAnyValidMove()) {
     if (gameMode === 'vsAI') {
       // Same as clicking "End movement": run AI with move animations (do not use playerEndMovement / advancePhase).
       runAiTurnWithAnimation();
@@ -4334,7 +4321,7 @@ function updateUI(): void {
       }
       toastVariant = 'yellow';
     } else {
-      toastText = youAreAttacker ? "You're the attacker" : "You're the defender";
+      toastText = youAreAttacker ? "You're the attacker. Conquer the control point to own the sector." : "You're the defender. Hold the control point to keep the sector.";
       toastVariant = 'gray';
     }
     breakthroughToastEl.textContent = toastText;

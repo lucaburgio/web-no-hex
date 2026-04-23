@@ -379,8 +379,6 @@ export interface GameConfig {
   upgradeBonusHealPerStack: number;
   /** Tank melee: additive fraction to attacker CS when the approach uses the full movement allowance in one charge (path steps = movement, from rest that turn). */
   tankSpearheadAttackBonus: number;
-  autoEndProduction: boolean;
-  autoEndMovement: boolean;
   // Duration in ms for the unit move animation (0 = instant)
   unitMoveSpeed: number;
   // Fraction of board hexes to randomly set as impassable mountains (0–1)
