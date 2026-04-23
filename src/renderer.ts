@@ -88,19 +88,13 @@ function countMountainNeighborSides(
 }
 
 /**
- * Visual-only mountain tints: majority per hex (ties → neutral); adjacent mountains contribute their
- * **current** resolved category so color propagates along ridges (Jacobi iteration to fixed point).
- * Production focus uses the same dimmed player/AI hex colors as owned territory in {@link renderState}.
+ * Same plurality + ridge propagation as mountain tints: used for fill colors and conquest/domi frontlines.
  */
-function computeMountainTerritoryFillByKey(
+function resolveMountainTerritoryCategoryByKey(
   state: GameState,
   mountainSet: Set<string>,
-  localPlayer: Owner,
-  c: Colors,
-  productionFocusHexes: Set<string>,
-  unitByHex: Map<string, Unit>,
-): Map<string, string> {
-  const out = new Map<string, string>();
+): Map<string, MountainTerritoryCategory> {
+  const out = new Map<string, MountainTerritoryCategory>();
   if (mountainSet.size === 0) return out;
 
   const keys = [...mountainSet];
@@ -142,7 +136,32 @@ function computeMountainTerritoryFillByKey(
   }
 
   for (const key of keys) {
-    const cat = prev.get(key) ?? 'neutral';
+    out.set(key, prev.get(key) ?? 'neutral');
+  }
+  return out;
+}
+
+/**
+ * Visual-only mountain tints: majority per hex (ties → neutral); adjacent mountains contribute their
+ * **current** resolved category so color propagates along ridges (Jacobi iteration to fixed point).
+ * Production focus uses the same dimmed player/AI hex colors as owned territory in {@link renderState}.
+ */
+function computeMountainTerritoryFillByKey(
+  state: GameState,
+  mountainSet: Set<string>,
+  localPlayer: Owner,
+  c: Colors,
+  productionFocusHexes: Set<string>,
+  unitByHex: Map<string, Unit>,
+  mtnCategoryByKey?: Map<string, MountainTerritoryCategory>,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const categoryMap = mtnCategoryByKey ?? resolveMountainTerritoryCategoryByKey(state, mountainSet);
+  if (categoryMap.size === 0) return out;
+
+  const keys = [...mountainSet];
+  for (const key of keys) {
+    const cat = categoryMap.get(key) ?? 'neutral';
     const ownerForTint: Owner | null = cat === 'p1' ? PLAYER : cat === 'p2' ? AI : null;
     const hexOccupied = unitByHex.has(key);
     const mountainDimmed =
@@ -775,6 +794,54 @@ function buildInterSectorBoundaryPath(
   return d;
 }
 
+/** P1 / P2 for passable owned hex; same from {@link resolveMountainTerritoryCategoryByKey} for mountains. */
+function effectiveTerritoryOwnerAt(
+  key: string,
+  hexStates: Record<string, { owner: Owner }>,
+  mountainSet: Set<string>,
+  mtnCategory: Map<string, MountainTerritoryCategory>,
+): Owner | null {
+  if (mountainSet.has(key)) {
+    const cat = mtnCategory.get(key) ?? 'neutral';
+    if (cat === 'p1') return PLAYER;
+    if (cat === 'p2') return AI;
+    return null;
+  }
+  const hs = hexStates[key];
+  return hs ? hs.owner : null;
+}
+
+/** Edges where adjacent cells resolve to different factions (passable ownership + mountain tint categories). */
+function buildInterFactionBoundaryPath(
+  hexStates: Record<string, { owner: Owner }>,
+  mountainSet: Set<string>,
+  mtnCategory: Map<string, MountainTerritoryCategory>,
+  cols: number,
+  rows: number,
+): string {
+  let d = '';
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const key = `${c},${r}`;
+      const a = effectiveTerritoryOwnerAt(key, hexStates, mountainSet, mtnCategory);
+      const { x, y } = hexToPixel(c, r);
+      const dirs = r % 2 === 0 ? DIRS_EVEN : DIRS_ODD;
+      for (let i = 0; i < 6; i++) {
+        const [dc, dr] = dirs[i]!;
+        const nc = c + dc;
+        const nr = r + dr;
+        if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+        const nk = `${nc},${nr}`;
+        if (!hexKeyLess(key, nk)) continue;
+        const b = effectiveTerritoryOwnerAt(nk, hexStates, mountainSet, mtnCategory);
+        if (a == null || b == null || a === b) continue;
+        d = appendHexEdgeToPath(d, x, y, i);
+      }
+    }
+  }
+  return d;
+}
+
 /** Edges between two different sectors both still held by the defender. */
 function buildDefenderOnlySectorBoundaryPath(
   sectorIndexByHex: Record<string, number>,
@@ -1064,6 +1131,7 @@ export function renderState(
   }
 
   /** Per mountain key: territory-adjacency tint after propagating along mountain adjacency. */
+  const mtnTerritoryCategoryByKey = resolveMountainTerritoryCategoryByKey(state, mountainSet);
   const mountainTerritoryFillByKey = computeMountainTerritoryFillByKey(
     state,
     mountainSet,
@@ -1071,6 +1139,7 @@ export function renderState(
     c,
     productionFocusHexes,
     unitByHex,
+    mtnTerritoryCategoryByKey,
   );
 
   let selectedUnit = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
@@ -1391,7 +1460,7 @@ export function renderState(
       mountainLayer.appendChild(clipped);
     }
   }
-/* breakthrought sector outline border, frontline */
+  // Breakthrough: sector political borders. Conquest / domination: frontline between owned hexes.
   const sectorOutlineLayerEl = domCache?.sectorOutlineLayer ?? (svgElement.querySelector('#sector-outline-layer') as SVGGElement | null);
   if (sectorOutlineLayerEl) {
     sectorOutlineLayerEl.innerHTML = '';
@@ -1432,6 +1501,27 @@ export function renderState(
         path.setAttribute('stroke-linecap', 'round');
         path.setAttribute('pointer-events', 'none');
         path.setAttribute('class', 'sector-outline sector-outline-between');
+        sectorOutlineLayerEl.appendChild(path);
+      }
+    } else if (state.gameMode === 'conquest' || state.gameMode === 'domination') {
+      const dFaction = buildInterFactionBoundaryPath(
+        state.hexStates,
+        mountainSet,
+        mtnTerritoryCategoryByKey,
+        COLS,
+        ROWS,
+      );
+      // frontline border between owned hexes of different factions
+      if (dFaction) {
+        const path = svgEl('path');
+        path.setAttribute('d', dFaction);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', 'rgba(0,0,0,1)');
+        path.setAttribute('stroke-width', '2.5');
+        path.setAttribute('stroke-linejoin', 'round');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('pointer-events', 'none');
+        path.setAttribute('class', 'faction-frontline');
         sectorOutlineLayerEl.appendChild(path);
       }
     }
