@@ -1,5 +1,11 @@
 import { getNeighbors, hexDistance } from './hex';
-import config, { getAvailableUnitTypes, snapshotActiveUnitPackagesForSave } from './gameconfig';
+import config, {
+  BOARD_HEX_DIM_MAX,
+  BOARD_HEX_DIM_MIN,
+  getAvailableUnitTypes,
+  snapshotActiveUnitPackagesForSave,
+  updateConfig,
+} from './gameconfig';
 import { generateRiver, getAllBorderEntries, riverMaxHexesFromBoardWidth } from './rivers';
 import type { RiverHex } from './types';
 import type {
@@ -54,6 +60,74 @@ export let ROWS = config.boardRows;
 export function syncDimensions(): void {
   COLS = config.boardCols;
   ROWS = config.boardRows;
+}
+
+const HEX_KEY_RE = /^(\d+),(\d+)$/;
+
+function considerHexKey(key: string, acc: { maxC: number; maxR: number }): void {
+  const m = key.match(HEX_KEY_RE);
+  if (!m) return;
+  const c = Number(m[1]);
+  const r = Number(m[2]);
+  if (c > acc.maxC) acc.maxC = c;
+  if (r > acc.maxR) acc.maxR = r;
+}
+
+/** Infer width/height from every hex position referenced in a save (for older JSON without `boardCols` / `boardRows`). */
+export function inferBoardDimensionsFromState(state: GameState): { boardCols: number; boardRows: number } {
+  const acc = { maxC: -1, maxR: -1 };
+  for (const u of state.units) {
+    if (u.col > acc.maxC) acc.maxC = u.col;
+    if (u.row > acc.maxR) acc.maxR = u.row;
+  }
+  for (const k of Object.keys(state.hexStates)) considerHexKey(k, acc);
+  for (const k of state.mountainHexes) considerHexKey(k, acc);
+  for (const rh of state.riverHexes) {
+    if (rh.col > acc.maxC) acc.maxC = rh.col;
+    if (rh.row > acc.maxR) acc.maxR = rh.row;
+  }
+  for (const k of state.controlPointHexes) considerHexKey(k, acc);
+  for (const k of state.sectorControlPointHex) {
+    if (k) considerHexKey(k, acc);
+  }
+  for (const group of state.sectorHexes) {
+    for (const k of group) considerHexKey(k, acc);
+  }
+  for (const k of Object.keys(state.sectorIndexByHex)) considerHexKey(k, acc);
+  if (acc.maxC < 0 || acc.maxR < 0) {
+    return { boardCols: config.boardCols, boardRows: config.boardRows };
+  }
+  return { boardCols: acc.maxC + 1, boardRows: acc.maxR + 1 };
+}
+
+function isValidBoardDim(n: number): boolean {
+  return Number.isInteger(n) && n >= BOARD_HEX_DIM_MIN && n <= BOARD_HEX_DIM_MAX;
+}
+
+/** Use persisted `boardCols` / `boardRows` when present and valid; else infer; clamp to allowed range. */
+export function resolveBoardDimensionsForState(state: GameState): { boardCols: number; boardRows: number } {
+  if (
+    state.boardCols != null &&
+    state.boardRows != null &&
+    isValidBoardDim(state.boardCols) &&
+    isValidBoardDim(state.boardRows)
+  ) {
+    return { boardCols: state.boardCols, boardRows: state.boardRows };
+  }
+  const inf = inferBoardDimensionsFromState(state);
+  return {
+    boardCols: Math.min(BOARD_HEX_DIM_MAX, Math.max(BOARD_HEX_DIM_MIN, inf.boardCols)),
+    boardRows: Math.min(BOARD_HEX_DIM_MAX, Math.max(BOARD_HEX_DIM_MIN, inf.boardRows)),
+  };
+}
+
+/** Align global `config`, `COLS`/`ROWS`, and optional fields on `state` with the match map size. */
+export function applyGameStateBoardDimensions(state: GameState): void {
+  const { boardCols, boardRows } = resolveBoardDimensionsForState(state);
+  state.boardCols = boardCols;
+  state.boardRows = boardRows;
+  updateConfig({ boardCols, boardRows });
+  syncDimensions();
 }
 
 let unitIdCounter = 0;
@@ -1764,6 +1838,8 @@ export function createInitialState(): GameState {
     hexStates,
     mountainHexes,
     riverHexes,
+    boardCols: COLS,
+    boardRows: ROWS,
     gameMode: gm,
     controlPointHexes,
     conquestPoints,
@@ -1914,6 +1990,8 @@ export function createInitialStatePreservingTerrain(previous: GameState): GameSt
     hexStates,
     mountainHexes,
     riverHexes,
+    boardCols: COLS,
+    boardRows: ROWS,
     gameMode: gm,
     controlPointHexes,
     conquestPoints,
@@ -2150,6 +2228,8 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
     hexStates,
     mountainHexes,
     riverHexes,
+    boardCols: COLS,
+    boardRows: ROWS,
     gameMode: gm,
     controlPointHexes,
     conquestPoints,
@@ -2339,6 +2419,8 @@ export function createStoryState(story: StoryDef): GameState {
     hexStates,
     mountainHexes,
     riverHexes: mapForTerrain.rivers ?? [],
+    boardCols: COLS,
+    boardRows: ROWS,
     gameMode: story.gameMode,
     controlPointHexes,
     conquestPoints,
@@ -3035,6 +3117,15 @@ function snapshotUnits(st: GameState): Unit[] {
   return st.units.map(u => ({ ...u }));
 }
 
+/** Territory map for AI anim replay (hex fills match the board before each step). */
+function snapshotHexStates(st: GameState): Record<string, HexState> {
+  const out: Record<string, HexState> = {};
+  for (const [k, h] of Object.entries(st.hexStates)) {
+    out[k] = { ...h };
+  }
+  return out;
+}
+
 /** AI replay: one unit at a hex (game state keeps attacker on start hex until resolve for path length 2). */
 function withUnitAtHex(units: Unit[], unitId: number, col: number, row: number): Unit[] {
   return units.map(u => (u.id === unitId ? { ...u, col, row } : u));
@@ -3047,6 +3138,8 @@ export function aiMovement(state: GameState): {
   animSteps: AiAnimStep[];
   /** Board state immediately before each step (same length as animSteps). */
   animUnitsBefore: Unit[][];
+  /** `hexStates` immediately before each step — for replay territory paint (same length as animSteps). */
+  animHexStatesBefore: Record<string, HexState>[];
   /** Board state immediately after each step (same length as animSteps). */
   animUnitsAfter: Unit[][];
 } {
@@ -3054,6 +3147,7 @@ export function aiMovement(state: GameState): {
   const combatVfx: CombatVfxPayload[] = [];
   const animSteps: AiAnimStep[] = [];
   const animUnitsBefore: Unit[][] = [];
+  const animHexStatesBefore: Record<string, HexState>[] = [];
   const animUnitsAfter: Unit[][] = [];
   const pressure = aiDefensivePressure(state);
   const threat = criticalThreatPlayerUnit(state);
@@ -3131,6 +3225,7 @@ export function aiMovement(state: GameState): {
         const defCol = target.col;
         const defRow = target.row;
         animUnitsBefore.push(snapshotUnits(state));
+        animHexStatesBefore.push(snapshotHexStates(state));
         const res = resolveCombat(state, unit, target);
         const vfx = combatVfxFromResolve(attackerId, atkCol, atkRow, defCol, defRow, res);
         combatVfx.push(vfx);
@@ -3188,11 +3283,13 @@ export function aiMovement(state: GameState): {
         const attackerId = unit.id;
         const unitBeforeMelee = { ...unit } as Unit;
         const unitsBeforeApproach = snapshotUnits(state);
+        const hexBeforeApproach = snapshotHexStates(state);
 
         advanceAlongPathBeforeCombat(state, unit, path, AI);
         const atkCol = unit.col;
         const atkRow = unit.row;
         const beforeResolveUnits = snapshotUnits(state);
+        const hexAfterApproachBeforeResolve = snapshotHexStates(state);
 
         const res = resolveCombat(state, unit, target, { spearhead });
         const vfx = combatVfxFromResolve(attackerId, atkCol, atkRow, best.col, best.row, res, path);
@@ -3205,6 +3302,7 @@ export function aiMovement(state: GameState): {
           const s = p[0]!;
           const e = p[p.length - 1]!;
           animUnitsBefore.push(unitsBeforeApproach);
+          animHexStatesBefore.push(hexBeforeApproach);
           animSteps.push({
             type: 'move',
             anim: {
@@ -3239,6 +3337,7 @@ export function aiMovement(state: GameState): {
           const from = approachHexes[0]!;
           const to = approachHexes[approachHexes.length - 1]!;
           animUnitsBefore.push(unitsBeforeApproach);
+          animHexStatesBefore.push(hexBeforeApproach);
           animSteps.push({
             type: 'move',
             anim: {
@@ -3257,6 +3356,7 @@ export function aiMovement(state: GameState): {
 
         // Combat floats / strike: mutual-kill path shows empty board before floats; else pre-damage for strike.
         animUnitsBefore.push(hasMk ? snapshotUnits(state) : boardBeforeMeleeFloats);
+        animHexStatesBefore.push(hasMk ? snapshotHexStates(state) : hexAfterApproachBeforeResolve);
         animSteps.push({ type: 'combat', vfx });
         animUnitsAfter.push(snapshotUnits(state));
         checkVictory(state);
@@ -3270,6 +3370,7 @@ export function aiMovement(state: GameState): {
       const fromRow = unit.row;
       const unitSnap = { ...unit } as Unit;
       animUnitsBefore.push(snapshotUnits(state));
+      animHexStatesBefore.push(snapshotHexStates(state));
       unit.movesUsed += stepsCost;
       for (const [pc, pr] of path.slice(1)) {
         conquerHex(state, pc, pr, AI);
@@ -3294,7 +3395,7 @@ export function aiMovement(state: GameState): {
   checkVictory(state);
   log(state, 'AI completed movement.');
   perfLog('ai.movement.total', performance.now() - tStart);
-  return { state, combatVfx, animSteps, animUnitsBefore, animUnitsAfter };
+  return { state, combatVfx, animSteps, animUnitsBefore, animHexStatesBefore, animUnitsAfter };
 }
 
 // ── Phase advancement ─────────────────────────────────────────────────────────

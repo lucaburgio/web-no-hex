@@ -18,7 +18,7 @@ import {
   getBreakthroughDefenderOwner,
 } from './game';
 import type { Owner } from './types';
-import type { GameState, Unit } from './types';
+import type { GameState, HexState, Unit } from './types';
 import config from './gameconfig';
 import mountainHex01 from '../public/images/misc/mountain-hex/mountain-01.png';
 import mountainHex02 from '../public/images/misc/mountain-hex/mountain-02.png';
@@ -50,13 +50,34 @@ function hexTerrainDimmedFillForOwner(owner: Owner, localPlayer: Owner, c: Color
 /** Resolved mountain tint faction (visual-only). */
 type MountainTerritoryCategory = 'p1' | 'p2' | 'neutral';
 
-/** Strict plurality: the side with the highest count wins; any tie (including 2,2,2) → neutral. */
-function mountainTerritoryCategoryFromCounts(nP1: number, nP2: number, nNeutral: number): MountainTerritoryCategory {
+/**
+ * Strict plurality: the side with the highest count wins.
+ * Two-way ties (e.g. 3–3–0) → neutral. Three-way tie (e.g. 2–2–2): keep `prev` if it is p1/p2, else stable pick by `key`.
+ */
+function mountainTerritoryCategoryFromCounts(
+  nP1: number,
+  nP2: number,
+  nNeutral: number,
+  opts?: { prev?: MountainTerritoryCategory; key?: string },
+): MountainTerritoryCategory {
   const max = Math.max(nP1, nP2, nNeutral);
   const tieCount = (nP1 === max ? 1 : 0) + (nP2 === max ? 1 : 0) + (nNeutral === max ? 1 : 0);
-  if (tieCount !== 1) return 'neutral';
-  if (nP1 === max) return 'p1';
-  if (nP2 === max) return 'p2';
+  if (tieCount === 1) {
+    if (nP1 === max) return 'p1';
+    if (nP2 === max) return 'p2';
+    return 'neutral';
+  }
+  if (tieCount === 3) {
+    const prev = opts?.prev;
+    if (prev === 'p1' || prev === 'p2') return prev;
+    const key = opts?.key;
+    if (key) {
+      let h = 0;
+      for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+      return h % 2 === 0 ? 'p1' : 'p2';
+    }
+    return 'p1';
+  }
   return 'neutral';
 }
 
@@ -112,7 +133,7 @@ function resolveMountainTerritoryCategoryByKey(
       else if (hs.owner === PLAYER) nP1 += 1;
       else nP2 += 1;
     }
-    passableOnly.set(key, mountainTerritoryCategoryFromCounts(nP1, nP2, nNeutral));
+    passableOnly.set(key, mountainTerritoryCategoryFromCounts(nP1, nP2, nNeutral, { key }));
   }
 
   let prev = passableOnly;
@@ -122,7 +143,7 @@ function resolveMountainTerritoryCategoryByKey(
     for (const key of keys) {
       const [col, row] = key.split(',').map(Number);
       const { nP1, nP2, nNeutral } = countMountainNeighborSides(state, col, row, mountainSet, prev);
-      next.set(key, mountainTerritoryCategoryFromCounts(nP1, nP2, nNeutral));
+      next.set(key, mountainTerritoryCategoryFromCounts(nP1, nP2, nNeutral, { prev: prev.get(key), key }));
     }
     let stable = true;
     for (const key of keys) {
@@ -142,7 +163,7 @@ function resolveMountainTerritoryCategoryByKey(
 }
 
 /**
- * Visual-only mountain tints: majority per hex (ties → neutral); adjacent mountains contribute their
+ * Visual-only mountain tints: majority per hex (two-way ties → neutral; three-way 2–2–2 keeps a side); adjacent mountains contribute their
  * **current** resolved category so color propagates along ridges (Jacobi iteration to fixed point).
  * Production focus uses the same dimmed player/AI hex colors as owned territory in {@link renderState}.
  */
@@ -1092,11 +1113,19 @@ export function renderState(
   unitDrawOverride?: Unit[] | null,
   /** vs human only: local-only unit id highlight while waiting for your turn (not synced). */
   localSpectatorInspectUnitId?: number | null,
+  /**
+   * When set (e.g. vs-AI replay), paint territory / frontlines from this map instead of `state.hexStates`
+   * so hex colors stay in sync with staged move animations.
+   */
+  hexStatesDrawOverride?: Record<string, HexState> | null,
 ): void {
   const tRenderStart = performance.now();
   const trackHpBars = svgElement.id === 'board' && !unitDrawOverride;
   const now = performance.now();
   if (trackHpBars) syncHpBarAnimState(state, now);
+
+  const stateTerritoryDraw: GameState =
+    hexStatesDrawOverride != null ? { ...state, hexStates: hexStatesDrawOverride } : state;
 
   const c = colors();
   const domCache = renderDomCacheBySvg.get(svgElement);
@@ -1115,7 +1144,7 @@ export function renderState(
     for (let r = 0; r < ROWS; r++) {
       for (let col = 0; col < COLS; col++) {
         const key = `${col},${r}`;
-        const hex = state.hexStates[key];
+        const hex = stateTerritoryDraw.hexStates[key];
         if (isValidProductionPlacement(state, col, r, localPlayer)) {
           canPlaceHexes.add(key);
         }
@@ -1124,16 +1153,16 @@ export function renderState(
         }
       }
     }
-    for (const [key, hex] of Object.entries(state.hexStates)) {
+    for (const [key, hex] of Object.entries(stateTerritoryDraw.hexStates)) {
       if (hex.owner === localPlayer && hex.isProduction) productionFocusHexes.add(key);
     }
     perfRecord('render.productionEligibility', performance.now() - tProdStart);
   }
 
   /** Per mountain key: territory-adjacency tint after propagating along mountain adjacency. */
-  const mtnTerritoryCategoryByKey = resolveMountainTerritoryCategoryByKey(state, mountainSet);
+  const mtnTerritoryCategoryByKey = resolveMountainTerritoryCategoryByKey(stateTerritoryDraw, mountainSet);
   const mountainTerritoryFillByKey = computeMountainTerritoryFillByKey(
-    state,
+    stateTerritoryDraw,
     mountainSet,
     localPlayer,
     c,
@@ -1222,7 +1251,7 @@ export function renderState(
 
       const key                = `${col},${r}`;
       const isMountain         = mountainSet.has(key);
-      const hexState           = state.hexStates[key];
+      const hexState           = stateTerritoryDraw.hexStates[key];
       const isSelectedHex      = selectedUnit && col === selectedUnit.col && r === selectedUnit.row;
       const isValidMove        = validMoveHexes.has(key);
       const isZoc              = zocHexes.has(key);
@@ -1505,7 +1534,7 @@ export function renderState(
       }
     } else if (state.gameMode === 'conquest' || state.gameMode === 'domination') {
       const dFaction = buildInterFactionBoundaryPath(
-        state.hexStates,
+        stateTerritoryDraw.hexStates,
         mountainSet,
         mtnTerritoryCategoryByKey,
         COLS,

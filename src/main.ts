@@ -73,7 +73,7 @@ import {
   type RulesPresetValues,
 } from './rulesPresets';
 import gsap from 'gsap';
-import type { GameState, Unit, UnitType, CombatForecast, Owner, CombatVfxPayload, GameMode, UnitUpgradeKind } from './types';
+import type { GameState, Unit, UnitType, CombatForecast, Owner, CombatVfxPayload, GameMode, UnitUpgradeKind, HexState } from './types';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
 import modeImgDomination from '../public/images/modes/domination.png';
 import modeImgConquest from '../public/images/modes/conquest.png';
@@ -101,7 +101,7 @@ import {
   type AchievementCategory,
   type AchievementView,
 } from './achievements';
-import { syncDimensions } from './game';
+import { applyGameStateBoardDimensions, syncDimensions } from './game';
 import {
   hideGameEndScreen,
   hideGameEndOverlayForReplay,
@@ -2815,6 +2815,7 @@ function applyUnitPackagesFromGameState(s: GameState): void {
 
 function startGame(initialState: GameState): void {
   hideGameEndScreen();
+  applyGameStateBoardDimensions(initialState);
   applyUnitPackagesFromGameState(initialState);
   state = initialState;
   if (!state.winner) {
@@ -3903,6 +3904,7 @@ function runAiTurnWithAnimation(): void {
     state = aiResult.state;
     const animSteps = aiResult.animSteps;
     const animUnitsBefore = aiResult.animUnitsBefore;
+    const animHexStatesBefore = aiResult.animHexStatesBefore;
     const animUnitsAfter = aiResult.animUnitsAfter;
 
     if (animSteps.length === 0) {
@@ -3961,6 +3963,7 @@ function runAiTurnWithAnimation(): void {
       vfx: CombatVfxPayload,
       unitsBefore: Unit[],
       unitsAfter: Unit[],
+      hexTerritoryBeforeStep: Record<string, HexState>,
       onDone: () => void,
     ): void => {
       const floats = vfx.damageFloats;
@@ -3975,7 +3978,7 @@ function runAiTurnWithAnimation(): void {
         const { pick, hiddenUnitIds } = aiDamageFloatDrawParams(unitsBefore, unitsAfter, afterStrike);
         const initial = cloneUnits(pick === 'after' ? unitsAfter : unitsBefore);
         syncAnimStaticHidden(hiddenUnitIds);
-        renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, initial, spectatorInspectIdForBoard());
+        renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, initial, spectatorInspectIdForBoard(), hexTerritoryBeforeStep);
         updateUI();
         if (floats.length === 0) {
           const ua = cloneUnits(unitsAfter);
@@ -4015,7 +4018,7 @@ function runAiTurnWithAnimation(): void {
         }
         const ub = cloneUnits(unitsBefore);
         syncAnimStaticHidden([sr.attackerId]);
-        renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, ub, spectatorInspectIdForBoard());
+        renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, ub, spectatorInspectIdForBoard(), hexTerritoryBeforeStep);
         updateUI();
         const { cancel } = animateStrikeAndReturn(
           svg,
@@ -4053,7 +4056,7 @@ function runAiTurnWithAnimation(): void {
           stackAbove = nextStep.vfx.attackerAnimAboveUnits ?? true;
         }
         syncAnimStaticHidden([a.unit.id]);
-        renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, before, spectatorInspectIdForBoard());
+        renderState(svg, state, null, animStaticHiddenUnitIds, localPlayer, before, spectatorInspectIdForBoard(), animHexStatesBefore[index]!);
         updateUI();
         const { cancel } = animateMoves(
           svg,
@@ -4066,7 +4069,7 @@ function runAiTurnWithAnimation(): void {
         );
         humanMoveAnimCancel = combineAnimCancels(cancel);
       } else {
-        playOneCombatVfx(step.vfx, before, animUnitsAfter[index]!, () => runStep(index + 1));
+        playOneCombatVfx(step.vfx, before, animUnitsAfter[index]!, animHexStatesBefore[index]!, () => runStep(index + 1));
       }
     };
 

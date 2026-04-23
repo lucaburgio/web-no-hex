@@ -98,6 +98,9 @@ export interface GameState {
   mountainHexes: string[];
   /** River hexes placed on the map (visual only). */
   riverHexes: RiverHex[];
+  /** Board width/height in hexes; persisted for Continue. Older saves infer size from hex data on load. */
+  boardCols?: number;
+  boardRows?: number;
   /** Set at match start from config; used for saves / multiplayer. */
   gameMode: GameMode;
   /** Unit type packages for production (P1 / south); persisted so saves restore the correct roster. */
