@@ -368,6 +368,11 @@ export interface GameConfig {
   zoneOfControl: boolean;
   /** If true, artillery cannot use ranged fire while any enemy is adjacent; must clear adjacencies first. */
   limitArtillery: boolean;
+  /**
+   * When true, the client only shows enemy units and true territory tints for hexes within
+   * BFS distance 2 of the local player's units; see renderer fog-of-war.
+   */
+  fogOfWar: boolean;
   /** Multiplier on HP actually removed from the enemy when awarding upgrade points (1 = one point per damage). */
   upgradePointsPerDamageDealt: number;
   /** Extra upgrade points when the attacker destroys the defender. */

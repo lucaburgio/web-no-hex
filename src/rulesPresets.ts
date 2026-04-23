@@ -19,6 +19,7 @@ export type RulesPresetValues = Pick<
   | 'maxFlankingUnits'
   | 'zoneOfControl'
   | 'limitArtillery'
+  | 'fogOfWar'
   | 'healOwnTerritory'
   | 'conquestPointsPlayer'
   | 'conquestPointsAi'
@@ -51,6 +52,7 @@ function rulesValuesMatchConfig(cfg: GameConfig, p: RulesPresetValues): boolean 
     cfg.maxFlankingUnits === p.maxFlankingUnits &&
     cfg.zoneOfControl === p.zoneOfControl &&
     cfg.limitArtillery === p.limitArtillery &&
+    cfg.fogOfWar === p.fogOfWar &&
     cfg.healOwnTerritory === p.healOwnTerritory &&
     cfg.conquestPointsPlayer === p.conquestPointsPlayer &&
     cfg.conquestPointsAi === p.conquestPointsAi &&
@@ -79,6 +81,7 @@ export const RULES_PRESETS: RulesPreset[] = [
     maxFlankingUnits: 2,
     zoneOfControl: true,
     limitArtillery: false,
+    fogOfWar: false,
     healOwnTerritory: 2,
     conquestPointsPlayer: 40,
     conquestPointsAi: 40,
@@ -104,6 +107,7 @@ export const RULES_PRESETS: RulesPreset[] = [
     maxFlankingUnits: 2,
     zoneOfControl: true,
     limitArtillery: false,
+    fogOfWar: false,
     healOwnTerritory: 2,
     conquestPointsPlayer: 40,
     conquestPointsAi: 40,

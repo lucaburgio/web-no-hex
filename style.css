@@ -111,10 +111,16 @@ img {
     --color-hex-zoc:           #d58f8f;
     /* Unconquered hexes: transparent so the game-area line texture shows through */
     --color-hex-neutral:       var(--color-light);
+    /* Fog of war: replaces owner tint for hexes outside local vision */
+    --color-fog:               #a8a4a0;
     --color-hex-stroke:        transparent;
   
     /* ── Movement area perimeter outline ────────────────────────────────────── */
     --color-move-border: var(--color-yellow-900);
+
+    /* Domination / Conquest: SVG stroke on hex edges between opposing owned territory */
+    --color-faction-frontline-border: rgba(0, 0, 0, 1);
+    --color-faction-frontline-border-production: rgba(0, 0, 0, 0.1);
   
     /* ── Unit icon & HP bar thresholds ──────────────────────────────────────── */
     --color-unit-icon: #FFF;
@@ -133,6 +139,14 @@ img {
     --heal-float-bg: var(--color-green-500);
     --heal-float-text: var(--color-green-700);
 
+}
+
+/* Domination / Conquest inter-faction frontline (renderer: path.faction-frontline) */
+.faction-frontline {
+  stroke: var(--color-faction-frontline-border);
+}
+.faction-frontline.faction-frontline--production {
+  stroke: var(--color-faction-frontline-border-production);
 }
 
 @keyframes damage-float-rise {

@@ -617,6 +617,14 @@ function syncDamageFloatCssDuration(): void {
 
 /** Guest: replay host movement + combat visuals (also accepts legacy single {@link MoveAnimation}). */
 function runOpponentAnimationPayload(anim: WsAnimationPayload | MoveAnimation, onDone: () => void): void {
+  if (config.fogOfWar) {
+    animStaticHiddenUnitIds.clear();
+    humanMoveAnimCancel = null;
+    clearCombatVfxLayers(svg);
+    render();
+    onDone();
+    return;
+  }
   syncDamageFloatCssDuration();
   if (isLegacySingleMoveAnimation(anim)) {
     syncAnimStaticHidden([anim.unit.id]);
@@ -1366,10 +1374,13 @@ declare const _cfgNumProxy: {
   // enableRivers is a toggle, handled separately via TOGGLE_FIELDS
 };
 
-const TOGGLE_FIELDS: Array<[string, 'zoneOfControl' | 'limitArtillery' | 'enableRivers']> = [
+const TOGGLE_FIELDS: Array<
+  [string, 'zoneOfControl' | 'limitArtillery' | 'enableRivers' | 'fogOfWar']
+> = [
   ['cfg-zoneOfControl',      'zoneOfControl'],
   ['cfg-limitArtillery',     'limitArtillery'],
   ['cfg-enableRivers',       'enableRivers'],
+  ['cfg-fogOfWar',           'fogOfWar'],
 ];
 
 const RULES_PRESET_NUM_FIELDS: Array<[string, keyof RulesPresetValues, number]> = [
@@ -1389,10 +1400,13 @@ const RULES_PRESET_NUM_FIELDS: Array<[string, keyof RulesPresetValues, number]> 
   ['cfg-breakthroughSectorCaptureBonusPP', 'breakthroughSectorCaptureBonusPP', 1],
 ];
 
-const RULES_PRESET_TOGGLES: Array<[string, 'zoneOfControl' | 'limitArtillery' | 'enableRivers']> = [
+const RULES_PRESET_TOGGLES: Array<
+  [string, 'zoneOfControl' | 'limitArtillery' | 'enableRivers' | 'fogOfWar']
+> = [
   ['cfg-enableRivers', 'enableRivers'],
   ['cfg-zoneOfControl', 'zoneOfControl'],
   ['cfg-limitArtillery', 'limitArtillery'],
+  ['cfg-fogOfWar', 'fogOfWar'],
 ];
 
 class SettingsOnOffToggle {
@@ -2559,6 +2573,7 @@ function broadcastSettingsPreview(): void {
     row('Max flanking units', v('cfg-maxFlankingUnits'));
     row('Zone of control', tog('cfg-zoneOfControl'));
     row('Limit artillery', tog('cfg-limitArtillery'));
+    row('Fog of war', tog('cfg-fogOfWar'));
 
     sec('HEALING');
     row('HP/turn on own territory', v('cfg-healOwnTerritory'));
@@ -3959,6 +3974,11 @@ function runAiTurnWithAnimation(): void {
       });
     };
 
+    if (config.fogOfWar) {
+      finishAi();
+      return;
+    }
+
     const playOneCombatVfx = (
       vfx: CombatVfxPayload,
       unitsBefore: Unit[],
@@ -4686,7 +4706,17 @@ function renderRecapTurn(index: number): void {
   const snap = turnSnapshots[index];
   if (!snap) return;
   // Override phase/selectedUnit so renderState never dims hexes or highlights moves
-  renderState(recapSvg, { ...snap, phase: 'movement', selectedUnit: null }, null, new Set(), localPlayer);
+  renderState(
+    recapSvg,
+    { ...snap, phase: 'movement', selectedUnit: null },
+    null,
+    new Set(),
+    localPlayer,
+    undefined,
+    undefined,
+    null,
+    { skipFogOfWar: true },
+  );
   recapTurnLabel.textContent = index === 0
     ? 'TURN 1 — START'
     : `TURN ${snap.turn - 1} — END`;

@@ -396,6 +396,9 @@ const config: GameConfig = {
   // If true, artillery cannot ranged-attack while any enemy is adjacent (must fight adjacent first)
   limitArtillery: false,
 
+  // Reveal only nearby enemies and shroud distant territory (renderer-only; default off)
+  fogOfWar: false,
+
   // Upgrade points: attacker earns these from damage dealt to enemies and from kills (see game.ts combat)
   upgradePointsPerDamageDealt: 1,
   upgradePointsKillBonus: 1,

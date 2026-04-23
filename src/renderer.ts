@@ -17,8 +17,7 @@ import {
   getOpponentHomeGuardBlockedHexes,
   getBreakthroughDefenderOwner,
 } from './game';
-import type { Owner } from './types';
-import type { GameState, HexState, Unit } from './types';
+import type { GameState, HexState, Owner, Unit } from './types';
 import config from './gameconfig';
 import mountainHex01 from '../public/images/misc/mountain-hex/mountain-01.png';
 import mountainHex02 from '../public/images/misc/mountain-hex/mountain-02.png';
@@ -30,6 +29,40 @@ import mountainHex07 from '../public/images/misc/mountain-hex/mountain-07.png';
 import { riverSegmentDisplay } from './rivers';
 
 const MOUNTAIN_HEX_TEXTURES = [mountainHex01, mountainHex02, mountainHex03, mountainHex04, mountainHex05, mountainHex06, mountainHex07] as const;
+
+/** BFS path distance: hexes with distance 0, 1, or 2 from any friendly unit are in vision. */
+const FOG_VISION_HEX_DISTANCE = 2;
+
+/** Keys `col,row` reachable within {@link FOG_VISION_HEX_DISTANCE} steps of any `localPlayer` unit. */
+function buildLocalPlayerVisionKeys(
+  units: readonly Unit[],
+  localPlayer: Owner,
+  cols: number,
+  rows: number,
+): Set<string> {
+  const dist = new Map<string, number>();
+  const q: [number, number][] = [];
+  for (const u of units) {
+    if (u.owner !== localPlayer) continue;
+    const k = `${u.col},${u.row}`;
+    if (dist.has(k)) continue;
+    dist.set(k, 0);
+    q.push([u.col, u.row]);
+  }
+  for (let i = 0; i < q.length; i++) {
+    const [c, r] = q[i]!;
+    const d = dist.get(`${c},${r}`) ?? 0;
+    if (d >= FOG_VISION_HEX_DISTANCE) continue;
+    for (const [nc, nr] of getNeighbors(c, r, cols, rows)) {
+      const nk = `${nc},${nr}`;
+      if (dist.has(nk)) continue;
+      const nd = d + 1;
+      dist.set(nk, nd);
+      if (nd < FOG_VISION_HEX_DISTANCE) q.push([nc, nr]);
+    }
+  }
+  return new Set(dist.keys());
+}
 
 /** Stable pseudo-random pick so each mountain hex keeps the same art across re-renders. */
 function mountainHexTextureUrl(key: string): string {
@@ -581,6 +614,7 @@ interface Colors {
   hexCanPlace: string;
   hexProdSelected: string;
   hexZoc: string;
+  hexFog: string;
   hexNeutral: string;
   hexStroke: string;
   hexProdStroke: string;
@@ -627,6 +661,7 @@ function colors(): Colors {
     hexCanPlace:     v('--color-hex-can-place'),
     hexProdSelected: v('--color-hex-prod-selected'),
     hexZoc:          v('--color-hex-zoc'),
+    hexFog:          v('--color-fog'),
     hexNeutral:      v('--color-hex-neutral'),
     hexStroke:       v('--color-hex-stroke'),
     hexProdStroke:   v('--color-hex-prod-stroke'),
@@ -1118,6 +1153,8 @@ export function renderState(
    * so hex colors stay in sync with staged move animations.
    */
   hexStatesDrawOverride?: Record<string, HexState> | null,
+  /** When `skipFogOfWar`, ignore {@link config.fogOfWar} (e.g. end-game turn recap). */
+  renderOptions?: { skipFogOfWar?: boolean },
 ): void {
   const tRenderStart = performance.now();
   const trackHpBars = svgElement.id === 'board' && !unitDrawOverride;
@@ -1128,6 +1165,10 @@ export function renderState(
     hexStatesDrawOverride != null ? { ...state, hexStates: hexStatesDrawOverride } : state;
 
   const c = colors();
+  const visionKeys =
+    config.fogOfWar && !renderOptions?.skipFogOfWar
+      ? buildLocalPlayerVisionKeys(state.units, localPlayer, COLS, ROWS)
+      : null;
   const domCache = renderDomCacheBySvg.get(svgElement);
   const unitLayer = domCache?.unitLayer ?? (svgElement.querySelector('#unit-layer') as SVGGElement);
   unitLayer.innerHTML = '';
@@ -1170,6 +1211,20 @@ export function renderState(
     unitByHex,
     mtnTerritoryCategoryByKey,
   );
+  if (visionKeys) {
+    for (const key of mountainSet) {
+      if (visionKeys.has(key)) continue;
+      const f = mountainTerritoryFillByKey.get(key);
+      if (
+        f === c.hexPlayer ||
+        f === c.hexAi ||
+        f === c.hexPlayerDimmed ||
+        f === c.hexAiDimmed
+      ) {
+        mountainTerritoryFillByKey.set(key, c.hexFog);
+      }
+    }
+  }
 
   let selectedUnit = state.selectedUnit !== null ? getUnitById(state, state.selectedUnit) : null;
   if (selectedUnit && selectedUnit.owner !== localPlayer) selectedUnit = null;
@@ -1285,6 +1340,12 @@ export function renderState(
         }
       }
 
+      const inVision   = !visionKeys || visionKeys.has(key);
+      const boardOverlay = isSelectedHex || isZoc || isValidMove || isProdSelected || canPlace;
+      if (visionKeys && !inVision && !boardOverlay) {
+        fill = c.hexFog;
+      }
+
       // Draw dashed production stroke above #mountain-layer (SVG paint order), not on the base hex polygon.
       let prodOverlayStroke: string | null = null;
       if (!isSelectedHex && !isZoc && !isValidMove) {
@@ -1295,11 +1356,11 @@ export function renderState(
 
       const hexOccupied = unitByHex.has(key);
       const hexDimmed = productionFocusHexes.size > 0 && isConquered && (!productionFocusHexes.has(key) || hexOccupied) && !isProdSelected;
-      if (hexDimmed && hexState) {
+      if (hexDimmed && hexState && inVision) {
         if (hexState.owner === localPlayer) fill = c.hexPlayerDimmed;
         else fill = c.hexAiDimmed;
       }
-      const opacityDimmed = hexDimmed && fill !== c.hexPlayerDimmed && fill !== c.hexAiDimmed;
+      const opacityDimmed = inVision && hexDimmed && fill !== c.hexPlayerDimmed && fill !== c.hexAiDimmed;
       poly.setAttribute('fill', fill);
       if (stroke === 'transparent') {
         poly.setAttribute('stroke', 'none');
@@ -1322,7 +1383,7 @@ export function renderState(
         overlay.setAttribute('stroke-width', '2.5');
         overlay.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);
         overlay.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
-        overlay.setAttribute('opacity', hexDimmed ? '0.2' : '1');
+        overlay.setAttribute('opacity', inVision && hexDimmed ? '0.2' : '1');
         overlay.setAttribute('pointer-events', 'none');
         prodStrokeLayer.appendChild(overlay);
       }
@@ -1332,6 +1393,7 @@ export function renderState(
         markerLayer ?? domCache?.hexLayer ?? (svgElement.querySelector('#hex-layer') as SVGGElement);
 
       if (
+        inVision &&
         hexState &&
         hexState.isProduction &&
         !isSelectedHex &&
@@ -1540,18 +1602,34 @@ export function renderState(
         COLS,
         ROWS,
       );
-      // frontline border between owned hexes of different factions
+      // frontline border between owned hexes of different factions (stroke: style.css vars)
       if (dFaction) {
         const path = svgEl('path');
         path.setAttribute('d', dFaction);
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', 'rgba(0,0,0,1)');
-        path.setAttribute('stroke-width', '2.5');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('stroke', 'var(--color-dark)');
         path.setAttribute('stroke-linejoin', 'round');
         path.setAttribute('stroke-linecap', 'round');
         path.setAttribute('pointer-events', 'none');
-        path.setAttribute('class', 'faction-frontline');
+        path.setAttribute(
+          'class',
+          state.phase === 'production'
+            ? 'faction-frontline faction-frontline--production'
+            : 'faction-frontline',
+        );
+        
+        const path2 = svgEl('path');
+        path2.setAttribute('d', dFaction);
+        path2.setAttribute('fill', 'none');
+        path2.setAttribute('stroke', 'rgba(0,0,0,0.15)');
+        path2.setAttribute('stroke-width', '16');
+        path2.setAttribute('stroke-linejoin', 'round');
+        path2.setAttribute('stroke-linecap', 'round');
+        path2.setAttribute('pointer-events', 'none');
+
         sectorOutlineLayerEl.appendChild(path);
+        sectorOutlineLayerEl.appendChild(path2);
       }
     }
   }
@@ -1564,6 +1642,7 @@ export function renderState(
     const ih = HEX_SIZE * 0.5;
     for (const key of cpKeys) {
       if (mountainSet.has(key)) continue;
+      if (visionKeys && !visionKeys.has(key)) continue;
       const [mc, mr] = key.split(',').map(Number);
       const { x, y } = hexToPixel(mc, mr);
       const ring = svgEl('polygon');
@@ -1619,6 +1698,13 @@ export function renderState(
   // Draw units
   for (const unit of unitsToDraw) {
     if (hiddenUnitIds.has(unit.id)) continue;
+    if (
+      visionKeys &&
+      unit.owner !== localPlayer &&
+      !visionKeys.has(`${unit.col},${unit.row}`)
+    ) {
+      continue;
+    }
     const dc = unit.col;
     const dr = unit.row;
     const { x, y } = hexToPixel(dc, dr);
