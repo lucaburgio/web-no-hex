@@ -1269,7 +1269,7 @@ export function renderState(
         const pDef = svgEl('path');
         pDef.setAttribute('d', dDef);
         pDef.setAttribute('fill', 'none');
-        pDef.setAttribute('stroke', 'var(--color-ai)');
+        pDef.setAttribute('stroke', 'rgba(0,0,0,0.3)');
         pDef.setAttribute('stroke-opacity', '0.3');
         pDef.setAttribute('stroke-width', '2.5');
         pDef.setAttribute('stroke-linejoin', 'round');
