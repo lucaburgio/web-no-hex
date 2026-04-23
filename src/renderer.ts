@@ -38,6 +38,115 @@ function mountainHexTextureUrl(key: string): string {
   return MOUNTAIN_HEX_TEXTURES[h % MOUNTAIN_HEX_TEXTURES.length];
 }
 
+/** Same hex fill mapping as conquered cells (`localPlayer` = “your” palette). */
+function hexTerrainFillForOwner(owner: Owner, localPlayer: Owner, c: Colors): string {
+  return owner === localPlayer ? c.hexPlayer : c.hexAi;
+}
+
+/** Resolved mountain tint faction (visual-only). */
+type MountainTerritoryCategory = 'p1' | 'p2' | 'neutral';
+
+function mountainTerritoryCategoryFromCounts(nP1: number, nP2: number, nNeutral: number): MountainTerritoryCategory {
+  const max = Math.max(nP1, nP2, nNeutral);
+  if (max <= 2) return 'neutral';
+  const atMax = (nP1 === max ? 1 : 0) + (nP2 === max ? 1 : 0) + (nNeutral === max ? 1 : 0);
+  if (atMax !== 1) return 'neutral';
+  if (nP1 === max) return 'p1';
+  if (nP2 === max) return 'p2';
+  return 'neutral';
+}
+
+function countMountainNeighborSides(
+  state: GameState,
+  col: number,
+  row: number,
+  mountainSet: Set<string>,
+  mountainCategory: Map<string, MountainTerritoryCategory>,
+): { nP1: number; nP2: number; nNeutral: number } {
+  let nP1 = 0;
+  let nP2 = 0;
+  let nNeutral = 0;
+  for (const [nc, nr] of getNeighbors(col, row, COLS, ROWS)) {
+    const nk = `${nc},${nr}`;
+    if (mountainSet.has(nk)) {
+      const mc = mountainCategory.get(nk) ?? 'neutral';
+      if (mc === 'p1') nP1 += 1;
+      else if (mc === 'p2') nP2 += 1;
+      else nNeutral += 1;
+      continue;
+    }
+    const hs = state.hexStates[nk];
+    if (!hs) nNeutral += 1;
+    else if (hs.owner === PLAYER) nP1 += 1;
+    else nP2 += 1;
+  }
+  return { nP1, nP2, nNeutral };
+}
+
+/**
+ * Visual-only mountain tints: same win/tie rules per hex, but adjacent mountains contribute their
+ * **current** resolved category so color propagates along ridges (Jacobi iteration to fixed point).
+ */
+function computeMountainTerritoryFillByKey(
+  state: GameState,
+  mountainSet: Set<string>,
+  localPlayer: Owner,
+  c: Colors,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  if (mountainSet.size === 0) return out;
+
+  const keys = [...mountainSet];
+  const passableOnly = new Map<string, MountainTerritoryCategory>();
+  for (const key of keys) {
+    const [col, row] = key.split(',').map(Number);
+    let nP1 = 0;
+    let nP2 = 0;
+    let nNeutral = 0;
+    for (const [nc, nr] of getNeighbors(col, row, COLS, ROWS)) {
+      const nk = `${nc},${nr}`;
+      if (mountainSet.has(nk)) continue;
+      const hs = state.hexStates[nk];
+      if (!hs) nNeutral += 1;
+      else if (hs.owner === PLAYER) nP1 += 1;
+      else nP2 += 1;
+    }
+    passableOnly.set(key, mountainTerritoryCategoryFromCounts(nP1, nP2, nNeutral));
+  }
+
+  let prev = passableOnly;
+  const MAX_ITER = 64;
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    const next = new Map<string, MountainTerritoryCategory>();
+    for (const key of keys) {
+      const [col, row] = key.split(',').map(Number);
+      const { nP1, nP2, nNeutral } = countMountainNeighborSides(state, col, row, mountainSet, prev);
+      next.set(key, mountainTerritoryCategoryFromCounts(nP1, nP2, nNeutral));
+    }
+    let stable = true;
+    for (const key of keys) {
+      if (prev.get(key) !== next.get(key)) {
+        stable = false;
+        break;
+      }
+    }
+    if (stable) break;
+    prev = next;
+  }
+
+  for (const key of keys) {
+    const cat = prev.get(key) ?? 'neutral';
+    const fill =
+      cat === 'p1'
+        ? hexTerrainFillForOwner(PLAYER, localPlayer, c)
+        : cat === 'p2'
+          ? hexTerrainFillForOwner(AI, localPlayer, c)
+          : c.hexNeutral;
+    out.set(key, fill);
+  }
+  return out;
+}
+
 /** Margin in px between SVG edge and board origin (must match {@link initRenderer}). */
 export const BOARD_MARGIN = 100;
 
@@ -913,6 +1022,8 @@ export function renderState(
   unitLayer.innerHTML = '';
 
   const mountainSet = new Set(state.mountainHexes ?? []);
+  /** Per mountain key: territory-adjacency tint after propagating along mountain adjacency. */
+  const mountainTerritoryFillByKey = computeMountainTerritoryFillByKey(state, mountainSet, localPlayer, c);
   const unitByHex = new Map<string, Unit>();
   for (const u of state.units) unitByHex.set(`${u.col},${u.row}`, u);
 
@@ -1032,7 +1143,7 @@ export function renderState(
       let stroke = 'transparent';
 
       if (isMountain) {
-        fill = c.hexNeutral;
+        fill = mountainTerritoryFillByKey.get(key) ?? c.hexNeutral;
       } else if (isSelectedHex) {
         fill = c.hexSelected;
       } else if (isZoc) {
@@ -1244,6 +1355,16 @@ export function renderState(
         clipped.appendChild(upright);
       } else {
         clipped.appendChild(img);
+      }
+      const mtnFill = mountainTerritoryFillByKey.get(key) ?? c.hexNeutral;
+      if (mtnFill !== c.hexNeutral) {
+        const tint = svgEl('polygon');
+        tint.setAttribute('points', hexPoints(x, y));
+        tint.setAttribute('fill', mtnFill);
+        tint.setAttribute('opacity', '0.42');
+        tint.setAttribute('pointer-events', 'none');
+        tint.setAttribute('style', 'mix-blend-mode: multiply');
+        clipped.appendChild(tint);
       }
       mountainLayer.appendChild(clipped);
     }
