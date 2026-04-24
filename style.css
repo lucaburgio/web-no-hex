@@ -329,7 +329,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 30px;
+  padding: 20px;
   z-index: 5;
 }
 
@@ -563,11 +563,10 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   bottom: 0;
   left: 0;
   right: 0;
-  height: 72px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px 0 20px;
+  padding: 20px;
   z-index: 20;
 }
 
@@ -586,14 +585,17 @@ body:has(#recap-overlay:not(.hidden)) #game-footer {
   display: flex;
   align-items: center;
   gap: 16px;
+  background: var(--color-gray-100);
+  padding: 0 0 0 16px;
 }
 
 #phase-label {
   text-transform: uppercase;
   font-weight: bold;
   letter-spacing: 0.1em;
-  color: #23251E;
+  color: var(--color-gray-300);
   text-align: right;
+  font-size: 0.9em;
 }
 
 /* ── Unit picker: floating panel ─────────────────────────────────────────────── */
@@ -646,7 +648,7 @@ body:has(#recap-overlay:not(.hidden)) #game-footer {
 #unit-picker {
   display: none;
   position: fixed;
-  bottom: 40px;
+  bottom: 20px;
   left: 12px;
   right: 12px;
   z-index: 25;
@@ -665,7 +667,6 @@ body:has(#recap-overlay:not(.hidden)) #game-footer {
   margin: 0 auto;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 8px;
 }
 
 @keyframes unit-card-enter {
