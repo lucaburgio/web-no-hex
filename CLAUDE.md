@@ -73,6 +73,15 @@ Row = r, Col = q offset per row parity.
 - SVG for rendering (scalable, easy hit-testing)
 - AI uses greedy heuristics in `game.ts`: **Domination** — pressure toward the player home row and threats; **Conquest** — prioritize capturing neutral/enemy control points, defending AI-owned CPs when player units are close, and prefer ranged/melee targets on CP hexes; **Breakthrough** — defend CPs in sectors still owned by the **defender**, pressure threats from the **attacker** (roles follow `breakthroughAttackerOwner`).
 
+### SVG layers with CSS animations (avoid flicker)
+`renderState` runs on every board interaction (selection, moves, combat, etc.). **Do not** wipe whole SVG subtrees with `innerHTML = ''` (or mass `remove`/`replace`) if those nodes carry CSS **`animation`** or other continuous motion (e.g. marching **`stroke-dashoffset`**). Replacing the node restarts the animation from 0 and reads as a global flicker.
+
+**Do instead:** keep **stable elements** per logical thing (e.g. one path pair for the faction frontline, one group per control point hex). On each render, **update in place** (`d`, `class`, `stroke`, `transform`, visibility). When updating `d` or similar, **skip** `setAttribute` if the value is unchanged so the browser does not reset animation state unnecessarily. For keyed decorations (CPs, markers), sync with a map: remove only disappeared keys, create only new keys.
+
+If you add persistent caches (`WeakMap` keyed by the root `SVGSVGElement`), **clear them inside `initRenderer`** when that SVG is rebuilt so you never hold detached nodes.
+
+Reference implementation: `#sector-outline-layer` and `#control-point-layer` in `src/renderer.ts`.
+
 ## Tauri Asset Rules
 When working on the Tauri build, follow these rules to avoid broken assets:
 

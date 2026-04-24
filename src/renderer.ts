@@ -949,6 +949,10 @@ function svgUprightAt(x: number, y: number): SVGGElement {
   return g;
 }
 
+function syncSvgAttr(el: Element, name: string, value: string): void {
+  if (el.getAttribute(name) !== value) el.setAttribute(name, value);
+}
+
 interface RenderDomCache {
   hexPolys: SVGPolygonElement[][];
   hexLayer: SVGGElement | null;
@@ -958,11 +962,16 @@ interface RenderDomCache {
   controlPointLayer: SVGGElement | null;
   prodStrokeLayer: SVGGElement | null;
   sectorOutlineLayer: SVGGElement | null;
+  sectorOutlineDefender: SVGPathElement | null;
+  sectorOutlinePrimary: SVGPathElement | null;
+  sectorOutlineSecondary: SVGPathElement | null;
   markerLayer: SVGGElement | null;
   moveBoundary: SVGPathElement | null;
 }
 
 const renderDomCacheBySvg = new WeakMap<SVGSVGElement, RenderDomCache>();
+/** Persistent CP groups by hex key — cleared in {@link initRenderer} so nodes are not stale after rebuild. */
+const controlPointGroupsBySvg = new WeakMap<SVGSVGElement, Map<string, SVGGElement>>();
 
 export interface InitRendererOptions {
   /** When true (vs-human guest), mirror the board through its center (horizontal + vertical). */
@@ -971,6 +980,7 @@ export interface InitRendererOptions {
 
 export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOptions): void {
   svgElement.innerHTML = '';
+  controlPointGroupsBySvg.delete(svgElement);
   const flipBoardY = !!options?.flipBoardY;
   svgElement.dataset.boardFlipY = flipBoardY ? '1' : '';
   const c = colors();
@@ -1019,6 +1029,29 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   const sectorOutlineLayer = svgEl('g');
   sectorOutlineLayer.id = 'sector-outline-layer';
   sectorOutlineLayer.setAttribute('pointer-events', 'none');
+  const boardId = svgElement.id || 'board';
+
+  const sectorOutlineDefender = svgEl('path');
+  sectorOutlineDefender.id = `${boardId}-sector-outline-defender`;
+  sectorOutlineDefender.setAttribute('fill', 'none');
+  sectorOutlineDefender.setAttribute('pointer-events', 'none');
+  sectorOutlineDefender.setAttribute('display', 'none');
+  sectorOutlineLayer.appendChild(sectorOutlineDefender);
+
+  const sectorOutlinePrimary = svgEl('path');
+  sectorOutlinePrimary.id = `${boardId}-sector-outline-primary`;
+  sectorOutlinePrimary.setAttribute('fill', 'none');
+  sectorOutlinePrimary.setAttribute('pointer-events', 'none');
+  sectorOutlinePrimary.setAttribute('display', 'none');
+  sectorOutlineLayer.appendChild(sectorOutlinePrimary);
+
+  const sectorOutlineSecondary = svgEl('path');
+  sectorOutlineSecondary.id = `${boardId}-sector-outline-secondary`;
+  sectorOutlineSecondary.setAttribute('fill', 'none');
+  sectorOutlineSecondary.setAttribute('pointer-events', 'none');
+  sectorOutlineSecondary.setAttribute('display', 'none');
+  sectorOutlineLayer.appendChild(sectorOutlineSecondary);
+
   boardViewRoot.appendChild(sectorOutlineLayer);
 
   const unitLayer = svgEl('g');
@@ -1138,6 +1171,9 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
     controlPointLayer,
     prodStrokeLayer,
     sectorOutlineLayer,
+    sectorOutlineDefender,
+    sectorOutlinePrimary,
+    sectorOutlineSecondary,
     markerLayer,
     moveBoundary: boundary,
   });
@@ -1562,9 +1598,30 @@ export function renderState(
     }
   }
   // Breakthrough: sector political borders. Conquest / domination: frontline between owned hexes.
+  // Reuse the same path nodes so CSS animations (faction-frontline-secondary, etc.) do not restart every render.
   const sectorOutlineLayerEl = domCache?.sectorOutlineLayer ?? (svgElement.querySelector('#sector-outline-layer') as SVGGElement | null);
-  if (sectorOutlineLayerEl) {
-    sectorOutlineLayerEl.innerHTML = '';
+  const boardId = svgElement.id || 'board';
+  const pathSectorDef =
+    domCache?.sectorOutlineDefender ??
+    (sectorOutlineLayerEl?.querySelector(`#${boardId}-sector-outline-defender`) as SVGPathElement | null);
+  const pathSectorPrimary =
+    domCache?.sectorOutlinePrimary ??
+    (sectorOutlineLayerEl?.querySelector(`#${boardId}-sector-outline-primary`) as SVGPathElement | null);
+  const pathSectorSecondary =
+    domCache?.sectorOutlineSecondary ??
+    (sectorOutlineLayerEl?.querySelector(`#${boardId}-sector-outline-secondary`) as SVGPathElement | null);
+
+  if (sectorOutlineLayerEl && pathSectorDef && pathSectorPrimary && pathSectorSecondary) {
+    const setSectorPathDisplay = (p: SVGPathElement, vis: boolean): void => {
+      syncSvgAttr(p, 'display', vis ? 'inline' : 'none');
+    };
+
+    const hideSectorOutlines = (): void => {
+      setSectorPathDisplay(pathSectorDef, false);
+      setSectorPathDisplay(pathSectorPrimary, false);
+      setSectorPathDisplay(pathSectorSecondary, false);
+    };
+
     if (
       state.gameMode === 'breakthrough' &&
       state.sectorIndexByHex &&
@@ -1579,54 +1636,51 @@ export function renderState(
         getBreakthroughDefenderOwner(state),
       );
       if (dDef) {
-        const pDef = svgEl('path');
-        pDef.setAttribute('d', dDef);
-        pDef.setAttribute('fill', 'none');
-        pDef.setAttribute('stroke', 'rgba(0,0,0,0.3)');
-        pDef.setAttribute('stroke-opacity', '0');
-        pDef.setAttribute('stroke-width', '2.5');
-        pDef.setAttribute('stroke-linejoin', 'round');
-        pDef.setAttribute('stroke-linecap', 'round');
-        pDef.setAttribute('pointer-events', 'none');
-        pDef.setAttribute('class', 'sector-outline sector-outline-defender-internal');
-        sectorOutlineLayerEl.appendChild(pDef);
+        syncSvgAttr(pathSectorDef, 'd', dDef);
+        syncSvgAttr(pathSectorDef, 'stroke', 'rgba(0,0,0,0.3)');
+        syncSvgAttr(pathSectorDef, 'stroke-opacity', '0');
+        syncSvgAttr(pathSectorDef, 'stroke-width', '2.5');
+        syncSvgAttr(pathSectorDef, 'stroke-linejoin', 'round');
+        syncSvgAttr(pathSectorDef, 'stroke-linecap', 'round');
+        syncSvgAttr(pathSectorDef, 'pointer-events', 'none');
+        syncSvgAttr(pathSectorDef, 'class', 'sector-outline sector-outline-defender-internal');
+        setSectorPathDisplay(pathSectorDef, true);
+      } else {
+        setSectorPathDisplay(pathSectorDef, false);
       }
-      const d = buildInterSectorBoundaryPath(state.sectorIndexByHex, state.sectorOwners, COLS, ROWS);
-      if (d) {
-        const path = svgEl('path');
-        path.setAttribute('d', d);
-        path.setAttribute('fill', 'none');
-        path.setAttribute('stroke-width', '2');
-        path.setAttribute('stroke-linejoin', 'round');
-        path.setAttribute('stroke-linecap', 'round');
-        path.setAttribute('pointer-events', 'none');
-        path.setAttribute('class', 'sector-outline sector-outline-between');
-        path.setAttribute(
-          'class',
-          state.phase === 'production'
-            ? 'faction-frontline faction-frontline--production'
-            : 'faction-frontline',
-        );
 
-        const path2 = svgEl('path');
-        path2.setAttribute('d', d);
-        path2.setAttribute('fill', 'none');
-        path2.setAttribute('stroke-width', '8');
-        path2.setAttribute('stroke-linejoin', 'round');
-        path2.setAttribute('stroke-linecap', 'round');
-        path2.setAttribute('pointer-events', 'none');
-        path2.setAttribute('class', 'sector-outline sector-outline-between');
-        path2.setAttribute(
-          'class',
+      const dInter = buildInterSectorBoundaryPath(state.sectorIndexByHex, state.sectorOwners, COLS, ROWS);
+      if (dInter) {
+        syncSvgAttr(pathSectorPrimary, 'd', dInter);
+        syncSvgAttr(pathSectorSecondary, 'd', dInter);
+        syncSvgAttr(pathSectorPrimary, 'fill', 'none');
+        syncSvgAttr(pathSectorSecondary, 'fill', 'none');
+        syncSvgAttr(pathSectorPrimary, 'stroke-width', '2');
+        syncSvgAttr(pathSectorSecondary, 'stroke-width', '8');
+        syncSvgAttr(pathSectorPrimary, 'stroke-linejoin', 'round');
+        syncSvgAttr(pathSectorSecondary, 'stroke-linejoin', 'round');
+        syncSvgAttr(pathSectorPrimary, 'stroke-linecap', 'round');
+        syncSvgAttr(pathSectorSecondary, 'stroke-linecap', 'round');
+        syncSvgAttr(pathSectorPrimary, 'pointer-events', 'none');
+        syncSvgAttr(pathSectorSecondary, 'pointer-events', 'none');
+        const clsPri =
           state.phase === 'production'
-            ? 'faction-frontline-secondary faction-frontline-secondary--production'
-            : 'faction-frontline-secondary',
-        );
-
-        sectorOutlineLayerEl.appendChild(path);
-        sectorOutlineLayerEl.appendChild(path2);
+            ? 'sector-outline sector-outline-between faction-frontline faction-frontline--production'
+            : 'sector-outline sector-outline-between faction-frontline';
+        const clsSec =
+          state.phase === 'production'
+            ? 'sector-outline sector-outline-between faction-frontline-secondary faction-frontline-secondary--production'
+            : 'sector-outline sector-outline-between faction-frontline-secondary';
+        syncSvgAttr(pathSectorPrimary, 'class', clsPri);
+        syncSvgAttr(pathSectorSecondary, 'class', clsSec);
+        setSectorPathDisplay(pathSectorPrimary, true);
+        setSectorPathDisplay(pathSectorSecondary, true);
+      } else {
+        setSectorPathDisplay(pathSectorPrimary, false);
+        setSectorPathDisplay(pathSectorSecondary, false);
       }
     } else if (state.gameMode === 'conquest' || state.gameMode === 'domination') {
+      setSectorPathDisplay(pathSectorDef, false);
       const dFaction = buildInterFactionBoundaryPath(
         stateTerritoryDraw.hexStates,
         mountainSet,
@@ -1634,56 +1688,71 @@ export function renderState(
         COLS,
         ROWS,
       );
-      // frontline border between owned hexes of different factions (stroke: style.css vars)
       if (dFaction) {
-        const path = svgEl('path');
-        path.setAttribute('d', dFaction);
-        path.setAttribute('fill', 'none');
-        path.setAttribute('stroke-width', '2');
-        path.setAttribute('stroke-linejoin', 'round');
-        path.setAttribute('stroke-linecap', 'round');
-        path.setAttribute('pointer-events', 'none');
-        path.setAttribute(
-          'class',
+        syncSvgAttr(pathSectorPrimary, 'd', dFaction);
+        syncSvgAttr(pathSectorSecondary, 'd', dFaction);
+        syncSvgAttr(pathSectorPrimary, 'fill', 'none');
+        syncSvgAttr(pathSectorSecondary, 'fill', 'none');
+        syncSvgAttr(pathSectorPrimary, 'stroke-width', '2');
+        syncSvgAttr(pathSectorSecondary, 'stroke-width', '8');
+        syncSvgAttr(pathSectorPrimary, 'stroke-linejoin', 'round');
+        syncSvgAttr(pathSectorSecondary, 'stroke-linejoin', 'round');
+        syncSvgAttr(pathSectorPrimary, 'stroke-linecap', 'round');
+        syncSvgAttr(pathSectorSecondary, 'stroke-linecap', 'round');
+        syncSvgAttr(pathSectorPrimary, 'pointer-events', 'none');
+        syncSvgAttr(pathSectorSecondary, 'pointer-events', 'none');
+        const clsPri =
           state.phase === 'production'
             ? 'faction-frontline faction-frontline--production'
-            : 'faction-frontline',
-        );
-        
-        const path2 = svgEl('path');
-        path2.setAttribute('d', dFaction);
-        path2.setAttribute('fill', 'none');
-        path2.setAttribute('stroke-width', '8');
-        path2.setAttribute('stroke-linejoin', 'round');
-        path2.setAttribute('stroke-linecap', 'round');
-        path2.setAttribute('pointer-events', 'none');
-        path2.setAttribute(
-          'class',
+            : 'faction-frontline';
+        const clsSec =
           state.phase === 'production'
             ? 'faction-frontline-secondary faction-frontline-secondary--production'
-            : 'faction-frontline-secondary',
-        );
-
-        sectorOutlineLayerEl.appendChild(path);
-        sectorOutlineLayerEl.appendChild(path2);
+            : 'faction-frontline-secondary';
+        syncSvgAttr(pathSectorPrimary, 'class', clsPri);
+        syncSvgAttr(pathSectorSecondary, 'class', clsSec);
+        setSectorPathDisplay(pathSectorPrimary, true);
+        setSectorPathDisplay(pathSectorSecondary, true);
+      } else {
+        setSectorPathDisplay(pathSectorPrimary, false);
+        setSectorPathDisplay(pathSectorSecondary, false);
       }
+    } else {
+      hideSectorOutlines();
     }
   }
 
   const controlPointLayer = domCache?.controlPointLayer ?? (svgElement.querySelector('#control-point-layer') as SVGGElement | null);
   if (controlPointLayer) {
-    controlPointLayer.innerHTML = '';
+    let cpMap = controlPointGroupsBySvg.get(svgElement);
+    if (!cpMap) {
+      cpMap = new Map();
+      controlPointGroupsBySvg.set(svgElement, cpMap);
+    }
+
     const cpKeys = state.controlPointHexes ?? [];
-    const iw = HEX_SIZE * 0.5;
-    const ih = HEX_SIZE * 0.5;
+    const desiredKeys: string[] = [];
     for (const key of cpKeys) {
       if (mountainSet.has(key)) continue;
       if (visionKeys && !visionKeys.has(key)) continue;
+      desiredKeys.push(key);
+    }
+    const desired = new Set(desiredKeys);
+
+    for (const key of [...cpMap.keys()]) {
+      if (!desired.has(key)) {
+        cpMap.get(key)?.remove();
+        cpMap.delete(key);
+      }
+    }
+
+    const iw = HEX_SIZE * 0.5;
+    const ih = HEX_SIZE * 0.5;
+    const cpStrokeW = '2.5';
+
+    for (const key of desiredKeys) {
       const [mc, mr] = key.split(',').map(Number);
       const { x, y } = hexToPixel(mc, mr);
-      const ring = svgEl('polygon');
-      ring.setAttribute('points', hexPoints(x, y));
-      ring.setAttribute('fill', 'none');
       let ringStroke = '#6B6B6B';
       if (state.gameMode === 'breakthrough' && state.sectorOwners?.length && state.sectorIndexByHex) {
         const sid = state.sectorIndexByHex[key];
@@ -1691,27 +1760,56 @@ export function renderState(
           ringStroke = paletteBaseForOwner(state.sectorOwners[sid]!, localPlayer, c);
         }
       }
-      ring.setAttribute('stroke', ringStroke);
-      ring.setAttribute('stroke-width', state.gameMode === 'breakthrough' ? '2.5' : '2.5');
-      ring.setAttribute('stroke-linejoin', 'round');
-      ring.setAttribute('pointer-events', 'none');
-      ring.setAttribute('class', 'control-point-ring');
 
-      const img = svgEl('image');
-      img.setAttribute('href', '/icons/control-point.svg');
-      img.setAttribute('x', String(x - iw / 2));
-      img.setAttribute('y', String(y - ih / 2));
-      img.setAttribute('width', String(iw));
-      img.setAttribute('height', String(ih));
-      img.setAttribute('pointer-events', 'none');
+      let root = cpMap.get(key);
+      if (!root) {
+        root = svgEl('g');
+        root.setAttribute('data-cp-key', key);
+        root.setAttribute('pointer-events', 'none');
+
+        const ring = svgEl('polygon');
+        ring.setAttribute('class', 'control-point-ring');
+        ring.setAttribute('fill', 'none');
+        ring.setAttribute('stroke-linejoin', 'round');
+        ring.setAttribute('pointer-events', 'none');
+
+        const img = svgEl('image');
+        img.setAttribute('href', '/icons/control-point.svg');
+        img.setAttribute('pointer-events', 'none');
+
+        if (flipBoardY) {
+          const upright = svgUprightAt(x, y);
+          upright.appendChild(ring);
+          upright.appendChild(img);
+          root.appendChild(upright);
+        } else {
+          root.appendChild(ring);
+          root.appendChild(img);
+        }
+        controlPointLayer.appendChild(root);
+        cpMap.set(key, root);
+      }
+
+      const ringEl = root.querySelector('.control-point-ring') as SVGPolygonElement | null;
+      const imgEl = root.querySelector('image') as SVGImageElement | null;
+      if (ringEl) {
+        const pts = hexPoints(x, y);
+        syncSvgAttr(ringEl, 'points', pts);
+        syncSvgAttr(ringEl, 'stroke', ringStroke);
+        syncSvgAttr(ringEl, 'stroke-width', cpStrokeW);
+      }
+      if (imgEl) {
+        syncSvgAttr(imgEl, 'x', String(x - iw / 2));
+        syncSvgAttr(imgEl, 'y', String(y - ih / 2));
+        syncSvgAttr(imgEl, 'width', String(iw));
+        syncSvgAttr(imgEl, 'height', String(ih));
+      }
       if (flipBoardY) {
-        const upright = svgUprightAt(x, y);
-        upright.appendChild(ring);
-        upright.appendChild(img);
-        controlPointLayer.appendChild(upright);
-      } else {
-        controlPointLayer.appendChild(ring);
-        controlPointLayer.appendChild(img);
+        const upright = root.firstElementChild as SVGGElement | null;
+        if (upright) {
+          const tr = `translate(${x},${y}) scale(-1,-1) translate(${-x},${-y})`;
+          syncSvgAttr(upright, 'transform', tr);
+        }
       }
     }
   }
