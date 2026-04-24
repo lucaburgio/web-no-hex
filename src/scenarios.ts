@@ -5,6 +5,8 @@ import deWw2Icon from '../public/icons/scenarios/de-ww2.svg';
 import ruWw2Icon from '../public/icons/scenarios/ru-ww2.svg';
 import jpWw2Icon from '../public/icons/scenarios/jp-ww2.svg';
 import usvietnamIcon from '../public/icons/scenarios/us-vietnam.svg';
+import austriahungaryIcon from '../public/icons/scenarios/austriahungary.svg';
+import romePunicWarsIcon from '../public/icons/scenarios/rome-punic-wars.svg';
 import trainingImg from '../public/images/scenarios/training.png';
 import usww2Img from '../public/images/scenarios/us-ww2.png';
 import ruww2Img from '../public/images/scenarios/ru-ww2.png';
@@ -57,7 +59,7 @@ export const SCENARIOS: ScenarioDef[] = [
   },
   {
     id: 'ww1ah',
-    icon: jpWw2Icon,
+    icon: austriahungaryIcon,
     title: 'THE WAR FRONTLINE',
     image: ahww1Img,
     miniTitle: 'FIRST WORLD WAR - AUSTRIA-HUNGARY',
@@ -65,7 +67,7 @@ export const SCENARIOS: ScenarioDef[] = [
   },
   {
     id: 'romePunicWars',
-    icon: jpWw2Icon,
+    icon: romePunicWarsIcon,
     title: 'OUR STRONG EMPIRE',
     image: romePunicWarsImg,
     miniTitle: 'PUNIC WARS - ROMAN EMPIRE',
