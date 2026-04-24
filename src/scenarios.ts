@@ -11,6 +11,8 @@ import ruww2Img from '../public/images/scenarios/ru-ww2.png';
 import jpww2Img from '../public/images/scenarios/jp-ww2.png';
 import deww2Img from '../public/images/scenarios/de-ww2.png';
 import usvietImg from '../public/images/scenarios/us-vietnam.png';
+import ahww1Img from '../public/images/scenarios/austriahun-ww1.png';
+import romePunicWarsImg from '../public/images/scenarios/rome-punic-wars.png';
 
 export const SCENARIOS: ScenarioDef[] = [
   {
@@ -52,6 +54,22 @@ export const SCENARIOS: ScenarioDef[] = [
     image: jpww2Img,
     miniTitle: 'SECOND WORLD WAR - JAPAN',
     description: 'The largest conflict in human history. Command Japan forces across a series of tactical engagements on the Pacific front.',
+  },
+  {
+    id: 'ww1ah',
+    icon: jpWw2Icon,
+    title: 'THE WAR FRONTLINE',
+    image: ahww1Img,
+    miniTitle: 'FIRST WORLD WAR - AUSTRIA-HUNGARY',
+    description: 'The first large conflict in human history. Command Austria-Hungarian forces across a series of tactical engagements on the frontlines.',
+  },
+  {
+    id: 'romePunicWars',
+    icon: jpWw2Icon,
+    title: 'OUR STRONG EMPIRE',
+    image: romePunicWarsImg,
+    miniTitle: 'PUNIC WARS - ROMAN EMPIRE',
+    description: 'The first large conflict in human history. Command Austria-Hungarian forces across a series of tactical engagements on the frontlines.',
   }
 ];
 
