@@ -83,9 +83,17 @@ function hexTerrainDimmedFillForOwner(owner: Owner, localPlayer: Owner, c: Color
 /** Resolved mountain tint faction (visual-only). */
 type MountainTerritoryCategory = 'p1' | 'p2' | 'neutral';
 
+/** Deterministic p1/p2 when counts tie (per mountain hex `key`); same mixing as {@link mountainHexTextureUrl}. */
+function mountainTerritoryTieBreakP1P2(key: string): 'p1' | 'p2' {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return h % 2 === 0 ? 'p1' : 'p2';
+}
+
 /**
  * Strict plurality: the side with the highest count wins.
- * Two-way ties (e.g. 3–3–0) → neutral. Three-way tie (e.g. 2–2–2): keep `prev` if it is p1/p2, else stable pick by `key`.
+ * P1–P2 two-way max ties (e.g. 3–3–0) use a stable pick by `key`. Other two-way ties (e.g. 3–0–3) stay neutral.
+ * Three-way tie (2–2–2): keep `prev` if it is p1/p2, else same stable pick by `key`.
  */
 function mountainTerritoryCategoryFromCounts(
   nP1: number,
@@ -100,16 +108,18 @@ function mountainTerritoryCategoryFromCounts(
     if (nP2 === max) return 'p2';
     return 'neutral';
   }
+  if (tieCount === 2) {
+    if (nP1 === nP2 && nP1 === max && nNeutral < max) {
+      const key = opts?.key;
+      return key ? mountainTerritoryTieBreakP1P2(key) : 'p1';
+    }
+    return 'neutral';
+  }
   if (tieCount === 3) {
     const prev = opts?.prev;
     if (prev === 'p1' || prev === 'p2') return prev;
     const key = opts?.key;
-    if (key) {
-      let h = 0;
-      for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-      return h % 2 === 0 ? 'p1' : 'p2';
-    }
-    return 'p1';
+    return key ? mountainTerritoryTieBreakP1P2(key) : 'p1';
   }
   return 'neutral';
 }
@@ -196,7 +206,7 @@ function resolveMountainTerritoryCategoryByKey(
 }
 
 /**
- * Visual-only mountain tints: majority per hex (two-way ties → neutral; three-way 2–2–2 keeps a side); adjacent mountains contribute their
+ * Visual-only mountain tints: majority per hex (P1–P2 two-way max ties use a stable side; P1/P2 vs neutral ties stay neutral; 2–2–2 uses prev or key); adjacent mountains contribute their
  * **current** resolved category so color propagates along ridges (Jacobi iteration to fixed point).
  * Production focus uses the same dimmed player/AI hex colors as owned territory in {@link renderState}.
  */
@@ -1573,7 +1583,7 @@ export function renderState(
         pDef.setAttribute('d', dDef);
         pDef.setAttribute('fill', 'none');
         pDef.setAttribute('stroke', 'rgba(0,0,0,0.3)');
-        pDef.setAttribute('stroke-opacity', '0.3');
+        pDef.setAttribute('stroke-opacity', '0');
         pDef.setAttribute('stroke-width', '2.5');
         pDef.setAttribute('stroke-linejoin', 'round');
         pDef.setAttribute('stroke-linecap', 'round');
@@ -1586,13 +1596,35 @@ export function renderState(
         const path = svgEl('path');
         path.setAttribute('d', d);
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', 'var(--color-dark)');
-        path.setAttribute('stroke-width', '2.5');
+        path.setAttribute('stroke-width', '2');
         path.setAttribute('stroke-linejoin', 'round');
         path.setAttribute('stroke-linecap', 'round');
         path.setAttribute('pointer-events', 'none');
         path.setAttribute('class', 'sector-outline sector-outline-between');
+        path.setAttribute(
+          'class',
+          state.phase === 'production'
+            ? 'faction-frontline faction-frontline--production'
+            : 'faction-frontline',
+        );
+
+        const path2 = svgEl('path');
+        path2.setAttribute('d', d);
+        path2.setAttribute('fill', 'none');
+        path2.setAttribute('stroke-width', '8');
+        path2.setAttribute('stroke-linejoin', 'round');
+        path2.setAttribute('stroke-linecap', 'round');
+        path2.setAttribute('pointer-events', 'none');
+        path2.setAttribute('class', 'sector-outline sector-outline-between');
+        path2.setAttribute(
+          'class',
+          state.phase === 'production'
+            ? 'faction-frontline-secondary faction-frontline-secondary--production'
+            : 'faction-frontline-secondary',
+        );
+
         sectorOutlineLayerEl.appendChild(path);
+        sectorOutlineLayerEl.appendChild(path2);
       }
     } else if (state.gameMode === 'conquest' || state.gameMode === 'domination') {
       const dFaction = buildInterFactionBoundaryPath(
@@ -1608,7 +1640,6 @@ export function renderState(
         path.setAttribute('d', dFaction);
         path.setAttribute('fill', 'none');
         path.setAttribute('stroke-width', '2');
-        path.setAttribute('stroke', 'var(--color-dark)');
         path.setAttribute('stroke-linejoin', 'round');
         path.setAttribute('stroke-linecap', 'round');
         path.setAttribute('pointer-events', 'none');
@@ -1622,11 +1653,16 @@ export function renderState(
         const path2 = svgEl('path');
         path2.setAttribute('d', dFaction);
         path2.setAttribute('fill', 'none');
-        path2.setAttribute('stroke', 'rgba(0,0,0,0.15)');
-        path2.setAttribute('stroke-width', '16');
+        path2.setAttribute('stroke-width', '8');
         path2.setAttribute('stroke-linejoin', 'round');
         path2.setAttribute('stroke-linecap', 'round');
         path2.setAttribute('pointer-events', 'none');
+        path2.setAttribute(
+          'class',
+          state.phase === 'production'
+            ? 'faction-frontline-secondary faction-frontline-secondary--production'
+            : 'faction-frontline-secondary',
+        );
 
         sectorOutlineLayerEl.appendChild(path);
         sectorOutlineLayerEl.appendChild(path2);

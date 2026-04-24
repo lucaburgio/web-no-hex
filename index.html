@@ -597,16 +597,21 @@
 
   <div id="recap-overlay" class="hidden">
     <div id="recap-header">
-      <button id="recap-close-btn">&#x2715; Back</button>
-      <span id="recap-turn-label">TURN 1</span>
+      <button type="button" id="recap-close-btn" class="button-primary">Exit</button>
+      <div id="recap-header-center">
+        <span id="recap-turn-label">TURN 1</span>
+        <ul id="recap-log"></ul>
+      </div>
       <div id="recap-header-right"></div>
     </div>
     <div id="recap-board-wrap">
       <svg id="recap-board"></svg>
     </div>
     <div id="recap-footer">
-      <input type="range" id="recap-slider" min="0" value="0" step="1" />
-      <ul id="recap-log"></ul>
+      <div id="recap-controls">
+        <button type="button" id="recap-play-btn" class="button-secondary" aria-pressed="false">Play</button>
+        <input type="range" id="recap-slider" min="0" value="0" step="1" />
+      </div>
     </div>
   </div>
 

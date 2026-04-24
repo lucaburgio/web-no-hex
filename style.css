@@ -121,6 +121,8 @@ img {
     /* Domination / Conquest: SVG stroke on hex edges between opposing owned territory */
     --color-faction-frontline-border: rgba(0, 0, 0, 1);
     --color-faction-frontline-border-production: rgba(0, 0, 0, 0.1);
+    --color-faction-frontline-border-secondary: rgba(0, 0, 0, 0.15);
+    --color-faction-frontline-border-secondary-production: rgba(0, 0, 0, 0.05);
   
     /* ── Unit icon & HP bar thresholds ──────────────────────────────────────── */
     --color-unit-icon: #FFF;
@@ -147,6 +149,27 @@ img {
 }
 .faction-frontline.faction-frontline--production {
   stroke: var(--color-faction-frontline-border-production);
+}
+.faction-frontline-secondary {
+  stroke: var(--color-faction-frontline-border-secondary);
+  animation: faction-frontline-secondary-animation 1s ease-in-out infinite;
+}
+.faction-frontline-secondary.faction-frontline-secondary--production {
+  stroke: var(--color-faction-frontline-border-secondary-production);
+}
+@keyframes faction-frontline-secondary-animation {
+  0% {
+    opacity: 1;
+    stroke-width: 8;
+  }
+  50% {
+    opacity: 0.6;
+    stroke-width: 10;
+  }
+  100% {
+    opacity: 1;
+    stroke-width: 8;
+  }
 }
 
 @keyframes damage-float-rise {
@@ -546,6 +569,10 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   justify-content: space-between;
   padding: 0 20px 0 20px;
   z-index: 20;
+}
+
+body:has(#recap-overlay:not(.hidden)) #game-footer {
+  display: none !important;
 }
 
 #footer-left {
@@ -1130,11 +1157,12 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   position: fixed;
   z-index: 100;
   font-size: 11px;
-  background: #000100;
+  background: var(--color-dark);
   padding: 24px;
   color: #FFF;
   pointer-events: none;
   min-width: 220px;
+  max-width: 380px;
   line-height: 1.6;
   text-transform: uppercase;
   font-weight: 700;
@@ -1471,33 +1499,42 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #recap-overlay.hidden { display: none; }
 
 #recap-header {
-  height: 48px;
   flex-shrink: 0;
   display: flex;
-  align-items: center;
+  position: fixed;
+  width: 100%;
+  align-items: start;
+  padding: 30px;
+  background: transparent;
   justify-content: space-between;
-  padding: 0 16px;
-  border-bottom: 1px solid #23251E;
+}
+
+#recap-header-center {
+  justify-self: center;
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 
 #recap-turn-label {
   color: #23251E;
   text-transform: uppercase;
   letter-spacing: 0.18em;
+  text-align: right;
+  width: 100%;
 }
 
-#recap-header-right { width: 80px; }
-
-#recap-close-btn {
-  background: transparent;
-  border: 1px solid #23251E;
-  color: #23251E;
-  font-family: inherit;
-  padding: 3px 10px;
-  cursor: url('/icons/pointer.svg') 13 14, pointer;
-  width: 80px;
+#recap-header > button {
+  justify-self: start;
 }
-#recap-close-btn:hover { opacity: 0.6; }
+
+#recap-header-right {
+  justify-self: end;
+  width: auto;
+  align-self: center;
+}
 
 #recap-board-wrap {
   flex: 1;
@@ -1517,27 +1554,46 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #recap-footer {
   flex-shrink: 0;
   padding: 12px 20px 16px;
-  border-top: 1px solid #23251E;
-  position: fixed;
-    bottom: 0;
-    width: 100%;
-    height: 140px;
+  display: flex;
+  background: transparent;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#recap-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+#recap-controls .button-secondary {
+  flex-shrink: 0;
 }
 
 #recap-slider {
   width: 100%;
-  margin-bottom: 10px;
+  max-width: 300px;
+  flex: 0 1 300px;
+  margin: 0;
   accent-color: #23251E;
   cursor: url('/icons/pointer.svg') 13 14, pointer;
 }
 
 #recap-log {
   list-style: none;
-  color: #23251E;
+  color: var(--color-gray-600);
   opacity: 0.5;
-  max-height: 70px;
+  font-size: 0.75rem;
   overflow-y: auto;
   line-height: 1.7;
+  text-align: right;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  align-self: stretch;
 }
 
 

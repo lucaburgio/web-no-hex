@@ -258,7 +258,7 @@ function calcTerritoryIncomePreview(ownedHexes: number): {
   const hexesToNext = config.territoryQuota - hexesIntoQuota;
   const nextLine = hexesIntoQuota === 0 && ownedHexes === 0
     ? `Own ${config.territoryQuota} hexes to earn +${config.pointsPerQuota} PP`
-    : `Next +${config.pointsPerQuota} PP in ${hexesToNext} more hex${hexesToNext === 1 ? '' : 'es'}`;
+    : `Next +${config.pointsPerQuota} PP in ${hexesToNext} more hex${hexesToNext === 1 ? '' : 'es'}. Mountains hexes do not count towards territory quota.`;
   return { territoryBonus, total, nextLine };
 }
 
@@ -4389,6 +4389,10 @@ function updateUI(): void {
 
 function checkWinner(): void {
   if (!state.winner) return;
+  const lastSnap = turnSnapshots[turnSnapshots.length - 1];
+  if (lastSnap?.winner == null) {
+    turnSnapshots.push(structuredClone(state));
+  }
   const showRetry = gameMode === 'vsAI' && state.winner !== localPlayer;
   showGameEndScreenForOutcome(state.winner === localPlayer, state.winReason, state, localPlayer, {
     showRetry,
@@ -4697,10 +4701,23 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
 // ── Replay ────────────────────────────────────────────────────────────────────
 
 const recapSliderEl   = document.getElementById('recap-slider') as HTMLInputElement;
+const recapPlayBtn    = document.getElementById('recap-play-btn') as HTMLButtonElement;
 const recapTurnLabel  = document.getElementById('recap-turn-label') as HTMLElement;
 const recapLogEl      = document.getElementById('recap-log') as HTMLUListElement;
 const recapSvg        = document.getElementById('recap-board') as unknown as SVGSVGElement;
 const recapCloseBtn   = document.getElementById('recap-close-btn') as HTMLButtonElement;
+
+const RECAP_PLAY_MS = 1000;
+let recapPlaybackTimer: number | null = null;
+
+function stopRecapPlayback(): void {
+  if (recapPlaybackTimer !== null) {
+    window.clearInterval(recapPlaybackTimer);
+    recapPlaybackTimer = null;
+  }
+  recapPlayBtn.textContent = 'Play';
+  recapPlayBtn.setAttribute('aria-pressed', 'false');
+}
 
 function renderRecapTurn(index: number): void {
   const snap = turnSnapshots[index];
@@ -4729,6 +4746,7 @@ function renderRecapTurn(index: number): void {
 }
 
 function openReplayFromEndGame(): void {
+  stopRecapPlayback();
   initRenderer(recapSvg, { flipBoardY: gameMode === 'vsHuman' && localPlayer === AI });
   recapSliderEl.max = String(turnSnapshots.length - 1);
   recapSliderEl.value = String(turnSnapshots.length - 1);
@@ -4740,10 +4758,40 @@ function openReplayFromEndGame(): void {
 gameEndRecapBtn.addEventListener('click', openReplayFromEndGame);
 
 recapSliderEl.addEventListener('input', () => {
-  renderRecapTurn(parseInt(recapSliderEl.value));
+  stopRecapPlayback();
+  renderRecapTurn(parseInt(recapSliderEl.value, 10));
+});
+
+recapPlayBtn.addEventListener('click', () => {
+  if (recapPlaybackTimer !== null) {
+    stopRecapPlayback();
+    return;
+  }
+  const max = turnSnapshots.length - 1;
+  if (max < 0) return;
+  let v = parseInt(recapSliderEl.value, 10);
+  if (v >= max) {
+    v = 0;
+    recapSliderEl.value = String(v);
+    renderRecapTurn(v);
+  }
+  recapPlayBtn.textContent = 'Pause';
+  recapPlayBtn.setAttribute('aria-pressed', 'true');
+  recapPlaybackTimer = window.setInterval(() => {
+    const m = turnSnapshots.length - 1;
+    const cur = parseInt(recapSliderEl.value, 10);
+    if (cur >= m) {
+      stopRecapPlayback();
+      return;
+    }
+    const next = cur + 1;
+    recapSliderEl.value = String(next);
+    renderRecapTurn(next);
+  }, RECAP_PLAY_MS);
 });
 
 recapCloseBtn.addEventListener('click', () => {
+  stopRecapPlayback();
   recapOverlayEl.classList.add('hidden');
   revealGameEndScreenAfterReplay();
 });

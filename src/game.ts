@@ -521,7 +521,8 @@ function seedEmptyHomeRowHexStates(hexStates: Record<string, HexState>, mountain
 /**
  * When a border-row hex is cleared and the attacker survives, who should own the empty cell?
  * — Native garrison lost: killer's side (attacker) takes the border.
- * — Invader on the opposite home row: the edge reverts to that map side's owner.
+ * — Invader on the opposite home row: the edge reverts to that map side's owner (melee; ranged
+ *   skips this revert — see skipRangedBorderRevertToNative).
  * Interior rows: undefined (use normal conquest: attacker when they survive).
  * Melee mutual kill: caller does not use this — ownership is left unchanged.
  */
@@ -533,6 +534,12 @@ function ownerForEmptyBorderAfterDefenderRemoved(
   const native = borderRowNativeOwner(defRow);
   if (native === undefined) return undefined;
   return defOwner === native ? attackerOwner : native;
+}
+
+/** Ranged: do not auto-flip a home-border hex to the native side when the invader dies — reconquer by moving a unit in. */
+function skipRangedBorderRevertToNative(defRow: number, defOwner: Owner, borderOwner: Owner): boolean {
+  const native = borderRowNativeOwner(defRow);
+  return native !== undefined && defOwner !== native && borderOwner === native;
 }
 
 function getHexesWithinDistance(col: number, row: number, dist: number, cols: number, rows: number): [number, number][] {
@@ -668,9 +675,10 @@ export function isInEnemyZoC(state: GameState, col: number, row: number, enemyOw
 }
 
 /**
- * Domination + ZoC: cannot move onto an empty opponent home-row hex if any enemy is adjacent to that hex.
- * Stops fast units from using multi-hex movement to reach the win row without ever being adjacent to a
- * defender at the start of the move. Moving onto an enemy on that row (melee) is still allowed.
+ * Domination + ZoC: cannot *blitz* onto an empty opponent home-row hex — i.e. reach it in 2+ movement
+ * steps in one turn — if that hex is in enemy ZoC. A single step from an adjacent hex (infantry, etc.)
+ * is not blocked. Stops fast units from using multi-hex movement to the win row while skipping adjacency
+ * to a defender. Moving onto an enemy on that row (melee) is still allowed.
  */
 export function isOpponentHomeEntryBlocked(state: GameState, unit: Unit, destCol: number, destRow: number): boolean {
   if (!config.zoneOfControl || state.gameMode !== 'domination') return false;
@@ -679,6 +687,10 @@ export function isOpponentHomeEntryBlocked(state: GameState, unit: Unit, destCol
   if (destRow !== opponentHomeRow) return false;
   const occupant = getUnit(state, destCol, destRow);
   if (occupant && occupant.owner === enemy) return false;
+  const oneStepToDest = getNeighbors(unit.col, unit.row, COLS, ROWS).some(
+    ([c, r]) => c === destCol && r === destRow,
+  );
+  if (oneStepToDest) return false;
   return isInEnemyZoC(state, destCol, destRow, enemy);
 }
 
@@ -1180,7 +1192,7 @@ function resolveCombat(
       const dOwner = defender.owner;
       removeUnit(state, defender.id);
       const borderOwner = ownerForEmptyBorderAfterDefenderRemoved(dr, dOwner, attacker.owner);
-      if (borderOwner !== undefined) {
+      if (borderOwner !== undefined && !skipRangedBorderRevertToNative(dr, dOwner, borderOwner)) {
         conquerHex(state, dc, dr, borderOwner);
       }
       noteDominationBreakthroughIfHomeRowCleared(state, dOwner, dr, attacker.owner, false);
