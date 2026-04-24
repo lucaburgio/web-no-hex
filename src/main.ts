@@ -83,7 +83,7 @@ import modeIconConquest from '../public/icons/modes/conquest.svg';
 import modeIconBreakthrough from '../public/icons/modes/breakthrough.svg';
 import chevronFilledIcon from '../public/icons/chevron-filled.svg';
 import { STORIES } from './stories';
-import { storyMapHasFullCustomMatchSupport } from './storyMapLayouts';
+import { getHomeRowPassableHexCounts, storyMapHasFullCustomMatchSupport } from './storyMapLayouts';
 import { SCENARIOS, getScenarioById } from './scenarios';
 import {
   loadStoryProgress,
@@ -1529,7 +1529,7 @@ function populateSettings(): void {
   } else {
     setBoardSettingsLocked(false);
   }
-  clampStartingUnitsInputsToBoardWidth(vals.boardCols);
+  applyStartingUnitsInputMaxes();
   lastCommittedBoardCols = vals.boardCols;
 
   const rulesPresetEl = document.getElementById('cfg-rulesPreset') as HTMLSelectElement | null;
@@ -1633,6 +1633,7 @@ function applyRulesPreset(id: string): void {
   updateConfig(values);
   syncRulesFieldsFromConfig();
   updateModeSpecificSettingsVisibility();
+  applyStartingUnitsInputMaxes();
   syncRulesDetailVisibility();
 }
 
@@ -1647,7 +1648,6 @@ function clampNumericInputToBounds(el: HTMLInputElement): number {
   return clamped;
 }
 
-/** Starting unit count inputs — max is always {@link boardCols} (one unit per home-row hex). */
 const STARTING_UNITS_FIELD_IDS = [
   'cfg-startingUnitsPlayer1',
   'cfg-startingUnitsPlayer2',
@@ -1655,17 +1655,75 @@ const STARTING_UNITS_FIELD_IDS = [
   'cfg-startingUnitsAttacker',
 ] as const;
 
-/** Sets each starting-units input `max` to `width` and clamps values above `width`. */
-function clampStartingUnitsInputsToBoardWidth(width: number): void {
+function getSelectedCustomMapStoryForSettings(): (typeof STORIES)[number] | undefined {
+  const customMapEl = document.getElementById('cfg-customMap') as HTMLSelectElement | null;
+  if (!customMapEl) return undefined;
+  const id = customMapEl.value.trim();
+  if (!id) return undefined;
+  return STORIES.find(s => s.id === id && storyMapHasFullCustomMatchSupport(s.map));
+}
+
+/**
+ * Sets each starting-units input `max` from board width, or from passable (non-mountain) home rows
+ * when a custom map preset is selected. Breakthrough mode maps attacker/defender caps to the correct border.
+ */
+function applyStartingUnitsInputMaxes(): void {
+  const widthEl = document.getElementById('cfg-boardCols') as HTMLInputElement | null;
+  const t = widthEl?.value.trim() ?? '';
+  const parsedW = t === '' ? NaN : parseFloat(t);
+  const width = Number.isFinite(parsedW) ? parsedW : lastCommittedBoardCols;
+
+  const customStory = getSelectedCustomMapStoryForSettings();
+  const { south, north } = customStory
+    ? getHomeRowPassableHexCounts(customStory.map)
+    : { south: width, north: width };
+
+  const p1el = document.getElementById('cfg-startingUnitsPlayer1') as HTMLInputElement | null;
+  const p2el = document.getElementById('cfg-startingUnitsPlayer2') as HTMLInputElement | null;
+  const defEl = document.getElementById('cfg-startingUnitsDefender') as HTMLInputElement | null;
+  const attEl = document.getElementById('cfg-startingUnitsAttacker') as HTMLInputElement | null;
+  if (!p1el || !p2el || !defEl || !attEl) return;
+
+  const cap = (n: number) => String(Math.max(1, n));
+  const gameModeEl = document.getElementById('cfg-gameMode') as HTMLSelectElement;
+  const v = gameModeEl.value as GameMode;
+
+  if (v === 'breakthrough') {
+    const randEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement | null;
+    const roleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement | null;
+    const random = randEl?.checked ?? false;
+    const p1Attacks = (roleEl?.value ?? 'attacker') === 'attacker';
+    let maxDef: number;
+    let maxAtt: number;
+    if (random) {
+      const m = Math.min(south, north);
+      maxDef = m;
+      maxAtt = m;
+    } else if (p1Attacks) {
+      maxDef = north;
+      maxAtt = south;
+    } else {
+      maxDef = south;
+      maxAtt = north;
+    }
+    defEl.max = cap(maxDef);
+    attEl.max = cap(maxAtt);
+    p1el.max = cap(width);
+    p2el.max = cap(width);
+  } else {
+    p1el.max = cap(south);
+    p2el.max = cap(north);
+    defEl.max = cap(width);
+    attEl.max = cap(width);
+  }
+
   for (const id of STARTING_UNITS_FIELD_IDS) {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) continue;
-    el.max = String(width);
+    const maxN = parseFloat(el.max);
     const raw = parseFloat(el.value);
-    const v = Number.isFinite(raw) ? raw : Number(el.min) || 1;
-    if (v > width) {
-      el.value = String(width);
-    }
+    const cur = Number.isFinite(raw) ? raw : Number(el.min) || 1;
+    if (Number.isFinite(maxN) && cur > maxN) el.value = String(maxN);
   }
 }
 
@@ -1846,16 +1904,16 @@ boardColsSettingsEl.addEventListener('input', () => {
   // Do not enforce min while typing (e.g. "1" before "2" in "12"); blur commits min.
   if (raw > max) {
     boardColsSettingsEl.value = String(max);
-    clampStartingUnitsInputsToBoardWidth(max);
+    applyStartingUnitsInputMaxes();
     return;
   }
   if (raw >= min) {
-    clampStartingUnitsInputsToBoardWidth(raw);
+    applyStartingUnitsInputMaxes();
   }
 });
 boardColsSettingsEl.addEventListener('change', () => {
   const w = clampNumericInputToBounds(boardColsSettingsEl);
-  clampStartingUnitsInputsToBoardWidth(w);
+  applyStartingUnitsInputMaxes();
   lastCommittedBoardCols = w;
 });
 
@@ -1911,7 +1969,7 @@ document.getElementById('cfg-customMap')?.addEventListener('change', () => {
   if (story) {
     colsEl.value = String(story.map.cols);
     rowsEl.value = String(story.map.rows);
-    clampStartingUnitsInputsToBoardWidth(story.map.cols);
+    applyStartingUnitsInputMaxes();
     lastCommittedBoardCols = story.map.cols;
   }
   setBoardSettingsLocked(!!sel.value.trim());
@@ -1919,8 +1977,13 @@ document.getElementById('cfg-customMap')?.addEventListener('change', () => {
 document.getElementById('cfg-gameMode')!.addEventListener('change', () => {
   updateModeSpecificSettingsVisibility();
   syncModeCards();
+  applyStartingUnitsInputMaxes();
 });
-document.getElementById('cfg-breakthroughRandomRoles')?.addEventListener('change', syncBreakthroughRoleControls);
+document.getElementById('cfg-breakthroughRandomRoles')?.addEventListener('change', () => {
+  syncBreakthroughRoleControls();
+  applyStartingUnitsInputMaxes();
+});
+document.getElementById('cfg-breakthroughPlayer1Role')?.addEventListener('change', applyStartingUnitsInputMaxes);
 
 // Mode pager — visual game mode picker
 function syncModeCards(): void {

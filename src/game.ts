@@ -253,6 +253,30 @@ function spreadCols(n: number, cols: number): number[] {
   );
 }
 
+function passableHomeRowColumnIndices(
+  mountainHexes: string[],
+  cols: number,
+  homeRow: number,
+): number[] {
+  const mtn = new Set(mountainHexes);
+  const out: number[] = [];
+  for (let c = 0; c < cols; c++) {
+    if (!mtn.has(`${c},${homeRow}`)) out.push(c);
+  }
+  return out;
+}
+
+/** Like {@link spreadCols} but only uses `passable` board columns (e.g. home row without mountains). */
+function spreadOnPassableRow(n: number, passableColumnsSorted: number[]): number[] {
+  const L = passableColumnsSorted.length;
+  if (L === 0 || n <= 0) return [];
+  const m = Math.min(n, L);
+  if (m === 1) return [passableColumnsSorted[Math.floor(L / 2)]!];
+  return Array.from({ length: m }, (_, i) =>
+    passableColumnsSorted[Math.round((L - 1) * i / (m - 1))]!,
+  );
+}
+
 /** Conquest: place control points with north/south balance and spacing (not clustered). */
 function pickControlPointHexes(cpCandidates: string[], want: number, cols: number, rows: number): string[] {
   if (want <= 0 || cpCandidates.length === 0) return [];
@@ -1902,8 +1926,10 @@ export function createInitialStatePreservingTerrain(previous: GameState): GameSt
     playerStartingUnits = att === PLAYER ? config.startingUnitsAttacker : config.startingUnitsDefender;
     aiStartingUnits = att === AI ? config.startingUnitsAttacker : config.startingUnitsDefender;
   }
-  const playerStartingCols = spreadCols(playerStartingUnits, COLS);
-  const aiStartingCols = spreadCols(aiStartingUnits, COLS);
+  const passSouth = passableHomeRowColumnIndices(mountainHexes, COLS, ROWS - 1);
+  const passNorth = passableHomeRowColumnIndices(mountainHexes, COLS, 0);
+  const playerStartingCols = spreadOnPassableRow(playerStartingUnits, passSouth);
+  const aiStartingCols = spreadOnPassableRow(aiStartingUnits, passNorth);
 
   for (const c of playerStartingCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
   for (const c of aiStartingCols) units.push(makeUnit(AI, c, 0));
@@ -2111,8 +2137,11 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
   }
   const mirrorCols = gm === 'breakthrough' && breakthroughAttackerOwnerForState === AI;
   const mirrorC = (c: number) => (mirrorCols ? COLS - 1 - c : c);
-  const playerStartingCols = spreadCols(playerStartingUnits, COLS).map(mirrorC);
-  const aiStartingCols = spreadCols(aiStartingUnits, COLS).map(mirrorC);
+  const mtnList = mapSource.mountains;
+  const passSouth = passableHomeRowColumnIndices(mtnList, COLS, ROWS - 1);
+  const passNorth = passableHomeRowColumnIndices(mtnList, COLS, 0);
+  const playerStartingCols = spreadOnPassableRow(playerStartingUnits, passSouth).map(mirrorC);
+  const aiStartingCols = spreadOnPassableRow(aiStartingUnits, passNorth).map(mirrorC);
 
   for (const c of playerStartingCols) units.push(makeUnit(PLAYER, c, ROWS - 1));
   for (const c of aiStartingCols) units.push(makeUnit(AI, c, 0));
@@ -2123,7 +2152,7 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
   }
 
   const reservedKeys = new Set(units.map(u => `${u.col},${u.row}`));
-  const mountainHexes = [...mapSource.mountains];
+  const mountainHexes = [...mtnList];
   const mountainSet = new Set(mountainHexes);
   const riverHexes: RiverHex[] = mapSource.rivers ?? [];
 

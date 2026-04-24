@@ -31,6 +31,25 @@ export function storyMapHasFullCustomMatchSupport(map: StoryMapDef): boolean {
 }
 
 /**
+ * Counts passable (non-mountain) hexes on each home row for custom maps.
+ * P1 (south) uses `rows - 1`, P2/AI (north) uses `0`. Used to cap "starting units" in settings
+ * when a hand-authored map has mountains on border production hexes.
+ */
+export function getHomeRowPassableHexCounts(
+  map: StoryMapDef,
+): { south: number; north: number } {
+  const mtn = new Set(map.mountains);
+  let south = 0;
+  let north = 0;
+  const bottom = map.rows - 1;
+  for (let c = 0; c < map.cols; c++) {
+    if (!mtn.has(`${c},${bottom}`)) south++;
+    if (!mtn.has(`${c},0`)) north++;
+  }
+  return { south, north };
+}
+
+/**
  * Mirror both grid axes: `col' = cols - 1 - col`, `row' = rows - 1 - row` on every hex key.
  * Used for Breakthrough when the attacker is AI (player 1 defends): authored maps assume a
  * south attacker, so mirroring aligns terrain, sectors, and CPs with the north-attacker layout.
