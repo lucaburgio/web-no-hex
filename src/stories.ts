@@ -70,6 +70,7 @@ export const STORIES: StoryDef[] = [
   map: {
     cols: 4,
     rows: 7,
+    controlPoints: ['1,3'],
     mountains: ['0,0', '0,1', '0,2', '3,3', '3,4'],
     playerStart: [{ col: 0 }, { col: 1 }, { col: 2 }, { col: 3 }],
     aiStart: [{ col: 1 }, { col: 2 }, { col: 3 }],
