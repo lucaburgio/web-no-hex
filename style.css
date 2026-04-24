@@ -57,14 +57,15 @@ img {
   --color-yellow-500: #FFC13A;
   --color-yellow-100: #EDE1C7;
 
+  --color-gray-700: #595959;
   --color-gray-600: #797979;
+  --color-gray-500: #9E9E9E;
+  --color-gray-400: #B0B0B0;
   --color-gray-300: #A5A5A5;
   --color-gray-200: #C8C8C8;
   --color-gray-150: #d3d3d3;
   --color-gray-100: #DCDCDC;
-
-  --color-gray-500: #9E9E9E;
-  --color-gray-400: #B0B0B0;
+  
   --color-beige-600: #9a908c;
   --color-beige-500: #b2a8a5;
   --color-beige-400: #c4bab7;
@@ -106,6 +107,8 @@ img {
     --color-hex-player-dimmed: var(--color-gray-200);
     --color-hex-ai-dimmed:     var(--color-gray-100);
     --color-hex-can-place:     var(--color-gray-600);
+    /* Production phase: hover on empty placement hexes (+) — see renderer (hex hit layer passes through) */
+    --color-hex-prod-candidate-hover: var(--color-gray-700);
     --color-hex-prod-selected: var(--color-yellow-500);
     --color-hex-prod-stroke:   transparent;
     --color-hex-zoc:           #d58f8f;
@@ -150,6 +153,18 @@ img {
 .faction-frontline.faction-frontline--production {
   stroke: var(--color-faction-frontline-border-production);
 }
+
+/* Board: production phase placement hexes (empty + targets). #hex-hit-layer uses pointer-events: none
+   for these so the terrain hex receives :hover. Class set in renderer. */
+   #board polygon.hex-prod-candidate {
+    transition-duration: 0.3s;
+   }
+#board polygon.hex-prod-candidate:hover {
+  fill: var(--color-hex-prod-candidate-hover) !important;
+  opacity: 1 !important;
+  transition-duration: 0.3s;
+}
+
 .faction-frontline-secondary {
   stroke: var(--color-faction-frontline-border-secondary);
   animation: faction-frontline-secondary-animation 1s ease-in-out infinite;
@@ -436,6 +451,56 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #breakthrough-toast.toast-red {
   background: var(--color-red-500);
   color: var(--color-red-900);
+}
+
+/* Full-viewport pulsing frame when breakthrough toast is yellow or red (matches toast background). */
+#breakthrough-screen-frame {
+  --breakthrough-screen-frame-width-min: 4px;
+  --breakthrough-screen-frame-width-max: 12px;
+  --breakthrough-screen-frame-z: 8;
+  --breakthrough-screen-frame-pulse-duration: 2.5s;
+  --breakthrough-screen-frame-pulse-easing: ease-out;
+  /* Optional overrides per variant (defaults = same vars as toast backgrounds). */
+  --breakthrough-screen-frame-yellow: var(--color-yellow-500);
+  --breakthrough-screen-frame-red: var(--color-red-500);
+
+  position: fixed;
+  inset: 0;
+  z-index: var(--breakthrough-screen-frame-z);
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border-style: solid;
+  border-color: var(--breakthrough-screen-frame-active-color, transparent);
+  border-width: var(--breakthrough-screen-frame-width-min);
+  animation: breakthrough-screen-frame-pulse var(--breakthrough-screen-frame-pulse-duration)
+    var(--breakthrough-screen-frame-pulse-easing) infinite;
+}
+
+#breakthrough-screen-frame.frame-yellow {
+  --breakthrough-screen-frame-active-color: var(--breakthrough-screen-frame-yellow);
+}
+
+#breakthrough-screen-frame.frame-red {
+  --breakthrough-screen-frame-active-color: var(--breakthrough-screen-frame-red);
+}
+
+@keyframes breakthrough-screen-frame-pulse {
+  0%,
+  100% {
+    border-width: var(--breakthrough-screen-frame-width-min);
+  }
+  50% {
+    border-width: var(--breakthrough-screen-frame-width-max);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #breakthrough-screen-frame {
+    animation: none;
+    border-width: var(--breakthrough-screen-frame-width-min);
+  }
 }
 
 #game-area {

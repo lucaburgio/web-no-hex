@@ -207,6 +207,7 @@ const conquerBarEl = document.getElementById('conquer-bar-line') as HTMLElement;
 const conquerBarLocalEl      = conquerBarEl.querySelector('.conquer-bar-local') as HTMLElement;
 const conquerBarOpponentEl   = conquerBarEl.querySelector('.conquer-bar-opponent') as HTMLElement;
 const breakthroughToastEl = document.getElementById('breakthrough-toast') as HTMLDivElement;
+const breakthroughScreenFrameEl = document.getElementById('breakthrough-screen-frame') as HTMLDivElement;
 const ppTooltipEl         = document.getElementById('pp-tooltip') as HTMLDivElement;
 const unitStatTooltipEl   = document.getElementById('unit-stat-tooltip') as HTMLDivElement;
 const settingsTooltipEl   = document.getElementById('settings-tooltip') as HTMLDivElement;
@@ -4412,8 +4413,16 @@ function updateUI(): void {
     }
     breakthroughToastEl.textContent = toastText;
     breakthroughToastEl.className = `toast-${toastVariant}`;
+    if (toastVariant === 'yellow') {
+      breakthroughScreenFrameEl.className = 'breakthrough-screen-frame frame-yellow';
+    } else if (toastVariant === 'red') {
+      breakthroughScreenFrameEl.className = 'breakthrough-screen-frame frame-red';
+    } else {
+      breakthroughScreenFrameEl.className = 'hidden';
+    }
   } else {
     breakthroughToastEl.className = 'hidden';
+    breakthroughScreenFrameEl.className = 'hidden';
   }
 
   const isMyTurn = state.activePlayer === localPlayer;

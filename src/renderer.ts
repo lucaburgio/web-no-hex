@@ -955,6 +955,7 @@ function syncSvgAttr(el: Element, name: string, value: string): void {
 
 interface RenderDomCache {
   hexPolys: SVGPolygonElement[][];
+  hexHitPolys: SVGPolygonElement[][];
   hexLayer: SVGGElement | null;
   unitLayer: SVGGElement | null;
   riverLayer: SVGGElement | null;
@@ -979,6 +980,7 @@ export interface InitRendererOptions {
 }
 
 export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOptions): void {
+  document.getElementById('board-prod-marker-hover-style')?.remove();
   svgElement.innerHTML = '';
   controlPointGroupsBySvg.delete(svgElement);
   const flipBoardY = !!options?.flipBoardY;
@@ -1146,10 +1148,13 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   // Full-hex invisible targets on top of unit artwork so clicks always map to a cell (getHexFromEvent).
   const hexHitLayer = svgEl('g');
   hexHitLayer.id = 'hex-hit-layer';
+  const hexHitPolys: SVGPolygonElement[][] = [];
   for (let r = 0; r < ROWS; r++) {
+    hexHitPolys[r] = [];
     for (let col = 0; col < COLS; col++) {
       const { x, y } = hexToPixel(col, r);
       const hit = svgEl('polygon');
+      hit.setAttribute('id', `hex-hit-${col}-${r}`);
       hit.setAttribute('points', hexPoints(x, y));
       hit.setAttribute('data-col', String(col));
       hit.setAttribute('data-row', String(r));
@@ -1158,12 +1163,14 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
       hit.setAttribute('pointer-events', 'all');
       hit.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
       hexHitLayer.appendChild(hit);
+      hexHitPolys[r]![col] = hit;
     }
   }
   boardViewRoot.appendChild(hexHitLayer);
 
   renderDomCacheBySvg.set(svgElement, {
     hexPolys,
+    hexHitPolys,
     hexLayer,
     unitLayer,
     riverLayer,
@@ -1420,6 +1427,12 @@ export function renderState(
         poly.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
       }
       poly.setAttribute('opacity', opacityDimmed ? '0.2' : '1');
+
+      const isProdPassThrough =
+        state.phase === 'production' && state.activePlayer === localPlayer && canPlace && !isProdSelected;
+      poly.classList.toggle('hex-prod-candidate', isProdPassThrough);
+      const hit = domCache?.hexHitPolys?.[r]?.[col];
+      if (hit) hit.setAttribute('pointer-events', isProdPassThrough ? 'none' : 'all');
 
       if (prodOverlayStroke && prodStrokeLayer) {
         const overlay = svgEl('polygon');
