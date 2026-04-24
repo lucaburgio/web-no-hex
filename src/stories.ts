@@ -754,7 +754,7 @@ export const STORIES: StoryDef[] = [
     rows: 7,
     mountains: ['0,4', '0,5', '4,3', '5,2', '5,3'],
     playerStart: [{ col: 1, unitTypeId: 'tank' }, { col: 3 }, { col: 4 }, { col: 5 }],
-    aiStart: [{ col: 0 }, { col: 3, unitTypeId: 'tank' }, { col: 4, unitTypeId: 'tank' }],
+    aiStart: [{ col: 0 }, { col: 1 }, { col: 2 }, { col: 3, unitTypeId: 'tank' }, { col: 4, unitTypeId: 'tank' }],
     rivers: [
       { col: 1, row: 0, segment: 'A-C-08', entrySide: 'C', exitSide: 'A' },
       { col: 1, row: 1, segment: 'F-D-08', entrySide: 'D', exitSide: 'F' },
