@@ -1,0 +1,87 @@
+/* ── Editor V2 ─────────────────────────────────────────────────────────────── */
+
+/* Canvas area */
+#editor-v2-overlay {
+  position: fixed; inset: 0; display: flex; z-index: 200;
+  background: #f5f5f3;
+}
+#ev2-canvas-area {
+  flex: 1; overflow: hidden; position: relative;
+  background: #ebebea; /* light gray map background */
+}
+#ev2-svg {
+  display: block; cursor: crosshair;
+}
+
+/* SVG elements */
+.ev2-territory-fill { stroke: none; }
+.ev2-state-neutral { fill: #fafafa; }
+.ev2-state-allied { fill: #eff6ff; }
+.ev2-state-enemy { fill: #fff1f2; }
+
+.ev2-edge {
+  stroke: #1a1a1a; stroke-width: 1.5; stroke-linecap: round;
+}
+.ev2-point {
+  fill: #1a1a1a; stroke: none; r: 5;
+  transition: r 0.1s;
+}
+.ev2-point-hover {
+  fill: #2563eb; /* blue highlight on snap */
+}
+.ev2-point-closeable {
+  fill: #16a34a; /* green = can close shape */
+  stroke: #16a34a; stroke-width: 2;
+}
+.ev2-preview-line {
+  stroke: #555; stroke-width: 1.2; stroke-dasharray: 5 4;
+  pointer-events: none;
+}
+
+/* Sidebar */
+#ev2-sidebar {
+  width: 220px; background: #1a1a1a; color: #fff;
+  display: flex; flex-direction: column; padding: 24px 16px;
+  gap: 20px;
+}
+#ev2-title {
+  font-size: 18px; font-weight: 700; letter-spacing: 0.1em;
+  line-height: 1.1;
+}
+#ev2-mode-switcher {
+  display: flex; gap: 6px;
+}
+.ev2-mode-btn {
+  flex: 1; padding: 8px 4px; background: #333; color: #fff;
+  border: 1px solid #555; border-radius: 3px; font-size: 11px;
+  font-weight: 600; letter-spacing: 0.08em; cursor: pointer;
+}
+.ev2-mode-btn.active {
+  background: #fff; color: #1a1a1a; border-color: #fff;
+}
+.ev2-section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: #999;
+  margin-bottom: 8px;
+}
+.ev2-hint {
+  font-size: 11px; color: #aaa; line-height: 1.5; margin: 0;
+}
+.ev2-action-btn {
+  display: block; width: 100%; padding: 9px 8px; margin-top: 8px;
+  background: #333; color: #fff; border: 1px solid #555;
+  border-radius: 3px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.08em; cursor: pointer; text-align: center;
+}
+.ev2-action-btn:hover { background: #444; }
+.ev2-danger-btn { border-color: #7f1d1d; color: #fca5a5; }
+.ev2-danger-btn:hover { background: #7f1d1d; color: #fff; }
+
+/* Territory type legend */
+#ev2-type-legend { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.ev2-type-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #ccc; }
+.ev2-type-swatch { width: 14px; height: 14px; border-radius: 2px; flex-shrink: 0; border: 1px solid #555; }
+.ev2-swatch-neutral { background: #fafafa; }
+.ev2-swatch-allied { background: #eff6ff; border-color: #2563eb; }
+.ev2-swatch-enemy { background: #fff1f2; border-color: #dc2626; }
+
+#ev2-footer { margin-top: auto; }

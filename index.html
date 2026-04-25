@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Web Strategic</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="editorV2.css" />
   <script>
     (function () {
       const theme = new URLSearchParams(location.search).get('theme');
@@ -90,6 +91,7 @@
       <button id="menu-host-btn" class="menu-btn">HOST GAME</button>
       <button id="menu-join-btn" class="menu-btn">JOIN GAME</button>
       <button id="menu-map-editor-btn" class="menu-btn">MAP EDITOR</button>
+      <button id="menu-editor-v2-btn" class="menu-btn">EDITOR V2</button>
       <p class="menu-version-text">v0.1 — BETA</p>
     </div>
   </div>
@@ -229,6 +231,40 @@
           <button id="me-load-confirm-btn" type="button" class="button-primary">LOAD</button>
           <button id="me-load-cancel-btn" type="button" class="button-secondary">CANCEL</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map Editor v2 overlay -->
+  <div id="editor-v2-overlay" class="hidden">
+    <div id="ev2-canvas-area">
+      <svg id="ev2-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div id="ev2-sidebar">
+      <div id="ev2-header">
+        <div id="ev2-title">EDITOR<br>V2</div>
+      </div>
+      <div id="ev2-mode-switcher">
+        <button id="ev2-btn-edit" class="ev2-mode-btn active">EDIT</button>
+        <button id="ev2-btn-territory" class="ev2-mode-btn">TERRITORY</button>
+      </div>
+      <div id="ev2-panel-edit">
+        <div class="ev2-section-label">PEN TOOL</div>
+        <p class="ev2-hint">Click to place points.<br>Click the first point to close a shape.<br>Esc cancels current path.</p>
+        <button id="ev2-undo-btn" class="ev2-action-btn">UNDO LAST POINT</button>
+        <button id="ev2-clear-btn" class="ev2-action-btn ev2-danger-btn">CLEAR ALL</button>
+      </div>
+      <div id="ev2-panel-territory" class="hidden">
+        <div class="ev2-section-label">TERRITORY TYPE</div>
+        <p class="ev2-hint">Click a territory to cycle its type.</p>
+        <div id="ev2-type-legend">
+          <div class="ev2-type-row"><span class="ev2-type-swatch ev2-swatch-neutral"></span>NEUTRAL</div>
+          <div class="ev2-type-row"><span class="ev2-type-swatch ev2-swatch-allied"></span>ALLIED</div>
+          <div class="ev2-type-row"><span class="ev2-type-swatch ev2-swatch-enemy"></span>ENEMY</div>
+        </div>
+      </div>
+      <div id="ev2-footer">
+        <button id="ev2-back-btn" class="ev2-action-btn">BACK</button>
       </div>
     </div>
   </div>

@@ -116,6 +116,7 @@ import {
   gameEndRetryBtn,
 } from './gameEndScreen';
 import { initMapEditor, showMapEditor, hideMapEditor } from './mapEditor';
+import { initEditorV2, showEditorV2, hideEditorV2 } from './editorV2';
 import { initSettingsNumberSpinners } from './settingsNumberSpinners';
 import { initGameAreaBoardTexture } from './gameAreaBoardTexture';
 import { playMainMenuEnterAnimation } from './mainMenuEnterAnimation';
@@ -361,6 +362,7 @@ const menuAchievementsBtn  = document.getElementById('menu-achievements-btn') as
 const menuHostBtn          = document.getElementById('menu-host-btn') as HTMLButtonElement;
 const menuJoinBtn          = document.getElementById('menu-join-btn') as HTMLButtonElement;
 const menuMapEditorBtn     = document.getElementById('menu-map-editor-btn') as HTMLButtonElement;
+const menuEditorV2Btn      = document.getElementById('menu-editor-v2-btn') as HTMLButtonElement;
 
 // ── Stories DOM refs ──────────────────────────────────────────────────────────
 
@@ -1321,6 +1323,17 @@ for (const id of ['me-scenario', 'me-game-mode', 'me-unit-package', 'me-unit-pac
 menuMapEditorBtn.addEventListener('click', () => {
   hideMainMenu();
   showMapEditor();
+});
+
+// ── Map Editor v2 ──────────────────────────────────────────────────────────────
+initEditorV2(() => {
+  hideEditorV2();
+  showMainMenu();
+});
+
+menuEditorV2Btn.addEventListener('click', () => {
+  hideMainMenu();
+  showEditorV2();
 });
 
 // ── Game settings ────────────────────────────────────────────────────────────
