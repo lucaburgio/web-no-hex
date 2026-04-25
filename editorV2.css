@@ -73,6 +73,9 @@
   letter-spacing: 0.08em; cursor: pointer; text-align: center;
 }
 .ev2-action-btn:hover { background: #444; }
+.ev2-action-btn.active {
+  background: #1d4ed8; border-color: #3b82f6; color: #fff;
+}
 .ev2-danger-btn { border-color: #7f1d1d; color: #fca5a5; }
 .ev2-danger-btn:hover { background: #7f1d1d; color: #fff; }
 

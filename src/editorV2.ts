@@ -739,8 +739,11 @@ export function showEditorV2(): void {
 
   // Reset mode to edit
   mode = 'edit';
+  isRemovingDot = false;
   btnEdit.classList.add('active');
   btnTerritory.classList.remove('active');
+  btnView.classList.remove('active');
+  removeDotBtn.classList.remove('active');
   panelEdit.classList.remove('hidden');
   panelTerritory.classList.add('hidden');
   svgEl.style.cursor = 'crosshair';
