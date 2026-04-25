@@ -649,9 +649,8 @@ body:has(#recap-overlay:not(.hidden)) #game-footer {
 #footer-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  height: 52px;
   background: var(--color-gray-100);
-  padding: 0 0 0 16px;
 }
 
 #phase-label {
@@ -661,6 +660,7 @@ body:has(#recap-overlay:not(.hidden)) #game-footer {
   color: var(--color-gray-300);
   text-align: right;
   font-size: 0.9em;
+  padding: 0 16px;
 }
 
 /* ── Unit picker: floating panel ─────────────────────────────────────────────── */
