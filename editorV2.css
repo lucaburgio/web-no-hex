@@ -84,4 +84,31 @@
 .ev2-swatch-allied { background: #eff6ff; border-color: #2563eb; }
 .ev2-swatch-enemy { background: #fff1f2; border-color: #dc2626; }
 
-#ev2-footer { margin-top: auto; }
+#ev2-footer { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+
+/* Import modal */
+#ev2-import-modal {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10;
+}
+#ev2-import-modal.hidden { display: none; }
+#ev2-import-modal-inner {
+  background: #1a1a1a; border: 1px solid #444;
+  padding: 24px; border-radius: 4px; width: 480px; max-width: 90vw;
+  display: flex; flex-direction: column; gap: 12px;
+}
+#ev2-import-textarea {
+  width: 100%; height: 200px; background: #0d0d0d; color: #e5e5e5;
+  border: 1px solid #555; border-radius: 3px; padding: 10px;
+  font-family: monospace; font-size: 12px; resize: vertical;
+  box-sizing: border-box;
+}
+#ev2-import-error {
+  font-size: 11px; color: #fca5a5; background: #7f1d1d;
+  padding: 6px 10px; border-radius: 3px;
+}
+#ev2-import-error.hidden { display: none; }
+#ev2-import-actions { display: flex; gap: 8px; }
+#ev2-import-actions .ev2-action-btn { flex: 1; margin-top: 0; }

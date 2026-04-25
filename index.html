@@ -250,7 +250,7 @@
       </div>
       <div id="ev2-panel-edit">
         <div class="ev2-section-label">PEN TOOL</div>
-        <p class="ev2-hint">Click to place points.<br>Click the first point to close a shape.<br>Esc cancels current path.</p>
+        <p class="ev2-hint">Click to place points. Snap to existing points to share borders. Closing a shape auto-creates a territory. Esc cancels current path.</p>
         <button id="ev2-undo-btn" class="ev2-action-btn">UNDO LAST POINT</button>
         <button id="ev2-clear-btn" class="ev2-action-btn ev2-danger-btn">CLEAR ALL</button>
       </div>
@@ -264,7 +264,22 @@
         </div>
       </div>
       <div id="ev2-footer">
+        <button id="ev2-export-btn" class="ev2-action-btn">EXPORT (COPY JSON)</button>
+        <button id="ev2-import-btn" class="ev2-action-btn">IMPORT JSON</button>
         <button id="ev2-back-btn" class="ev2-action-btn">BACK</button>
+      </div>
+    </div>
+
+    <!-- Import modal -->
+    <div id="ev2-import-modal" class="hidden">
+      <div id="ev2-import-modal-inner">
+        <div class="ev2-section-label">IMPORT MAP JSON</div>
+        <textarea id="ev2-import-textarea" spellcheck="false" placeholder="Paste exported JSON here…"></textarea>
+        <div id="ev2-import-error" class="hidden"></div>
+        <div id="ev2-import-actions">
+          <button id="ev2-import-confirm-btn" class="ev2-action-btn">LOAD</button>
+          <button id="ev2-import-cancel-btn" class="ev2-action-btn">CANCEL</button>
+        </div>
       </div>
     </div>
   </div>

@@ -89,6 +89,53 @@ function addEdge(aId: string, bId: string): void {
   }
 }
 
+// ── Cycle detection ───────────────────────────────────────────────────────────
+
+/** BFS shortest path from start→end, excluding the edge (exA–exB). */
+function findPathBFS(start: string, end: string, exA: string, exB: string): string[] | null {
+  const queue: string[][] = [[start]];
+  const visited = new Set<string>([start]);
+  while (queue.length) {
+    const path = queue.shift()!;
+    const cur = path[path.length - 1];
+    if (cur === end) return path;
+    for (const e of edges) {
+      if ((e.a === exA && e.b === exB) || (e.a === exB && e.b === exA)) continue;
+      let nb: string | null = null;
+      if (e.a === cur) nb = e.b;
+      else if (e.b === cur) nb = e.a;
+      if (nb && !visited.has(nb)) {
+        visited.add(nb);
+        queue.push([...path, nb]);
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * After adding edge aId–bId, check if a cycle now exists.
+ * If so, and the cycle isn't already a territory, create one.
+ */
+function tryAutoCloseTerritory(aId: string, bId: string): void {
+  // Find path from bId back to aId using existing edges, excluding the new edge
+  const path = findPathBFS(bId, aId, aId, bId);
+  if (!path || path.length < 3) return; // need ≥3 edges for a valid polygon
+
+  // path = [bId, …, aId]; cycle points = [aId, bId, …, second-to-last]
+  const cycle = [aId, ...path.slice(0, -1)];
+  if (cycle.length < 3) return;
+
+  // Skip if a territory with the same point set already exists
+  const cycleSet = new Set(cycle);
+  const exists = territories.some(
+    (t) => t.pointIds.length === cycle.length && t.pointIds.every((id) => cycleSet.has(id))
+  );
+  if (!exists) {
+    territories.push({ id: newTerritoryId(), pointIds: cycle, state: 'neutral' });
+  }
+}
+
 // ── Resize ────────────────────────────────────────────────────────────────────
 
 function resizeSvg(): void {
@@ -269,40 +316,45 @@ function handleEditClick(e: MouseEvent): void {
   const { x, y } = svgCoords(e);
   const snap = findSnapPoint(x, y);
 
+  let edgeAdded: [string, string] | null = null;
+
   if (snap) {
-    // Snap to existing point
-    if (currentPath.length >= 3 && snap.id === currentPath[0]) {
-      // Close shape: create territory
-      addEdge(currentPath[currentPath.length - 1], snap.id);
-      territories.push({
-        id: newTerritoryId(),
-        pointIds: [...currentPath],
-        state: 'neutral',
-      });
-      currentPath = [];
-    } else if (currentPath.includes(snap.id) && snap.id !== currentPath[0]) {
-      // T-junction: add edge to intermediate point, clear path
-      if (currentPath.length > 0) {
-        addEdge(currentPath[currentPath.length - 1], snap.id);
+    const snapId = snap.id;
+
+    if (currentPath.length > 0) {
+      const lastId = currentPath[currentPath.length - 1];
+
+      if (snapId !== lastId) {
+        addEdge(lastId, snapId);
+        edgeAdded = [lastId, snapId];
+
+        if (currentPath.includes(snapId)) {
+          // Snapped to a point already in the path (first or intermediate) → close/end
+          currentPath = [];
+        } else {
+          currentPath.push(snapId);
+        }
       }
-      currentPath = [];
+      // If snap === last point, ignore (no-op)
     } else {
-      // Normal snap: add edge from last point and extend path
-      if (currentPath.length > 0) {
-        addEdge(currentPath[currentPath.length - 1], snap.id);
-      }
-      if (!currentPath.includes(snap.id)) {
-        currentPath.push(snap.id);
-      }
+      // Start a new path from this existing point
+      currentPath.push(snapId);
     }
   } else {
-    // Create new point
+    // Place a new point
     const newPt: Pt = { id: newPtId(), x, y };
     pts.push(newPt);
     if (currentPath.length > 0) {
-      addEdge(currentPath[currentPath.length - 1], newPt.id);
+      const lastId = currentPath[currentPath.length - 1];
+      addEdge(lastId, newPt.id);
+      edgeAdded = [lastId, newPt.id];
     }
     currentPath.push(newPt.id);
+  }
+
+  // Auto-detect a closed territory whenever an edge is added
+  if (edgeAdded) {
+    tryAutoCloseTerritory(edgeAdded[0], edgeAdded[1]);
   }
 
   render();
@@ -370,6 +422,60 @@ function clearAll(): void {
   _edgeCounter = 0;
   _territoryCounter = 0;
   render();
+}
+
+// ── Export / Import ───────────────────────────────────────────────────────────
+
+function exportState(): void {
+  const data = { version: 1, pts, edges, territories };
+  const json = JSON.stringify(data, null, 2);
+  navigator.clipboard.writeText(json).then(() => {
+    const btn = document.getElementById('ev2-export-btn') as HTMLButtonElement;
+    const original = btn.textContent!;
+    btn.textContent = 'COPIED!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  }).catch(() => {
+    // Fallback: show in the import modal textarea (read-only)
+    const textarea = document.getElementById('ev2-import-textarea') as HTMLTextAreaElement;
+    textarea.value = json;
+    textarea.readOnly = true;
+    showImportModal();
+  });
+}
+
+function importFromJson(json: string): void {
+  const data = JSON.parse(json);
+  if (!Array.isArray(data.pts) || !Array.isArray(data.edges) || !Array.isArray(data.territories)) {
+    throw new Error('Invalid format: missing pts, edges, or territories arrays.');
+  }
+  pts = data.pts as Pt[];
+  edges = data.edges as Edge[];
+  territories = data.territories as Territory[];
+  currentPath = [];
+  hoveredPoint = null;
+
+  // Restore counters from max IDs so new IDs don't collide
+  const maxNum = (arr: Array<{ id: string }>, prefix: string) =>
+    arr.reduce((m, x) => Math.max(m, parseInt(x.id.slice(prefix.length)) || 0), 0);
+  _ptCounter        = maxNum(pts, 'p');
+  _edgeCounter      = maxNum(edges, 'e');
+  _territoryCounter = maxNum(territories, 't');
+}
+
+function showImportModal(): void {
+  const modal = document.getElementById('ev2-import-modal') as HTMLElement;
+  const textarea = document.getElementById('ev2-import-textarea') as HTMLTextAreaElement;
+  modal.classList.remove('hidden');
+  textarea.readOnly = false;
+  textarea.focus();
+}
+
+function hideImportModal(): void {
+  const modal = document.getElementById('ev2-import-modal') as HTMLElement;
+  modal.classList.add('hidden');
+  const errorEl = document.getElementById('ev2-import-error') as HTMLElement;
+  errorEl.textContent = '';
+  errorEl.classList.add('hidden');
 }
 
 // ── Exported API ──────────────────────────────────────────────────────────────
@@ -441,6 +547,35 @@ export function initEditorV2(onBack: () => void): void {
     hideEditorV2();
     _onBack?.();
   });
+
+  // Export / Import
+  (document.getElementById('ev2-export-btn') as HTMLButtonElement)
+    .addEventListener('click', () => exportState());
+
+  (document.getElementById('ev2-import-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      const textarea = document.getElementById('ev2-import-textarea') as HTMLTextAreaElement;
+      textarea.value = '';
+      textarea.readOnly = false;
+      showImportModal();
+    });
+
+  (document.getElementById('ev2-import-confirm-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      const textarea = document.getElementById('ev2-import-textarea') as HTMLTextAreaElement;
+      const errorEl  = document.getElementById('ev2-import-error') as HTMLElement;
+      try {
+        importFromJson(textarea.value.trim());
+        hideImportModal();
+        render();
+      } catch (err) {
+        errorEl.textContent = err instanceof Error ? err.message : 'Failed to parse JSON.';
+        errorEl.classList.remove('hidden');
+      }
+    });
+
+  (document.getElementById('ev2-import-cancel-btn') as HTMLButtonElement)
+    .addEventListener('click', () => hideImportModal());
 
   // Resize observer
   const ro = new ResizeObserver(() => {
