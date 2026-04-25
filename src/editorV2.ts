@@ -16,9 +16,12 @@ let pts: Pt[] = [];
 let edges: Edge[] = [];
 let territories: Territory[] = [];
 let currentPath: string[] = [];      // point IDs in-progress
-let mode: 'edit' | 'territory' = 'edit';
+let mode: 'edit' | 'territory' | 'view' = 'edit';
+let isRemovingDot = false;           // remove-dot sub-mode within edit
 let hoveredPoint: string | null = null;
 let cursorPos: { x: number; y: number } = { x: 0, y: 0 };
+let dragPointId: string | null = null;  // point being dragged
+let hasDragged = false;                 // true if mouse moved during drag
 
 let _ptCounter = 0;
 let _edgeCounter = 0;
@@ -35,6 +38,8 @@ let svgEl: SVGSVGElement;
 let canvasAreaEl: HTMLElement;
 let btnEdit: HTMLButtonElement;
 let btnTerritory: HTMLButtonElement;
+let btnView: HTMLButtonElement;
+let removeDotBtn: HTMLButtonElement;
 let panelEdit: HTMLElement;
 let panelTerritory: HTMLElement;
 
@@ -91,47 +96,64 @@ function addEdge(aId: string, bId: string): void {
 
 // ── Cycle detection ───────────────────────────────────────────────────────────
 
-/** BFS shortest path from start→end, excluding the edge (exA–exB). */
-function findPathBFS(start: string, end: string, exA: string, exB: string): string[] | null {
-  const queue: string[][] = [[start]];
-  const visited = new Set<string>([start]);
-  while (queue.length) {
-    const path = queue.shift()!;
+/**
+ * DFS to find ALL simple paths from start→end, excluding the edge (exA–exB).
+ * Paths are limited to MAX_CYCLE_LENGTH nodes to keep search tractable.
+ */
+const MAX_CYCLE_LENGTH = 24;
+function findAllPathsDFS(start: string, end: string, exA: string, exB: string): string[][] {
+  const results: string[][] = [];
+  const stack: Array<{ path: string[]; visited: Set<string> }> = [
+    { path: [start], visited: new Set([start]) },
+  ];
+  while (stack.length) {
+    const { path, visited } = stack.pop()!;
     const cur = path[path.length - 1];
-    if (cur === end) return path;
     for (const e of edges) {
       if ((e.a === exA && e.b === exB) || (e.a === exB && e.b === exA)) continue;
       let nb: string | null = null;
       if (e.a === cur) nb = e.b;
       else if (e.b === cur) nb = e.a;
-      if (nb && !visited.has(nb)) {
-        visited.add(nb);
-        queue.push([...path, nb]);
+      if (!nb) continue;
+      if (nb === end && path.length >= 2) {
+        // Closed a cycle — only keep it if no existing territory has the same point set
+        results.push([...path, end]);
+      } else if (!visited.has(nb) && path.length < MAX_CYCLE_LENGTH) {
+        const newVisited = new Set(visited);
+        newVisited.add(nb);
+        stack.push({ path: [...path, nb], visited: newVisited });
       }
     }
   }
-  return null;
+  return results;
 }
 
 /**
- * After adding edge aId–bId, check if a cycle now exists.
- * If so, and the cycle isn't already a territory, create one.
+ * After adding edge aId–bId, find ALL new cycles that now close and create
+ * a territory for each one not already represented.
  */
 function tryAutoCloseTerritory(aId: string, bId: string): void {
-  // Find path from bId back to aId using existing edges, excluding the new edge
-  const path = findPathBFS(bId, aId, aId, bId);
-  if (!path || path.length < 3) return; // need ≥3 edges for a valid polygon
+  const allPaths = findAllPathsDFS(bId, aId, aId, bId);
+  for (const path of allPaths) {
+    // path = [bId, …, aId]; cycle = [aId, bId, …, second-to-last]
+    const cycle = [aId, ...path.slice(0, -1)];
+    if (cycle.length < 3) continue;
 
-  // path = [bId, …, aId]; cycle points = [aId, bId, …, second-to-last]
-  const cycle = [aId, ...path.slice(0, -1)];
-  if (cycle.length < 3) return;
+    const cycleSet = new Set(cycle);
 
-  // Skip if a territory with the same point set already exists
-  const cycleSet = new Set(cycle);
-  const exists = territories.some(
-    (t) => t.pointIds.length === cycle.length && t.pointIds.every((id) => cycleSet.has(id))
-  );
-  if (!exists) {
+    // Skip if an identical territory already exists
+    const exists = territories.some(
+      (t) => t.pointIds.length === cycle.length && t.pointIds.every((id) => cycleSet.has(id))
+    );
+    if (exists) continue;
+
+    // Skip non-minimal cycles: if this cycle is a strict superset of any existing
+    // territory, it encloses that territory and is not a face of the planar map.
+    const isSuperset = territories.some(
+      (t) => t.pointIds.length < cycle.length && t.pointIds.every((id) => cycleSet.has(id))
+    );
+    if (isSuperset) continue;
+
     territories.push({ id: newTerritoryId(), pointIds: cycle, state: 'neutral' });
   }
 }
@@ -171,6 +193,30 @@ function stateBorderColor(state: TerritoryState): string {
   return 'transparent';
 }
 
+// ── Shared-border helpers ─────────────────────────────────────────────────────
+
+/** Returns ordered edge pairs [(p0,p1),(p1,p2),...,(pn,p0)] for a territory polygon. */
+function polygonEdgePairs(t: Territory): Array<[string, string]> {
+  return t.pointIds.map((id, i) => [id, t.pointIds[(i + 1) % t.pointIds.length]] as [string, string]);
+}
+
+function edgePairsMatch(a: [string, string], b: [string, string]): boolean {
+  return (a[0] === b[0] && a[1] === b[1]) || (a[0] === b[1] && a[1] === b[0]);
+}
+
+/**
+ * Returns true if edge (aId, bId) of territory t is shared with another
+ * territory of the same non-neutral state.
+ */
+function isEdgeSharedWithSameState(t: Territory, edge: [string, string]): boolean {
+  if (t.state === 'neutral') return false;
+  for (const other of territories) {
+    if (other.id === t.id || other.state !== t.state) continue;
+    if (polygonEdgePairs(other).some((e) => edgePairsMatch(e, edge))) return true;
+  }
+  return false;
+}
+
 function render(): void {
   // Ensure defs element exists and is first
   let defsEl = svgEl.querySelector('defs') as SVGDefsElement | null;
@@ -196,7 +242,6 @@ function render(): void {
 
   for (const t of territories) {
     const pts_str = territoryPointsAttr(t);
-    const borderColor = stateBorderColor(t.state);
 
     const group = document.createElementNS(SVG_NS, 'g');
 
@@ -206,15 +251,26 @@ function render(): void {
     fill.setAttribute('points', pts_str);
     group.appendChild(fill);
 
-    // Inner border polygon (only for non-neutral)
+    // Inner border — drawn edge-by-edge so shared same-state borders are suppressed
     if (t.state !== 'neutral') {
-      const border = document.createElementNS(SVG_NS, 'polygon');
-      border.setAttribute('points', pts_str);
-      border.setAttribute('fill', 'none');
-      border.setAttribute('stroke-width', '8');
-      border.setAttribute('stroke', borderColor);
-      border.setAttribute('clip-path', `url(#ev2-clip-${t.id})`);
-      group.appendChild(border);
+      const borderColor = stateBorderColor(t.state);
+      for (const [aId, bId] of polygonEdgePairs(t)) {
+        if (isEdgeSharedWithSameState(t, [aId, bId])) continue;
+        const pa = ptById(aId);
+        const pb = ptById(bId);
+        if (!pa || !pb) continue;
+        const seg = document.createElementNS(SVG_NS, 'line');
+        seg.setAttribute('x1', String(pa.x));
+        seg.setAttribute('y1', String(pa.y));
+        seg.setAttribute('x2', String(pb.x));
+        seg.setAttribute('y2', String(pb.y));
+        seg.setAttribute('stroke', borderColor);
+        seg.setAttribute('stroke-width', '8');
+        seg.setAttribute('stroke-linecap', 'square');
+        seg.setAttribute('fill', 'none');
+        seg.setAttribute('clip-path', `url(#ev2-clip-${t.id})`);
+        group.appendChild(seg);
+      }
     }
 
     // Click handler for territory mode
@@ -253,22 +309,26 @@ function render(): void {
   const pointLayer = svgEl.querySelector('#ev2-point-layer') as SVGGElement;
   pointLayer.innerHTML = '';
 
-  const firstPathPointId = currentPath.length > 0 ? currentPath[0] : null;
+  if (mode !== 'view') {
+    const firstPathPointId = currentPath.length > 0 ? currentPath[0] : null;
 
-  for (const p of pts) {
-    const circle = document.createElementNS(SVG_NS, 'circle');
-    const isHovered = p.id === hoveredPoint;
-    const isCloseable = p.id === firstPathPointId && currentPath.length >= 3;
+    for (const p of pts) {
+      const circle = document.createElementNS(SVG_NS, 'circle');
+      const isHovered = p.id === hoveredPoint;
+      const isCloseable = p.id === firstPathPointId && currentPath.length >= 3;
+      const isDeleteTarget = isRemovingDot && isHovered;
 
-    let cls = 'ev2-point';
-    if (isCloseable) cls += ' ev2-point-closeable';
-    else if (isHovered) cls += ' ev2-point-hover';
+      let cls = 'ev2-point';
+      if (isDeleteTarget)      cls += ' ev2-point-delete';
+      else if (isCloseable)    cls += ' ev2-point-closeable';
+      else if (isHovered)      cls += ' ev2-point-hover';
 
-    circle.setAttribute('class', cls);
-    circle.setAttribute('cx', String(p.x));
-    circle.setAttribute('cy', String(p.y));
-    circle.setAttribute('r', isHovered || isCloseable ? '7' : '5');
-    pointLayer.appendChild(circle);
+      circle.setAttribute('class', cls);
+      circle.setAttribute('cx', String(p.x));
+      circle.setAttribute('cy', String(p.y));
+      circle.setAttribute('r', isHovered || isCloseable ? '7' : '5');
+      pointLayer.appendChild(circle);
+    }
   }
 
   // ── Preview layer ────────────────────────────────────────────────────────
@@ -296,24 +356,51 @@ function render(): void {
 
 // ── Mode switching ────────────────────────────────────────────────────────────
 
-function setMode(newMode: 'edit' | 'territory'): void {
+function setMode(newMode: 'edit' | 'territory' | 'view'): void {
   mode = newMode;
+  isRemovingDot = false;
+  currentPath = [];
 
   btnEdit.classList.toggle('active', mode === 'edit');
   btnTerritory.classList.toggle('active', mode === 'territory');
+  btnView.classList.toggle('active', mode === 'view');
 
   panelEdit.classList.toggle('hidden', mode !== 'edit');
   panelTerritory.classList.toggle('hidden', mode !== 'territory');
+
+  // Reset remove-dot button visual
+  if (removeDotBtn) removeDotBtn.classList.remove('active');
 
   svgEl.style.cursor = mode === 'edit' ? 'crosshair' : 'default';
 
   render();
 }
 
+// ── Remove point ──────────────────────────────────────────────────────────────
+
+function removePoint(ptId: string): void {
+  // Drop all territories that used this point (polygon is now invalid)
+  territories = territories.filter((t) => !t.pointIds.includes(ptId));
+  // Drop all edges touching this point
+  edges = edges.filter((e) => e.a !== ptId && e.b !== ptId);
+  // Drop the point itself
+  pts = pts.filter((p) => p.id !== ptId);
+  // Clean up current path
+  currentPath = currentPath.filter((id) => id !== ptId);
+}
+
 // ── Edit mode click handling ──────────────────────────────────────────────────
 
 function handleEditClick(e: MouseEvent): void {
   const { x, y } = svgCoords(e);
+
+  // Remove-dot sub-mode: click a point to destroy it
+  if (isRemovingDot) {
+    const snap = findSnapPoint(x, y);
+    if (snap) { removePoint(snap.id); render(); }
+    return;
+  }
+
   const snap = findSnapPoint(x, y);
 
   let edgeAdded: [string, string] | null = null;
@@ -494,6 +581,8 @@ export function initEditorV2(onBack: () => void): void {
   canvasAreaEl   = document.getElementById('ev2-canvas-area') as HTMLElement;
   btnEdit        = document.getElementById('ev2-btn-edit') as HTMLButtonElement;
   btnTerritory   = document.getElementById('ev2-btn-territory') as HTMLButtonElement;
+  btnView        = document.getElementById('ev2-btn-view') as HTMLButtonElement;
+  removeDotBtn   = document.getElementById('ev2-remove-dot-btn') as HTMLButtonElement;
   panelEdit      = document.getElementById('ev2-panel-edit') as HTMLElement;
   panelTerritory = document.getElementById('ev2-panel-territory') as HTMLElement;
 
@@ -505,20 +594,58 @@ export function initEditorV2(onBack: () => void): void {
   }
 
   // SVG mouse events
+  svgEl.addEventListener('mousedown', (e: MouseEvent) => {
+    if (overlayEl.classList.contains('hidden')) return;
+    if (mode === 'view') return;                // no drag in view mode
+    if (isRemovingDot) return;                  // remove-dot uses click, not drag
+    const { x, y } = svgCoords(e);
+    const snap = findSnapPoint(x, y);
+    if (snap) {
+      dragPointId = snap.id;
+      hasDragged = false;
+      e.preventDefault();                       // prevent text selection while dragging
+    }
+  });
+
   svgEl.addEventListener('mousemove', (e: MouseEvent) => {
     if (overlayEl.classList.contains('hidden')) return;
     const { x, y } = svgCoords(e);
     cursorPos = { x, y };
+
+    if (dragPointId) {
+      const pt = pts.find((p) => p.id === dragPointId);
+      if (pt) { pt.x = x; pt.y = y; hasDragged = true; }
+      svgEl.style.cursor = 'grabbing';
+      render();
+      return;
+    }
+
     const snap = findSnapPoint(x, y);
     hoveredPoint = snap ? snap.id : null;
+    // Show grab cursor when hovering a point in non-view mode
+    if (snap && mode !== 'view') svgEl.style.cursor = 'grab';
+    else svgEl.style.cursor = mode === 'edit' && !isRemovingDot ? 'crosshair'
+                             : mode === 'edit' && isRemovingDot ? 'cell'
+                             : 'default';
     render();
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (dragPointId) {
+      dragPointId = null;
+      // Restore cursor
+      svgEl.style.cursor = mode === 'edit' && !isRemovingDot ? 'crosshair'
+                         : mode === 'edit' && isRemovingDot  ? 'cell'
+                         : 'default';
+    }
   });
 
   svgEl.addEventListener('click', (e: MouseEvent) => {
     if (overlayEl.classList.contains('hidden')) return;
+    if (hasDragged) { hasDragged = false; return; }  // was a drag, not a tap
     if (mode === 'edit') {
       handleEditClick(e);
-    } else {
+    } else if (mode === 'territory') {
       handleTerritoryClick(e);
     }
   });
@@ -532,9 +659,18 @@ export function initEditorV2(onBack: () => void): void {
     }
   });
 
-  // Sidebar buttons
+  // Mode buttons
   btnEdit.addEventListener('click', () => setMode('edit'));
   btnTerritory.addEventListener('click', () => setMode('territory'));
+  btnView.addEventListener('click', () => setMode('view'));
+
+  // Remove-dot toggle (within edit mode)
+  removeDotBtn.addEventListener('click', () => {
+    isRemovingDot = !isRemovingDot;
+    removeDotBtn.classList.toggle('active', isRemovingDot);
+    svgEl.style.cursor = isRemovingDot ? 'cell' : 'crosshair';
+    render();
+  });
 
   const undoBtn = document.getElementById('ev2-undo-btn') as HTMLButtonElement;
   undoBtn.addEventListener('click', () => undo());
