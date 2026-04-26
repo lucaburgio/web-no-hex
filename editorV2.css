@@ -52,7 +52,7 @@
 /* Main grid edge */
 .ev2-edge       { stroke: #CDCDCD; stroke-width: 2; stroke-linecap: round; }
 /* Perimeter edge (borders exactly one territory — outer map boundary) */
-.ev2-edge-outer { stroke: #1a1a1a; }
+.ev2-edge-outer { stroke: #4E4F4E; }
 .ev2-edge-hit {
   pointer-events: stroke; cursor: default;
 }
