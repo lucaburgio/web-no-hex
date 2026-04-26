@@ -923,7 +923,7 @@ function render(): void {
         perimPath.setAttribute('stroke', 'url(#ev2-outer-border-pattern)');
         perimPath.setAttribute('stroke-width', '144');
         perimPath.setAttribute('stroke-linecap', 'butt');
-        perimPath.setAttribute('stroke-linejoin', 'miter');
+        perimPath.setAttribute('stroke-linejoin', 'round');
         outerBorderLayer.appendChild(perimPath);
       }
     }
