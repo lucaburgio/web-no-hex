@@ -409,6 +409,104 @@ function stateFillColor(state: TerritoryState): string {
   return '#fafafa';
 }
 
+/**
+ * Builds an SVG path string for the territory border at `inset` pixels inward
+ * from the polygon boundary. Adjacent non-suppressed offset edges are joined with
+ * a miter (line intersection); if the miter is too extreme (concave vertex), a
+ * bevel (two points) is used instead. Suppressed edges create natural gaps.
+ */
+function buildInsetBorderPath(
+  t: Territory,
+  edgeIndex: Map<string, Territory[]>,
+  inset: number,
+): string {
+  const tPts = territoryPoints(t);
+  const n = tPts.length;
+  if (n < 3) return '';
+
+  // Signed area (SVG y-down): positive = CW → right normal is inward
+  let area = 0;
+  for (let i = 0; i < n; i++) {
+    const a = tPts[i]!, b = tPts[(i + 1) % n]!;
+    area += a.x * b.y - b.x * a.y;
+  }
+  const cw = area > 0 ? 1 : -1;
+
+  const edgePairs = polygonEdgePairs(t);
+  const suppressed = edgePairs.map(([a, b]) => shouldSuppressBorderOnEdge(t, [a, b], edgeIndex));
+
+  // Offset each edge inward by `inset` pixels
+  type OE = { ax: number; ay: number; bx: number; by: number };
+  const off: OE[] = edgePairs.map(([aId, bId]) => {
+    const pa = ptById(aId)!, pb = ptById(bId)!;
+    const dx = pb.x - pa.x, dy = pb.y - pa.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.5) return { ax: pa.x, ay: pa.y, bx: pb.x, by: pb.y };
+    const nx = cw * dy / len, ny = cw * -dx / len;
+    return { ax: pa.x + nx * inset, ay: pa.y + ny * inset,
+             bx: pb.x + nx * inset, by: pb.y + ny * inset };
+  });
+
+  // Miter join: intersection of the two infinite offset lines.
+  // Returns null when parallel or when the parameter is outside a reasonable range
+  // (extreme concave miter) — caller falls back to bevel.
+  function miterJoin(i: number, j: number): { x: number; y: number } | null {
+    const o1 = off[i]!, o2 = off[j]!;
+    const dx1 = o1.bx - o1.ax, dy1 = o1.by - o1.ay;
+    const dx2 = o2.bx - o2.ax, dy2 = o2.by - o2.ay;
+    const denom = dx1 * dy2 - dy1 * dx2;
+    if (Math.abs(denom) < 0.001) return null;
+    const param = ((o2.ax - o1.ax) * dy2 - (o2.ay - o1.ay) * dx2) / denom;
+    if (param < -2 || param > 3) return null; // too extreme → bevel
+    return { x: o1.ax + param * dx1, y: o1.ay + param * dy1 };
+  }
+
+  // All edges non-suppressed → single closed polygon
+  if (suppressed.every(s => !s)) {
+    const pts: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const jp = miterJoin(i, j);
+      if (jp) {
+        pts.push(jp);
+      } else {
+        pts.push({ x: off[i]!.bx, y: off[i]!.by });
+        pts.push({ x: off[j]!.ax, y: off[j]!.ay });
+      }
+    }
+    return 'M ' + pts.map(p => `${p.x},${p.y}`).join(' L ') + ' Z';
+  }
+
+  // Mixed suppression → open sub-paths, one per run of non-suppressed edges
+  let pathD = '';
+  for (let start = 0; start < n; start++) {
+    if (suppressed[start] || !suppressed[(start - 1 + n) % n]) continue; // only run starts
+
+    const pts: Array<{ x: number; y: number }> = [];
+    pts.push({ x: off[start]!.ax, y: off[start]!.ay }); // open start (no join)
+
+    let i = start;
+    while (true) {
+      const next = (i + 1) % n;
+      if (suppressed[next] || next === start) {
+        pts.push({ x: off[i]!.bx, y: off[i]!.by }); // open end
+        break;
+      }
+      const jp = miterJoin(i, next);
+      if (jp) {
+        pts.push(jp);
+      } else {
+        pts.push({ x: off[i]!.bx, y: off[i]!.by });
+        pts.push({ x: off[next]!.ax, y: off[next]!.ay });
+      }
+      i = next;
+    }
+
+    if (pts.length >= 2) pathD += 'M ' + pts.map(p => `${p.x},${p.y}`).join(' L ') + ' ';
+  }
+  return pathD;
+}
+
 // ── Shared-border helpers ─────────────────────────────────────────────────────
 
 /** Returns ordered edge pairs [(p0,p1),(p1,p2),...,(pn,p0)] for a territory polygon. */
@@ -513,38 +611,21 @@ function render(): void {
     fill.setAttribute('points', pts_str);
     group.appendChild(fill);
 
-    // Inner border — drawn edge-by-edge so shared same-state borders are suppressed
+    // Inset border: path computed 10px inward from boundary, stroked with owner color.
+    // No clip-path or gap cover needed — the offset geometry handles the gap.
     if (t.state !== 'neutral') {
-      const borderColor = stateBorderColor(t.state);
-      for (const [aId, bId] of polygonEdgePairs(t)) {
-        if (shouldSuppressBorderOnEdge(t, [aId, bId], edgeIndex)) continue;
-        const pa = ptById(aId);
-        const pb = ptById(bId);
-        if (!pa || !pb) continue;
-        const seg = document.createElementNS(SVG_NS, 'line');
-        seg.setAttribute('x1', String(pa.x));
-        seg.setAttribute('y1', String(pa.y));
-        seg.setAttribute('x2', String(pb.x));
-        seg.setAttribute('y2', String(pb.y));
-        seg.setAttribute('stroke', borderColor);
-        seg.setAttribute('stroke-width', '28');
-        seg.setAttribute('stroke-linecap', 'square');
-        seg.setAttribute('fill', 'none');
-        seg.setAttribute('clip-path', `url(#ev2-clip-${t.id})`);
-        if (mode === 'territory') seg.setAttribute('pointer-events', 'none');
-        group.appendChild(seg);
+      const borderPathD = buildInsetBorderPath(t, edgeIndex, 10);
+      if (borderPathD) {
+        const borderEl = document.createElementNS(SVG_NS, 'path');
+        borderEl.setAttribute('d', borderPathD);
+        borderEl.setAttribute('stroke', stateBorderColor(t.state));
+        borderEl.setAttribute('stroke-width', '5');
+        borderEl.setAttribute('stroke-linecap', 'butt');
+        borderEl.setAttribute('stroke-linejoin', 'miter');
+        borderEl.setAttribute('fill', 'none');
+        borderEl.setAttribute('pointer-events', 'none');
+        group.appendChild(borderEl);
       }
-
-      // Gap cover: overdraw 0-10px from edge with the fill color, pushing the
-      // visible border band to start 10px inward. Clip-path keeps it inside.
-      const gapCover = document.createElementNS(SVG_NS, 'polygon');
-      gapCover.setAttribute('points', pts_str);
-      gapCover.setAttribute('fill', 'none');
-      gapCover.setAttribute('stroke', stateFillColor(t.state));
-      gapCover.setAttribute('stroke-width', '20');
-      gapCover.setAttribute('clip-path', `url(#ev2-clip-${t.id})`);
-      gapCover.setAttribute('pointer-events', 'none');
-      group.appendChild(gapCover);
     }
 
     territoryLayer.appendChild(group);
