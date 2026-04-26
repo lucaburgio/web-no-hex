@@ -929,38 +929,6 @@ function render(): void {
     territoryLayer.appendChild(group);
   }
 
-  // ── Sector border layer ──────────────────────────────────────────────────
-  const sectorBorderLayer = svgEl.querySelector('#ev2-sector-border-layer') as SVGGElement;
-  sectorBorderLayer.innerHTML = '';
-  sectorBorderLayer.setAttribute('pointer-events', 'none');
-
-  if (sectors.length > 0) {
-    const territoryToSector = new Map<string, string>();
-    for (const s of sectors) {
-      for (const tid of s.territoryIds) {
-        territoryToSector.set(tid, s.id);
-      }
-    }
-    for (const edge of edges) {
-      const k = undirectedEdgeKey(edge.a, edge.b);
-      const terrs = edgeIndex.get(k);
-      if (!terrs || terrs.length !== 2) continue;
-      const sA = territoryToSector.get(terrs[0]!.id);
-      const sB = territoryToSector.get(terrs[1]!.id);
-      if (!sA || !sB || sA === sB) continue;
-      const pa = ptById(edge.a);
-      const pb = ptById(edge.b);
-      if (!pa || !pb) continue;
-      const line = document.createElementNS(SVG_NS, 'line');
-      line.setAttribute('class', 'ev2-sector-border');
-      line.setAttribute('x1', String(pa.x));
-      line.setAttribute('y1', String(pa.y));
-      line.setAttribute('x2', String(pb.x));
-      line.setAttribute('y2', String(pb.y));
-      sectorBorderLayer.appendChild(line);
-    }
-  }
-
   // ── Control point layer ──────────────────────────────────────────────────
   const cpLayer = svgEl.querySelector('#ev2-cp-layer') as SVGGElement;
   cpLayer.innerHTML = '';
@@ -1089,6 +1057,38 @@ function render(): void {
     line.setAttribute('y2', String(pb.y));
     line.setAttribute('pointer-events', 'none');
     edgeLayer.appendChild(line);
+  }
+
+  // ── Sector border layer ──────────────────────────────────────────────────
+  const sectorBorderLayer = svgEl.querySelector('#ev2-sector-border-layer') as SVGGElement;
+  sectorBorderLayer.innerHTML = '';
+  sectorBorderLayer.setAttribute('pointer-events', 'none');
+
+  if (sectors.length > 0) {
+    const territoryToSector = new Map<string, string>();
+    for (const s of sectors) {
+      for (const tid of s.territoryIds) {
+        territoryToSector.set(tid, s.id);
+      }
+    }
+    for (const edge of edges) {
+      const k = undirectedEdgeKey(edge.a, edge.b);
+      const terrs = edgeIndex.get(k);
+      if (!terrs || terrs.length !== 2) continue;
+      const sA = territoryToSector.get(terrs[0]!.id);
+      const sB = territoryToSector.get(terrs[1]!.id);
+      if (!sA || !sB || sA === sB) continue;
+      const pa = ptById(edge.a);
+      const pb = ptById(edge.b);
+      if (!pa || !pb) continue;
+      const line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('class', 'ev2-sector-border');
+      line.setAttribute('x1', String(pa.x));
+      line.setAttribute('y1', String(pa.y));
+      line.setAttribute('x2', String(pb.x));
+      line.setAttribute('y2', String(pb.y));
+      sectorBorderLayer.appendChild(line);
+    }
   }
 
   // ── Point layer ──────────────────────────────────────────────────────────
@@ -1520,7 +1520,7 @@ export function initEditorV2(onBack: () => void): void {
   panelSectors   = document.getElementById('ev2-panel-sectors') as HTMLElement;
 
   // Create SVG layers
-  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-sector-border-layer', 'ev2-edge-layer', 'ev2-cp-layer', 'ev2-note-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
+  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-edge-layer', 'ev2-sector-border-layer', 'ev2-cp-layer', 'ev2-note-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('id', id);
     svgEl.appendChild(g);
