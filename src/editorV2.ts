@@ -398,15 +398,9 @@ function territoryPointsAttr(t: Territory): string {
 }
 
 function stateBorderColor(state: TerritoryState): string {
-  if (state === 'allied') return '#2563eb';
-  if (state === 'enemy') return '#dc2626';
+  if (state === 'allied') return '#5EB1FF';
+  if (state === 'enemy') return '#FE775E';
   return 'transparent';
-}
-
-function stateFillColor(state: TerritoryState): string {
-  if (state === 'allied') return '#eff6ff';
-  if (state === 'enemy') return '#fff1f2';
-  return '#fafafa';
 }
 
 /**
@@ -611,20 +605,35 @@ function render(): void {
     fill.setAttribute('points', pts_str);
     group.appendChild(fill);
 
-    // Inset border: path computed 10px inward from boundary, stroked with owner color.
-    // No clip-path or gap cover needed — the offset geometry handles the gap.
+    // Inset border rendered as a compositing group so opacity never compounds at
+    // sub-path endpoints. The glow layer uses butt caps (no end-cap blobs);
+    // the main line uses round caps for clean termination.
     if (t.state !== 'neutral') {
       const borderPathD = buildInsetBorderPath(t, edgeIndex, -10);
       if (borderPathD) {
-        const borderEl = document.createElementNS(SVG_NS, 'path');
-        borderEl.setAttribute('d', borderPathD);
-        borderEl.setAttribute('stroke', stateBorderColor(t.state));
-        borderEl.setAttribute('stroke-width', '2');
-        borderEl.setAttribute('stroke-linecap', 'butt');
-        borderEl.setAttribute('stroke-linejoin', 'miter');
-        borderEl.setAttribute('fill', 'none');
-        borderEl.setAttribute('pointer-events', 'none');
-        group.appendChild(borderEl);
+        const borderColor = stateBorderColor(t.state);
+        const borderGroup = document.createElementNS(SVG_NS, 'g');
+        borderGroup.setAttribute('class', 'ev2-territory-border');
+        borderGroup.setAttribute('pointer-events', 'none');
+
+        const glowEl = document.createElementNS(SVG_NS, 'path');
+        glowEl.setAttribute('d', borderPathD);
+        glowEl.setAttribute('stroke', borderColor);
+        glowEl.setAttribute('stroke-width', '10');
+        glowEl.setAttribute('stroke-linecap', 'butt');
+        glowEl.setAttribute('stroke-opacity', '0.18');
+        glowEl.setAttribute('fill', 'none');
+        borderGroup.appendChild(glowEl);
+
+        const lineEl = document.createElementNS(SVG_NS, 'path');
+        lineEl.setAttribute('d', borderPathD);
+        lineEl.setAttribute('stroke', borderColor);
+        lineEl.setAttribute('stroke-width', '2');
+        lineEl.setAttribute('stroke-linecap', 'round');
+        lineEl.setAttribute('fill', 'none');
+        borderGroup.appendChild(lineEl);
+
+        group.appendChild(borderGroup);
       }
     }
 
