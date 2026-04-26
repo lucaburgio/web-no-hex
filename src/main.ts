@@ -3756,6 +3756,14 @@ svg.addEventListener('click', (e: MouseEvent) => {
 
         syncDamageFloatCssDuration();
 
+        if (config.fogOfWar || state.customMapGraph) {
+          if (gameMode === 'vsAI') scheduleSaveGameState();
+          render();
+          checkWinner();
+          maybeAutoEnd();
+          return;
+        }
+
         if (!combatVfx) {
           if (needsApproach) {
             isAnimating = true;
