@@ -2183,6 +2183,7 @@ settingsBackBtn.addEventListener('click', () => {
 
 function startTutorialMap(mode: GameMode): void {
   hideSettings();
+  hideMainMenu();
   gameMode = 'vsAI';
   localPlayer = PLAYER;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -4084,7 +4085,7 @@ function runAiTurnWithAnimation(): void {
       });
     };
 
-    if (config.fogOfWar) {
+    if (config.fogOfWar || state.customMapGraph) {
       finishAi();
       return;
     }

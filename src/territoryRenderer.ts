@@ -142,6 +142,9 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   const vbH = maxY - minY + 2 * pad;
   svgEl.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
   svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svgEl.setAttribute('width', String(vbW));
+  svgEl.setAttribute('height', String(vbH));
+  svgEl.style.overflow = 'visible';
 
   // Define mountain pattern
   const defs = createSvgEl('defs');
@@ -207,7 +210,7 @@ export function renderTerritoryState(
   svgElement: SVGSVGElement,
   state: GameState,
   graph: TerritoryGraphData,
-  productionKey: string | null,
+  _productionKey: string | null,
   hiddenUnitIds: Set<number>,
   localPlayer: Owner,
 ): void {
@@ -225,7 +228,6 @@ export function renderTerritoryState(
   const validMoveKeys = new Set(validMoves.map(([c, r]) => `${c},${r}`));
 
   // Production placement highlights
-  const productionHex = productionKey;
   const productionPlacementKeys = new Set<string>();
   if (state.phase === 'production') {
     for (const t of mapDef.territories) {
