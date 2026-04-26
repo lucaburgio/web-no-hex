@@ -124,8 +124,23 @@
 .ev2-swatch-enemy    { background: #fff1f2; border-color: #FE775E; }
 .ev2-swatch-mountain { overflow: hidden; border-color: #78716c; }
 
+/* Sector border — dashed black line between territories in different sectors */
+.ev2-sector-border {
+  stroke: #000;
+  stroke-width: 3;
+  stroke-dasharray: 10 6;
+  stroke-linecap: butt;
+  fill: none;
+  opacity: 0.7;
+}
+
 .ev2-territory-selected .ev2-territory-fill {
   stroke: #fbbf24; stroke-width: 3; filter: none;
+}
+
+/* Territory selected in sectors mode — blue outline */
+.ev2-territory-sector-selected .ev2-territory-fill {
+  stroke: #3b82f6; stroke-width: 3;
 }
 .ev2-edge-selected { stroke: #fbbf24 !important; }
 .ev2-borders-count { font-size: 11px; color: #93c5fd; margin: 0 0 4px; }
@@ -159,6 +174,22 @@
 }
 .ev2-territory-list .ev2-territory-row button:hover { background: #444; }
 .ev2-territory-list .ev2-territory-row .ev2-danger { border-color: #7f1d1d; color: #fca5a5; }
+
+/* Sector list items */
+.ev2-sector-item {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+}
+.ev2-sector-count-badge {
+  flex: 0 0 auto; background: #333; color: #999; border: 1px solid #555;
+  border-radius: 10px; font-size: 9px; font-weight: 700;
+  padding: 1px 6px; letter-spacing: 0.06em;
+}
+.ev2-sector-edit-btn {
+  flex: 0 0 auto; padding: 3px 8px; background: #333; color: #ccc;
+  border: 1px solid #555; border-radius: 2px; font-size: 9px;
+  font-weight: 700; letter-spacing: 0.06em; cursor: pointer;
+}
+.ev2-sector-edit-btn:hover { background: #444; }
 
 /* Territory tool selector */
 .ev2-tool-selector { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
@@ -194,22 +225,28 @@
 /* CP SVG elements */
 .ev2-cp-dot { fill: #111; }
 .ev2-cp-label-bg {
-  fill: rgba(255, 255, 255, 0.9);
+  /*fill: rgba(255, 255, 255, 0.9);*/
+  fill: transparent; 
 }
 .ev2-cp-label {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   fill: #111;
   text-anchor: middle;
+  paint-order: stroke fill;
+  stroke: rgba(255, 255, 255, 0.88);
+  stroke-width: 4px;
   dominant-baseline: auto;
   pointer-events: none;
 }
 
 /* Note SVG elements */
 .ev2-note-text {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  fill: #1a1a1a;
+  letter-spacing: 0.1em;
+  fill: #afafaf;
   paint-order: stroke fill;
   stroke: rgba(255, 255, 255, 0.88);
   stroke-width: 4px;

@@ -14,6 +14,7 @@ interface Edge { id: string; a: string; b: string }
 interface Territory { id: string; pointIds: string[]; state: TerritoryState }
 interface ControlPoint { id: string; territoryId: string; name: string }
 interface Note { id: string; x: number; y: number; text: string; align: 'left' | 'center' | 'right' }
+interface Sector { id: string; name: string; territoryIds: string[] }
 
 // ── Module-level state ────────────────────────────────────────────────────────
 
@@ -22,13 +23,16 @@ let edges: Edge[] = [];
 let territories: Territory[] = [];
 let controlPoints: ControlPoint[] = [];
 let notes: Note[] = [];
+let sectors: Sector[] = [];
 let currentPath: string[] = [];      // point IDs in-progress
-let mode: 'edit' | 'borders' | 'territory' | 'view' = 'edit';
+let mode: 'edit' | 'borders' | 'territory' | 'sectors' | 'view' = 'edit';
 let isRemovingDot = false;           // remove-dot sub-mode within edit
 let isNoteTool = false;              // note placement sub-mode within edit
 let territoryTool: TerritoryTool = 'allied';
 let selectedEdgeIds = new Set<string>();
 let selectedTerritoryId: string | null = null;
+let selectedSectorTerritoryIds = new Set<string>();
+let editingSectorId: string | null = null;
 let bordersError: string | null = null;
 let hoveredPoint: string | null = null;
 let cursorPos: { x: number; y: number } = { x: 0, y: 0 };
@@ -41,12 +45,14 @@ let _edgeCounter = 0;
 let _territoryCounter = 0;
 let _cpCounter = 0;
 let _noteCounter = 0;
+let _sectorCounter = 0;
 
 function newPtId(): string  { return `p${++_ptCounter}`; }
 function newEdgeId(): string { return `e${++_edgeCounter}`; }
 function newTerritoryId(): string { return `t${++_territoryCounter}`; }
 function newCpId(): string { return `cp${++_cpCounter}`; }
 function newNoteId(): string { return `note${++_noteCounter}`; }
+function newSectorId(): string { return `sec${++_sectorCounter}`; }
 
 // ── DOM refs (set in initEditorV2) ────────────────────────────────────────────
 
@@ -62,6 +68,8 @@ let noteToolBtn: HTMLButtonElement;
 let panelEdit: HTMLElement;
 let panelBorders: HTMLElement;
 let panelTerritory: HTMLElement;
+let btnSectors: HTMLButtonElement;
+let panelSectors: HTMLElement;
 
 // ── Geometry helpers ──────────────────────────────────────────────────────────
 
@@ -444,6 +452,58 @@ function renderNoteList(): void {
   }
 }
 
+function renderSectorList(): void {
+  const ul = document.getElementById('ev2-sector-list') as HTMLUListElement | null;
+  if (!ul) return;
+  ul.replaceChildren();
+  for (const s of sectors) {
+    const li = document.createElement('li');
+    li.dataset.sectorId = s.id;
+    li.className = 'ev2-sector-item';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = s.name;
+    nameInput.className = 'ev2-cp-name-input';
+    nameInput.dataset.sectorId = s.id;
+    nameInput.placeholder = 'Sector name…';
+
+    const countBadge = document.createElement('span');
+    countBadge.className = 'ev2-sector-count-badge';
+    countBadge.textContent = `${s.territoryIds.length}`;
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'ev2-sector-edit-btn';
+    editBtn.textContent = 'EDIT';
+    editBtn.dataset.sectorEdit = s.id;
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'ev2-cp-del-btn';
+    delBtn.textContent = '×';
+    delBtn.title = 'Delete sector';
+    delBtn.dataset.sectorDelete = s.id;
+
+    li.appendChild(nameInput);
+    li.appendChild(countBadge);
+    li.appendChild(editBtn);
+    li.appendChild(delBtn);
+    ul.appendChild(li);
+  }
+
+  // Update selection count display
+  const selEl = document.getElementById('ev2-sectors-selection');
+  if (selEl) {
+    const n = selectedSectorTerritoryIds.size;
+    selEl.textContent = `${n} territor${n === 1 ? 'y' : 'ies'} selected`;
+  }
+
+  // Update cancel button visibility
+  const cancelBtn = document.getElementById('ev2-sectors-cancel-btn') as HTMLButtonElement | null;
+  if (cancelBtn) cancelBtn.classList.toggle('hidden', !editingSectorId);
+}
+
 function updateBordersPanel(): void {
   const n = selectedEdgeIds.size;
   const countEl = document.getElementById('ev2-borders-selection');
@@ -454,6 +514,7 @@ function updateBordersPanel(): void {
   renderTerritoryList();
   renderCpList();
   renderNoteList();
+  renderSectorList();
 }
 
 function territoryCentroid(t: Territory): { x: number; y: number } {
@@ -831,6 +892,9 @@ function render(): void {
     if (mode === 'borders' && selectedTerritoryId === t.id) {
       group.classList.add('ev2-territory-selected');
     }
+    if (mode === 'sectors' && selectedSectorTerritoryIds.has(t.id)) {
+      group.classList.add('ev2-territory-sector-selected');
+    }
 
     // Filled polygon
     const fill = document.createElementNS(SVG_NS, 'polygon');
@@ -863,6 +927,38 @@ function render(): void {
     }
 
     territoryLayer.appendChild(group);
+  }
+
+  // ── Sector border layer ──────────────────────────────────────────────────
+  const sectorBorderLayer = svgEl.querySelector('#ev2-sector-border-layer') as SVGGElement;
+  sectorBorderLayer.innerHTML = '';
+  sectorBorderLayer.setAttribute('pointer-events', 'none');
+
+  if (sectors.length > 0) {
+    const territoryToSector = new Map<string, string>();
+    for (const s of sectors) {
+      for (const tid of s.territoryIds) {
+        territoryToSector.set(tid, s.id);
+      }
+    }
+    for (const edge of edges) {
+      const k = undirectedEdgeKey(edge.a, edge.b);
+      const terrs = edgeIndex.get(k);
+      if (!terrs || terrs.length !== 2) continue;
+      const sA = territoryToSector.get(terrs[0]!.id);
+      const sB = territoryToSector.get(terrs[1]!.id);
+      if (!sA || !sB || sA === sB) continue;
+      const pa = ptById(edge.a);
+      const pb = ptById(edge.b);
+      if (!pa || !pb) continue;
+      const line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('class', 'ev2-sector-border');
+      line.setAttribute('x1', String(pa.x));
+      line.setAttribute('y1', String(pa.y));
+      line.setAttribute('x2', String(pb.x));
+      line.setAttribute('y2', String(pb.y));
+      sectorBorderLayer.appendChild(line);
+    }
   }
 
   // ── Control point layer ──────────────────────────────────────────────────
@@ -1050,7 +1146,11 @@ function render(): void {
 
 // ── Mode switching ────────────────────────────────────────────────────────────
 
-function setMode(newMode: 'edit' | 'borders' | 'territory' | 'view'): void {
+function setMode(newMode: 'edit' | 'borders' | 'territory' | 'sectors' | 'view'): void {
+  if (newMode !== 'sectors') {
+    selectedSectorTerritoryIds = new Set();
+    editingSectorId = null;
+  }
   mode = newMode;
   isRemovingDot = false;
   isNoteTool = false;
@@ -1059,11 +1159,13 @@ function setMode(newMode: 'edit' | 'borders' | 'territory' | 'view'): void {
   btnEdit.classList.toggle('active', mode === 'edit');
   btnBorders.classList.toggle('active', mode === 'borders');
   btnTerritory.classList.toggle('active', mode === 'territory');
+  btnSectors.classList.toggle('active', mode === 'sectors');
   btnView.classList.toggle('active', mode === 'view');
 
   panelEdit.classList.toggle('hidden', mode !== 'edit');
   panelBorders.classList.toggle('hidden', mode !== 'borders');
   panelTerritory.classList.toggle('hidden', mode !== 'territory');
+  panelSectors.classList.toggle('hidden', mode !== 'sectors');
 
   // Reset sub-tool button visuals
   if (removeDotBtn) removeDotBtn.classList.remove('active');
@@ -1238,6 +1340,41 @@ function handleTerritoryClick(e: MouseEvent): void {
   if (t) applyTerritoryTool(t);
 }
 
+// ── Sectors mode ──────────────────────────────────────────────────────────────
+
+function handleSectorsClick(e: MouseEvent): void {
+  const fromFill = territoryIdFromTopFillPolygonAt(e);
+  let t: Territory | null = null;
+  if (fromFill) {
+    t = territories.find((x) => x.id === fromFill) ?? null;
+  }
+  if (!t) {
+    const { x, y } = svgCoords(e);
+    t = pickTerritoryAt(x, y);
+  }
+  if (!t) return;
+  if (selectedSectorTerritoryIds.has(t.id)) {
+    selectedSectorTerritoryIds.delete(t.id);
+  } else {
+    selectedSectorTerritoryIds.add(t.id);
+  }
+  render();
+}
+
+function saveSector(): void {
+  const ids = [...selectedSectorTerritoryIds];
+  if (ids.length === 0) return;
+  if (editingSectorId) {
+    const existing = sectors.find((s) => s.id === editingSectorId);
+    if (existing) existing.territoryIds = ids;
+    editingSectorId = null;
+  } else {
+    sectors.push({ id: newSectorId(), name: `Sector ${sectors.length + 1}`, territoryIds: ids });
+  }
+  selectedSectorTerritoryIds = new Set();
+  render();
+}
+
 // ── Undo ──────────────────────────────────────────────────────────────────────
 
 function undo(): void {
@@ -1274,6 +1411,7 @@ function clearAll(): void {
   territories = [];
   controlPoints = [];
   notes = [];
+  sectors = [];
   currentPath = [];
   hoveredPoint = null;
   _ptCounter = 0;
@@ -1281,6 +1419,7 @@ function clearAll(): void {
   _territoryCounter = 0;
   _cpCounter = 0;
   _noteCounter = 0;
+  _sectorCounter = 0;
   selectedEdgeIds = new Set();
   selectedTerritoryId = null;
   bordersError = null;
@@ -1290,7 +1429,7 @@ function clearAll(): void {
 // ── Export / Import ───────────────────────────────────────────────────────────
 
 function exportState(): void {
-  const data = { version: 2, pts, edges, territories, controlPoints, notes };
+  const data = { version: 2, pts, edges, territories, controlPoints, notes, sectors };
   const json = JSON.stringify(data, null, 2);
   navigator.clipboard.writeText(json).then(() => {
     const btn = document.getElementById('ev2-export-btn') as HTMLButtonElement;
@@ -1316,10 +1455,13 @@ function importFromJson(json: string): void {
   territories = data.territories as Territory[];
   controlPoints = Array.isArray(data.controlPoints) ? data.controlPoints as ControlPoint[] : [];
   notes = Array.isArray(data.notes) ? data.notes as Note[] : [];
+  sectors = Array.isArray(data.sectors) ? data.sectors as Sector[] : [];
   currentPath = [];
   hoveredPoint = null;
   selectedEdgeIds = new Set();
   selectedTerritoryId = null;
+  selectedSectorTerritoryIds = new Set();
+  editingSectorId = null;
   bordersError = null;
 
   // Restore counters from max IDs so new IDs don't collide
@@ -1330,6 +1472,7 @@ function importFromJson(json: string): void {
   _territoryCounter = maxNum(territories, 't');
   _cpCounter        = maxNum(controlPoints, 'cp');
   _noteCounter      = maxNum(notes, 'note');
+  _sectorCounter    = maxNum(sectors, 'sec');
 }
 
 function showImportModal(): void {
@@ -1373,9 +1516,11 @@ export function initEditorV2(onBack: () => void): void {
   panelEdit      = document.getElementById('ev2-panel-edit') as HTMLElement;
   panelBorders   = document.getElementById('ev2-panel-borders') as HTMLElement;
   panelTerritory = document.getElementById('ev2-panel-territory') as HTMLElement;
+  btnSectors     = document.getElementById('ev2-btn-sectors') as HTMLButtonElement;
+  panelSectors   = document.getElementById('ev2-panel-sectors') as HTMLElement;
 
   // Create SVG layers
-  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-edge-layer', 'ev2-cp-layer', 'ev2-note-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
+  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-sector-border-layer', 'ev2-edge-layer', 'ev2-cp-layer', 'ev2-note-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('id', id);
     svgEl.appendChild(g);
@@ -1384,7 +1529,7 @@ export function initEditorV2(onBack: () => void): void {
   // SVG mouse events
   svgEl.addEventListener('mousedown', (e: MouseEvent) => {
     if (overlayEl.classList.contains('hidden')) return;
-    if (mode === 'view' || mode === 'borders') return;
+    if (mode === 'view' || mode === 'borders' || mode === 'sectors') return;
     if (isRemovingDot) return;                  // remove-dot uses click, not drag
     const { x, y } = svgCoords(e);
     const snapNote = findSnapNote(x, y);
@@ -1465,6 +1610,8 @@ export function initEditorV2(onBack: () => void): void {
       handleBordersClick(e);
     } else if (mode === 'territory') {
       handleTerritoryClick(e);
+    } else if (mode === 'sectors') {
+      handleSectorsClick(e);
     }
   });
 
@@ -1487,7 +1634,51 @@ export function initEditorV2(onBack: () => void): void {
   btnEdit.addEventListener('click', () => setMode('edit'));
   btnBorders.addEventListener('click', () => setMode('borders'));
   btnTerritory.addEventListener('click', () => setMode('territory'));
+  btnSectors.addEventListener('click', () => setMode('sectors'));
   btnView.addEventListener('click', () => setMode('view'));
+
+  // Sectors panel
+  (document.getElementById('ev2-sectors-save-btn') as HTMLButtonElement)
+    .addEventListener('click', () => saveSector());
+  (document.getElementById('ev2-sectors-clear-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      selectedSectorTerritoryIds = new Set();
+      editingSectorId = null;
+      render();
+    });
+  (document.getElementById('ev2-sectors-cancel-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      editingSectorId = null;
+      selectedSectorTerritoryIds = new Set();
+      render();
+    });
+  document.getElementById('ev2-sector-list')?.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+    if (!b) return;
+    if (b.dataset.sectorDelete) {
+      sectors = sectors.filter((s) => s.id !== b.dataset.sectorDelete);
+      if (editingSectorId === b.dataset.sectorDelete) {
+        editingSectorId = null;
+        selectedSectorTerritoryIds = new Set();
+      }
+      render();
+      return;
+    }
+    if (b.dataset.sectorEdit) {
+      const s = sectors.find((x) => x.id === b.dataset.sectorEdit);
+      if (s) {
+        editingSectorId = s.id;
+        selectedSectorTerritoryIds = new Set(s.territoryIds);
+        render();
+      }
+    }
+  });
+  document.getElementById('ev2-sector-list')?.addEventListener('input', (e) => {
+    const input = e.target as HTMLInputElement;
+    if (!input.dataset.sectorId) return;
+    const s = sectors.find((x) => x.id === input.dataset.sectorId);
+    if (s) s.name = input.value;
+  });
 
   (document.getElementById('ev2-borders-autodetect-btn') as HTMLButtonElement)
     .addEventListener('click', () => {
@@ -1685,6 +1876,7 @@ export function showEditorV2(): void {
   territories = [];
   controlPoints = [];
   notes = [];
+  sectors = [];
   currentPath = [];
   hoveredPoint = null;
   cursorPos = { x: 0, y: 0 };
@@ -1693,11 +1885,14 @@ export function showEditorV2(): void {
   _territoryCounter = 0;
   _cpCounter = 0;
   _noteCounter = 0;
+  _sectorCounter = 0;
   isNoteTool = false;
   dragNoteId = null;
   territoryTool = 'allied';
   selectedEdgeIds = new Set();
   selectedTerritoryId = null;
+  selectedSectorTerritoryIds = new Set();
+  editingSectorId = null;
   bordersError = null;
 
   // Reset mode to edit
@@ -1706,12 +1901,14 @@ export function showEditorV2(): void {
   btnEdit.classList.add('active');
   btnBorders.classList.remove('active');
   btnTerritory.classList.remove('active');
+  btnSectors.classList.remove('active');
   btnView.classList.remove('active');
   removeDotBtn.classList.remove('active');
   noteToolBtn.classList.remove('active');
   panelEdit.classList.remove('hidden');
   panelBorders.classList.add('hidden');
   panelTerritory.classList.add('hidden');
+  panelSectors.classList.add('hidden');
   svgEl.style.cursor = 'crosshair';
 
   // Reset territory tool selector to 'allied'
