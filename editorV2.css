@@ -20,7 +20,10 @@
 .ev2-state-enemy { fill: #fff1f2; }
 
 .ev2-edge {
-  stroke: #1a1a1a; stroke-width: 1.5; stroke-linecap: round;
+  stroke: #CDCDCD; stroke-width: 1.5; stroke-linecap: round;
+}
+.ev2-edge-hit {
+  pointer-events: stroke; cursor: default;
 }
 .ev2-point {
   fill: #1a1a1a; stroke: none; r: 5;
@@ -40,20 +43,21 @@
 
 /* Sidebar */
 #ev2-sidebar {
-  width: 220px; background: #1a1a1a; color: #fff;
+  width: 240px; min-width: 220px; max-width: 280px; background: #1a1a1a; color: #fff;
   display: flex; flex-direction: column; padding: 24px 16px;
-  gap: 20px;
+  gap: 20px; flex-shrink: 0;
 }
 #ev2-title {
   font-size: 18px; font-weight: 700; letter-spacing: 0.1em;
   line-height: 1.1;
 }
-#ev2-mode-switcher {
-  display: flex; gap: 6px;
+#ev2-mode-switcher,
+.ev2-mode-switcher {
+  display: flex; flex-wrap: wrap; gap: 6px;
 }
 .ev2-mode-btn {
-  flex: 1; padding: 8px 4px; background: #333; color: #fff;
-  border: 1px solid #555; border-radius: 3px; font-size: 11px;
+  flex: 1 1 calc(50% - 3px); min-width: 70px; padding: 8px 4px; background: #333; color: #fff;
+  border: 1px solid #555; border-radius: 3px; font-size: 10px;
   font-weight: 600; letter-spacing: 0.08em; cursor: pointer;
 }
 .ev2-mode-btn.active {
@@ -86,6 +90,42 @@
 .ev2-swatch-neutral { background: #fafafa; }
 .ev2-swatch-allied { background: #eff6ff; border-color: #2563eb; }
 .ev2-swatch-enemy { background: #fff1f2; border-color: #dc2626; }
+
+.ev2-territory-selected .ev2-territory-fill {
+  stroke: #fbbf24; stroke-width: 3; filter: none;
+}
+.ev2-edge-selected { stroke: #fbbf24 !important; }
+.ev2-borders-count { font-size: 11px; color: #93c5fd; margin: 0 0 4px; }
+.ev2-borders-error {
+  font-size: 10px; color: #fecaca; background: #7f1d1d; padding: 6px 8px;
+  border-radius: 3px; margin: 0 0 6px; line-height: 1.35;
+}
+.ev2-borders-error.hidden { display: none; }
+#ev2-borders-replace-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ev2-territory-list {
+  list-style: none; margin: 0; padding: 0; max-height: 200px; overflow: auto;
+  border: 1px solid #444; border-radius: 3px; background: #111;
+}
+.ev2-territory-list li { border-bottom: 1px solid #333; }
+.ev2-territory-list li:last-child { border-bottom: 0; }
+.ev2-territory-list button.ev2-territory-list-select {
+  display: block; width: 100%; text-align: left; padding: 8px 10px; margin: 0;
+  background: transparent; color: #e5e5e5; border: none; cursor: pointer;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+}
+.ev2-territory-list button.ev2-territory-list-select:hover { background: #2a2a2a; }
+.ev2-territory-list button.ev2-territory-list-select.active {
+  background: #1d4ed8; color: #fff;
+}
+.ev2-territory-list .ev2-territory-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 6px 8px 10px;
+}
+.ev2-territory-list .ev2-territory-row button {
+  flex: 1; min-width: 56px; padding: 4px 6px; font-size: 9px; margin: 0;
+  background: #333; color: #ccc; border: 1px solid #555; border-radius: 2px; cursor: pointer;
+}
+.ev2-territory-list .ev2-territory-row button:hover { background: #444; }
+.ev2-territory-list .ev2-territory-row .ev2-danger { border-color: #7f1d1d; color: #fca5a5; }
 
 #ev2-footer { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
 

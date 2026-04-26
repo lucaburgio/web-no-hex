@@ -244,17 +244,32 @@
       <div id="ev2-header">
         <div id="ev2-title">EDITOR<br>V2</div>
       </div>
-      <div id="ev2-mode-switcher">
+      <div id="ev2-mode-switcher" class="ev2-mode-switcher">
         <button id="ev2-btn-edit" class="ev2-mode-btn active">EDIT</button>
+        <button id="ev2-btn-borders" class="ev2-mode-btn">BORDERS</button>
         <button id="ev2-btn-territory" class="ev2-mode-btn">TERRITORY</button>
         <button id="ev2-btn-view" class="ev2-mode-btn">VIEW</button>
       </div>
       <div id="ev2-panel-edit">
         <div class="ev2-section-label">PEN TOOL</div>
-        <p class="ev2-hint">Click to place points. Snap to existing points to share borders. Closing a shape auto-creates a territory. Esc cancels current path.</p>
+        <p class="ev2-hint">Click to place points. Snap to an existing point to share a border. New territories are defined in <strong>BORDERS</strong> mode, not here. Esc cancels the current path.</p>
         <button id="ev2-undo-btn" class="ev2-action-btn">UNDO LAST POINT</button>
         <button id="ev2-clear-btn" class="ev2-action-btn ev2-danger-btn">CLEAR ALL</button>
         <button type="button" id="ev2-remove-dot-btn" class="ev2-action-btn">REMOVE DOT</button>
+      </div>
+      <div id="ev2-panel-borders" class="hidden">
+        <div class="ev2-section-label">AUTO-DETECT</div>
+        <p class="ev2-hint">Scan all drawn edges and automatically save every enclosed region as a territory.</p>
+        <button type="button" id="ev2-borders-autodetect-btn" class="ev2-action-btn">AUTO-DETECT TERRITORIES</button>
+        <div class="ev2-section-label" style="margin-top: 14px;">DEFINE MANUALLY</div>
+        <p class="ev2-hint">Click map edges to select them (one closed loop: each corner must have exactly two selected edges). Then save as a territory, or select one in the list to replace or delete.</p>
+        <p id="ev2-borders-selection" class="ev2-borders-count">0 edges selected</p>
+        <p id="ev2-borders-error" class="ev2-borders-error hidden"></p>
+        <button type="button" id="ev2-borders-clear-btn" class="ev2-action-btn">CLEAR SELECTION</button>
+        <button type="button" id="ev2-borders-save-btn" class="ev2-action-btn">SAVE AS TERRITORY</button>
+        <button type="button" id="ev2-borders-replace-btn" class="ev2-action-btn" disabled>REPLACE SELECTION (LIST)</button>
+        <div class="ev2-section-label" style="margin-top: 14px;">TERRITORIES</div>
+        <ul id="ev2-territory-list" class="ev2-territory-list" aria-label="Defined territories"></ul>
       </div>
       <div id="ev2-panel-territory" class="hidden">
         <div class="ev2-section-label">TERRITORY TYPE</div>

@@ -16,8 +16,11 @@ let pts: Pt[] = [];
 let edges: Edge[] = [];
 let territories: Territory[] = [];
 let currentPath: string[] = [];      // point IDs in-progress
-let mode: 'edit' | 'territory' | 'view' = 'edit';
+let mode: 'edit' | 'borders' | 'territory' | 'view' = 'edit';
 let isRemovingDot = false;           // remove-dot sub-mode within edit
+let selectedEdgeIds = new Set<string>();
+let selectedTerritoryId: string | null = null;
+let bordersError: string | null = null;
 let hoveredPoint: string | null = null;
 let cursorPos: { x: number; y: number } = { x: 0, y: 0 };
 let dragPointId: string | null = null;  // point being dragged
@@ -39,8 +42,10 @@ let canvasAreaEl: HTMLElement;
 let btnEdit: HTMLButtonElement;
 let btnTerritory: HTMLButtonElement;
 let btnView: HTMLButtonElement;
+let btnBorders: HTMLButtonElement;
 let removeDotBtn: HTMLButtonElement;
 let panelEdit: HTMLElement;
+let panelBorders: HTMLElement;
 let panelTerritory: HTMLElement;
 
 // ── Geometry helpers ──────────────────────────────────────────────────────────
@@ -69,15 +74,22 @@ function findSnapPoint(x: number, y: number): Pt | null {
   return best;
 }
 
-/** Ray-casting point-in-polygon test */
+/**
+ * d3.polygonContains — ray parity over edges (d3-polygon, proven on dense meshes).
+ * Uses same (x,y) space as the SVG polygon vertices.
+ */
 function pointInPolygon(x: number, y: number, polygon: Array<{ x: number; y: number }>): boolean {
-  let inside = false;
   const n = polygon.length;
-  for (let i = 0, j = n - 1; i < n; j = i++) {
-    const xi = polygon[i].x, yi = polygon[i].y;
-    const xj = polygon[j].x, yj = polygon[j].y;
-    const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
-    if (intersect) inside = !inside;
+  if (n < 3) return false;
+  const p0 = polygon[n - 1]!;
+  let x0 = p0.x, y0 = p0.y;
+  let x1, y1;
+  let inside = false;
+  for (let i = 0; i < n; i++) {
+    const p = polygon[i]!;
+    x1 = p.x; y1 = p.y;
+    if ((y1 > y) !== (y0 > y) && x < ((x0 - x1) * (y - y1)) / (y0 - y1) + x1) inside = !inside;
+    x0 = x1; y0 = y1;
   }
   return inside;
 }
@@ -94,68 +106,266 @@ function addEdge(aId: string, bId: string): void {
   }
 }
 
-// ── Cycle detection ───────────────────────────────────────────────────────────
+// ── Auto-detect territories from planar graph ────────────────────────────────
 
 /**
- * DFS to find ALL simple paths from start→end, excluding the edge (exA–exB).
- * Paths are limited to MAX_CYCLE_LENGTH nodes to keep search tractable.
+ * Finds all enclosed faces in the drawn planar graph using a DCEL half-edge
+ * traversal and saves them as new territories (skipping duplicates and the
+ * outer/infinite face).
+ *
+ * For each undirected edge {a,b} we create two directed half-edges: (a→b) and
+ * (b→a).  For half-edge h = (u→v) the "next" half-edge in the face is the one
+ * that leaves v making the most clockwise turn — i.e. the outgoing edge from v
+ * that comes just *before* the twin (v→u) in the CCW-sorted list around v.
+ * Traversing these "next" pointers traces every face.  Faces with positive
+ * signed area (in SVG coords where y increases downward) are interior faces;
+ * the outer (infinite) face has negative area and is discarded.
  */
-const MAX_CYCLE_LENGTH = 24;
-function findAllPathsDFS(start: string, end: string, exA: string, exB: string): string[][] {
-  const results: string[][] = [];
-  const stack: Array<{ path: string[]; visited: Set<string> }> = [
-    { path: [start], visited: new Set([start]) },
-  ];
-  while (stack.length) {
-    const { path, visited } = stack.pop()!;
-    const cur = path[path.length - 1];
-    for (const e of edges) {
-      if ((e.a === exA && e.b === exB) || (e.a === exB && e.b === exA)) continue;
-      let nb: string | null = null;
-      if (e.a === cur) nb = e.b;
-      else if (e.b === cur) nb = e.a;
-      if (!nb) continue;
-      if (nb === end && path.length >= 2) {
-        // Closed a cycle — only keep it if no existing territory has the same point set
-        results.push([...path, end]);
-      } else if (!visited.has(nb) && path.length < MAX_CYCLE_LENGTH) {
-        const newVisited = new Set(visited);
-        newVisited.add(nb);
-        stack.push({ path: [...path, nb], visited: newVisited });
-      }
-    }
+function autoDetectTerritories(): { added: number; skipped: number } {
+  if (edges.length < 3) return { added: 0, skipped: 0 };
+
+  // Flat arrays keyed by half-edge index (edge i → HE 2i and 2i+1)
+  const totalHE = edges.length * 2;
+  const heFrom:    string[]  = new Array(totalHE);
+  const heTo:      string[]  = new Array(totalHE);
+  const heTwin:    number[]  = new Array(totalHE);
+  const heNext:    number[]  = new Array(totalHE);
+  const heVisited: boolean[] = new Array(totalHE).fill(false);
+
+  for (let i = 0; i < edges.length; i++) {
+    const e = edges[i]!;
+    const idx = i * 2;
+    heFrom[idx]     = e.a; heTo[idx]     = e.b; heTwin[idx]     = idx + 1;
+    heFrom[idx + 1] = e.b; heTo[idx + 1] = e.a; heTwin[idx + 1] = idx;
   }
-  return results;
+
+  // Outgoing half-edge lists per vertex, sorted CCW by angle
+  const outgoing = new Map<string, number[]>();
+  for (let i = 0; i < totalHE; i++) {
+    const from = heFrom[i]!;
+    let list = outgoing.get(from);
+    if (!list) { list = []; outgoing.set(from, list); }
+    list.push(i);
+  }
+  for (const indices of outgoing.values()) {
+    indices.sort((a, b) => {
+      const pfa = ptById(heFrom[a]!)!; const pta = ptById(heTo[a]!)!;
+      const pfb = ptById(heFrom[b]!)!; const ptb = ptById(heTo[b]!)!;
+      return Math.atan2(pta.y - pfa.y, pta.x - pfa.x) -
+             Math.atan2(ptb.y - pfb.y, ptb.x - pfb.x);
+    });
+  }
+
+  // next(h) = outgoing[h.to][ (pos_of_twin - 1 + n) % n ]
+  // This picks the most clockwise turn from the twin's direction around the vertex.
+  for (let i = 0; i < totalHE; i++) {
+    const toVtx  = heTo[i]!;
+    const outList = outgoing.get(toVtx)!;
+    const pos = outList.indexOf(heTwin[i]!);
+    heNext[i] = outList[(pos - 1 + outList.length) % outList.length]!;
+  }
+
+  // Traverse faces
+  let added = 0;
+  let skipped = 0;
+
+  for (let start = 0; start < totalHE; start++) {
+    if (heVisited[start]) continue;
+
+    const face: string[] = [];
+    let cur = start;
+    while (!heVisited[cur]) {
+      heVisited[cur] = true;
+      face.push(heFrom[cur]!);
+      cur = heNext[cur]!;
+    }
+
+    if (face.length < 3) continue;
+
+    // Signed area via shoelace — positive in SVG coords (y-down) = CW winding = interior face
+    let area = 0;
+    for (let j = 0; j < face.length; j++) {
+      const pj = ptById(face[j]!)!;
+      const pk = ptById(face[(j + 1) % face.length]!)!;
+      area += pj.x * pk.y - pk.x * pj.y;
+    }
+    if (area <= 0) continue; // outer / infinite face
+
+    if (territories.some((t) => samePointSetAsTerritory(t, face))) {
+      skipped++;
+      continue;
+    }
+
+    territories.push({ id: newTerritoryId(), pointIds: face, state: 'neutral' });
+    added++;
+  }
+
+  render();
+  return { added, skipped };
+}
+
+// ── Close loop from selected border edges (Borders mode) ────────────────────
+
+function samePointSetAsTerritory(t: Territory, pointIds: string[]): boolean {
+  if (t.pointIds.length !== pointIds.length) return false;
+  const a = new Set(t.pointIds);
+  const b = new Set(pointIds);
+  if (a.size !== b.size) return false;
+  for (const id of a) {
+    if (!b.has(id)) return false;
+  }
+  return true;
 }
 
 /**
- * After adding edge aId–bId, find ALL new cycles that now close and create
- * a territory for each one not already represented.
+ * Selected edges must form one simple cycle: 2 edges per point, |E| = |V|, connected.
+ * Returns pointIds in order around the loop (not repeating the first at the end).
  */
-function tryAutoCloseTerritory(aId: string, bId: string): void {
-  const allPaths = findAllPathsDFS(bId, aId, aId, bId);
-  for (const path of allPaths) {
-    // path = [bId, …, aId]; cycle = [aId, bId, …, second-to-last]
-    const cycle = [aId, ...path.slice(0, -1)];
-    if (cycle.length < 3) continue;
+function cycleFromSelectedEdges(selected: Set<string>): { ok: true; pointIds: string[] } | { ok: false; error: string } {
+  const el = edges.filter((e) => selected.has(e.id));
+  if (el.length < 3) return { ok: false, error: 'Select at least 3 edges.' };
 
-    const cycleSet = new Set(cycle);
-
-    // Skip if an identical territory already exists
-    const exists = territories.some(
-      (t) => t.pointIds.length === cycle.length && t.pointIds.every((id) => cycleSet.has(id))
-    );
-    if (exists) continue;
-
-    // Skip non-minimal cycles: if this cycle is a strict superset of any existing
-    // territory, it encloses that territory and is not a face of the planar map.
-    const isSuperset = territories.some(
-      (t) => t.pointIds.length < cycle.length && t.pointIds.every((id) => cycleSet.has(id))
-    );
-    if (isSuperset) continue;
-
-    territories.push({ id: newTerritoryId(), pointIds: cycle, state: 'neutral' });
+  const deg = new Map<string, number>();
+  for (const e of el) {
+    deg.set(e.a, (deg.get(e.a) || 0) + 1);
+    deg.set(e.b, (deg.get(e.b) || 0) + 1);
   }
+  for (const c of deg.values()) {
+    if (c !== 2) {
+      return { ok: false, error: 'Each point must be touched by exactly two selected edges (one closed loop).' };
+    }
+  }
+  if (el.length !== deg.size) {
+    return { ok: false, error: 'Selection must be a single closed loop (same number of edges and corners).' };
+  }
+
+  const e0 = el[0]!;
+  const pointIds: string[] = [e0.a];
+  let at = e0.b;
+  const used = new Set<string>([e0.id]);
+
+  while (used.size < el.length) {
+    const e = el.find((ed) => !used.has(ed.id) && (ed.a === at || ed.b === at));
+    if (!e) return { ok: false, error: 'Selected edges are not one connected loop.' };
+    const other = e.a === at ? e.b : e.a;
+    used.add(e.id);
+    if (used.size < el.length) {
+      if (other === pointIds[0]) {
+        return { ok: false, error: 'Loop closes before every edge is used—select only one closed ring.' };
+      }
+      pointIds.push(other);
+      at = other;
+    } else {
+      if (other !== pointIds[0]) {
+        return { ok: false, error: 'The last edge does not return to the start of the loop.' };
+      }
+    }
+  }
+  return { ok: true, pointIds };
+}
+
+function findEdgeIdAtEvent(e: MouseEvent): string | null {
+  const stack = document.elementsFromPoint(e.clientX, e.clientY);
+  for (const item of stack) {
+    if (!(item instanceof Element) || !svgEl.contains(item)) continue;
+    if (item.localName === 'line' && item.classList.contains('ev2-edge-hit')) {
+      const id = item.getAttribute('data-ev2-edge-id');
+      if (id) return id;
+    }
+  }
+  return null;
+}
+
+function setBordersError(msg: string | null): void {
+  bordersError = msg;
+  const el = document.getElementById('ev2-borders-error');
+  if (!el) return;
+  if (msg) {
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  } else {
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
+}
+
+function renderTerritoryList(): void {
+  const ul = document.getElementById('ev2-territory-list') as HTMLUListElement | null;
+  if (!ul) return;
+  ul.replaceChildren();
+  for (const t of territories) {
+    const li = document.createElement('li');
+    const top = document.createElement('div');
+    top.style.display = 'flex';
+    top.style.alignItems = 'center';
+    top.style.gap = '6px';
+    const selBtn = document.createElement('button');
+    selBtn.type = 'button';
+    selBtn.className = 'ev2-territory-list-select' + (t.id === selectedTerritoryId ? ' active' : '');
+    selBtn.textContent = t.id;
+    selBtn.dataset.territoryId = t.id;
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'ev2-danger';
+    delBtn.textContent = '×';
+    delBtn.title = 'Delete';
+    delBtn.style.flex = '0 0 28px';
+    delBtn.dataset.territoryDelete = t.id;
+    top.appendChild(selBtn);
+    top.appendChild(delBtn);
+    li.appendChild(top);
+    ul.appendChild(li);
+  }
+}
+
+function updateBordersPanel(): void {
+  const n = selectedEdgeIds.size;
+  const countEl = document.getElementById('ev2-borders-selection');
+  if (countEl) countEl.textContent = `${n} edge${n === 1 ? '' : 's'} selected`;
+  const rep = document.getElementById('ev2-borders-replace-btn') as HTMLButtonElement | null;
+  if (rep) rep.disabled = !selectedTerritoryId;
+  setBordersError(bordersError);
+  renderTerritoryList();
+}
+
+function saveTerritoryFromSelection(replace: boolean): void {
+  const r = cycleFromSelectedEdges(selectedEdgeIds);
+  if (!r.ok) {
+    setBordersError(r.error);
+    return;
+  }
+  if (replace) {
+    if (!selectedTerritoryId) {
+      setBordersError('Select a territory in the list first.');
+      return;
+    }
+    const t = territories.find((x) => x.id === selectedTerritoryId);
+    if (!t) {
+      setBordersError('Selected territory not found.');
+      return;
+    }
+    t.pointIds = r.pointIds;
+    setBordersError(null);
+    selectedEdgeIds = new Set();
+  } else {
+    if (territories.some((t) => samePointSetAsTerritory(t, r.pointIds))) {
+      setBordersError('A territory with this exact border already exists.');
+      return;
+    }
+    territories.push({ id: newTerritoryId(), pointIds: r.pointIds, state: 'neutral' });
+    setBordersError(null);
+    selectedEdgeIds = new Set();
+  }
+  render();
+}
+
+function handleBordersClick(e: MouseEvent): void {
+  const edgeId = findEdgeIdAtEvent(e);
+  if (!edgeId) return;
+  if (selectedEdgeIds.has(edgeId)) selectedEdgeIds.delete(edgeId);
+  else selectedEdgeIds.add(edgeId);
+  setBordersError(null);
+  render();
 }
 
 // ── Resize ────────────────────────────────────────────────────────────────────
@@ -200,21 +410,60 @@ function polygonEdgePairs(t: Territory): Array<[string, string]> {
   return t.pointIds.map((id, i) => [id, t.pointIds[(i + 1) % t.pointIds.length]] as [string, string]);
 }
 
-function edgePairsMatch(a: [string, string], b: [string, string]): boolean {
-  return (a[0] === b[0] && a[1] === b[1]) || (a[0] === b[1] && a[1] === b[0]);
+function undirectedEdgeKey(aId: string, bId: string): string {
+  return aId < bId ? `${aId}\0${bId}` : `${bId}\0${aId}`;
+}
+
+/** For each undirected map edge, which distinct territories use that segment (deduped by id). */
+function buildEdgeTerritoryIndex(): Map<string, Territory[]> {
+  const byId = new Map(territories.map((t) => [t.id, t] as [string, Territory]));
+  const idSets = new Map<string, Set<string>>();
+  for (const t of territories) {
+    for (const [aId, bId] of polygonEdgePairs(t)) {
+      if (aId === bId) continue;
+      const k = undirectedEdgeKey(aId, bId);
+      let set = idSets.get(k);
+      if (!set) {
+        set = new Set();
+        idSets.set(k, set);
+      }
+      set.add(t.id);
+    }
+  }
+  const out = new Map<string, Territory[]>();
+  for (const [k, set] of idSets) {
+    out.set(
+      k,
+      [...set].map((id) => byId.get(id)).filter((x): x is Territory => x !== undefined),
+    );
+  }
+  return out;
 }
 
 /**
- * Returns true if edge (aId, bId) of territory t is shared with another
- * territory of the same non-neutral state.
+ * The other territory that shares the undirected edge, if any (planar: usually one).
  */
-function isEdgeSharedWithSameState(t: Territory, edge: [string, string]): boolean {
+function neighborFromEdgeIndex(
+  t: Territory,
+  edge: [string, string],
+  index: Map<string, Territory[]>,
+): Territory | null {
+  const k = undirectedEdgeKey(edge[0]!, edge[1]!);
+  const list = index.get(k);
+  if (!list) return null;
+  return list.find((o) => o.id !== t.id) ?? null;
+}
+
+/** True if this side of the edge should not draw a stroke (shared with same-state neighbor). */
+function shouldSuppressBorderOnEdge(
+  t: Territory,
+  edge: [string, string],
+  edgeIndex: Map<string, Territory[]>,
+): boolean {
   if (t.state === 'neutral') return false;
-  for (const other of territories) {
-    if (other.id === t.id || other.state !== t.state) continue;
-    if (polygonEdgePairs(other).some((e) => edgePairsMatch(e, edge))) return true;
-  }
-  return false;
+  const neighbor = neighborFromEdgeIndex(t, edge, edgeIndex);
+  if (!neighbor) return false;
+  return neighbor.state === t.state;
 }
 
 function render(): void {
@@ -239,11 +488,18 @@ function render(): void {
   // ── Territory layer ──────────────────────────────────────────────────────
   const territoryLayer = svgEl.querySelector('#ev2-territory-layer') as SVGGElement;
   territoryLayer.innerHTML = '';
+  territoryLayer.style.pointerEvents = mode === 'territory' ? 'auto' : 'none';
+
+  const edgeIndex = buildEdgeTerritoryIndex();
 
   for (const t of territories) {
     const pts_str = territoryPointsAttr(t);
 
     const group = document.createElementNS(SVG_NS, 'g');
+    group.setAttribute('data-ev2-territory-id', t.id);
+    if (mode === 'borders' && selectedTerritoryId === t.id) {
+      group.classList.add('ev2-territory-selected');
+    }
 
     // Filled polygon
     const fill = document.createElementNS(SVG_NS, 'polygon');
@@ -255,7 +511,7 @@ function render(): void {
     if (t.state !== 'neutral') {
       const borderColor = stateBorderColor(t.state);
       for (const [aId, bId] of polygonEdgePairs(t)) {
-        if (isEdgeSharedWithSameState(t, [aId, bId])) continue;
+        if (shouldSuppressBorderOnEdge(t, [aId, bId], edgeIndex)) continue;
         const pa = ptById(aId);
         const pb = ptById(bId);
         if (!pa || !pb) continue;
@@ -269,21 +525,10 @@ function render(): void {
         seg.setAttribute('stroke-linecap', 'square');
         seg.setAttribute('fill', 'none');
         seg.setAttribute('clip-path', `url(#ev2-clip-${t.id})`);
+        if (mode === 'territory') seg.setAttribute('pointer-events', 'none');
         group.appendChild(seg);
       }
     }
-
-    // Click handler for territory mode
-    group.addEventListener('click', () => {
-      if (mode !== 'territory') return;
-      const nextState: Record<TerritoryState, TerritoryState> = {
-        neutral: 'allied',
-        allied: 'enemy',
-        enemy: 'neutral',
-      };
-      t.state = nextState[t.state];
-      render();
-    });
 
     territoryLayer.appendChild(group);
   }
@@ -296,18 +541,38 @@ function render(): void {
     const pa = ptById(edge.a);
     const pb = ptById(edge.b);
     if (!pa || !pb) continue;
+    if (mode === 'borders') {
+      const hit = document.createElementNS(SVG_NS, 'line');
+      hit.setAttribute('class', 'ev2-edge-hit');
+      hit.setAttribute('data-ev2-edge-id', edge.id);
+      hit.setAttribute('x1', String(pa.x));
+      hit.setAttribute('y1', String(pa.y));
+      hit.setAttribute('x2', String(pb.x));
+      hit.setAttribute('y2', String(pb.y));
+      hit.setAttribute('stroke', 'rgba(0,0,0,0.01)');
+      hit.setAttribute('stroke-width', '22');
+      hit.setAttribute('stroke-linecap', 'round');
+      hit.setAttribute('pointer-events', 'stroke');
+      edgeLayer.appendChild(hit);
+    }
     const line = document.createElementNS(SVG_NS, 'line');
-    line.setAttribute('class', 'ev2-edge');
+    let cls = 'ev2-edge';
+    if (mode === 'borders' && selectedEdgeIds.has(edge.id)) cls += ' ev2-edge-selected';
+    line.setAttribute('class', cls);
+    if (mode === 'borders') line.setAttribute('data-ev2-edge-id', edge.id);
     line.setAttribute('x1', String(pa.x));
     line.setAttribute('y1', String(pa.y));
     line.setAttribute('x2', String(pb.x));
     line.setAttribute('y2', String(pb.y));
+    line.setAttribute('pointer-events', 'none');
     edgeLayer.appendChild(line);
   }
 
   // ── Point layer ──────────────────────────────────────────────────────────
   const pointLayer = svgEl.querySelector('#ev2-point-layer') as SVGGElement;
   pointLayer.innerHTML = '';
+  pointLayer.style.pointerEvents = mode === 'territory' || mode === 'borders' ? 'none' : 'auto';
+  edgeLayer.style.pointerEvents = mode === 'territory' ? 'none' : 'auto';
 
   if (mode !== 'view') {
     const firstPathPointId = currentPath.length > 0 ? currentPath[0] : null;
@@ -335,6 +600,8 @@ function render(): void {
   const previewLayer = svgEl.querySelector('#ev2-preview-layer') as SVGGElement;
   previewLayer.innerHTML = '';
 
+  updateBordersPanel();
+
   if (mode === 'edit' && currentPath.length > 0) {
     const lastId = currentPath[currentPath.length - 1];
     const lastPt = ptById(lastId);
@@ -356,22 +623,25 @@ function render(): void {
 
 // ── Mode switching ────────────────────────────────────────────────────────────
 
-function setMode(newMode: 'edit' | 'territory' | 'view'): void {
+function setMode(newMode: 'edit' | 'borders' | 'territory' | 'view'): void {
   mode = newMode;
   isRemovingDot = false;
   currentPath = [];
 
   btnEdit.classList.toggle('active', mode === 'edit');
+  btnBorders.classList.toggle('active', mode === 'borders');
   btnTerritory.classList.toggle('active', mode === 'territory');
   btnView.classList.toggle('active', mode === 'view');
 
   panelEdit.classList.toggle('hidden', mode !== 'edit');
+  panelBorders.classList.toggle('hidden', mode !== 'borders');
   panelTerritory.classList.toggle('hidden', mode !== 'territory');
 
   // Reset remove-dot button visual
   if (removeDotBtn) removeDotBtn.classList.remove('active');
 
-  svgEl.style.cursor = mode === 'edit' ? 'crosshair' : 'default';
+  if (mode === 'edit') svgEl.style.cursor = 'crosshair';
+  else svgEl.style.cursor = 'default';
 
   render();
 }
@@ -403,8 +673,6 @@ function handleEditClick(e: MouseEvent): void {
 
   const snap = findSnapPoint(x, y);
 
-  let edgeAdded: [string, string] | null = null;
-
   if (snap) {
     const snapId = snap.id;
 
@@ -413,7 +681,6 @@ function handleEditClick(e: MouseEvent): void {
 
       if (snapId !== lastId) {
         addEdge(lastId, snapId);
-        edgeAdded = [lastId, snapId];
 
         if (currentPath.includes(snapId)) {
           // Snapped to a point already in the path (first or intermediate) → close/end
@@ -434,14 +701,8 @@ function handleEditClick(e: MouseEvent): void {
     if (currentPath.length > 0) {
       const lastId = currentPath[currentPath.length - 1];
       addEdge(lastId, newPt.id);
-      edgeAdded = [lastId, newPt.id];
     }
     currentPath.push(newPt.id);
-  }
-
-  // Auto-detect a closed territory whenever an edge is added
-  if (edgeAdded) {
-    tryAutoCloseTerritory(edgeAdded[0], edgeAdded[1]);
   }
 
   render();
@@ -449,24 +710,96 @@ function handleEditClick(e: MouseEvent): void {
 
 // ── Territory mode click handling ─────────────────────────────────────────────
 
-function handleTerritoryClick(e: MouseEvent): void {
-  const { x, y } = svgCoords(e);
+function cycleTerritoryState(t: Territory): void {
+  const nextState: Record<TerritoryState, TerritoryState> = {
+    neutral: 'allied',
+    allied: 'enemy',
+    enemy: 'neutral',
+  };
+  t.state = nextState[t.state];
+  render();
+}
 
-  // Check from last to first (topmost rendered)
-  for (let i = territories.length - 1; i >= 0; i--) {
-    const t = territories[i];
-    const polygon = territoryPoints(t);
-    if (pointInPolygon(x, y, polygon)) {
-      const nextState: Record<TerritoryState, TerritoryState> = {
-        neutral: 'allied',
-        allied: 'enemy',
-        enemy: 'neutral',
-      };
-      t.state = nextState[t.state];
-      render();
+/**
+ * Nudges in SVG user space: ray tests on long edges and pixel-thin hit targets
+ * often sit exactly on a boundary; wiggle the probe until exactly one (or a clear) face wins.
+ */
+/** Large nudges would push out of very small 4-vertex (and similar) cells; try tiny first. */
+const PIP_NUDGE_PAIRS: Array<{ dx: number; dy: number }> = (() => {
+  const a = 0.01, b = 0.1, c = 0.5, d = 1.5, e = 3;
+  return [
+    { dx: 0, dy: 0 },
+    { dx: a, dy: 0 }, { dx: -a, dy: 0 }, { dx: 0, dy: a }, { dx: 0, dy: -a },
+    { dx: b, dy: 0 }, { dx: -b, dy: 0 }, { dx: 0, dy: b }, { dx: 0, dy: -b },
+    { dx: c, dy: 0 }, { dx: -c, dy: 0 }, { dx: 0, dy: c }, { dx: 0, dy: -c },
+    { dx: d, dy: 0 }, { dx: -d, dy: 0 }, { dx: 0, dy: d }, { dx: 0, dy: -d },
+    { dx: d, dy: d }, { dx: -d, dy: -d }, { dx: d, dy: -d }, { dx: -d, dy: d },
+    { dx: e, dy: 0 }, { dx: -e, dy: 0 },
+  ];
+})();
+
+/**
+ * Picks a single territory from SVG coords. With overlapping / self-intersecting
+ * loops, many territories can be “inside” for one (x,y); the smallest-area rule
+ * does not match paint order or the browser’s own hit test, so we use the same
+ * rule as the painter: last in `territories` is drawn on top and wins the click.
+ */
+function pickTerritoryAt(svgX: number, svgY: number): Territory | null {
+  for (const { dx, dy } of PIP_NUDGE_PAIRS) {
+    const x = svgX + dx;
+    const y = svgY + dy;
+    const inside: Territory[] = [];
+    for (const t of territories) {
+      if (pointInPolygon(x, y, territoryPoints(t))) inside.push(t);
+    }
+    if (inside.length === 0) continue;
+
+    if (inside.length === 1) return inside[0]!;
+
+    let best = inside[0]!;
+    let bestIdx = territories.indexOf(best);
+    for (let i = 1; i < inside.length; i++) {
+      const cand = inside[i]!;
+      const idx = territories.indexOf(cand);
+      if (idx > bestIdx) {
+        best = cand;
+        bestIdx = idx;
+      }
+    }
+    return best;
+  }
+  return null;
+}
+
+/**
+ * Topmost *filled* territory polygon (not border strokes) — matches what the user sees.
+ * Ignores thick inner border lines, which can sit over another face’s fill.
+ */
+function territoryIdFromTopFillPolygonAt(e: MouseEvent): string | null {
+  const stack = document.elementsFromPoint(e.clientX, e.clientY);
+  for (const item of stack) {
+    if (!(item instanceof Element) || !svgEl.contains(item)) continue;
+    if (item.localName !== 'polygon' || !item.classList.contains('ev2-territory-fill')) continue;
+    const g = item.parentElement;
+    if (g && g.hasAttribute('data-ev2-territory-id')) {
+      return g.getAttribute('data-ev2-territory-id')!;
+    }
+  }
+  return null;
+}
+
+function handleTerritoryClick(e: MouseEvent): void {
+  const fromFill = territoryIdFromTopFillPolygonAt(e);
+  if (fromFill) {
+    const t = territories.find((x) => x.id === fromFill);
+    if (t) {
+      cycleTerritoryState(t);
       return;
     }
   }
+  const { x, y } = svgCoords(e);
+  const t = pickTerritoryAt(x, y);
+  if (t) cycleTerritoryState(t);
 }
 
 // ── Undo ──────────────────────────────────────────────────────────────────────
@@ -508,6 +841,9 @@ function clearAll(): void {
   _ptCounter = 0;
   _edgeCounter = 0;
   _territoryCounter = 0;
+  selectedEdgeIds = new Set();
+  selectedTerritoryId = null;
+  bordersError = null;
   render();
 }
 
@@ -540,6 +876,9 @@ function importFromJson(json: string): void {
   territories = data.territories as Territory[];
   currentPath = [];
   hoveredPoint = null;
+  selectedEdgeIds = new Set();
+  selectedTerritoryId = null;
+  bordersError = null;
 
   // Restore counters from max IDs so new IDs don't collide
   const maxNum = (arr: Array<{ id: string }>, prefix: string) =>
@@ -580,10 +919,12 @@ export function initEditorV2(onBack: () => void): void {
   svgEl          = document.getElementById('ev2-svg') as unknown as SVGSVGElement;
   canvasAreaEl   = document.getElementById('ev2-canvas-area') as HTMLElement;
   btnEdit        = document.getElementById('ev2-btn-edit') as HTMLButtonElement;
+  btnBorders     = document.getElementById('ev2-btn-borders') as HTMLButtonElement;
   btnTerritory   = document.getElementById('ev2-btn-territory') as HTMLButtonElement;
   btnView        = document.getElementById('ev2-btn-view') as HTMLButtonElement;
   removeDotBtn   = document.getElementById('ev2-remove-dot-btn') as HTMLButtonElement;
   panelEdit      = document.getElementById('ev2-panel-edit') as HTMLElement;
+  panelBorders   = document.getElementById('ev2-panel-borders') as HTMLElement;
   panelTerritory = document.getElementById('ev2-panel-territory') as HTMLElement;
 
   // Create SVG layers
@@ -596,7 +937,7 @@ export function initEditorV2(onBack: () => void): void {
   // SVG mouse events
   svgEl.addEventListener('mousedown', (e: MouseEvent) => {
     if (overlayEl.classList.contains('hidden')) return;
-    if (mode === 'view') return;                // no drag in view mode
+    if (mode === 'view' || mode === 'borders') return;
     if (isRemovingDot) return;                  // remove-dot uses click, not drag
     const { x, y } = svgCoords(e);
     const snap = findSnapPoint(x, y);
@@ -616,6 +957,13 @@ export function initEditorV2(onBack: () => void): void {
       const pt = pts.find((p) => p.id === dragPointId);
       if (pt) { pt.x = x; pt.y = y; hasDragged = true; }
       svgEl.style.cursor = 'grabbing';
+      render();
+      return;
+    }
+
+    if (mode === 'borders') {
+      hoveredPoint = null;
+      svgEl.style.cursor = 'default';
       render();
       return;
     }
@@ -645,6 +993,8 @@ export function initEditorV2(onBack: () => void): void {
     if (hasDragged) { hasDragged = false; return; }  // was a drag, not a tap
     if (mode === 'edit') {
       handleEditClick(e);
+    } else if (mode === 'borders') {
+      handleBordersClick(e);
     } else if (mode === 'territory') {
       handleTerritoryClick(e);
     }
@@ -654,15 +1004,79 @@ export function initEditorV2(onBack: () => void): void {
   window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (overlayEl.classList.contains('hidden')) return;
     if (e.key === 'Escape') {
-      currentPath = [];
-      render();
+      if (mode === 'borders') {
+        selectedEdgeIds = new Set();
+        bordersError = null;
+        render();
+      } else {
+        currentPath = [];
+        render();
+      }
     }
   });
 
   // Mode buttons
   btnEdit.addEventListener('click', () => setMode('edit'));
+  btnBorders.addEventListener('click', () => setMode('borders'));
   btnTerritory.addEventListener('click', () => setMode('territory'));
   btnView.addEventListener('click', () => setMode('view'));
+
+  (document.getElementById('ev2-borders-autodetect-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      const { added, skipped } = autoDetectTerritories();
+      if (added === 0 && skipped === 0) {
+        setBordersError('No closed regions found. Draw a connected graph with enclosed areas first.');
+      } else if (added === 0) {
+        setBordersError(`All ${skipped} detected region${skipped === 1 ? '' : 's'} already exist as territories.`);
+      } else {
+        setBordersError(null);
+        const msg = `Added ${added} territory${added === 1 ? '' : 'ies'}` +
+                    (skipped ? ` (${skipped} already existed).` : '.');
+        // Show a transient success message by briefly setting a non-error notice
+        const el = document.getElementById('ev2-borders-error')!;
+        el.textContent = msg;
+        el.classList.remove('hidden');
+        el.style.color = '#16a34a';
+        setTimeout(() => {
+          el.style.color = '';
+          el.classList.add('hidden');
+          el.textContent = '';
+        }, 2500);
+      }
+    });
+
+  (document.getElementById('ev2-borders-clear-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      selectedEdgeIds = new Set();
+      bordersError = null;
+      render();
+    });
+  (document.getElementById('ev2-borders-save-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      saveTerritoryFromSelection(false);
+    });
+  (document.getElementById('ev2-borders-replace-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      saveTerritoryFromSelection(true);
+    });
+  document.getElementById('ev2-territory-list')?.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+    if (!b) return;
+    e.preventDefault();
+    if (b.dataset.territoryDelete) {
+      const id = b.dataset.territoryDelete;
+      territories = territories.filter((t) => t.id !== id);
+      if (selectedTerritoryId === id) selectedTerritoryId = null;
+      bordersError = null;
+      render();
+      return;
+    }
+    if (b.dataset.territoryId) {
+      selectedTerritoryId = b.dataset.territoryId;
+      bordersError = null;
+      render();
+    }
+  });
 
   // Remove-dot toggle (within edit mode)
   removeDotBtn.addEventListener('click', () => {
@@ -736,15 +1150,20 @@ export function showEditorV2(): void {
   _ptCounter = 0;
   _edgeCounter = 0;
   _territoryCounter = 0;
+  selectedEdgeIds = new Set();
+  selectedTerritoryId = null;
+  bordersError = null;
 
   // Reset mode to edit
   mode = 'edit';
   isRemovingDot = false;
   btnEdit.classList.add('active');
+  btnBorders.classList.remove('active');
   btnTerritory.classList.remove('active');
   btnView.classList.remove('active');
   removeDotBtn.classList.remove('active');
   panelEdit.classList.remove('hidden');
+  panelBorders.classList.add('hidden');
   panelTerritory.classList.add('hidden');
   svgEl.style.cursor = 'crosshair';
 
