@@ -397,11 +397,6 @@ function territoryPointsAttr(t: Territory): string {
     .join(' ');
 }
 
-function stateBorderColor(state: TerritoryState): string {
-  if (state === 'allied') return '#5EB1FF';
-  if (state === 'enemy') return '#FE775E';
-  return 'transparent';
-}
 
 /**
  * Builds an SVG path string for the territory border at `inset` pixels inward
@@ -611,26 +606,18 @@ function render(): void {
     if (t.state !== 'neutral') {
       const borderPathD = buildInsetBorderPath(t, edgeIndex, -10);
       if (borderPathD) {
-        const borderColor = stateBorderColor(t.state);
         const borderGroup = document.createElementNS(SVG_NS, 'g');
-        borderGroup.setAttribute('class', 'ev2-territory-border');
+        borderGroup.setAttribute('class', `ev2-territory-border ev2-border-${t.state}`);
         borderGroup.setAttribute('pointer-events', 'none');
 
         const glowEl = document.createElementNS(SVG_NS, 'path');
         glowEl.setAttribute('d', borderPathD);
-        glowEl.setAttribute('stroke', borderColor);
-        glowEl.setAttribute('stroke-width', '10');
-        glowEl.setAttribute('stroke-linecap', 'butt');
-        glowEl.setAttribute('stroke-opacity', '0.18');
-        glowEl.setAttribute('fill', 'none');
+        glowEl.setAttribute('class', 'ev2-border-glow');
         borderGroup.appendChild(glowEl);
 
         const lineEl = document.createElementNS(SVG_NS, 'path');
         lineEl.setAttribute('d', borderPathD);
-        lineEl.setAttribute('stroke', borderColor);
-        lineEl.setAttribute('stroke-width', '2');
-        lineEl.setAttribute('stroke-linecap', 'round');
-        lineEl.setAttribute('fill', 'none');
+        lineEl.setAttribute('class', 'ev2-border-line');
         borderGroup.appendChild(lineEl);
 
         group.appendChild(borderGroup);

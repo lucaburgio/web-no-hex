@@ -13,21 +13,44 @@
   display: block; cursor: crosshair;
 }
 
-/* SVG elements */
-.ev2-territory-fill { stroke: none; }
-/* Border group: opacity lives here so sub-path strokes inside never compound */
-.ev2-territory-border { isolation: isolate; }
-.ev2-state-neutral { fill: #fafafa; }
-.ev2-state-allied { fill: #eff6ff; }
-.ev2-state-enemy { fill: #fff1f2; }
+/* ── SVG design tokens ──────────────────────────────────────────────────────── */
 
-.ev2-edge-glow-group { opacity: 0.04; } /* opacity on group — never compounds at vertices */
-.ev2-edge-glow {
-  stroke: #000; stroke-width: 20; stroke-linecap: round;
+/* Territory fills */
+.ev2-state-neutral { fill: #fafafa; }
+.ev2-state-allied  { fill: #eff6ff; }
+.ev2-state-enemy   { fill: #fff1f2; }
+.ev2-territory-fill { stroke: none; }
+
+/* Owner border color tokens (inherited by glow + line via var) */
+.ev2-border-allied { --ev2-border-color: #5EB1FF; }
+.ev2-border-enemy  { --ev2-border-color: #FE775E; }
+
+/* Border compositing group — opacity lives here, never on individual paths */
+.ev2-territory-border { isolation: isolate; }
+
+/* Border glow layer */
+.ev2-border-glow {
+  stroke: var(--ev2-border-color);
+  stroke-width: 10;
+  stroke-linecap: butt;
+  stroke-opacity: 0.18;
+  fill: none;
 }
-.ev2-edge {
-  stroke: #CDCDCD; stroke-width: 2; stroke-linecap: round;
+
+/* Border main line */
+.ev2-border-line {
+  stroke: var(--ev2-border-color);
+  stroke-width: 2;
+  stroke-linecap: round;
+  fill: none;
 }
+
+/* Edge shadow glow — opacity on group so vertex overlaps never compound */
+.ev2-edge-glow-group { opacity: 0.04; }
+.ev2-edge-glow       { stroke: #000; stroke-width: 20; stroke-linecap: round; }
+
+/* Main grid edge */
+.ev2-edge { stroke: #CDCDCD; stroke-width: 2; stroke-linecap: round; }
 .ev2-edge-hit {
   pointer-events: stroke; cursor: default;
 }
