@@ -460,11 +460,13 @@ export function renderTerritoryState(
   }
   const seenCP = new Set<string>();
 
-  const activeCpHexes = new Set(state.controlPointHexes);
+  const activeCpHexes = new Set([
+    ...state.controlPointHexes,
+    ...state.sectorControlPointHex.filter(k => k),
+  ]);
   for (const cp of Object.values(graph.controlPoints)) {
     const t = graph.territories[cp.territoryId];
     if (!t) continue;
-    // Only show if in state.controlPointHexes (active)
     if (!activeCpHexes.has(t.virtualKey)) continue;
 
     seenCP.add(cp.id);

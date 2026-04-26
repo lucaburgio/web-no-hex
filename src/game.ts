@@ -3719,17 +3719,7 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
 
     primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
 
-    // Compute active CP (first defender sector from attacker perspective)
-    let activeCpHex = '';
-    if (attackerOwner === PLAYER) {
-      const idx = sectorOwners.findIndex(o => o !== attackerOwner);
-      if (idx >= 0) activeCpHex = sectorControlPointHex[idx] ?? '';
-    } else {
-      for (let i = sectorOwners.length - 1; i >= 0; i--) {
-        if (sectorOwners[i] !== attackerOwner) { activeCpHex = sectorControlPointHex[i] ?? ''; break; }
-      }
-    }
-    const controlPointHexes = activeCpHex ? [activeCpHex] : [];
+    const controlPointHexes: string[] = [];
 
     const pp: Record<Owner, number> = { 1: 0, 2: 0 };
     pp[attackerOwner] = config.breakthroughAttackerStartingPP;

@@ -28,7 +28,9 @@
       "Bash(bash:*)",
       "Bash(create-dmg --version)",
       "Bash(git stash *)",
-      "Bash(git revert *)"
+      "Bash(git revert *)",
+      "WebFetch(domain:localhost)",
+      "Bash(curl -s http://localhost:5173/)"
     ]
   }
 }
