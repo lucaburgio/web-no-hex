@@ -20,11 +20,11 @@
 .ev2-state-enemy { fill: #fff1f2; }
 
 .ev2-edge-glow {
-  stroke: #CDCDCD; stroke-width: 20; stroke-linecap: round; opacity: 0.04;
+  stroke: #000; stroke-width: 20; stroke-linecap: round; opacity: 0.04;
   pointer-events: none;
 }
 .ev2-edge {
-  stroke: #CDCDCD; stroke-width: 1.5; stroke-linecap: round;
+  stroke: #CDCDCD; stroke-width: 2; stroke-linecap: round;
 }
 .ev2-edge-hit {
   pointer-events: stroke; cursor: default;
@@ -93,7 +93,7 @@
 .ev2-type-swatch { width: 14px; height: 14px; border-radius: 2px; flex-shrink: 0; border: 1px solid #555; }
 .ev2-swatch-neutral { background: #fafafa; }
 .ev2-swatch-allied { background: #eff6ff; border-color: #2563eb; }
-.ev2-swatch-enemy { background: #fff1f2; border-color: #dc2626; }
+.ev2-swatch-enemy { background: #fff1f2; border-color: #FE775E; }
 
 .ev2-territory-selected .ev2-territory-fill {
   stroke: #fbbf24; stroke-width: 3; filter: none;

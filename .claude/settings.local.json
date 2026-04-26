@@ -27,7 +27,8 @@
       "Bash(cargo check:*)",
       "Bash(bash:*)",
       "Bash(create-dmg --version)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(git revert *)"
     ]
   }
 }
