@@ -780,6 +780,12 @@ function render(): void {
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('data-cp-id', cp.id);
 
+    // Placeholder rect — sized after text is in DOM
+    const bg = document.createElementNS(SVG_NS, 'rect');
+    bg.setAttribute('class', 'ev2-cp-label-bg');
+    bg.setAttribute('rx', '3');
+    g.appendChild(bg);
+
     const label = document.createElementNS(SVG_NS, 'text');
     label.setAttribute('class', 'ev2-cp-label');
     label.setAttribute('x', String(c.x));
@@ -795,6 +801,16 @@ function render(): void {
     g.appendChild(dot);
 
     cpLayer.appendChild(g);
+
+    // Size the background rect to the rendered text bounds + padding
+    try {
+      const pad = 4;
+      const bb = label.getBBox();
+      bg.setAttribute('x', String(bb.x - pad));
+      bg.setAttribute('y', String(bb.y - pad));
+      bg.setAttribute('width', String(bb.width + pad * 2));
+      bg.setAttribute('height', String(bb.height + pad * 2));
+    } catch (_) { /* getBBox unavailable when SVG is hidden */ }
   }
 
   // ── Edge layer ───────────────────────────────────────────────────────────

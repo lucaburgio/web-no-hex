@@ -190,10 +190,16 @@
 
 /* CP SVG elements */
 .ev2-cp-dot { fill: #111; }
+.ev2-cp-label-bg {
+  fill: white;
+  filter: blur(3px);
+}
 .ev2-cp-label {
   font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
-  fill: #111; text-anchor: middle; dominant-baseline: auto;
-  font-family: system-ui, sans-serif; pointer-events: none;
+  fill: #111;
+  text-anchor: middle;
+  dominant-baseline: auto;
+  pointer-events: none;
 }
 
 #ev2-footer { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
