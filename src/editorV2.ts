@@ -1705,21 +1705,12 @@ export function initEditorV2(onBack: () => void): void {
     }
   });
 
-  // Wheel zoom (zoom toward cursor)
+  // Wheel pan
   svgEl.addEventListener('wheel', (e: WheelEvent) => {
     if (overlayEl.classList.contains('hidden')) return;
     e.preventDefault();
-    const rect = svgEl.getBoundingClientRect();
-    const mouseOffsetX = e.clientX - rect.left;
-    const mouseOffsetY = e.clientY - rect.top;
-    // SVG coords under cursor before zoom
-    const svgX = mouseOffsetX / zoom + panX;
-    const svgY = mouseOffsetY / zoom + panY;
-    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    zoom = Math.max(0.1, Math.min(10, zoom * factor));
-    // Adjust pan so the point under cursor stays fixed
-    panX = svgX - mouseOffsetX / zoom;
-    panY = svgY - mouseOffsetY / zoom;
+    panX += e.deltaX / zoom;
+    panY += e.deltaY / zoom;
     updateViewBox();
     render();
   }, { passive: false });
