@@ -5,19 +5,23 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type TerritoryState = 'neutral' | 'allied' | 'enemy';
+type TerritoryTool = TerritoryState | 'controlpoint';
 
 interface Pt { id: string; x: number; y: number }
 interface Edge { id: string; a: string; b: string }
 interface Territory { id: string; pointIds: string[]; state: TerritoryState }
+interface ControlPoint { id: string; territoryId: string; name: string }
 
 // ── Module-level state ────────────────────────────────────────────────────────
 
 let pts: Pt[] = [];
 let edges: Edge[] = [];
 let territories: Territory[] = [];
+let controlPoints: ControlPoint[] = [];
 let currentPath: string[] = [];      // point IDs in-progress
 let mode: 'edit' | 'borders' | 'territory' | 'view' = 'edit';
 let isRemovingDot = false;           // remove-dot sub-mode within edit
+let territoryTool: TerritoryTool = 'allied';
 let selectedEdgeIds = new Set<string>();
 let selectedTerritoryId: string | null = null;
 let bordersError: string | null = null;
@@ -29,10 +33,12 @@ let hasDragged = false;                 // true if mouse moved during drag
 let _ptCounter = 0;
 let _edgeCounter = 0;
 let _territoryCounter = 0;
+let _cpCounter = 0;
 
 function newPtId(): string  { return `p${++_ptCounter}`; }
 function newEdgeId(): string { return `e${++_edgeCounter}`; }
 function newTerritoryId(): string { return `t${++_territoryCounter}`; }
+function newCpId(): string { return `cp${++_cpCounter}`; }
 
 // ── DOM refs (set in initEditorV2) ────────────────────────────────────────────
 
@@ -318,6 +324,43 @@ function renderTerritoryList(): void {
   }
 }
 
+function renderCpList(): void {
+  const ul = document.getElementById('ev2-cp-list') as HTMLUListElement | null;
+  if (!ul) return;
+
+  // Remove items for deleted CPs
+  const cpIds = new Set(controlPoints.map(cp => cp.id));
+  for (const li of [...ul.children] as HTMLElement[]) {
+    if (li.dataset.cpId && !cpIds.has(li.dataset.cpId)) li.remove();
+  }
+
+  // Add items for new CPs (skip existing)
+  const existing = new Set([...ul.querySelectorAll<HTMLElement>('li[data-cp-id]')].map(li => li.dataset.cpId!));
+  for (const cp of controlPoints) {
+    if (existing.has(cp.id)) continue;
+    const li = document.createElement('li');
+    li.dataset.cpId = cp.id;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = cp.name;
+    input.className = 'ev2-cp-name-input';
+    input.dataset.cpId = cp.id;
+    input.placeholder = 'Name…';
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'ev2-cp-del-btn';
+    delBtn.textContent = '×';
+    delBtn.title = 'Delete';
+    delBtn.dataset.cpDelete = cp.id;
+
+    li.appendChild(input);
+    li.appendChild(delBtn);
+    ul.appendChild(li);
+  }
+}
+
 function updateBordersPanel(): void {
   const n = selectedEdgeIds.size;
   const countEl = document.getElementById('ev2-borders-selection');
@@ -326,6 +369,14 @@ function updateBordersPanel(): void {
   if (rep) rep.disabled = !selectedTerritoryId;
   setBordersError(bordersError);
   renderTerritoryList();
+  renderCpList();
+}
+
+function territoryCentroid(t: Territory): { x: number; y: number } {
+  const tPts = territoryPoints(t);
+  const x = tPts.reduce((s, p) => s + p.x, 0) / tPts.length;
+  const y = tPts.reduce((s, p) => s + p.y, 0) / tPts.length;
+  return { x, y };
 }
 
 function saveTerritoryFromSelection(replace: boolean): void {
@@ -717,6 +768,35 @@ function render(): void {
     territoryLayer.appendChild(group);
   }
 
+  // ── Control point layer ──────────────────────────────────────────────────
+  const cpLayer = svgEl.querySelector('#ev2-cp-layer') as SVGGElement;
+  cpLayer.innerHTML = '';
+  cpLayer.setAttribute('pointer-events', 'none');
+  for (const cp of controlPoints) {
+    const t = territories.find((x) => x.id === cp.territoryId);
+    if (!t) continue;
+    const c = territoryCentroid(t);
+
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('data-cp-id', cp.id);
+
+    const label = document.createElementNS(SVG_NS, 'text');
+    label.setAttribute('class', 'ev2-cp-label');
+    label.setAttribute('x', String(c.x));
+    label.setAttribute('y', String(c.y - 10));
+    label.textContent = cp.name;
+    g.appendChild(label);
+
+    const dot = document.createElementNS(SVG_NS, 'circle');
+    dot.setAttribute('class', 'ev2-cp-dot');
+    dot.setAttribute('cx', String(c.x));
+    dot.setAttribute('cy', String(c.y));
+    dot.setAttribute('r', '4');
+    g.appendChild(dot);
+
+    cpLayer.appendChild(g);
+  }
+
   // ── Edge layer ───────────────────────────────────────────────────────────
   const edgeLayer = svgEl.querySelector('#ev2-edge-layer') as SVGGElement;
   edgeLayer.innerHTML = '';
@@ -913,13 +993,17 @@ function handleEditClick(e: MouseEvent): void {
 
 // ── Territory mode click handling ─────────────────────────────────────────────
 
-function cycleTerritoryState(t: Territory): void {
-  const nextState: Record<TerritoryState, TerritoryState> = {
-    neutral: 'allied',
-    allied: 'enemy',
-    enemy: 'neutral',
-  };
-  t.state = nextState[t.state];
+function applyTerritoryTool(t: Territory): void {
+  if (territoryTool === 'controlpoint') {
+    const existing = controlPoints.find((cp) => cp.territoryId === t.id);
+    if (existing) {
+      controlPoints = controlPoints.filter((cp) => cp.id !== existing.id);
+    } else {
+      controlPoints.push({ id: newCpId(), territoryId: t.id, name: t.id.toUpperCase() });
+    }
+  } else {
+    t.state = t.state === territoryTool ? 'neutral' : territoryTool;
+  }
   render();
 }
 
@@ -995,14 +1079,11 @@ function handleTerritoryClick(e: MouseEvent): void {
   const fromFill = territoryIdFromTopFillPolygonAt(e);
   if (fromFill) {
     const t = territories.find((x) => x.id === fromFill);
-    if (t) {
-      cycleTerritoryState(t);
-      return;
-    }
+    if (t) { applyTerritoryTool(t); return; }
   }
   const { x, y } = svgCoords(e);
   const t = pickTerritoryAt(x, y);
-  if (t) cycleTerritoryState(t);
+  if (t) applyTerritoryTool(t);
 }
 
 // ── Undo ──────────────────────────────────────────────────────────────────────
@@ -1039,11 +1120,13 @@ function clearAll(): void {
   pts = [];
   edges = [];
   territories = [];
+  controlPoints = [];
   currentPath = [];
   hoveredPoint = null;
   _ptCounter = 0;
   _edgeCounter = 0;
   _territoryCounter = 0;
+  _cpCounter = 0;
   selectedEdgeIds = new Set();
   selectedTerritoryId = null;
   bordersError = null;
@@ -1053,7 +1136,7 @@ function clearAll(): void {
 // ── Export / Import ───────────────────────────────────────────────────────────
 
 function exportState(): void {
-  const data = { version: 1, pts, edges, territories };
+  const data = { version: 2, pts, edges, territories, controlPoints };
   const json = JSON.stringify(data, null, 2);
   navigator.clipboard.writeText(json).then(() => {
     const btn = document.getElementById('ev2-export-btn') as HTMLButtonElement;
@@ -1077,6 +1160,7 @@ function importFromJson(json: string): void {
   pts = data.pts as Pt[];
   edges = data.edges as Edge[];
   territories = data.territories as Territory[];
+  controlPoints = Array.isArray(data.controlPoints) ? data.controlPoints as ControlPoint[] : [];
   currentPath = [];
   hoveredPoint = null;
   selectedEdgeIds = new Set();
@@ -1089,6 +1173,7 @@ function importFromJson(json: string): void {
   _ptCounter        = maxNum(pts, 'p');
   _edgeCounter      = maxNum(edges, 'e');
   _territoryCounter = maxNum(territories, 't');
+  _cpCounter        = maxNum(controlPoints, 'cp');
 }
 
 function showImportModal(): void {
@@ -1131,7 +1216,7 @@ export function initEditorV2(onBack: () => void): void {
   panelTerritory = document.getElementById('ev2-panel-territory') as HTMLElement;
 
   // Create SVG layers
-  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-edge-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
+  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-cp-layer', 'ev2-edge-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('id', id);
     svgEl.appendChild(g);
@@ -1281,6 +1366,37 @@ export function initEditorV2(onBack: () => void): void {
     }
   });
 
+  // Territory tool selector
+  document.getElementById('ev2-territory-tool-selector')?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('[data-tool]') as HTMLElement | null;
+    if (!btn) return;
+    const tool = btn.dataset.tool as TerritoryTool;
+    territoryTool = tool;
+    document.querySelectorAll('#ev2-territory-tool-selector .ev2-tool-btn').forEach((b) => {
+      b.classList.toggle('active', (b as HTMLElement).dataset.tool === tool);
+    });
+  });
+
+  // CP list — delete button
+  document.getElementById('ev2-cp-list')?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('[data-cp-delete]') as HTMLElement | null;
+    if (!btn) return;
+    const id = btn.dataset.cpDelete!;
+    controlPoints = controlPoints.filter((cp) => cp.id !== id);
+    render();
+  });
+
+  // CP list — name input (live update, update SVG label without full re-render)
+  document.getElementById('ev2-cp-list')?.addEventListener('input', (e) => {
+    const input = (e.target as HTMLElement) as HTMLInputElement;
+    if (!input.dataset.cpId) return;
+    const cp = controlPoints.find((c) => c.id === input.dataset.cpId);
+    if (!cp) return;
+    cp.name = input.value;
+    const label = svgEl.querySelector<SVGTextElement>(`[data-cp-id="${cp.id}"] text`);
+    if (label) label.textContent = cp.name;
+  });
+
   // Remove-dot toggle (within edit mode)
   removeDotBtn.addEventListener('click', () => {
     isRemovingDot = !isRemovingDot;
@@ -1347,12 +1463,15 @@ export function showEditorV2(): void {
   pts = [];
   edges = [];
   territories = [];
+  controlPoints = [];
   currentPath = [];
   hoveredPoint = null;
   cursorPos = { x: 0, y: 0 };
   _ptCounter = 0;
   _edgeCounter = 0;
   _territoryCounter = 0;
+  _cpCounter = 0;
+  territoryTool = 'allied';
   selectedEdgeIds = new Set();
   selectedTerritoryId = null;
   bordersError = null;
@@ -1369,6 +1488,11 @@ export function showEditorV2(): void {
   panelBorders.classList.add('hidden');
   panelTerritory.classList.add('hidden');
   svgEl.style.cursor = 'crosshair';
+
+  // Reset territory tool selector to 'allied'
+  document.querySelectorAll('#ev2-territory-tool-selector .ev2-tool-btn').forEach((b) => {
+    b.classList.toggle('active', (b as HTMLElement).dataset.tool === 'allied');
+  });
 
   resizeSvg();
   render();

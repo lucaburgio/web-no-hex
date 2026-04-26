@@ -158,6 +158,44 @@
 .ev2-territory-list .ev2-territory-row button:hover { background: #444; }
 .ev2-territory-list .ev2-territory-row .ev2-danger { border-color: #7f1d1d; color: #fca5a5; }
 
+/* Territory tool selector */
+.ev2-tool-selector { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.ev2-tool-btn {
+  flex: 1 1 calc(50% - 2px); padding: 7px 4px; background: #333; color: #888;
+  border: 1px solid #444; border-radius: 3px; font-size: 9px;
+  font-weight: 700; letter-spacing: 0.08em; cursor: pointer;
+}
+.ev2-tool-btn:hover { background: #444; color: #ccc; }
+.ev2-tool-btn[data-tool="neutral"].active  { background: #555; border-color: #888; color: #fff; }
+.ev2-tool-btn[data-tool="allied"].active   { background: #2563eb; border-color: #3b82f6; color: #fff; }
+.ev2-tool-btn[data-tool="enemy"].active    { background: #be123c; border-color: #FE775E; color: #fff; }
+.ev2-tool-btn[data-tool="controlpoint"].active { background: #b45309; border-color: #f59e0b; color: #fff; }
+
+/* CP list items */
+.ev2-territory-list li[data-cp-id] {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+}
+.ev2-cp-name-input {
+  flex: 1; background: transparent; color: #e5e5e5; border: none;
+  border-bottom: 1px solid #444; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.06em; padding: 2px 2px; outline: none; min-width: 0;
+}
+.ev2-cp-name-input:focus { border-bottom-color: #93c5fd; }
+.ev2-cp-del-btn {
+  flex: 0 0 22px; width: 22px; height: 22px; background: transparent;
+  color: #fca5a5; border: 1px solid #7f1d1d; border-radius: 2px;
+  font-size: 13px; line-height: 1; cursor: pointer; padding: 0;
+}
+.ev2-cp-del-btn:hover { background: #7f1d1d; color: #fff; }
+
+/* CP SVG elements */
+.ev2-cp-dot { fill: #111; }
+.ev2-cp-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+  fill: #111; text-anchor: middle; dominant-baseline: auto;
+  font-family: system-ui, sans-serif; pointer-events: none;
+}
+
 #ev2-footer { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
 
 /* Import modal */

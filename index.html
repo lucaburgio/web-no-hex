@@ -272,13 +272,21 @@
         <ul id="ev2-territory-list" class="ev2-territory-list" aria-label="Defined territories"></ul>
       </div>
       <div id="ev2-panel-territory" class="hidden">
-        <div class="ev2-section-label">TERRITORY TYPE</div>
-        <p class="ev2-hint">Click a territory to cycle its type.</p>
+        <div class="ev2-section-label">PAINT TOOL</div>
+        <div id="ev2-territory-tool-selector" class="ev2-tool-selector">
+          <button type="button" class="ev2-tool-btn" data-tool="neutral">NEUTRAL</button>
+          <button type="button" class="ev2-tool-btn active" data-tool="allied">ALLIED</button>
+          <button type="button" class="ev2-tool-btn" data-tool="enemy">ENEMY</button>
+          <button type="button" class="ev2-tool-btn" data-tool="controlpoint">CTRL PT</button>
+        </div>
+        <p class="ev2-hint">Click a territory to apply the selected type. Click again to clear.</p>
         <div id="ev2-type-legend">
           <div class="ev2-type-row"><span class="ev2-type-swatch ev2-swatch-neutral"></span>NEUTRAL</div>
           <div class="ev2-type-row"><span class="ev2-type-swatch ev2-swatch-allied"></span>ALLIED</div>
           <div class="ev2-type-row"><span class="ev2-type-swatch ev2-swatch-enemy"></span>ENEMY</div>
         </div>
+        <div class="ev2-section-label" style="margin-top: 14px;">CONTROL POINTS</div>
+        <ul id="ev2-cp-list" class="ev2-territory-list" aria-label="Control points"></ul>
       </div>
       <div id="ev2-footer">
         <button id="ev2-export-btn" class="ev2-action-btn">EXPORT (COPY JSON)</button>
