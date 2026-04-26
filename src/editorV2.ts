@@ -667,7 +667,9 @@ function render(): void {
     }
 
     const line = document.createElementNS(SVG_NS, 'line');
-    let cls = 'ev2-edge';
+    const edgeTerritories = edgeIndex.get(undirectedEdgeKey(edge.a, edge.b));
+    const isOuterEdge = edgeTerritories !== undefined && edgeTerritories.length === 1;
+    let cls = isOuterEdge ? 'ev2-edge ev2-edge-outer' : 'ev2-edge';
     if (mode === 'borders' && selectedEdgeIds.has(edge.id)) cls += ' ev2-edge-selected';
     line.setAttribute('class', cls);
     if (mode === 'borders') line.setAttribute('data-ev2-edge-id', edge.id);

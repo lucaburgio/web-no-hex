@@ -28,12 +28,12 @@
 /* Border compositing group — opacity lives here, never on individual paths */
 .ev2-territory-border { isolation: isolate; }
 
-/* Border glow layer */
+/* Border owner glow layer */
 .ev2-border-glow {
   stroke: var(--ev2-border-color);
   stroke-width: 10;
   stroke-linecap: butt;
-  stroke-opacity: 0.18;
+  stroke-opacity: 0;
   fill: none;
 }
 
@@ -50,7 +50,9 @@
 .ev2-edge-glow       { stroke: #000; stroke-width: 20; stroke-linecap: round; }
 
 /* Main grid edge */
-.ev2-edge { stroke: #CDCDCD; stroke-width: 2; stroke-linecap: round; }
+.ev2-edge       { stroke: #CDCDCD; stroke-width: 2; stroke-linecap: round; }
+/* Perimeter edge (borders exactly one territory — outer map boundary) */
+.ev2-edge-outer { stroke: #1a1a1a; }
 .ev2-edge-hit {
   pointer-events: stroke; cursor: default;
 }
