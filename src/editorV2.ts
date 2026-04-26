@@ -582,12 +582,12 @@ function render(): void {
   const outerPattern = document.createElementNS(SVG_NS, 'pattern');
   outerPattern.setAttribute('id', 'ev2-outer-border-pattern');
   outerPattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  outerPattern.setAttribute('width', '200');
-  outerPattern.setAttribute('height', '200');
+  outerPattern.setAttribute('width', '48');
+  outerPattern.setAttribute('height', '48');
   const outerPatternImg = document.createElementNS(SVG_NS, 'image');
   outerPatternImg.setAttribute('href', 'images/misc/outside-border-pattern.png');
-  outerPatternImg.setAttribute('width', '200');
-  outerPatternImg.setAttribute('height', '200');
+  outerPatternImg.setAttribute('width', '48');
+  outerPatternImg.setAttribute('height', '48');
   outerPattern.appendChild(outerPatternImg);
   defsEl.appendChild(outerPattern);
 

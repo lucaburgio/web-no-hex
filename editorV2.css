@@ -7,7 +7,7 @@
 }
 #ev2-canvas-area {
   flex: 1; overflow: hidden; position: relative;
-  background: #ebebea; /* light gray map background */
+  background: #EFF0F0; /* light gray map background */
 }
 #ev2-svg {
   display: block; cursor: crosshair;
@@ -52,7 +52,7 @@
 /* Main grid edge */
 .ev2-edge       { stroke: #CDCDCD; stroke-width: 2; stroke-linecap: round; }
 /* Perimeter edge (borders exactly one territory — outer map boundary) */
-.ev2-edge-outer { stroke: #1a1a1a; }
+.ev2-edge-outer { stroke: #4C4D4C; }
 .ev2-edge-hit {
   pointer-events: stroke; cursor: default;
 }
