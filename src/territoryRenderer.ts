@@ -1,28 +1,19 @@
 /**
  * Territory-based SVG renderer for polygon maps.
- * Uses exact territory polygon shapes from the map definition.
+ * Uses the exact same CSS classes and SVG elements as editorV2 for a 1:1 visual match.
+ * Requires editorV2.css (loaded via index.html).
  */
 
 import type { GameState, Owner } from './types';
-import type { TerritoryGraphData, TerritoryMapTerritory } from './territoryMap';
-import { PLAYER, AI, getUnit, getValidMoves, isValidProductionPlacement } from './game';
+import type { TerritoryGraphData, TerritoryMapTerritory, TerritoryMapDef } from './territoryMap';
+import { getValidMoves, isValidProductionPlacement } from './game';
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
+import outsideBorderPatternSrc from '../public/images/misc/outside-border-pattern.png';
 
-// ── Colors matching editorV2.css ───────────────────────────────────────────────
-const COLOR_NEUTRAL_FILL   = '#fafafa';
-const COLOR_NEUTRAL_STROKE = '#CDCDCD';
-const COLOR_PLAYER_FILL    = '#eff6ff';
-const COLOR_PLAYER_STROKE  = '#5EB1FF';
-const COLOR_AI_FILL        = '#fff1f2';
-const COLOR_AI_STROKE      = '#FE775E';
-const COLOR_OUTER_STROKE   = '#4C4D4C';
-const COLOR_SECTOR_STROKE  = '#4C4D4C';
-const STROKE_WIDTH_INNER   = 2;
-const STROKE_WIDTH_OUTER   = 2.5;
-const STROKE_WIDTH_SECTOR  = 2.5;
-const SECTOR_DASH          = '8 8';
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
-const COLOR_SELECTED_STROKE  = '#fbbf24';
+// Game-specific highlight colors (no editorV2 equivalent)
+const COLOR_SELECTED_STROKE   = '#fbbf24';
 const COLOR_VALID_MOVE_STROKE = '#22c55e';
 const COLOR_PRODUCTION_STROKE = '#3b82f6';
 const STROKE_WIDTH_HIGHLIGHT  = 3;
@@ -31,33 +22,44 @@ const HP_BAR_WIDTH  = 36;
 const HP_BAR_HEIGHT = 5;
 const UNIT_IMG_SIZE = 28;
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
-
-// ── Renderer state (per SVGSVGElement) ────────────────────────────────────────
-
 interface RendererState {
   graph: TerritoryGraphData;
-  mountainPatternId: string;
+  edgeTerritoryIndex: Map<string, string[]>;
 }
 
 const rendererStateMap = new WeakMap<SVGSVGElement, RendererState>();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function createSvgEl<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K] {
+function mksvg<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K] {
   return document.createElementNS(SVG_NS, tag) as SVGElementTagNameMap[K];
 }
 
+function setAttrIfChanged(el: SVGElement, attr: string, value: string): void {
+  if (el.getAttribute(attr) !== value) el.setAttribute(attr, value);
+}
 
-function pointsToPath(pointIds: string[], points: Record<string, { x: number; y: number }>): string {
-  const coords = pointIds.map(pid => points[pid]).filter(Boolean) as { x: number; y: number }[];
+function undirectedEdgeKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+function territoryPointsAttr(t: TerritoryMapTerritory, points: Record<string, { x: number; y: number }>): string {
+  return t.pointIds
+    .map(pid => points[pid])
+    .filter((p): p is { x: number; y: number } => !!p)
+    .map(p => `${p.x},${p.y}`)
+    .join(' ');
+}
+
+function territoryPathD(t: TerritoryMapTerritory, points: Record<string, { x: number; y: number }>): string {
+  const coords = t.pointIds.map(pid => points[pid]).filter((p): p is { x: number; y: number } => !!p);
   if (coords.length < 2) return '';
   return coords.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ') + ' Z';
 }
 
-function computeMapExtents(graph: TerritoryGraphData): { minX: number; minY: number; maxX: number; maxY: number } {
+function computeMapExtents(pts: Record<string, { x: number; y: number }>): { minX: number; minY: number; maxX: number; maxY: number } {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const pt of Object.values(graph.points)) {
+  for (const pt of Object.values(pts)) {
     if (pt.x < minX) minX = pt.x;
     if (pt.y < minY) minY = pt.y;
     if (pt.x > maxX) maxX = pt.x;
@@ -66,120 +68,388 @@ function computeMapExtents(graph: TerritoryGraphData): { minX: number; minY: num
   return { minX, minY, maxX, maxY };
 }
 
-function setAttrIfChanged(el: SVGElement, attr: string, value: string): void {
-  if (el.getAttribute(attr) !== value) el.setAttribute(attr, value);
-}
-
-// ── Edge classification ───────────────────────────────────────────────────────
-
-/**
- * For each edge (pair of point IDs), count how many territories include BOTH endpoints.
- * An edge is "outer" (boundary) if only one territory claims it.
- */
-function classifyEdges(graph: TerritoryGraphData): {
-  outerEdges: Set<string>;
-  innerEdges: Map<string, [string, string]>; // edgeKey → [tidA, tidB]
-  sectorBorderEdges: Set<string>;
-} {
-  const { mapDef, territories } = graph;
-
-  // Map from edgeKey → list of territory IDs that own it
-  const edgeTerritories = new Map<string, string[]>();
-
+/** Build edge-key → [territory-ids] index from territory polygon edge pairs. */
+function buildEdgeTerritoryIndex(mapDef: TerritoryMapDef): Map<string, string[]> {
+  const index = new Map<string, string[]>();
   for (const t of mapDef.territories) {
     const n = t.pointIds.length;
     for (let i = 0; i < n; i++) {
       const a = t.pointIds[i]!;
       const b = t.pointIds[(i + 1) % n]!;
-      const key = a < b ? `${a}|${b}` : `${b}|${a}`;
-      const list = edgeTerritories.get(key);
-      if (list) list.push(t.id);
-      else edgeTerritories.set(key, [t.id]);
+      const key = undirectedEdgeKey(a, b);
+      const list = index.get(key);
+      if (list) { if (!list.includes(t.id)) list.push(t.id); }
+      else index.set(key, [t.id]);
+    }
+  }
+  return index;
+}
+
+/**
+ * Build the outer perimeter SVG path — edges touching exactly one territory.
+ * The resulting path is stroked with the outer-border pattern at 144px width,
+ * matching editorV2's perimeter rendering.
+ */
+function buildOuterBorderPath(
+  mapDef: TerritoryMapDef,
+  points: Record<string, { x: number; y: number }>,
+  edgeTerritoryIndex: Map<string, string[]>,
+): string {
+  // Collect outer edge point-id keys
+  const allKeys = new Set<string>();
+  for (const t of mapDef.territories) {
+    const n = t.pointIds.length;
+    for (let i = 0; i < n; i++) allKeys.add(undirectedEdgeKey(t.pointIds[i]!, t.pointIds[(i + 1) % n]!));
+  }
+
+  const outerKeys: string[] = [];
+  for (const key of allKeys) {
+    const tids = edgeTerritoryIndex.get(key);
+    if (tids && tids.length === 1) outerKeys.push(key);
+  }
+  if (outerKeys.length === 0) return '';
+
+  // Build point adjacency for chaining outer segments into polylines
+  const adj = new Map<string, string[]>();
+  for (const key of outerKeys) {
+    const [pa, pb] = key.split('|') as [string, string];
+    if (!adj.has(pa)) adj.set(pa, []);
+    if (!adj.has(pb)) adj.set(pb, []);
+    adj.get(pa)!.push(pb);
+    adj.get(pb)!.push(pa);
+  }
+
+  const visited = new Set<string>();
+  let d = '';
+
+  for (const key of outerKeys) {
+    const [startPid] = key.split('|') as [string, string];
+    if (visited.has(startPid)) continue;
+
+    const chain: string[] = [startPid];
+    visited.add(startPid);
+    let cur = startPid;
+    let prevId: string | null = null;
+
+    while (true) {
+      const next = (adj.get(cur) ?? []).find(id => id !== prevId && !visited.has(id));
+      if (!next) break;
+      visited.add(next);
+      prevId = cur;
+      cur = next;
+      chain.push(cur);
+    }
+
+    const closed = (adj.get(chain[chain.length - 1]!) ?? []).includes(chain[0]!);
+    if (chain.length >= 2) {
+      const pts = chain.map(pid => points[pid]).filter((p): p is { x: number; y: number } => !!p);
+      d += `M ${pts[0]!.x},${pts[0]!.y}`;
+      for (let i = 1; i < pts.length; i++) d += ` L ${pts[i]!.x},${pts[i]!.y}`;
+      if (closed) d += ' Z';
     }
   }
 
-  const outerEdges = new Set<string>();
-  const innerEdges = new Map<string, [string, string]>();
+  return d;
+}
 
-  for (const [key, tids] of edgeTerritories) {
-    if (tids.length === 1) {
-      outerEdges.add(key);
-    } else if (tids.length === 2) {
-      innerEdges.set(key, [tids[0]!, tids[1]!]);
+/**
+ * Build the inset border path for a territory, ported directly from editorV2's
+ * buildInsetBorderPath. Edges shared with same-owner neighbors are suppressed.
+ */
+function buildInsetBorderPath(
+  t: TerritoryMapTerritory,
+  edgeTerritoryIndex: Map<string, string[]>,
+  points: Record<string, { x: number; y: number }>,
+  inset: number,
+  suppressEdge: (neighborTid: string | null) => boolean,
+): string {
+  const tPts = t.pointIds.map(pid => points[pid]).filter((p): p is { x: number; y: number } => !!p);
+  const n = tPts.length;
+  if (n < 3) return '';
+
+  // Signed area (SVG y-down): positive = CW → right normal points inward
+  let area = 0;
+  for (let i = 0; i < n; i++) {
+    const a = tPts[i]!, b = tPts[(i + 1) % n]!;
+    area += a.x * b.y - b.x * a.y;
+  }
+  const cw = area > 0 ? 1 : -1;
+
+  const edgePairs: [string, string][] = t.pointIds.map((id, i) => [id, t.pointIds[(i + 1) % t.pointIds.length]!]);
+
+  const suppressed = edgePairs.map(([aId, bId]) => {
+    const key = undirectedEdgeKey(aId, bId);
+    const tids = edgeTerritoryIndex.get(key);
+    const neighborTid = tids?.find(tid => tid !== t.id) ?? null;
+    return suppressEdge(neighborTid);
+  });
+
+  type OE = { ax: number; ay: number; bx: number; by: number };
+  const off: OE[] = edgePairs.map(([aId, bId]) => {
+    const pa = points[aId], pb = points[bId];
+    if (!pa || !pb) return { ax: 0, ay: 0, bx: 0, by: 0 };
+    const dx = pb.x - pa.x, dy = pb.y - pa.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.5) return { ax: pa.x, ay: pa.y, bx: pb.x, by: pb.y };
+    const nx = cw * dy / len, ny = cw * -dx / len;
+    return { ax: pa.x + nx * inset, ay: pa.y + ny * inset, bx: pb.x + nx * inset, by: pb.y + ny * inset };
+  });
+
+  function miterJoin(i: number, j: number): { x: number; y: number } | null {
+    const o1 = off[i]!, o2 = off[j]!;
+    const dx1 = o1.bx - o1.ax, dy1 = o1.by - o1.ay;
+    const dx2 = o2.bx - o2.ax, dy2 = o2.by - o2.ay;
+    const denom = dx1 * dy2 - dy1 * dx2;
+    if (Math.abs(denom) < 0.001) return null;
+    const param = ((o2.ax - o1.ax) * dy2 - (o2.ay - o1.ay) * dx2) / denom;
+    if (param < -2 || param > 3) return null;
+    return { x: o1.ax + param * dx1, y: o1.ay + param * dy1 };
+  }
+
+  if (suppressed.every(s => !s)) {
+    const pts: { x: number; y: number }[] = [];
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const jp = miterJoin(i, j);
+      if (jp) { pts.push(jp); } else { pts.push({ x: off[i]!.bx, y: off[i]!.by }); pts.push({ x: off[j]!.ax, y: off[j]!.ay }); }
     }
+    return 'M ' + pts.map(p => `${p.x},${p.y}`).join(' L ') + ' Z';
   }
 
-  // Build sector lookup
-  const tidToSector = new Map<string, string>();
-  for (const sec of graph.sectors) {
-    for (const tid of sec.territoryIds) tidToSector.set(tid, sec.id);
-  }
-
-  // A sector border edge is an inner edge where the two territories are in different sectors
-  const sectorBorderEdges = new Set<string>();
-  for (const [key, [tidA, tidB]] of innerEdges) {
-    const secA = tidToSector.get(tidA);
-    const secB = tidToSector.get(tidB);
-    if (secA && secB && secA !== secB) {
-      sectorBorderEdges.add(key);
+  // Mixed suppression → open sub-paths per run of non-suppressed edges
+  let pathD = '';
+  for (let start = 0; start < n; start++) {
+    if (suppressed[start] || !suppressed[(start - 1 + n) % n]) continue;
+    const pts: { x: number; y: number }[] = [{ x: off[start]!.ax, y: off[start]!.ay }];
+    let i = start;
+    while (true) {
+      const next = (i + 1) % n;
+      if (suppressed[next] || next === start) { pts.push({ x: off[i]!.bx, y: off[i]!.by }); break; }
+      const jp = miterJoin(i, next);
+      if (jp) { pts.push(jp); } else { pts.push({ x: off[i]!.bx, y: off[i]!.by }); pts.push({ x: off[next]!.ax, y: off[next]!.ay }); }
+      i = next;
     }
+    if (pts.length >= 2) pathD += 'M ' + pts.map(p => `${p.x},${p.y}`).join(' L ') + ' ';
   }
-
-  return { outerEdges, innerEdges, sectorBorderEdges };
+  return pathD;
 }
 
 // ── initTerritoryRenderer ─────────────────────────────────────────────────────
 
 export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGraphData): void {
-  // Clear existing content
   svgEl.innerHTML = '';
 
-  const { minX, minY, maxX, maxY } = computeMapExtents(graph);
-  const pad = 24;
-  const vbX = minX - pad;
-  const vbY = minY - pad;
-  const vbW = maxX - minX + 2 * pad;
-  const vbH = maxY - minY + 2 * pad;
-  svgEl.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
+  const { mapDef, points } = graph;
+  const { minX, minY, maxX, maxY } = computeMapExtents(points);
+  // 80px padding so the 72px outer-border pattern overhang is fully visible
+  const pad = 80;
+  svgEl.setAttribute('viewBox', `${minX - pad} ${minY - pad} ${maxX - minX + 2 * pad} ${maxY - minY + 2 * pad}`);
   svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-  svgEl.setAttribute('width', String(vbW));
-  svgEl.setAttribute('height', String(vbH));
+  svgEl.setAttribute('width', String(maxX - minX + 2 * pad));
+  svgEl.setAttribute('height', String(maxY - minY + 2 * pad));
   svgEl.style.overflow = 'visible';
 
-  // Define mountain pattern
-  const defs = createSvgEl('defs');
+  const edgeTerritoryIndex = buildEdgeTerritoryIndex(mapDef);
+
+  // ── Defs — same pattern IDs as editorV2 so CSS fill references resolve ──────
+  const defs = mksvg('defs');
   svgEl.appendChild(defs);
 
-  const patternId = 'trr-mountain-pattern';
-  const pattern = createSvgEl('pattern');
-  pattern.id = patternId;
-  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  pattern.setAttribute('width', '64');
-  pattern.setAttribute('height', '64');
-  const patImg = createSvgEl('image');
-  patImg.setAttribute('href', mountainPatternSrc);
-  patImg.setAttribute('width', '64');
-  patImg.setAttribute('height', '64');
-  pattern.appendChild(patImg);
-  defs.appendChild(pattern);
+  const outerPattern = mksvg('pattern');
+  outerPattern.id = 'ev2-outer-border-pattern';
+  outerPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  outerPattern.setAttribute('width', '48');
+  outerPattern.setAttribute('height', '48');
+  const outerImg = mksvg('image');
+  outerImg.setAttribute('href', outsideBorderPatternSrc);
+  outerImg.setAttribute('width', '48');
+  outerImg.setAttribute('height', '48');
+  outerPattern.appendChild(outerImg);
+  defs.appendChild(outerPattern);
 
-  // Create layer groups
-  const layers = [
-    'trr-fills',
-    'trr-inner-borders',
-    'trr-outer-borders',
-    'trr-sector-borders',
+  const mountainPattern = mksvg('pattern');
+  mountainPattern.id = 'ev2-mountain-pattern';
+  mountainPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  mountainPattern.setAttribute('width', '45');
+  mountainPattern.setAttribute('height', '45');
+  const mountainImg = mksvg('image');
+  mountainImg.setAttribute('href', mountainPatternSrc);
+  mountainImg.setAttribute('width', '45');
+  mountainImg.setAttribute('height', '45');
+  mountainPattern.appendChild(mountainImg);
+  defs.appendChild(mountainPattern);
+
+  // Clip paths per territory (same as editorV2)
+  for (const t of mapDef.territories) {
+    const clipPath = mksvg('clipPath');
+    clipPath.id = `ev2-clip-${t.id}`;
+    const clipPoly = mksvg('polygon');
+    clipPoly.setAttribute('points', territoryPointsAttr(t, points));
+    clipPath.appendChild(clipPoly);
+    defs.appendChild(clipPath);
+  }
+
+  // ── Layers — same IDs as editorV2 ────────────────────────────────────────────
+  for (const id of [
+    'ev2-outer-border-layer',
+    'ev2-territory-layer',
+    'ev2-edge-layer',
+    'ev2-sector-border-layer',
+    'ev2-cp-layer',
+    'ev2-note-layer',
     'trr-highlights',
-    'trr-control-points',
     'trr-units',
-  ];
-  for (const id of layers) {
-    const g = createSvgEl('g');
+  ]) {
+    const g = mksvg('g');
     g.id = id;
     svgEl.appendChild(g);
   }
 
-  rendererStateMap.set(svgEl, { graph, mountainPatternId: patternId });
+  // ── ev2-outer-border-layer ────────────────────────────────────────────────────
+  const outerBorderLayer = svgEl.querySelector('#ev2-outer-border-layer') as SVGGElement;
+  outerBorderLayer.setAttribute('pointer-events', 'none');
+  const outerPathD = buildOuterBorderPath(mapDef, points, edgeTerritoryIndex);
+  if (outerPathD) {
+    const perimPath = mksvg('path');
+    perimPath.setAttribute('d', outerPathD);
+    perimPath.setAttribute('fill', 'none');
+    perimPath.setAttribute('stroke', 'url(#ev2-outer-border-pattern)');
+    perimPath.setAttribute('stroke-width', '144');
+    perimPath.setAttribute('stroke-linecap', 'butt');
+    perimPath.setAttribute('stroke-linejoin', 'round');
+    outerBorderLayer.appendChild(perimPath);
+  }
+
+  // ── ev2-territory-layer ───────────────────────────────────────────────────────
+  // Create stable per-territory groups. Fill class and border path are updated
+  // on each renderTerritoryState call when ownership changes.
+  const territoryLayer = svgEl.querySelector('#ev2-territory-layer') as SVGGElement;
+  for (const t of mapDef.territories) {
+    const group = mksvg('g');
+    group.setAttribute('data-ev2-territory-id', t.id);
+    group.setAttribute('data-territory-id', t.id);
+
+    const fill = mksvg('polygon');
+    fill.setAttribute('class', 'ev2-territory-fill ev2-state-neutral');
+    fill.setAttribute('points', territoryPointsAttr(t, points));
+    if (t.state === 'mountain') {
+      fill.style.cursor = 'default';
+      fill.setAttribute('pointer-events', 'none');
+    } else {
+      fill.style.cursor = 'pointer';
+    }
+    group.appendChild(fill);
+
+    // Border compositing group — only shown for owned (allied/enemy) territories
+    if (t.state !== 'mountain') {
+      const borderGroup = mksvg('g');
+      borderGroup.setAttribute('class', 'ev2-territory-border ev2-border-allied');
+      borderGroup.setAttribute('pointer-events', 'none');
+      borderGroup.setAttribute('display', 'none');
+
+      const glowEl = mksvg('path');
+      glowEl.setAttribute('class', 'ev2-border-glow');
+      borderGroup.appendChild(glowEl);
+
+      const lineEl = mksvg('path');
+      lineEl.setAttribute('class', 'ev2-border-line');
+      borderGroup.appendChild(lineEl);
+
+      group.appendChild(borderGroup);
+    }
+
+    territoryLayer.appendChild(group);
+  }
+
+  // ── ev2-edge-layer (static — topology never changes) ─────────────────────────
+  const edgeLayer = svgEl.querySelector('#ev2-edge-layer') as SVGGElement;
+  edgeLayer.setAttribute('pointer-events', 'none');
+
+  const glowGroup = mksvg('g');
+  glowGroup.setAttribute('class', 'ev2-edge-glow-group');
+  glowGroup.setAttribute('pointer-events', 'none');
+  edgeLayer.appendChild(glowGroup);
+
+  for (const edge of mapDef.edges) {
+    const pa = points[edge.a], pb = points[edge.b];
+    if (!pa || !pb) continue;
+
+    const glow = mksvg('line');
+    glow.setAttribute('class', 'ev2-edge-glow');
+    glow.setAttribute('x1', String(pa.x)); glow.setAttribute('y1', String(pa.y));
+    glow.setAttribute('x2', String(pb.x)); glow.setAttribute('y2', String(pb.y));
+    glowGroup.appendChild(glow);
+
+    const isOuter = (edgeTerritoryIndex.get(undirectedEdgeKey(edge.a, edge.b))?.length ?? 0) === 1;
+    const line = mksvg('line');
+    line.setAttribute('class', isOuter ? 'ev2-edge ev2-edge-outer' : 'ev2-edge');
+    line.setAttribute('x1', String(pa.x)); line.setAttribute('y1', String(pa.y));
+    line.setAttribute('x2', String(pb.x)); line.setAttribute('y2', String(pb.y));
+    edgeLayer.appendChild(line);
+  }
+
+  // ── ev2-sector-border-layer (static) ─────────────────────────────────────────
+  const sectorBorderLayer = svgEl.querySelector('#ev2-sector-border-layer') as SVGGElement;
+  sectorBorderLayer.setAttribute('pointer-events', 'none');
+
+  if (graph.sectors.length > 0) {
+    const tidToSector = new Map<string, string>();
+    for (const sec of graph.sectors) for (const tid of sec.territoryIds) tidToSector.set(tid, sec.id);
+
+    for (const edge of mapDef.edges) {
+      const key = undirectedEdgeKey(edge.a, edge.b);
+      const tids = edgeTerritoryIndex.get(key);
+      if (!tids || tids.length !== 2) continue;
+      const secA = tidToSector.get(tids[0]!), secB = tidToSector.get(tids[1]!);
+      if (!secA || !secB || secA === secB) continue;
+      const pa = points[edge.a], pb = points[edge.b];
+      if (!pa || !pb) continue;
+      const line = mksvg('line');
+      line.setAttribute('class', 'ev2-sector-border');
+      line.setAttribute('x1', String(pa.x)); line.setAttribute('y1', String(pa.y));
+      line.setAttribute('x2', String(pb.x)); line.setAttribute('y2', String(pb.y));
+      sectorBorderLayer.appendChild(line);
+    }
+  }
+
+  // ── ev2-note-layer (static) ───────────────────────────────────────────────────
+  const noteLayer = svgEl.querySelector('#ev2-note-layer') as SVGGElement;
+  noteLayer.setAttribute('pointer-events', 'none');
+
+  for (const note of mapDef.notes ?? []) {
+    const anchorMap: Record<string, string> = { left: 'start', center: 'middle', right: 'end' };
+    const anchor = anchorMap[note.align ?? 'center'] ?? 'middle';
+    const g = mksvg('g');
+    g.setAttribute('data-note-id', note.id);
+
+    if (note.maxWidth) {
+      const mw = note.maxWidth;
+      const foX = note.align === 'center' ? note.x - mw / 2 : note.align === 'right' ? note.x - mw : note.x;
+      const fo = mksvg('foreignObject');
+      fo.setAttribute('x', String(foX));
+      fo.setAttribute('y', String(note.y - 20));
+      fo.setAttribute('width', String(mw));
+      fo.setAttribute('height', '2000');
+      const div = document.createElementNS('http://www.w3.org/1999/xhtml', 'div') as HTMLElement;
+      div.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+      div.className = 'ev2-note-fo-text';
+      div.textContent = note.text || ' ';
+      fo.appendChild(div);
+      g.appendChild(fo);
+    } else {
+      const textEl = mksvg('text');
+      textEl.setAttribute('class', 'ev2-note-text');
+      textEl.setAttribute('x', String(note.x));
+      textEl.setAttribute('y', String(note.y - 8));
+      textEl.setAttribute('text-anchor', anchor);
+      textEl.textContent = note.text || ' ';
+      g.appendChild(textEl);
+    }
+
+    noteLayer.appendChild(g);
+  }
+
+  rendererStateMap.set(svgEl, { graph, edgeTerritoryIndex });
 }
 
 // ── getTerritoryFromEvent ─────────────────────────────────────────────────────
@@ -187,19 +457,14 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
 export function getTerritoryFromEvent(e: MouseEvent, svgEl: SVGSVGElement): { col: number; row: number } | null {
   const rs = rendererStateMap.get(svgEl);
   if (!rs) return null;
-
-  const target = e.target as SVGElement | null;
-  if (!target) return null;
-
-  // Walk up from event target to find data-territory-id
-  let el: SVGElement | null = target;
-  while (el && el !== (svgEl as unknown as SVGElement)) {
-    const tid = el.dataset?.['territoryId'];
+  let el: Element | null = e.target as Element | null;
+  while (el && el !== svgEl) {
+    const tid = el.getAttribute('data-territory-id');
     if (tid) {
       const t = rs.graph.territories[tid];
       if (t) return { col: t.virtualCol, row: t.virtualRow };
     }
-    el = el.parentElement as SVGElement | null;
+    el = el.parentElement;
   }
   return null;
 }
@@ -215,249 +480,121 @@ export function renderTerritoryState(
   localPlayer: Owner,
 ): void {
   const rs = rendererStateMap.get(svgElement);
-  if (!rs || rs.graph !== graph) {
-    // Re-init if graph changed
-    initTerritoryRenderer(svgElement, graph);
-  }
-  const patternId = rendererStateMap.get(svgElement)!.mountainPatternId;
-  const { mapDef, points } = graph;
+  if (!rs || rs.graph !== graph) initTerritoryRenderer(svgElement, graph);
 
-  // Determine what is highlighted
-  const selectedUnit = state.selectedUnit !== null ? state.units.find(u => u.id === state.selectedUnit) ?? null : null;
+  const { mapDef, points, territories } = graph;
+  const edgeTerritoryIndex = rendererStateMap.get(svgElement)!.edgeTerritoryIndex;
+
+  const selectedUnit = state.selectedUnit !== null
+    ? (state.units.find(u => u.id === state.selectedUnit) ?? null)
+    : null;
   const validMoves = selectedUnit ? getValidMoves(state, selectedUnit) : [];
   const validMoveKeys = new Set(validMoves.map(([c, r]) => `${c},${r}`));
 
-  // Production placement highlights
   const productionPlacementKeys = new Set<string>();
   if (state.phase === 'production') {
     for (const t of mapDef.territories) {
-      const node = graph.territories[t.id];
-      if (!node) continue;
-      if (isValidProductionPlacement(state, node.virtualCol, node.virtualRow, localPlayer)) {
+      const node = territories[t.id];
+      if (node && isValidProductionPlacement(state, node.virtualCol, node.virtualRow, localPlayer)) {
         productionPlacementKeys.add(node.virtualKey);
       }
     }
   }
 
-  const { outerEdges, sectorBorderEdges } = classifyEdges(graph);
-
-  // ── Fills layer ─────────────────────────────────────────────────────────────
-  const fillsLayer = svgElement.querySelector('#trr-fills')!;
-  // Sync fill polygons keyed by territory id
-  const existingFills = new Map<string, SVGPathElement>();
-  for (const child of Array.from(fillsLayer.children)) {
-    const tid = (child as SVGElement).dataset['territoryId'];
-    if (tid) existingFills.set(tid, child as SVGPathElement);
+  function ownerState(tid: string): 'neutral' | 'allied' | 'enemy' {
+    const node = territories[tid];
+    if (!node) return 'neutral';
+    const hs = state.hexStates[node.virtualKey];
+    if (!hs) return 'neutral';
+    return hs.owner === localPlayer ? 'allied' : 'enemy';
   }
 
-  const seenFills = new Set<string>();
-  for (const t of mapDef.territories) {
-    const node = graph.territories[t.id];
-    if (!node) continue;
-    seenFills.add(t.id);
+  // ── ev2-territory-layer ───────────────────────────────────────────────────────
+  const territoryLayer = svgElement.querySelector('#ev2-territory-layer')!;
 
-    let pathEl = existingFills.get(t.id);
-    if (!pathEl) {
-      pathEl = document.createElementNS(SVG_NS, 'path') as SVGPathElement;
-      pathEl.dataset['territoryId'] = t.id;
-      fillsLayer.appendChild(pathEl);
+  for (const t of mapDef.territories) {
+    const group = territoryLayer.querySelector(`[data-ev2-territory-id="${t.id}"]`) as SVGGElement | null;
+    if (!group) continue;
+
+    const fillPoly = group.querySelector('.ev2-territory-fill') as SVGElement | null;
+    const borderGroup = group.querySelector('.ev2-territory-border') as SVGGElement | null;
+
+    const vizState: 'neutral' | 'allied' | 'enemy' | 'mountain' =
+      t.state === 'mountain' ? 'mountain' : ownerState(t.id);
+
+    if (fillPoly) {
+      const cls = `ev2-territory-fill ev2-state-${vizState}`;
+      if (fillPoly.getAttribute('class') !== cls) fillPoly.setAttribute('class', cls);
     }
 
-    const d = pointsToPath(t.pointIds, points);
-    setAttrIfChanged(pathEl, 'd', d);
-
-    // Determine fill
-    let fill: string;
-    if (t.state === 'mountain') {
-      fill = `url(#${patternId})`;
-    } else {
-      const hs = state.hexStates[node.virtualKey];
-      if (!hs) {
-        fill = COLOR_NEUTRAL_FILL;
-      } else if (hs.owner === localPlayer) {
-        fill = COLOR_PLAYER_FILL;
+    if (borderGroup) {
+      if (vizState === 'neutral' || vizState === 'mountain') {
+        if (borderGroup.getAttribute('display') !== 'none') borderGroup.setAttribute('display', 'none');
       } else {
-        fill = COLOR_AI_FILL;
+        if (borderGroup.getAttribute('display') === 'none') borderGroup.removeAttribute('display');
+
+        const borderCls = `ev2-territory-border ev2-border-${vizState}`;
+        if (borderGroup.getAttribute('class') !== borderCls) borderGroup.setAttribute('class', borderCls);
+
+        const suppressEdge = (neighborTid: string | null): boolean =>
+          neighborTid !== null && ownerState(neighborTid) === vizState;
+
+        const borderD = buildInsetBorderPath(t, edgeTerritoryIndex, points, -10, suppressEdge);
+        const glowEl = borderGroup.querySelector('.ev2-border-glow') as SVGElement | null;
+        const lineEl = borderGroup.querySelector('.ev2-border-line') as SVGElement | null;
+        if (glowEl) setAttrIfChanged(glowEl, 'd', borderD);
+        if (lineEl) setAttrIfChanged(lineEl, 'd', borderD);
       }
     }
-    setAttrIfChanged(pathEl, 'fill', fill);
-    setAttrIfChanged(pathEl, 'stroke', 'none');
-    pathEl.style.cursor = t.state === 'mountain' ? 'default' : 'pointer';
-  }
-  // Remove disappeared
-  for (const [tid, el] of existingFills) {
-    if (!seenFills.has(tid)) el.remove();
   }
 
-  // ── Inner borders layer ─────────────────────────────────────────────────────
-  const innerLayer = svgElement.querySelector('#trr-inner-borders')!;
-  // Draw a stroke path per territory polygon (inner borders share between territories)
-  // Simple approach: draw each territory's full polygon outline
-  const existingInner = new Map<string, SVGPathElement>();
-  for (const child of Array.from(innerLayer.children)) {
-    const tid = (child as SVGElement).dataset['territoryId'];
-    if (tid) existingInner.set(tid, child as SVGPathElement);
-  }
-  const seenInner = new Set<string>();
-  for (const t of mapDef.territories) {
-    seenInner.add(t.id);
-    let pathEl = existingInner.get(t.id);
-    if (!pathEl) {
-      pathEl = document.createElementNS(SVG_NS, 'path') as SVGPathElement;
-      pathEl.dataset['territoryId'] = t.id;
-      pathEl.setAttribute('fill', 'none');
-      pathEl.setAttribute('pointer-events', 'none');
-      innerLayer.appendChild(pathEl);
-    }
-    const d = pointsToPath(t.pointIds, points);
-    setAttrIfChanged(pathEl, 'd', d);
-
-    const node = graph.territories[t.id];
-    const hs = node ? state.hexStates[node.virtualKey] : undefined;
-    let stroke = COLOR_NEUTRAL_STROKE;
-    if (t.state === 'mountain') stroke = COLOR_NEUTRAL_STROKE;
-    else if (hs?.owner === localPlayer) stroke = COLOR_PLAYER_STROKE;
-    else if (hs?.owner !== undefined && hs.owner !== localPlayer) stroke = COLOR_AI_STROKE;
-
-    setAttrIfChanged(pathEl, 'stroke', stroke);
-    setAttrIfChanged(pathEl, 'stroke-width', String(STROKE_WIDTH_INNER));
-    setAttrIfChanged(pathEl, 'stroke-linejoin', 'round');
-  }
-  for (const [tid, el] of existingInner) {
-    if (!seenInner.has(tid)) el.remove();
-  }
-
-  // ── Outer borders layer ─────────────────────────────────────────────────────
-  const outerLayer = svgElement.querySelector('#trr-outer-borders')!;
-  // Draw outer boundary edges as individual lines
-  // Build edge geometry from mapDef.edges
-  const edgeById = new Map<string, { a: string; b: string }>();
-  for (const edge of mapDef.edges) {
-    edgeById.set(edge.id, { a: edge.a, b: edge.b });
-  }
-
-  // Build set of outer edge point-pair keys
-  const existingOuter = new Map<string, SVGLineElement>();
-  for (const child of Array.from(outerLayer.children)) {
-    const ek = (child as SVGElement).dataset['edgeKey'];
-    if (ek) existingOuter.set(ek, child as SVGLineElement);
-  }
-
-  const seenOuter = new Set<string>();
-  for (const edgeKey of outerEdges) {
-    seenOuter.add(edgeKey);
-    let lineEl = existingOuter.get(edgeKey);
-    if (!lineEl) {
-      lineEl = document.createElementNS(SVG_NS, 'line') as SVGLineElement;
-      lineEl.dataset['edgeKey'] = edgeKey;
-      lineEl.setAttribute('pointer-events', 'none');
-      lineEl.setAttribute('stroke', COLOR_OUTER_STROKE);
-      lineEl.setAttribute('stroke-width', String(STROKE_WIDTH_OUTER));
-      lineEl.setAttribute('stroke-linecap', 'round');
-      outerLayer.appendChild(lineEl);
-    }
-    const [pidA, pidB] = edgeKey.split('|');
-    const ptA = pidA ? points[pidA] : undefined;
-    const ptB = pidB ? points[pidB] : undefined;
-    if (ptA && ptB) {
-      setAttrIfChanged(lineEl, 'x1', String(ptA.x));
-      setAttrIfChanged(lineEl, 'y1', String(ptA.y));
-      setAttrIfChanged(lineEl, 'x2', String(ptB.x));
-      setAttrIfChanged(lineEl, 'y2', String(ptB.y));
-    }
-  }
-  for (const [ek, el] of existingOuter) {
-    if (!seenOuter.has(ek)) el.remove();
-  }
-
-  // ── Sector borders layer ────────────────────────────────────────────────────
-  const sectorLayer = svgElement.querySelector('#trr-sector-borders')!;
-  const existingSector = new Map<string, SVGLineElement>();
-  for (const child of Array.from(sectorLayer.children)) {
-    const ek = (child as SVGElement).dataset['edgeKey'];
-    if (ek) existingSector.set(ek, child as SVGLineElement);
-  }
-  const seenSector = new Set<string>();
-  for (const edgeKey of sectorBorderEdges) {
-    seenSector.add(edgeKey);
-    let lineEl = existingSector.get(edgeKey);
-    if (!lineEl) {
-      lineEl = document.createElementNS(SVG_NS, 'line') as SVGLineElement;
-      lineEl.dataset['edgeKey'] = edgeKey;
-      lineEl.setAttribute('pointer-events', 'none');
-      lineEl.setAttribute('stroke', COLOR_SECTOR_STROKE);
-      lineEl.setAttribute('stroke-width', String(STROKE_WIDTH_SECTOR));
-      lineEl.setAttribute('stroke-dasharray', SECTOR_DASH);
-      lineEl.setAttribute('stroke-linecap', 'round');
-      sectorLayer.appendChild(lineEl);
-    }
-    const [pidA, pidB] = edgeKey.split('|');
-    const ptA = pidA ? points[pidA] : undefined;
-    const ptB = pidB ? points[pidB] : undefined;
-    if (ptA && ptB) {
-      setAttrIfChanged(lineEl, 'x1', String(ptA.x));
-      setAttrIfChanged(lineEl, 'y1', String(ptA.y));
-      setAttrIfChanged(lineEl, 'x2', String(ptB.x));
-      setAttrIfChanged(lineEl, 'y2', String(ptB.y));
-    }
-  }
-  for (const [ek, el] of existingSector) {
-    if (!seenSector.has(ek)) el.remove();
-  }
-
-  // ── Highlights layer ────────────────────────────────────────────────────────
+  // ── trr-highlights ────────────────────────────────────────────────────────────
   const highlightLayer = svgElement.querySelector('#trr-highlights')!;
   const existingHL = new Map<string, SVGPathElement>();
   for (const child of Array.from(highlightLayer.children)) {
-    const tid = (child as SVGElement).dataset['territoryId'];
+    const tid = (child as SVGElement).getAttribute('data-territory-id');
     if (tid) existingHL.set(tid, child as SVGPathElement);
   }
   const seenHL = new Set<string>();
 
-  const processHighlight = (t: TerritoryMapTerritory, stroke: string): void => {
-    seenHL.add(t.id);
-    let pathEl = existingHL.get(t.id);
-    if (!pathEl) {
-      pathEl = document.createElementNS(SVG_NS, 'path') as SVGPathElement;
-      pathEl.dataset['territoryId'] = t.id;
-      pathEl.setAttribute('fill', 'none');
-      pathEl.setAttribute('pointer-events', 'none');
-      highlightLayer.appendChild(pathEl);
-    }
-    const d = pointsToPath(t.pointIds, points);
-    setAttrIfChanged(pathEl, 'd', d);
-    setAttrIfChanged(pathEl, 'stroke', stroke);
-    setAttrIfChanged(pathEl, 'stroke-width', String(STROKE_WIDTH_HIGHLIGHT));
-    setAttrIfChanged(pathEl, 'stroke-linejoin', 'round');
-  };
-
   for (const t of mapDef.territories) {
     if (t.state === 'mountain') continue;
-    const node = graph.territories[t.id];
+    const node = territories[t.id];
     if (!node) continue;
-
     const key = node.virtualKey;
-    const isSelected = selectedUnit && selectedUnit.col === node.virtualCol && selectedUnit.row === node.virtualRow;
-    const isValidMove = validMoveKeys.has(key);
-    const isProductionPlacement = productionPlacementKeys.has(key);
 
-    if (isSelected) {
-      processHighlight(t, COLOR_SELECTED_STROKE);
-    } else if (isValidMove) {
-      processHighlight(t, COLOR_VALID_MOVE_STROKE);
-    } else if (isProductionPlacement) {
-      processHighlight(t, COLOR_PRODUCTION_STROKE);
+    const isSelected = !!(selectedUnit && selectedUnit.col === node.virtualCol && selectedUnit.row === node.virtualRow);
+    const isValidMove = validMoveKeys.has(key);
+    const isProduction = productionPlacementKeys.has(key);
+
+    let stroke: string | null = null;
+    if (isSelected) stroke = COLOR_SELECTED_STROKE;
+    else if (isValidMove) stroke = COLOR_VALID_MOVE_STROKE;
+    else if (isProduction) stroke = COLOR_PRODUCTION_STROKE;
+
+    if (stroke) {
+      seenHL.add(t.id);
+      let pathEl = existingHL.get(t.id);
+      if (!pathEl) {
+        pathEl = document.createElementNS(SVG_NS, 'path') as SVGPathElement;
+        pathEl.setAttribute('data-territory-id', t.id);
+        pathEl.setAttribute('fill', 'none');
+        pathEl.setAttribute('pointer-events', 'none');
+        highlightLayer.appendChild(pathEl);
+      }
+      setAttrIfChanged(pathEl, 'd', territoryPathD(t, points));
+      setAttrIfChanged(pathEl, 'stroke', stroke);
+      setAttrIfChanged(pathEl, 'stroke-width', String(STROKE_WIDTH_HIGHLIGHT));
+      setAttrIfChanged(pathEl, 'stroke-linejoin', 'round');
     }
   }
-  for (const [tid, el] of existingHL) {
-    if (!seenHL.has(tid)) el.remove();
-  }
+  for (const [tid, el] of existingHL) if (!seenHL.has(tid)) el.remove();
 
-  // ── Control points layer ────────────────────────────────────────────────────
-  const cpLayer = svgElement.querySelector('#trr-control-points')!;
+  // ── ev2-cp-layer ──────────────────────────────────────────────────────────────
+  const cpLayer = svgElement.querySelector('#ev2-cp-layer')!;
   const existingCP = new Map<string, SVGGElement>();
   for (const child of Array.from(cpLayer.children)) {
-    const cpid = (child as SVGElement).dataset['cpId'];
+    const cpid = (child as SVGElement).getAttribute('data-cp-id');
     if (cpid) existingCP.set(cpid, child as SVGGElement);
   }
   const seenCP = new Set<string>();
@@ -466,71 +603,79 @@ export function renderTerritoryState(
     ...state.controlPointHexes,
     ...state.sectorControlPointHex.filter(k => k),
   ]);
+
   for (const cp of Object.values(graph.controlPoints)) {
-    const t = graph.territories[cp.territoryId];
-    if (!t) continue;
-    if (!activeCpHexes.has(t.virtualKey)) continue;
+    const t = territories[cp.territoryId];
+    if (!t || !activeCpHexes.has(t.virtualKey)) continue;
 
     seenCP.add(cp.id);
     let g = existingCP.get(cp.id);
     if (!g) {
       g = document.createElementNS(SVG_NS, 'g') as SVGGElement;
-      g.dataset['cpId'] = cp.id;
+      g.setAttribute('data-cp-id', cp.id);
       g.setAttribute('pointer-events', 'none');
       cpLayer.appendChild(g);
 
-      const circle = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
-      circle.setAttribute('r', '8');
-      circle.setAttribute('fill', '#eab308');
-      circle.setAttribute('stroke', '#92400e');
-      circle.setAttribute('stroke-width', '1.5');
-      g.appendChild(circle);
+      const bg = document.createElementNS(SVG_NS, 'rect') as SVGRectElement;
+      bg.setAttribute('class', 'ev2-cp-label-bg');
+      bg.setAttribute('rx', '0');
+      g.appendChild(bg);
 
       const label = document.createElementNS(SVG_NS, 'text') as SVGTextElement;
-      label.setAttribute('text-anchor', 'middle');
-      label.setAttribute('dominant-baseline', 'middle');
-      label.setAttribute('font-size', '8');
-      label.setAttribute('fill', '#1c1917');
-      label.setAttribute('font-weight', 'bold');
-      label.textContent = 'CP';
+      label.setAttribute('class', 'ev2-cp-label');
+      label.textContent = cp.name;
       g.appendChild(label);
+
+      const dot = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
+      dot.setAttribute('class', 'ev2-cp-dot');
+      dot.setAttribute('r', '4');
+      g.appendChild(dot);
     }
 
-    const cx = t.centroid.x;
-    const cy = t.centroid.y - 20; // offset upward from centroid
-    setAttrIfChanged(g, 'transform', `translate(${cx},${cy})`);
-  }
-  for (const [cpid, el] of existingCP) {
-    if (!seenCP.has(cpid)) el.remove();
-  }
+    const cx = t.centroid.x, cy = t.centroid.y;
+    const label = g.querySelector<SVGTextElement>('.ev2-cp-label')!;
+    setAttrIfChanged(label, 'x', String(cx));
+    setAttrIfChanged(label, 'y', String(cy - 14));
 
-  // ── Units layer ─────────────────────────────────────────────────────────────
+    const dot = g.querySelector<SVGCircleElement>('.ev2-cp-dot')!;
+    setAttrIfChanged(dot, 'cx', String(cx));
+    setAttrIfChanged(dot, 'cy', String(cy));
+
+    const bg = g.querySelector<SVGRectElement>('.ev2-cp-label-bg')!;
+    try {
+      const pad = 4, bb = label.getBBox();
+      bg.setAttribute('x', String(bb.x - pad));
+      bg.setAttribute('y', String(bb.y - pad));
+      bg.setAttribute('width', String(bb.width + pad * 2));
+      bg.setAttribute('height', String(bb.height + pad * 2));
+    } catch (_) { /* getBBox unavailable when SVG is hidden */ }
+  }
+  for (const [cpid, el] of existingCP) if (!seenCP.has(cpid)) el.remove();
+
+  // ── trr-units ─────────────────────────────────────────────────────────────────
   const unitsLayer = svgElement.querySelector('#trr-units')!;
   const existingUnits = new Map<number, SVGGElement>();
   for (const child of Array.from(unitsLayer.children)) {
-    const uid = (child as SVGElement).dataset['unitId'];
-    if (uid !== undefined) existingUnits.set(Number(uid), child as SVGGElement);
+    const uid = (child as SVGElement).getAttribute('data-unit-id');
+    if (uid !== null) existingUnits.set(Number(uid), child as SVGGElement);
   }
   const seenUnits = new Set<number>();
 
   for (const unit of state.units) {
     if (hiddenUnitIds.has(unit.id)) continue;
-    const node = graph.territories[
-      graph.keyToId[`${unit.col},${unit.row}`] ?? ''
-    ];
+    const node = territories[graph.keyToId[`${unit.col},${unit.row}`] ?? ''];
     if (!node) continue;
 
     seenUnits.add(unit.id);
     let g = existingUnits.get(unit.id);
     if (!g) {
       g = document.createElementNS(SVG_NS, 'g') as SVGGElement;
-      g.dataset['unitId'] = String(unit.id);
-      g.dataset['territoryId'] = graph.keyToId[`${unit.col},${unit.row}`] ?? '';
+      g.setAttribute('data-unit-id', String(unit.id));
+      g.setAttribute('data-territory-id', graph.keyToId[`${unit.col},${unit.row}`] ?? '');
       unitsLayer.appendChild(g);
 
-      // Unit icon
       const img = document.createElementNS(SVG_NS, 'image') as SVGImageElement;
-      img.dataset['role'] = 'icon';
+      img.setAttribute('data-role', 'icon');
       img.setAttribute('width', String(UNIT_IMG_SIZE));
       img.setAttribute('height', String(UNIT_IMG_SIZE));
       img.setAttribute('x', String(-UNIT_IMG_SIZE / 2));
@@ -538,9 +683,8 @@ export function renderTerritoryState(
       img.setAttribute('pointer-events', 'none');
       g.appendChild(img);
 
-      // HP bar background
       const hpBg = document.createElementNS(SVG_NS, 'rect') as SVGRectElement;
-      hpBg.dataset['role'] = 'hp-bg';
+      hpBg.setAttribute('data-role', 'hp-bg');
       hpBg.setAttribute('x', String(-HP_BAR_WIDTH / 2));
       hpBg.setAttribute('y', String(UNIT_IMG_SIZE / 2 + 2));
       hpBg.setAttribute('width', String(HP_BAR_WIDTH));
@@ -550,9 +694,8 @@ export function renderTerritoryState(
       hpBg.setAttribute('pointer-events', 'none');
       g.appendChild(hpBg);
 
-      // HP bar fill
       const hpFill = document.createElementNS(SVG_NS, 'rect') as SVGRectElement;
-      hpFill.dataset['role'] = 'hp-fill';
+      hpFill.setAttribute('data-role', 'hp-fill');
       hpFill.setAttribute('x', String(-HP_BAR_WIDTH / 2));
       hpFill.setAttribute('y', String(UNIT_IMG_SIZE / 2 + 2));
       hpFill.setAttribute('height', String(HP_BAR_HEIGHT));
@@ -561,33 +704,21 @@ export function renderTerritoryState(
       g.appendChild(hpFill);
     }
 
-    const cx = node.centroid.x;
-    const cy = node.centroid.y;
+    const cx = node.centroid.x, cy = node.centroid.y;
     setAttrIfChanged(g, 'transform', `translate(${cx},${cy})`);
 
-    // Update icon
     const img = g.querySelector<SVGImageElement>('[data-role="icon"]');
-    if (img && unit.icon) {
-      setAttrIfChanged(img, 'href', unit.icon);
-    }
+    if (img && unit.icon) setAttrIfChanged(img, 'href', unit.icon);
 
-    // Update HP bar
     const hpFill = g.querySelector<SVGRectElement>('[data-role="hp-fill"]');
     if (hpFill) {
       const pct = Math.max(0, Math.min(1, unit.hp / unit.maxHp));
-      const w = Math.round(pct * HP_BAR_WIDTH);
-      setAttrIfChanged(hpFill, 'width', String(w));
+      setAttrIfChanged(hpFill, 'width', String(Math.round(pct * HP_BAR_WIDTH)));
       const hpColor = pct > 0.6 ? '#22c55e' : pct > 0.3 ? '#eab308' : '#ef4444';
       setAttrIfChanged(hpFill, 'fill', hpColor);
     }
 
-    // Dim tired units
-    const isTired = unit.movesUsed >= unit.movement && state.phase === 'movement';
-    g.style.opacity = isTired ? '0.5' : '1';
+    g.style.opacity = (unit.movesUsed >= unit.movement && state.phase === 'movement') ? '0.5' : '1';
   }
-
-  // Remove disappeared units
-  for (const [uid, el] of existingUnits) {
-    if (!seenUnits.has(uid)) el.remove();
-  }
+  for (const [uid, el] of existingUnits) if (!seenUnits.has(uid)) el.remove();
 }
