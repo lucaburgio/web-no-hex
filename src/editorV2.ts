@@ -655,6 +655,12 @@ function render(): void {
   mountainPatternImgEl.setAttribute('width', '90');
   mountainPatternImgEl.setAttribute('height', '90');
   mountainPattern.appendChild(mountainPatternImgEl);
+  const mountainPatternOverlay = document.createElementNS(SVG_NS, 'rect');
+  mountainPatternOverlay.setAttribute('width', '90');
+  mountainPatternOverlay.setAttribute('height', '90');
+  mountainPatternOverlay.setAttribute('fill', 'white');
+  mountainPatternOverlay.setAttribute('opacity', '0.5');
+  mountainPattern.appendChild(mountainPatternOverlay);
   defsEl.appendChild(mountainPattern);
 
   // ── Territory layer ──────────────────────────────────────────────────────
