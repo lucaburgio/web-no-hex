@@ -566,21 +566,8 @@ function render(): void {
     defsEl = document.createElementNS(SVG_NS, 'defs') as SVGDefsElement;
     svgEl.prepend(defsEl);
   }
-  // Rebuild defs clip paths and pattern
+  // Rebuild defs clip paths
   defsEl.innerHTML = '';
-
-  // Outer border pattern
-  const outerPattern = document.createElementNS(SVG_NS, 'pattern');
-  outerPattern.setAttribute('id', 'ev2-outer-border-pattern');
-  outerPattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  outerPattern.setAttribute('width', '200');
-  outerPattern.setAttribute('height', '74');
-  const outerPatternImg = document.createElementNS(SVG_NS, 'image');
-  outerPatternImg.setAttribute('href', 'images/misc/outside-border-pattern.png');
-  outerPatternImg.setAttribute('width', '200');
-  outerPatternImg.setAttribute('height', '74');
-  outerPattern.appendChild(outerPatternImg);
-  defsEl.appendChild(outerPattern);
 
   for (const t of territories) {
     const clipPath = document.createElementNS(SVG_NS, 'clipPath');
@@ -597,46 +584,6 @@ function render(): void {
   territoryLayer.style.pointerEvents = mode === 'territory' ? 'auto' : 'none';
 
   const edgeIndex = buildEdgeTerritoryIndex();
-
-  // ── Outer border layer ───────────────────────────────────────────────────
-  const outerBorderLayer = svgEl.querySelector('#ev2-outer-border-layer') as SVGGElement;
-  outerBorderLayer.innerHTML = '';
-  outerBorderLayer.setAttribute('pointer-events', 'none');
-
-  for (const edge of edges) {
-    const pa = ptById(edge.a);
-    const pb = ptById(edge.b);
-    if (!pa || !pb) continue;
-    const edgeTerrs = edgeIndex.get(undirectedEdgeKey(edge.a, edge.b));
-    if (!edgeTerrs || edgeTerrs.length !== 1) continue;
-
-    // Outward normal: left normal of (pb - pa), flipped if it points toward the territory centroid
-    const dx = pb.x - pa.x;
-    const dy = pb.y - pa.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if (len === 0) continue;
-    let nx = -dy / len;
-    let ny = dx / len;
-
-    // Check dot product with (centroid - midpoint); outward normal should point away from centroid
-    const t0 = edgeTerrs[0];
-    const cx = t0.pointIds.reduce((s: number, id: string) => { const p = ptById(id); return s + (p?.x ?? 0); }, 0) / t0.pointIds.length;
-    const cy = t0.pointIds.reduce((s: number, id: string) => { const p = ptById(id); return s + (p?.y ?? 0); }, 0) / t0.pointIds.length;
-    const mx = (pa.x + pb.x) / 2;
-    const my = (pa.y + pb.y) / 2;
-    if (nx * (cx - mx) + ny * (cy - my) > 0) { nx = -nx; ny = -ny; }
-
-    const OUTER_W = 74;
-    const x1 = pa.x, y1 = pa.y;
-    const x2 = pb.x, y2 = pb.y;
-    const x3 = pb.x + nx * OUTER_W, y3 = pb.y + ny * OUTER_W;
-    const x4 = pa.x + nx * OUTER_W, y4 = pa.y + ny * OUTER_W;
-
-    const quad = document.createElementNS(SVG_NS, 'path');
-    quad.setAttribute('d', `M ${x1},${y1} L ${x2},${y2} L ${x3},${y3} L ${x4},${y4} Z`);
-    quad.setAttribute('fill', 'url(#ev2-outer-border-pattern)');
-    outerBorderLayer.appendChild(quad);
-  }
 
   for (const t of territories) {
     const pts_str = territoryPointsAttr(t);
@@ -1094,7 +1041,7 @@ export function initEditorV2(onBack: () => void): void {
   panelTerritory = document.getElementById('ev2-panel-territory') as HTMLElement;
 
   // Create SVG layers
-  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-edge-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
+  for (const id of ['ev2-territory-layer', 'ev2-edge-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('id', id);
     svgEl.appendChild(g);
