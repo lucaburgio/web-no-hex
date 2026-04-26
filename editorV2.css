@@ -291,6 +291,25 @@
 }
 .ev2-note-del-btn:hover { background: #7f1d1d; color: #fff; }
 
+.ev2-note-maxwidth-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.ev2-note-maxwidth-label {
+  font-size: 10px; color: #666; flex: 0 0 auto;
+}
+.ev2-note-maxwidth-input {
+  background: transparent; color: #e5e5e5; border: none;
+  border-bottom: 1px solid #444; font-size: 11px;
+  padding: 2px 2px; outline: none; width: 56px; min-width: 0;
+}
+.ev2-note-maxwidth-input:focus { border-bottom-color: #93c5fd; }
+.ev2-note-fo-text {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+  color: #afafaf; word-break: break-word; overflow-wrap: break-word;
+  white-space: pre-wrap; line-height: 1.4; margin: 0; padding: 0;
+  text-shadow: 0 0 4px rgba(255,255,255,0.88), 0 0 4px rgba(255,255,255,0.88);
+}
+
 #ev2-note-tool-btn.active { background: #7c3aed; border-color: #a855f7; color: #fff; }
 
 #ev2-footer { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }

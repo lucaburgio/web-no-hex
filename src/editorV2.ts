@@ -13,7 +13,7 @@ interface Pt { id: string; x: number; y: number }
 interface Edge { id: string; a: string; b: string }
 interface Territory { id: string; pointIds: string[]; state: TerritoryState }
 interface ControlPoint { id: string; territoryId: string; name: string }
-interface Note { id: string; x: number; y: number; text: string; align: 'left' | 'center' | 'right' }
+interface Note { id: string; x: number; y: number; text: string; align: 'left' | 'center' | 'right'; maxWidth?: number }
 interface Sector { id: string; name: string; territoryIds: string[] }
 
 // ── Module-level state ────────────────────────────────────────────────────────
@@ -426,6 +426,12 @@ function renderNoteList(): void {
       ul.querySelectorAll<HTMLElement>(`li[data-note-id="${note.id}"] .ev2-note-align-btn`).forEach(b => {
         b.classList.toggle('active', b.dataset.align === note.align);
       });
+      // Update max-width input
+      const mwInput = ul.querySelector<HTMLInputElement>(`li[data-note-id="${note.id}"] .ev2-note-maxwidth-input`);
+      if (mwInput) {
+        const v = note.maxWidth ? String(note.maxWidth) : '';
+        if (mwInput.value !== v) mwInput.value = v;
+      }
       continue;
     }
 
@@ -461,8 +467,26 @@ function renderNoteList(): void {
     delBtn.dataset.noteDelete = note.id;
 
     controls.appendChild(delBtn);
+
+    const mwRow = document.createElement('div');
+    mwRow.className = 'ev2-note-maxwidth-row';
+    const mwLabel = document.createElement('label');
+    mwLabel.className = 'ev2-note-maxwidth-label';
+    mwLabel.textContent = 'max-w';
+    const mwInput = document.createElement('input');
+    mwInput.type = 'number';
+    mwInput.min = '10';
+    mwInput.step = '10';
+    mwInput.value = note.maxWidth ? String(note.maxWidth) : '';
+    mwInput.className = 'ev2-note-maxwidth-input';
+    mwInput.dataset.noteId = note.id;
+    mwInput.placeholder = '—';
+    mwRow.appendChild(mwLabel);
+    mwRow.appendChild(mwInput);
+
     li.appendChild(input);
     li.appendChild(controls);
+    li.appendChild(mwRow);
     ul.appendChild(li);
   }
 }
@@ -1006,13 +1030,31 @@ function render(): void {
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('data-note-id', note.id);
 
-    const textEl = document.createElementNS(SVG_NS, 'text');
-    textEl.setAttribute('class', 'ev2-note-text');
-    textEl.setAttribute('x', String(note.x));
-    textEl.setAttribute('y', String(note.y - 8));
-    textEl.setAttribute('text-anchor', anchor);
-    textEl.textContent = note.text || ' ';
-    g.appendChild(textEl);
+    if (note.maxWidth) {
+      const mw = note.maxWidth;
+      const foX = note.align === 'center' ? note.x - mw / 2
+                : note.align === 'right'  ? note.x - mw
+                : note.x;
+      const fo = document.createElementNS(SVG_NS, 'foreignObject');
+      fo.setAttribute('x', String(foX));
+      fo.setAttribute('y', String(note.y - 20));
+      fo.setAttribute('width', String(mw));
+      fo.setAttribute('height', '2000');
+      const div = document.createElementNS('http://www.w3.org/1999/xhtml', 'div') as HTMLElement;
+      div.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+      div.className = 'ev2-note-fo-text';
+      div.textContent = note.text || ' ';
+      fo.appendChild(div);
+      g.appendChild(fo);
+    } else {
+      const textEl = document.createElementNS(SVG_NS, 'text');
+      textEl.setAttribute('class', 'ev2-note-text');
+      textEl.setAttribute('x', String(note.x));
+      textEl.setAttribute('y', String(note.y - 8));
+      textEl.setAttribute('text-anchor', anchor);
+      textEl.textContent = note.text || ' ';
+      g.appendChild(textEl);
+    }
 
     if (mode !== 'view') {
       const handle = document.createElementNS(SVG_NS, 'circle');
@@ -1890,15 +1932,24 @@ export function initEditorV2(onBack: () => void): void {
     }
   });
 
-  // Notes list — text input (live update)
+  // Notes list — text / maxWidth input (live update)
   document.getElementById('ev2-notes-list')?.addEventListener('input', (e) => {
     const input = e.target as HTMLInputElement;
     if (!input.dataset.noteId) return;
     const note = notes.find(n => n.id === input.dataset.noteId);
     if (!note) return;
-    note.text = input.value;
-    const textEl = svgEl.querySelector<SVGTextElement>(`[data-note-id="${note.id}"] text`);
-    if (textEl) textEl.textContent = note.text || ' ';
+    if (input.classList.contains('ev2-note-maxwidth-input')) {
+      const v = parseInt(input.value, 10);
+      note.maxWidth = !input.value || isNaN(v) || v <= 0 ? undefined : v;
+      render();
+    } else {
+      note.text = input.value;
+      // Quick DOM update without full render
+      const textEl = svgEl.querySelector<SVGTextElement>(`[data-note-id="${note.id}"] text`);
+      if (textEl) { textEl.textContent = note.text || ' '; return; }
+      const foDiv = svgEl.querySelector<HTMLElement>(`[data-note-id="${note.id}"] div`);
+      if (foDiv) foDiv.textContent = note.text || ' ';
+    }
   });
 
   const undoBtn = document.getElementById('ev2-undo-btn') as HTMLButtonElement;
