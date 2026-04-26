@@ -614,7 +614,7 @@ function render(): void {
     // Inset border: path computed 10px inward from boundary, stroked with owner color.
     // No clip-path or gap cover needed — the offset geometry handles the gap.
     if (t.state !== 'neutral') {
-      const borderPathD = buildInsetBorderPath(t, edgeIndex, 10);
+      const borderPathD = buildInsetBorderPath(t, edgeIndex, 13);
       if (borderPathD) {
         const borderEl = document.createElementNS(SVG_NS, 'path');
         borderEl.setAttribute('d', borderPathD);
