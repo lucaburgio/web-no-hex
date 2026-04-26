@@ -583,11 +583,11 @@ function render(): void {
   outerPattern.setAttribute('id', 'ev2-outer-border-pattern');
   outerPattern.setAttribute('patternUnits', 'userSpaceOnUse');
   outerPattern.setAttribute('width', '200');
-  outerPattern.setAttribute('height', '74');
+  outerPattern.setAttribute('height', '200');
   const outerPatternImg = document.createElementNS(SVG_NS, 'image');
   outerPatternImg.setAttribute('href', 'images/misc/outside-border-pattern.png');
   outerPatternImg.setAttribute('width', '200');
-  outerPatternImg.setAttribute('height', '74');
+  outerPatternImg.setAttribute('height', '200');
   outerPattern.appendChild(outerPatternImg);
   defsEl.appendChild(outerPattern);
 
@@ -629,11 +629,10 @@ function render(): void {
       }
 
       const visited = new Set<string>();
-      const chains: Pt[][] = [];
+      const chains: Array<{ pts: Pt[]; closed: boolean }> = [];
 
       for (const [startPt] of outerSegments) {
         if (visited.has(startPt.id)) continue;
-        // Walk the chain
         const chain: Pt[] = [startPt];
         visited.add(startPt.id);
         let cur = startPt;
@@ -648,15 +647,19 @@ function render(): void {
           cur = ptById(next)!;
           chain.push(cur);
         }
-        chains.push(chain);
+        // Detect closed loop: last point connects back to first
+        const lastNeighbors = adj.get(chain[chain.length - 1]!.id) ?? [];
+        const closed = lastNeighbors.includes(chain[0]!.id);
+        chains.push({ pts: chain, closed });
       }
 
       // Build SVG path from all chains
       let d = '';
-      for (const chain of chains) {
-        if (chain.length < 2) continue;
-        d += `M ${chain[0]!.x},${chain[0]!.y}`;
-        for (let i = 1; i < chain.length; i++) d += ` L ${chain[i]!.x},${chain[i]!.y}`;
+      for (const { pts: cpts, closed } of chains) {
+        if (cpts.length < 2) continue;
+        d += `M ${cpts[0]!.x},${cpts[0]!.y}`;
+        for (let i = 1; i < cpts.length; i++) d += ` L ${cpts[i]!.x},${cpts[i]!.y}`;
+        if (closed) d += ' Z';
       }
 
       if (d) {
