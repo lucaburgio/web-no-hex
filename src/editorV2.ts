@@ -40,6 +40,18 @@ let dragPointId: string | null = null;  // point being dragged
 let dragNoteId: string | null = null;   // note being dragged
 let hasDragged = false;                 // true if mouse moved during drag
 
+// Pan / zoom state
+let panX = 0;
+let panY = 0;
+let zoom = 1;
+let isPanning = false;
+let hasPanned = false;
+let spaceDown = false;
+let panStartClientX = 0;
+let panStartClientY = 0;
+let panStartPanX = 0;
+let panStartPanY = 0;
+
 let _ptCounter = 0;
 let _edgeCounter = 0;
 let _territoryCounter = 0;
@@ -75,7 +87,10 @@ let panelSectors: HTMLElement;
 
 function svgCoords(e: MouseEvent): { x: number; y: number } {
   const rect = svgEl.getBoundingClientRect();
-  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  return {
+    x: (e.clientX - rect.left) / zoom + panX,
+    y: (e.clientY - rect.top) / zoom + panY,
+  };
 }
 
 function dist(ax: number, ay: number, bx: number, by: number): number {
@@ -566,12 +581,18 @@ function handleBordersClick(e: MouseEvent): void {
 
 // ── Resize ────────────────────────────────────────────────────────────────────
 
+function updateViewBox(): void {
+  const w = canvasAreaEl.clientWidth;
+  const h = canvasAreaEl.clientHeight;
+  svgEl.setAttribute('viewBox', `${panX} ${panY} ${w / zoom} ${h / zoom}`);
+}
+
 function resizeSvg(): void {
   const w = canvasAreaEl.clientWidth;
   const h = canvasAreaEl.clientHeight;
   svgEl.setAttribute('width', String(w));
   svgEl.setAttribute('height', String(h));
-  svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  updateViewBox();
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
@@ -1529,6 +1550,17 @@ export function initEditorV2(onBack: () => void): void {
   // SVG mouse events
   svgEl.addEventListener('mousedown', (e: MouseEvent) => {
     if (overlayEl.classList.contains('hidden')) return;
+    // Middle-click or space+left-click → pan
+    if (e.button === 1 || (e.button === 0 && spaceDown)) {
+      isPanning = true;
+      panStartClientX = e.clientX;
+      panStartClientY = e.clientY;
+      panStartPanX = panX;
+      panStartPanY = panY;
+      svgEl.style.cursor = 'grabbing';
+      e.preventDefault();
+      return;
+    }
     if (mode === 'view' || mode === 'borders' || mode === 'sectors') return;
     if (isRemovingDot) return;                  // remove-dot uses click, not drag
     const { x, y } = svgCoords(e);
@@ -1549,6 +1581,18 @@ export function initEditorV2(onBack: () => void): void {
 
   svgEl.addEventListener('mousemove', (e: MouseEvent) => {
     if (overlayEl.classList.contains('hidden')) return;
+
+    if (isPanning) {
+      const dx = e.clientX - panStartClientX;
+      const dy = e.clientY - panStartClientY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasPanned = true;
+      panX = panStartPanX - dx / zoom;
+      panY = panStartPanY - dy / zoom;
+      updateViewBox();
+      render();
+      return;
+    }
+
     const { x, y } = svgCoords(e);
     cursorPos = { x, y };
 
@@ -1586,6 +1630,13 @@ export function initEditorV2(onBack: () => void): void {
   });
 
   window.addEventListener('mouseup', () => {
+    if (isPanning) {
+      isPanning = false;
+      svgEl.style.cursor = spaceDown ? 'grab'
+                         : mode === 'edit' && isRemovingDot ? 'cell'
+                         : mode === 'edit' ? 'crosshair'
+                         : 'default';
+    }
     if (dragNoteId) {
       dragNoteId = null;
       svgEl.style.cursor = mode === 'edit' && isRemovingDot ? 'cell'
@@ -1602,6 +1653,7 @@ export function initEditorV2(onBack: () => void): void {
 
   svgEl.addEventListener('click', (e: MouseEvent) => {
     if (overlayEl.classList.contains('hidden')) return;
+    if (hasPanned) { hasPanned = false; return; }     // was a pan, not a tap
     if (hasDragged) { hasDragged = false; return; }  // was a drag, not a tap
     if (mode === 'edit') {
       if (isNoteTool) handleNoteClick(e);
@@ -1618,6 +1670,11 @@ export function initEditorV2(onBack: () => void): void {
   // Keyboard
   window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (overlayEl.classList.contains('hidden')) return;
+    if (e.key === ' ' && !spaceDown) {
+      spaceDown = true;
+      if (!isPanning) svgEl.style.cursor = 'grab';
+      e.preventDefault();
+    }
     if (e.key === 'Escape') {
       if (mode === 'borders') {
         selectedEdgeIds = new Set();
@@ -1628,7 +1685,44 @@ export function initEditorV2(onBack: () => void): void {
         render();
       }
     }
+    // Reset view: Home or 0
+    if (e.key === 'Home' || (e.key === '0' && !e.ctrlKey && !e.metaKey)) {
+      panX = 0; panY = 0; zoom = 1;
+      updateViewBox();
+      render();
+    }
   });
+
+  window.addEventListener('keyup', (e: KeyboardEvent) => {
+    if (overlayEl.classList.contains('hidden')) return;
+    if (e.key === ' ') {
+      spaceDown = false;
+      if (!isPanning) {
+        svgEl.style.cursor = mode === 'edit' && isRemovingDot ? 'cell'
+                           : mode === 'edit' ? 'crosshair'
+                           : 'default';
+      }
+    }
+  });
+
+  // Wheel zoom (zoom toward cursor)
+  svgEl.addEventListener('wheel', (e: WheelEvent) => {
+    if (overlayEl.classList.contains('hidden')) return;
+    e.preventDefault();
+    const rect = svgEl.getBoundingClientRect();
+    const mouseOffsetX = e.clientX - rect.left;
+    const mouseOffsetY = e.clientY - rect.top;
+    // SVG coords under cursor before zoom
+    const svgX = mouseOffsetX / zoom + panX;
+    const svgY = mouseOffsetY / zoom + panY;
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    zoom = Math.max(0.1, Math.min(10, zoom * factor));
+    // Adjust pan so the point under cursor stays fixed
+    panX = svgX - mouseOffsetX / zoom;
+    panY = svgY - mouseOffsetY / zoom;
+    updateViewBox();
+    render();
+  }, { passive: false });
 
   // Mode buttons
   btnEdit.addEventListener('click', () => setMode('edit'));
@@ -1889,6 +1983,8 @@ export function showEditorV2(): void {
   isNoteTool = false;
   dragNoteId = null;
   territoryTool = 'allied';
+  panX = 0; panY = 0; zoom = 1;
+  isPanning = false; hasPanned = false; spaceDown = false;
   selectedEdgeIds = new Set();
   selectedTerritoryId = null;
   selectedSectorTerritoryIds = new Set();
