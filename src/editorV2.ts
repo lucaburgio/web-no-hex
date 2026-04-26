@@ -780,9 +780,11 @@ function render(): void {
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('data-cp-id', cp.id);
 
-    // bgWrapper receives clip-path after getBBox(); blur is contained inside it
-    const bgWrapper = document.createElementNS(SVG_NS, 'g');
-    g.appendChild(bgWrapper);
+    // Placeholder rect — sized after text is in DOM
+    const bg = document.createElementNS(SVG_NS, 'rect');
+    bg.setAttribute('class', 'ev2-cp-label-bg');
+    bg.setAttribute('rx', '3');
+    g.appendChild(bg);
 
     const label = document.createElementNS(SVG_NS, 'text');
     label.setAttribute('class', 'ev2-cp-label');
@@ -800,35 +802,14 @@ function render(): void {
 
     cpLayer.appendChild(g);
 
-    // Size bg rect from live text metrics; clip-path on the wrapper keeps blur inside bounds
+    // Size the background rect to the rendered text bounds + padding
     try {
       const pad = 4;
       const bb = label.getBBox();
-      const bx = bb.x - pad, by = bb.y - pad;
-      const bw = bb.width + pad * 2, bh = bb.height + pad * 2;
-
-      const bg = document.createElementNS(SVG_NS, 'rect');
-      bg.setAttribute('class', 'ev2-cp-label-bg');
-      bg.setAttribute('x', String(bx));
-      bg.setAttribute('y', String(by));
-      bg.setAttribute('width', String(bw));
-      bg.setAttribute('height', String(bh));
-      bg.setAttribute('rx', '3');
-      bgWrapper.appendChild(bg);
-
-      const clipId = `ev2-cp-clip-${cp.id}`;
-      const clipPath = document.createElementNS(SVG_NS, 'clipPath');
-      clipPath.setAttribute('id', clipId);
-      const clipRect = document.createElementNS(SVG_NS, 'rect');
-      clipRect.setAttribute('x', String(bx));
-      clipRect.setAttribute('y', String(by));
-      clipRect.setAttribute('width', String(bw));
-      clipRect.setAttribute('height', String(bh));
-      clipRect.setAttribute('rx', '3');
-      clipPath.appendChild(clipRect);
-      defsEl!.appendChild(clipPath);
-
-      bgWrapper.setAttribute('clip-path', `url(#${clipId})`);
+      bg.setAttribute('x', String(bb.x - pad));
+      bg.setAttribute('y', String(bb.y - pad));
+      bg.setAttribute('width', String(bb.width + pad * 2));
+      bg.setAttribute('height', String(bb.height + pad * 2));
     } catch (_) { /* getBBox unavailable when SVG is hidden */ }
   }
 
