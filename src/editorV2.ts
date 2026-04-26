@@ -94,66 +94,6 @@ function pointInPolygon(x: number, y: number, polygon: Array<{ x: number; y: num
   return inside;
 }
 
-/**
- * Insets a polygon by distance d (inward). Handles concave vertices by inserting
- * two offset points instead of a miter intersection when the bisector points outward.
- */
-function insetPolygon(
-  polyPts: Array<{ x: number; y: number }>,
-  d: number,
-): Array<{ x: number; y: number }> {
-  const n = polyPts.length;
-  if (n < 3) return [];
-
-  // Signed area (SVG y-down): positive = CW winding → interior is to the right of each edge
-  let area = 0;
-  for (let i = 0; i < n; i++) {
-    const a = polyPts[i]!;
-    const b = polyPts[(i + 1) % n]!;
-    area += a.x * b.y - b.x * a.y;
-  }
-  const cw = area > 0 ? 1 : -1; // +1 = CW, right normal is inward
-
-  const result: Array<{ x: number; y: number }> = [];
-
-  for (let i = 0; i < n; i++) {
-    const prev = polyPts[(i - 1 + n) % n]!;
-    const curr = polyPts[i]!;
-    const next = polyPts[(i + 1) % n]!;
-
-    const e1x = curr.x - prev.x, e1y = curr.y - prev.y;
-    const e2x = next.x - curr.x, e2y = next.y - curr.y;
-    const len1 = Math.sqrt(e1x * e1x + e1y * e1y);
-    const len2 = Math.sqrt(e2x * e2x + e2y * e2y);
-    if (len1 < 0.5 || len2 < 0.5) { result.push({ ...curr }); continue; }
-
-    // Inward unit normals (right normal for CW: (dy, -dx))
-    const n1x = cw * e1y / len1, n1y = cw * -e1x / len1;
-    const n2x = cw * e2y / len2, n2y = cw * -e2x / len2;
-
-    const bx = n1x + n2x, by = n1y + n2y;
-    const blen = Math.sqrt(bx * bx + by * by);
-
-    if (blen < 0.001) {
-      result.push({ x: curr.x + n1x * d, y: curr.y + n1y * d });
-      continue;
-    }
-
-    const dot = n1x * bx + n1y * by; // n1 · bisector (unnormalized)
-    if (dot <= 0) {
-      // Concave vertex: bisector points outward — insert two flat-cap points
-      result.push({ x: curr.x + n1x * d, y: curr.y + n1y * d });
-      result.push({ x: curr.x + n2x * d, y: curr.y + n2y * d });
-      continue;
-    }
-
-    const t = Math.min(d * blen / dot, d * 4); // cap miter at 4×d
-    result.push({ x: curr.x + (bx / blen) * t, y: curr.y + (by / blen) * t });
-  }
-
-  return result;
-}
-
 function hasEdge(aId: string, bId: string): boolean {
   return edges.some(
     (e) => (e.a === aId && e.b === bId) || (e.a === bId && e.b === aId)
@@ -595,20 +535,16 @@ function render(): void {
         group.appendChild(seg);
       }
 
-      // Gap cover ring: evenodd path (original polygon + inset-10 polygon) filled
-      // with fill color. Covers exactly the 0-10px zone, leaving 10-14px as border.
-      const insetPts = insetPolygon(territoryPoints(t), 10);
-      if (insetPts.length >= 3) {
-        const outerPath = 'M ' + territoryPoints(t).map(p => `${p.x},${p.y}`).join(' L ') + ' Z';
-        const innerPath = 'M ' + insetPts.map(p => `${p.x},${p.y}`).join(' L ') + ' Z';
-        const gapRing = document.createElementNS(SVG_NS, 'path');
-        gapRing.setAttribute('d', outerPath + ' ' + innerPath);
-        gapRing.setAttribute('fill-rule', 'evenodd');
-        gapRing.setAttribute('fill', stateFillColor(t.state));
-        gapRing.setAttribute('stroke', 'none');
-        gapRing.setAttribute('pointer-events', 'none');
-        group.appendChild(gapRing);
-      }
+      // Gap cover: overdraw 0-10px from edge with the fill color, pushing the
+      // visible border band to start 10px inward. Clip-path keeps it inside.
+      const gapCover = document.createElementNS(SVG_NS, 'polygon');
+      gapCover.setAttribute('points', pts_str);
+      gapCover.setAttribute('fill', 'none');
+      gapCover.setAttribute('stroke', stateFillColor(t.state));
+      gapCover.setAttribute('stroke-width', '20');
+      gapCover.setAttribute('clip-path', `url(#ev2-clip-${t.id})`);
+      gapCover.setAttribute('pointer-events', 'none');
+      group.appendChild(gapCover);
     }
 
     territoryLayer.appendChild(group);
