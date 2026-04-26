@@ -13,6 +13,7 @@ interface Pt { id: string; x: number; y: number }
 interface Edge { id: string; a: string; b: string }
 interface Territory { id: string; pointIds: string[]; state: TerritoryState }
 interface ControlPoint { id: string; territoryId: string; name: string }
+interface Note { id: string; x: number; y: number; text: string; align: 'left' | 'center' | 'right' }
 
 // ── Module-level state ────────────────────────────────────────────────────────
 
@@ -20,9 +21,11 @@ let pts: Pt[] = [];
 let edges: Edge[] = [];
 let territories: Territory[] = [];
 let controlPoints: ControlPoint[] = [];
+let notes: Note[] = [];
 let currentPath: string[] = [];      // point IDs in-progress
 let mode: 'edit' | 'borders' | 'territory' | 'view' = 'edit';
 let isRemovingDot = false;           // remove-dot sub-mode within edit
+let isNoteTool = false;              // note placement sub-mode within edit
 let territoryTool: TerritoryTool = 'allied';
 let selectedEdgeIds = new Set<string>();
 let selectedTerritoryId: string | null = null;
@@ -30,17 +33,20 @@ let bordersError: string | null = null;
 let hoveredPoint: string | null = null;
 let cursorPos: { x: number; y: number } = { x: 0, y: 0 };
 let dragPointId: string | null = null;  // point being dragged
+let dragNoteId: string | null = null;   // note being dragged
 let hasDragged = false;                 // true if mouse moved during drag
 
 let _ptCounter = 0;
 let _edgeCounter = 0;
 let _territoryCounter = 0;
 let _cpCounter = 0;
+let _noteCounter = 0;
 
 function newPtId(): string  { return `p${++_ptCounter}`; }
 function newEdgeId(): string { return `e${++_edgeCounter}`; }
 function newTerritoryId(): string { return `t${++_territoryCounter}`; }
 function newCpId(): string { return `cp${++_cpCounter}`; }
+function newNoteId(): string { return `note${++_noteCounter}`; }
 
 // ── DOM refs (set in initEditorV2) ────────────────────────────────────────────
 
@@ -52,6 +58,7 @@ let btnTerritory: HTMLButtonElement;
 let btnView: HTMLButtonElement;
 let btnBorders: HTMLButtonElement;
 let removeDotBtn: HTMLButtonElement;
+let noteToolBtn: HTMLButtonElement;
 let panelEdit: HTMLElement;
 let panelBorders: HTMLElement;
 let panelTerritory: HTMLElement;
@@ -77,6 +84,20 @@ function findSnapPoint(x: number, y: number): Pt | null {
     if (d < SNAP_RADIUS && d < bestDist) {
       bestDist = d;
       best = p;
+    }
+  }
+  return best;
+}
+
+function findSnapNote(x: number, y: number): Note | null {
+  const SNAP_RADIUS = 14;
+  let best: Note | null = null;
+  let bestDist = Infinity;
+  for (const n of notes) {
+    const d = dist(n.x, n.y, x, y);
+    if (d < SNAP_RADIUS && d < bestDist) {
+      bestDist = d;
+      best = n;
     }
   }
   return best;
@@ -363,6 +384,66 @@ function renderCpList(): void {
   }
 }
 
+function renderNoteList(): void {
+  const ul = document.getElementById('ev2-notes-list') as HTMLUListElement | null;
+  if (!ul) return;
+
+  const noteIds = new Set(notes.map(n => n.id));
+  for (const li of [...ul.children] as HTMLElement[]) {
+    if (li.dataset.noteId && !noteIds.has(li.dataset.noteId)) li.remove();
+  }
+
+  const existing = new Set([...ul.querySelectorAll<HTMLElement>('li[data-note-id]')].map(li => li.dataset.noteId!));
+  for (const note of notes) {
+    if (existing.has(note.id)) {
+      // Update text input value if it differs (e.g. after import)
+      const input = ul.querySelector<HTMLInputElement>(`li[data-note-id="${note.id}"] .ev2-note-text-input`);
+      if (input && input.value !== note.text) input.value = note.text;
+      // Update active align button
+      ul.querySelectorAll<HTMLElement>(`li[data-note-id="${note.id}"] .ev2-note-align-btn`).forEach(b => {
+        b.classList.toggle('active', b.dataset.align === note.align);
+      });
+      continue;
+    }
+
+    const li = document.createElement('li');
+    li.dataset.noteId = note.id;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = note.text;
+    input.className = 'ev2-note-text-input';
+    input.dataset.noteId = note.id;
+    input.placeholder = 'Note text…';
+
+    const controls = document.createElement('div');
+    controls.className = 'ev2-note-list-controls';
+
+    for (const align of ['left', 'center', 'right'] as const) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ev2-note-align-btn' + (note.align === align ? ' active' : '');
+      btn.dataset.align = align;
+      btn.dataset.noteId = note.id;
+      btn.textContent = align === 'left' ? 'L' : align === 'center' ? 'C' : 'R';
+      btn.title = align.charAt(0).toUpperCase() + align.slice(1);
+      controls.appendChild(btn);
+    }
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'ev2-note-del-btn';
+    delBtn.textContent = '×';
+    delBtn.title = 'Delete';
+    delBtn.dataset.noteDelete = note.id;
+
+    controls.appendChild(delBtn);
+    li.appendChild(input);
+    li.appendChild(controls);
+    ul.appendChild(li);
+  }
+}
+
 function updateBordersPanel(): void {
   const n = selectedEdgeIds.size;
   const countEl = document.getElementById('ev2-borders-selection');
@@ -372,6 +453,7 @@ function updateBordersPanel(): void {
   setBordersError(bordersError);
   renderTerritoryList();
   renderCpList();
+  renderNoteList();
 }
 
 function territoryCentroid(t: Territory): { x: number; y: number } {
@@ -828,6 +910,37 @@ function render(): void {
     } catch (_) { /* getBBox unavailable when SVG is hidden */ }
   }
 
+  // ── Note layer ───────────────────────────────────────────────────────────
+  const noteLayer = svgEl.querySelector('#ev2-note-layer') as SVGGElement;
+  noteLayer.innerHTML = '';
+  noteLayer.setAttribute('pointer-events', 'none');
+  for (const note of notes) {
+    const anchorMap = { left: 'start', center: 'middle', right: 'end' } as const;
+    const anchor = anchorMap[note.align];
+
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('data-note-id', note.id);
+
+    const textEl = document.createElementNS(SVG_NS, 'text');
+    textEl.setAttribute('class', 'ev2-note-text');
+    textEl.setAttribute('x', String(note.x));
+    textEl.setAttribute('y', String(note.y - 8));
+    textEl.setAttribute('text-anchor', anchor);
+    textEl.textContent = note.text || ' ';
+    g.appendChild(textEl);
+
+    if (mode !== 'view') {
+      const handle = document.createElementNS(SVG_NS, 'circle');
+      handle.setAttribute('class', 'ev2-note-handle');
+      handle.setAttribute('cx', String(note.x));
+      handle.setAttribute('cy', String(note.y));
+      handle.setAttribute('r', '5');
+      g.appendChild(handle);
+    }
+
+    noteLayer.appendChild(g);
+  }
+
   // ── Edge layer ───────────────────────────────────────────────────────────
   const edgeLayer = svgEl.querySelector('#ev2-edge-layer') as SVGGElement;
   edgeLayer.innerHTML = '';
@@ -940,6 +1053,7 @@ function render(): void {
 function setMode(newMode: 'edit' | 'borders' | 'territory' | 'view'): void {
   mode = newMode;
   isRemovingDot = false;
+  isNoteTool = false;
   currentPath = [];
 
   btnEdit.classList.toggle('active', mode === 'edit');
@@ -951,8 +1065,9 @@ function setMode(newMode: 'edit' | 'borders' | 'territory' | 'view'): void {
   panelBorders.classList.toggle('hidden', mode !== 'borders');
   panelTerritory.classList.toggle('hidden', mode !== 'territory');
 
-  // Reset remove-dot button visual
+  // Reset sub-tool button visuals
   if (removeDotBtn) removeDotBtn.classList.remove('active');
+  if (noteToolBtn) noteToolBtn.classList.remove('active');
 
   if (mode === 'edit') svgEl.style.cursor = 'crosshair';
   else svgEl.style.cursor = 'default';
@@ -1019,6 +1134,12 @@ function handleEditClick(e: MouseEvent): void {
     currentPath.push(newPt.id);
   }
 
+  render();
+}
+
+function handleNoteClick(e: MouseEvent): void {
+  const { x, y } = svgCoords(e);
+  notes.push({ id: newNoteId(), x, y, text: 'Note', align: 'center' });
   render();
 }
 
@@ -1152,12 +1273,14 @@ function clearAll(): void {
   edges = [];
   territories = [];
   controlPoints = [];
+  notes = [];
   currentPath = [];
   hoveredPoint = null;
   _ptCounter = 0;
   _edgeCounter = 0;
   _territoryCounter = 0;
   _cpCounter = 0;
+  _noteCounter = 0;
   selectedEdgeIds = new Set();
   selectedTerritoryId = null;
   bordersError = null;
@@ -1167,7 +1290,7 @@ function clearAll(): void {
 // ── Export / Import ───────────────────────────────────────────────────────────
 
 function exportState(): void {
-  const data = { version: 2, pts, edges, territories, controlPoints };
+  const data = { version: 2, pts, edges, territories, controlPoints, notes };
   const json = JSON.stringify(data, null, 2);
   navigator.clipboard.writeText(json).then(() => {
     const btn = document.getElementById('ev2-export-btn') as HTMLButtonElement;
@@ -1192,6 +1315,7 @@ function importFromJson(json: string): void {
   edges = data.edges as Edge[];
   territories = data.territories as Territory[];
   controlPoints = Array.isArray(data.controlPoints) ? data.controlPoints as ControlPoint[] : [];
+  notes = Array.isArray(data.notes) ? data.notes as Note[] : [];
   currentPath = [];
   hoveredPoint = null;
   selectedEdgeIds = new Set();
@@ -1205,6 +1329,7 @@ function importFromJson(json: string): void {
   _edgeCounter      = maxNum(edges, 'e');
   _territoryCounter = maxNum(territories, 't');
   _cpCounter        = maxNum(controlPoints, 'cp');
+  _noteCounter      = maxNum(notes, 'note');
 }
 
 function showImportModal(): void {
@@ -1244,12 +1369,13 @@ export function initEditorV2(onBack: () => void): void {
   btnTerritory   = document.getElementById('ev2-btn-territory') as HTMLButtonElement;
   btnView        = document.getElementById('ev2-btn-view') as HTMLButtonElement;
   removeDotBtn   = document.getElementById('ev2-remove-dot-btn') as HTMLButtonElement;
+  noteToolBtn    = document.getElementById('ev2-note-tool-btn') as HTMLButtonElement;
   panelEdit      = document.getElementById('ev2-panel-edit') as HTMLElement;
   panelBorders   = document.getElementById('ev2-panel-borders') as HTMLElement;
   panelTerritory = document.getElementById('ev2-panel-territory') as HTMLElement;
 
   // Create SVG layers
-  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-edge-layer', 'ev2-cp-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
+  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-edge-layer', 'ev2-cp-layer', 'ev2-note-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('id', id);
     svgEl.appendChild(g);
@@ -1261,6 +1387,13 @@ export function initEditorV2(onBack: () => void): void {
     if (mode === 'view' || mode === 'borders') return;
     if (isRemovingDot) return;                  // remove-dot uses click, not drag
     const { x, y } = svgCoords(e);
+    const snapNote = findSnapNote(x, y);
+    if (snapNote) {
+      dragNoteId = snapNote.id;
+      hasDragged = false;
+      e.preventDefault();
+      return;
+    }
     const snap = findSnapPoint(x, y);
     if (snap) {
       dragPointId = snap.id;
@@ -1273,6 +1406,14 @@ export function initEditorV2(onBack: () => void): void {
     if (overlayEl.classList.contains('hidden')) return;
     const { x, y } = svgCoords(e);
     cursorPos = { x, y };
+
+    if (dragNoteId) {
+      const note = notes.find(n => n.id === dragNoteId);
+      if (note) { note.x = x; note.y = y; hasDragged = true; }
+      svgEl.style.cursor = 'grabbing';
+      render();
+      return;
+    }
 
     if (dragPointId) {
       const pt = pts.find((p) => p.id === dragPointId);
@@ -1291,20 +1432,25 @@ export function initEditorV2(onBack: () => void): void {
 
     const snap = findSnapPoint(x, y);
     hoveredPoint = snap ? snap.id : null;
-    // Show grab cursor when hovering a point in non-view mode
-    if (snap && mode !== 'view') svgEl.style.cursor = 'grab';
-    else svgEl.style.cursor = mode === 'edit' && !isRemovingDot ? 'crosshair'
-                             : mode === 'edit' && isRemovingDot ? 'cell'
+    const snapNote = !snap ? findSnapNote(x, y) : null;
+    if ((snap || snapNote) && mode !== 'view') svgEl.style.cursor = 'grab';
+    else svgEl.style.cursor = mode === 'edit' && isRemovingDot ? 'cell'
+                             : mode === 'edit' ? 'crosshair'
                              : 'default';
     render();
   });
 
   window.addEventListener('mouseup', () => {
+    if (dragNoteId) {
+      dragNoteId = null;
+      svgEl.style.cursor = mode === 'edit' && isRemovingDot ? 'cell'
+                         : mode === 'edit' ? 'crosshair'
+                         : 'default';
+    }
     if (dragPointId) {
       dragPointId = null;
-      // Restore cursor
-      svgEl.style.cursor = mode === 'edit' && !isRemovingDot ? 'crosshair'
-                         : mode === 'edit' && isRemovingDot  ? 'cell'
+      svgEl.style.cursor = mode === 'edit' && isRemovingDot ? 'cell'
+                         : mode === 'edit' ? 'crosshair'
                          : 'default';
     }
   });
@@ -1313,7 +1459,8 @@ export function initEditorV2(onBack: () => void): void {
     if (overlayEl.classList.contains('hidden')) return;
     if (hasDragged) { hasDragged = false; return; }  // was a drag, not a tap
     if (mode === 'edit') {
-      handleEditClick(e);
+      if (isNoteTool) handleNoteClick(e);
+      else handleEditClick(e);
     } else if (mode === 'borders') {
       handleBordersClick(e);
     } else if (mode === 'territory') {
@@ -1433,9 +1580,49 @@ export function initEditorV2(onBack: () => void): void {
   // Remove-dot toggle (within edit mode)
   removeDotBtn.addEventListener('click', () => {
     isRemovingDot = !isRemovingDot;
+    if (isRemovingDot) { isNoteTool = false; noteToolBtn.classList.remove('active'); }
     removeDotBtn.classList.toggle('active', isRemovingDot);
     svgEl.style.cursor = isRemovingDot ? 'cell' : 'crosshair';
     render();
+  });
+
+  // Note tool toggle (within edit mode)
+  noteToolBtn.addEventListener('click', () => {
+    isNoteTool = !isNoteTool;
+    if (isNoteTool) { isRemovingDot = false; removeDotBtn.classList.remove('active'); }
+    noteToolBtn.classList.toggle('active', isNoteTool);
+    svgEl.style.cursor = 'crosshair';
+    render();
+  });
+
+  // Notes list — delete button
+  document.getElementById('ev2-notes-list')?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('[data-note-delete]') as HTMLElement | null;
+    if (btn) {
+      const id = btn.dataset.noteDelete!;
+      notes = notes.filter(n => n.id !== id);
+      render();
+      return;
+    }
+    const alignBtn = (e.target as HTMLElement).closest('[data-align]') as HTMLElement | null;
+    if (alignBtn && alignBtn.dataset.noteId) {
+      const note = notes.find(n => n.id === alignBtn.dataset.noteId);
+      if (note) {
+        note.align = alignBtn.dataset.align as Note['align'];
+        render();
+      }
+    }
+  });
+
+  // Notes list — text input (live update)
+  document.getElementById('ev2-notes-list')?.addEventListener('input', (e) => {
+    const input = e.target as HTMLInputElement;
+    if (!input.dataset.noteId) return;
+    const note = notes.find(n => n.id === input.dataset.noteId);
+    if (!note) return;
+    note.text = input.value;
+    const textEl = svgEl.querySelector<SVGTextElement>(`[data-note-id="${note.id}"] text`);
+    if (textEl) textEl.textContent = note.text || ' ';
   });
 
   const undoBtn = document.getElementById('ev2-undo-btn') as HTMLButtonElement;
@@ -1497,6 +1684,7 @@ export function showEditorV2(): void {
   edges = [];
   territories = [];
   controlPoints = [];
+  notes = [];
   currentPath = [];
   hoveredPoint = null;
   cursorPos = { x: 0, y: 0 };
@@ -1504,6 +1692,9 @@ export function showEditorV2(): void {
   _edgeCounter = 0;
   _territoryCounter = 0;
   _cpCounter = 0;
+  _noteCounter = 0;
+  isNoteTool = false;
+  dragNoteId = null;
   territoryTool = 'allied';
   selectedEdgeIds = new Set();
   selectedTerritoryId = null;
@@ -1517,6 +1708,7 @@ export function showEditorV2(): void {
   btnTerritory.classList.remove('active');
   btnView.classList.remove('active');
   removeDotBtn.classList.remove('active');
+  noteToolBtn.classList.remove('active');
   panelEdit.classList.remove('hidden');
   panelBorders.classList.add('hidden');
   panelTerritory.classList.add('hidden');
