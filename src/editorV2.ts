@@ -1,10 +1,12 @@
 // ── Editor V2 — Polygon-based map editor ────────────────────────────────────
 
+import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type TerritoryState = 'neutral' | 'allied' | 'enemy';
+type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain';
 type TerritoryTool = TerritoryState | 'controlpoint';
 
 interface Pt { id: string; x: number; y: number }
@@ -642,6 +644,19 @@ function render(): void {
   outerPattern.appendChild(outerPatternImg);
   defsEl.appendChild(outerPattern);
 
+  // Pattern for mountain territory fill
+  const mountainPattern = document.createElementNS(SVG_NS, 'pattern');
+  mountainPattern.setAttribute('id', 'ev2-mountain-pattern');
+  mountainPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  mountainPattern.setAttribute('width', '90');
+  mountainPattern.setAttribute('height', '90');
+  const mountainPatternImgEl = document.createElementNS(SVG_NS, 'image');
+  mountainPatternImgEl.setAttribute('href', mountainPatternSrc);
+  mountainPatternImgEl.setAttribute('width', '90');
+  mountainPatternImgEl.setAttribute('height', '90');
+  mountainPattern.appendChild(mountainPatternImgEl);
+  defsEl.appendChild(mountainPattern);
+
   // ── Territory layer ──────────────────────────────────────────────────────
   const territoryLayer = svgEl.querySelector('#ev2-territory-layer') as SVGGElement;
   territoryLayer.innerHTML = '';
@@ -744,7 +759,7 @@ function render(): void {
     // Inset border rendered as a compositing group so opacity never compounds at
     // sub-path endpoints. The glow layer uses butt caps (no end-cap blobs);
     // the main line uses round caps for clean termination.
-    if (t.state !== 'neutral') {
+    if (t.state !== 'neutral' && t.state !== 'mountain') {
       const borderPathD = buildInsetBorderPath(t, edgeIndex, -10);
       if (borderPathD) {
         const borderGroup = document.createElementNS(SVG_NS, 'g');
@@ -783,13 +798,13 @@ function render(): void {
     // Placeholder rect — sized after text is in DOM
     const bg = document.createElementNS(SVG_NS, 'rect');
     bg.setAttribute('class', 'ev2-cp-label-bg');
-    bg.setAttribute('rx', '3');
+    bg.setAttribute('rx', '0');
     g.appendChild(bg);
 
     const label = document.createElementNS(SVG_NS, 'text');
     label.setAttribute('class', 'ev2-cp-label');
     label.setAttribute('x', String(c.x));
-    label.setAttribute('y', String(c.y - 10));
+    label.setAttribute('y', String(c.y - 14));
     label.textContent = cp.name;
     g.appendChild(label);
 
@@ -1218,6 +1233,8 @@ export function initEditorV2(onBack: () => void): void {
 
   if (_initialized) return;
   _initialized = true;
+
+  (document.getElementById('ev2-swatch-mountain-img') as HTMLImageElement | null)?.setAttribute('src', mountainPatternSrc);
 
   overlayEl      = document.getElementById('editor-v2-overlay') as HTMLElement;
   svgEl          = document.getElementById('ev2-svg') as unknown as SVGSVGElement;

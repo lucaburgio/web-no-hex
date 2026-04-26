@@ -16,9 +16,10 @@
 /* ── SVG design tokens ──────────────────────────────────────────────────────── */
 
 /* Territory fills */
-.ev2-state-neutral { fill: #fafafa; }
-.ev2-state-allied  { fill: #eff6ff; }
-.ev2-state-enemy   { fill: #fff1f2; }
+.ev2-state-neutral  { fill: #fafafa; }
+.ev2-state-allied   { fill: #eff6ff; }
+.ev2-state-enemy    { fill: #fff1f2; }
+.ev2-state-mountain { fill: url(#ev2-mountain-pattern); }
 .ev2-territory-fill { stroke: none; }
 
 /* Owner border color tokens (inherited by glow + line via var) */
@@ -118,9 +119,10 @@
 #ev2-type-legend { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
 .ev2-type-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #ccc; }
 .ev2-type-swatch { width: 14px; height: 14px; border-radius: 2px; flex-shrink: 0; border: 1px solid #555; }
-.ev2-swatch-neutral { background: #fafafa; }
-.ev2-swatch-allied { background: #eff6ff; border-color: #2563eb; }
-.ev2-swatch-enemy { background: #fff1f2; border-color: #FE775E; }
+.ev2-swatch-neutral  { background: #fafafa; }
+.ev2-swatch-allied   { background: #eff6ff; border-color: #2563eb; }
+.ev2-swatch-enemy    { background: #fff1f2; border-color: #FE775E; }
+.ev2-swatch-mountain { overflow: hidden; border-color: #78716c; }
 
 .ev2-territory-selected .ev2-territory-fill {
   stroke: #fbbf24; stroke-width: 3; filter: none;
@@ -166,9 +168,10 @@
   font-weight: 700; letter-spacing: 0.08em; cursor: pointer;
 }
 .ev2-tool-btn:hover { background: #444; color: #ccc; }
-.ev2-tool-btn[data-tool="neutral"].active  { background: #555; border-color: #888; color: #fff; }
-.ev2-tool-btn[data-tool="allied"].active   { background: #2563eb; border-color: #3b82f6; color: #fff; }
-.ev2-tool-btn[data-tool="enemy"].active    { background: #be123c; border-color: #FE775E; color: #fff; }
+.ev2-tool-btn[data-tool="neutral"].active   { background: #555; border-color: #888; color: #fff; }
+.ev2-tool-btn[data-tool="allied"].active    { background: #2563eb; border-color: #3b82f6; color: #fff; }
+.ev2-tool-btn[data-tool="enemy"].active     { background: #be123c; border-color: #FE775E; color: #fff; }
+.ev2-tool-btn[data-tool="mountain"].active  { background: #57534e; border-color: #a8a29e; color: #fff; }
 .ev2-tool-btn[data-tool="controlpoint"].active { background: #b45309; border-color: #f59e0b; color: #fff; }
 
 /* CP list items */
@@ -191,8 +194,7 @@
 /* CP SVG elements */
 .ev2-cp-dot { fill: #111; }
 .ev2-cp-label-bg {
-  fill: white;
-  filter: blur(3px);
+  fill: rgba(255, 255, 255, 0.9);
 }
 .ev2-cp-label {
   font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
