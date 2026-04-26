@@ -21,9 +21,9 @@
 .ev2-state-allied { fill: #eff6ff; }
 .ev2-state-enemy { fill: #fff1f2; }
 
+.ev2-edge-glow-group { opacity: 0.04; } /* opacity on group — never compounds at vertices */
 .ev2-edge-glow {
-  stroke: #000; stroke-width: 20; stroke-linecap: round; opacity: 0.04;
-  pointer-events: none;
+  stroke: #000; stroke-width: 20; stroke-linecap: round;
 }
 .ev2-edge {
   stroke: #CDCDCD; stroke-width: 2; stroke-linecap: round;

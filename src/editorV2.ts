@@ -644,10 +644,26 @@ function render(): void {
   const edgeLayer = svgEl.querySelector('#ev2-edge-layer') as SVGGElement;
   edgeLayer.innerHTML = '';
 
+  // All glow lines go into one compositing group so their opacity is applied
+  // once to the full composite — overlapping strokes at vertices stay uniform.
+  const glowGroup = document.createElementNS(SVG_NS, 'g');
+  glowGroup.setAttribute('class', 'ev2-edge-glow-group');
+  glowGroup.setAttribute('pointer-events', 'none');
+  edgeLayer.appendChild(glowGroup);
+
   for (const edge of edges) {
     const pa = ptById(edge.a);
     const pb = ptById(edge.b);
     if (!pa || !pb) continue;
+
+    const glow = document.createElementNS(SVG_NS, 'line');
+    glow.setAttribute('class', 'ev2-edge-glow');
+    glow.setAttribute('x1', String(pa.x));
+    glow.setAttribute('y1', String(pa.y));
+    glow.setAttribute('x2', String(pb.x));
+    glow.setAttribute('y2', String(pb.y));
+    glowGroup.appendChild(glow);
+
     if (mode === 'borders') {
       const hit = document.createElementNS(SVG_NS, 'line');
       hit.setAttribute('class', 'ev2-edge-hit');
@@ -662,14 +678,6 @@ function render(): void {
       hit.setAttribute('pointer-events', 'stroke');
       edgeLayer.appendChild(hit);
     }
-    const glow = document.createElementNS(SVG_NS, 'line');
-    glow.setAttribute('class', 'ev2-edge-glow');
-    glow.setAttribute('x1', String(pa.x));
-    glow.setAttribute('y1', String(pa.y));
-    glow.setAttribute('x2', String(pb.x));
-    glow.setAttribute('y2', String(pb.y));
-    glow.setAttribute('pointer-events', 'none');
-    edgeLayer.appendChild(glow);
 
     const line = document.createElementNS(SVG_NS, 'line');
     let cls = 'ev2-edge';
