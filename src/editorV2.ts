@@ -403,6 +403,12 @@ function stateBorderColor(state: TerritoryState): string {
   return 'transparent';
 }
 
+function stateFillColor(state: TerritoryState): string {
+  if (state === 'allied') return '#eff6ff';
+  if (state === 'enemy') return '#fff1f2';
+  return '#fafafa';
+}
+
 // ── Shared-border helpers ─────────────────────────────────────────────────────
 
 /** Returns ordered edge pairs [(p0,p1),(p1,p2),...,(pn,p0)] for a territory polygon. */
@@ -473,21 +479,8 @@ function render(): void {
     defsEl = document.createElementNS(SVG_NS, 'defs') as SVGDefsElement;
     svgEl.prepend(defsEl);
   }
-  // Rebuild defs
+  // Rebuild defs clip paths
   defsEl.innerHTML = '';
-
-  // Shared erode filter for inset territory borders
-  const erodeFilter = document.createElementNS(SVG_NS, 'filter');
-  erodeFilter.setAttribute('id', 'ev2-border-erode');
-  erodeFilter.setAttribute('x', '-50%');
-  erodeFilter.setAttribute('y', '-50%');
-  erodeFilter.setAttribute('width', '200%');
-  erodeFilter.setAttribute('height', '200%');
-  const feMorph = document.createElementNS(SVG_NS, 'feMorphology');
-  feMorph.setAttribute('operator', 'erode');
-  feMorph.setAttribute('radius', '10');
-  erodeFilter.appendChild(feMorph);
-  defsEl.appendChild(erodeFilter);
 
   for (const t of territories) {
     const clipPath = document.createElementNS(SVG_NS, 'clipPath');
@@ -496,16 +489,6 @@ function render(): void {
     clipPoly.setAttribute('points', territoryPointsAttr(t));
     clipPath.appendChild(clipPoly);
     defsEl.appendChild(clipPath);
-
-    // Eroded mask: territory polygon shrunk by 10px inward, for offset borders
-    const mask = document.createElementNS(SVG_NS, 'mask');
-    mask.setAttribute('id', `ev2-mask-${t.id}`);
-    const maskPoly = document.createElementNS(SVG_NS, 'polygon');
-    maskPoly.setAttribute('points', territoryPointsAttr(t));
-    maskPoly.setAttribute('fill', 'white');
-    maskPoly.setAttribute('filter', 'url(#ev2-border-erode)');
-    mask.appendChild(maskPoly);
-    defsEl.appendChild(mask);
   }
 
   // ── Territory layer ──────────────────────────────────────────────────────
@@ -547,10 +530,21 @@ function render(): void {
         seg.setAttribute('stroke-width', '28');
         seg.setAttribute('stroke-linecap', 'square');
         seg.setAttribute('fill', 'none');
-        seg.setAttribute('mask', `url(#ev2-mask-${t.id})`);
+        seg.setAttribute('clip-path', `url(#ev2-clip-${t.id})`);
         if (mode === 'territory') seg.setAttribute('pointer-events', 'none');
         group.appendChild(seg);
       }
+
+      // Gap cover: overdraw 0-10px from edge with the fill color, pushing the
+      // visible border band to start 10px inward. Clip-path keeps it inside.
+      const gapCover = document.createElementNS(SVG_NS, 'polygon');
+      gapCover.setAttribute('points', pts_str);
+      gapCover.setAttribute('fill', 'none');
+      gapCover.setAttribute('stroke', stateFillColor(t.state));
+      gapCover.setAttribute('stroke-width', '20');
+      gapCover.setAttribute('clip-path', `url(#ev2-clip-${t.id})`);
+      gapCover.setAttribute('pointer-events', 'none');
+      group.appendChild(gapCover);
     }
 
     territoryLayer.appendChild(group);
