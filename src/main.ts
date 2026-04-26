@@ -3,6 +3,7 @@ import {
   createInitialStatePreservingTerrain,
   createInitialStateFromPlayableStory,
   createStoryState,
+  createInitialStateFromTerritoryMap,
   playerPlaceUnit,
   playerEndProduction,
   playerSelectUnit,
@@ -37,6 +38,12 @@ import {
   unitShowsBoardPointerHover,
   type EndProductionOptions,
 } from './game';
+import {
+  initTerritoryRenderer,
+  renderTerritoryState,
+  getTerritoryFromEvent,
+} from './territoryRenderer';
+import tutorialMapDef from '../public/maps/tutorial.json';
 import {
   initRenderer,
   loadIconDefs,
@@ -720,6 +727,11 @@ function render(): void {
     if (!hu || !unitShowsBoardPointerHover(state, hu, localPlayer, gameMode === 'vsHuman')) {
       boardPointerHoverHex = null;
     }
+  }
+  if (state.customMapGraph) {
+    const pkHex = pendingProductionHex ? `${pendingProductionHex.col},${pendingProductionHex.row}` : null;
+    renderTerritoryState(svg, state, state.customMapGraph, pkHex, animStaticHiddenUnitIds, localPlayer);
+    return;
   }
   renderState(svg, state, pendingProductionHex, animStaticHiddenUnitIds, localPlayer, undefined, spectatorInspectIdForBoard());
 }
@@ -2167,6 +2179,21 @@ settingsBackBtn.addEventListener('click', () => {
   showMainMenu();
 });
 
+// ── Tutorial map buttons ───────────────────────────────────────────────────────
+
+function startTutorialMap(mode: GameMode): void {
+  hideSettings();
+  gameMode = 'vsAI';
+  localPlayer = PLAYER;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const initialState = createInitialStateFromTerritoryMap(tutorialMapDef as any, mode);
+  startGame(initialState);
+}
+
+document.getElementById('tutorial-domination-btn')?.addEventListener('click', () => startTutorialMap('domination'));
+document.getElementById('tutorial-conquest-btn')?.addEventListener('click', () => startTutorialMap('conquest'));
+document.getElementById('tutorial-breakthrough-btn')?.addEventListener('click', () => startTutorialMap('breakthrough'));
+
 // Broadcast settings changes to P2 in real-time when hosting a multiplayer game
 settingsOverlayEl.addEventListener('change', broadcastSettingsPreview);
 settingsOverlayEl.addEventListener('click', (e: MouseEvent) => {
@@ -2925,7 +2952,11 @@ function startGame(initialState: GameState): void {
   aiPlaybackInProgress = false;
   aiTurnPendingStart = false;
   turnSnapshots = [structuredClone(state)];
-  initRenderer(svg, { flipBoardY: gameMode === 'vsHuman' && localPlayer === AI });
+  if (state.customMapGraph) {
+    initTerritoryRenderer(svg, state.customMapGraph);
+  } else {
+    initRenderer(svg, { flipBoardY: gameMode === 'vsHuman' && localPlayer === AI });
+  }
   updateHeaderModeLabel(initialState);
   render();
   updateUI();
@@ -3467,7 +3498,9 @@ function syncMovementUnitCard(): void {
 svg.addEventListener('click', (e: MouseEvent) => {
   if (state.winner) return;
 
-  const hex = getHexFromEvent(e);
+  const hex = state.customMapGraph
+    ? getTerritoryFromEvent(e, svg)
+    : getHexFromEvent(e);
   const offTurnInspect =
     gameMode === 'vsHuman' &&
     state.activePlayer !== localPlayer &&
@@ -4642,7 +4675,7 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
     svg.classList.remove('cursor-fight');
     return;
   }
-  const hex = getHexFromEvent(e);
+  const hex = state.customMapGraph ? getTerritoryFromEvent(e, svg) : getHexFromEvent(e);
   if (!hex) {
     clearMovePathPreview();
     tooltipEl.classList.add('hidden');

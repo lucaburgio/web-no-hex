@@ -28,6 +28,8 @@ import {
   getConquestControlPointsForMap,
   mirrorStoryMapY,
 } from './storyMapLayouts';
+import { buildTerritoryGraph } from './territoryMap';
+import type { TerritoryGraphData, TerritoryMapDef } from './territoryMap';
 
 function perfEnabled(): boolean {
   if (typeof window === 'undefined') return false;
@@ -60,6 +62,57 @@ export let ROWS = config.boardRows;
 export function syncDimensions(): void {
   COLS = config.boardCols;
   ROWS = config.boardRows;
+}
+
+// ── Territory graph (polygon maps) ────────────────────────────────────────────
+
+let _activeTerritoryGraph: TerritoryGraphData | null = null;
+
+export function setActiveTerritoryGraph(graph: TerritoryGraphData | null): void {
+  _activeTerritoryGraph = graph;
+}
+
+export function getActiveTerritoryGraph(): TerritoryGraphData | null {
+  return _activeTerritoryGraph;
+}
+
+/** When territory graph is active, return neighbors via graph adjacency; else use hex neighbors. */
+function effectiveGetNeighbors(col: number, row: number, cols: number, rows: number): [number, number][] {
+  if (_activeTerritoryGraph) {
+    const key = `${col},${row}`;
+    const tid = _activeTerritoryGraph.keyToId[key];
+    if (!tid) return [];
+    const neighborIds = _activeTerritoryGraph.adjacency[tid] ?? [];
+    return neighborIds.map(nid => {
+      const t = _activeTerritoryGraph!.territories[nid];
+      return t ? [t.virtualCol, t.virtualRow] as [number, number] : null;
+    }).filter((x): x is [number, number] => x !== null);
+  }
+  return getNeighbors(col, row, cols, rows);
+}
+
+/** When territory graph is active, use BFS through adjacency; else use hex distance formula. */
+function effectiveHexDistance(c1: number, r1: number, c2: number, r2: number): number {
+  if (_activeTerritoryGraph) {
+    if (c1 === c2 && r1 === r2) return 0;
+    const visited = new Set<string>();
+    let frontier: [number, number][] = [[c1, r1]];
+    let dist = 0;
+    while (frontier.length > 0) {
+      dist++;
+      const next: [number, number][] = [];
+      for (const [c, r] of frontier) {
+        for (const [nc, nr] of effectiveGetNeighbors(c, r, COLS, ROWS)) {
+          if (nc === c2 && nr === r2) return dist;
+          const k = `${nc},${nr}`;
+          if (!visited.has(k)) { visited.add(k); next.push([nc, nr]); }
+        }
+      }
+      frontier = next;
+    }
+    return Infinity;
+  }
+  return hexDistance(c1, r1, c2, r2, COLS, ROWS);
 }
 
 const HEX_KEY_RE = /^(\d+),(\d+)$/;
@@ -123,6 +176,17 @@ export function resolveBoardDimensionsForState(state: GameState): { boardCols: n
 
 /** Align global `config`, `COLS`/`ROWS`, and optional fields on `state` with the match map size. */
 export function applyGameStateBoardDimensions(state: GameState): void {
+  // For territory map games, restore the graph and use stored dimensions directly.
+  if (state.customMapGraph) {
+    setActiveTerritoryGraph(state.customMapGraph);
+    const boardCols = state.boardCols ?? state.customMapGraph.virtualCols;
+    const boardRows = state.boardRows ?? state.customMapGraph.virtualRows;
+    state.boardCols = boardCols;
+    state.boardRows = boardRows;
+    updateConfig({ boardCols, boardRows });
+    syncDimensions();
+    return;
+  }
   const { boardCols, boardRows } = resolveBoardDimensionsForState(state);
   state.boardCols = boardCols;
   state.boardRows = boardRows;
@@ -691,7 +755,7 @@ export type EndProductionOptions = { skipReason?: 'no-placements' };
 // Returns true if (col,row) is under ZoC from any unit belonging to `enemyOwner`
 export function isInEnemyZoC(state: GameState, col: number, row: number, enemyOwner: Owner): boolean {
   if (!config.zoneOfControl) return false;
-  const neighbors = getNeighbors(col, row, COLS, ROWS);
+  const neighbors = effectiveGetNeighbors(col, row, COLS, ROWS);
   return neighbors.some(([nc, nr]) => {
     const u = getUnit(state, nc, nr);
     return u && u.owner === enemyOwner;
@@ -705,13 +769,14 @@ export function isInEnemyZoC(state: GameState, col: number, row: number, enemyOw
  * to a defender. Moving onto an enemy on that row (melee) is still allowed.
  */
 export function isOpponentHomeEntryBlocked(state: GameState, unit: Unit, destCol: number, destRow: number): boolean {
+  if (_activeTerritoryGraph) return false; // territory maps use a different win condition
   if (!config.zoneOfControl || state.gameMode !== 'domination') return false;
   const enemy: Owner = unit.owner === PLAYER ? AI : PLAYER;
   const opponentHomeRow = unit.owner === PLAYER ? 0 : ROWS - 1;
   if (destRow !== opponentHomeRow) return false;
   const occupant = getUnit(state, destCol, destRow);
   if (occupant && occupant.owner === enemy) return false;
-  const oneStepToDest = getNeighbors(unit.col, unit.row, COLS, ROWS).some(
+  const oneStepToDest = effectiveGetNeighbors(unit.col, unit.row, COLS, ROWS).some(
     ([c, r]) => c === destCol && r === destRow,
   );
   if (oneStepToDest) return false;
@@ -739,7 +804,7 @@ function computeBaseValidMoves(state: GameState, unit: Unit): [number, number][]
   const inZoC = isInEnemyZoC(state, unit.col, unit.row, enemy);
 
   if (inZoC) {
-    return getNeighbors(unit.col, unit.row, COLS, ROWS).filter(([c, r]) => {
+    return effectiveGetNeighbors(unit.col, unit.row, COLS, ROWS).filter(([c, r]) => {
       if (mountains.has(`${c},${r}`)) return false;
       const occupant = getUnit(state, c, r);
       if (occupant && occupant.owner === unit.owner) return false;
@@ -758,7 +823,7 @@ function computeBaseValidMoves(state: GameState, unit: Unit): [number, number][]
   for (let step = 0; step < remainingMoves; step++) {
     const nextFrontier: [number, number][] = [];
     for (const [c, r] of frontier) {
-      for (const [nc, nr] of getNeighbors(c, r, COLS, ROWS)) {
+      for (const [nc, nr] of effectiveGetNeighbors(c, r, COLS, ROWS)) {
         const key = `${nc},${nr}`;
         if (visited.has(key)) continue;
         if (mountains.has(key)) continue; // impassable
@@ -811,7 +876,7 @@ export function getMovePath(state: GameState, unit: Unit, toCol: number, toRow: 
   outer: while (frontier.length > 0) {
     const next: [number, number][] = [];
     for (const [c, r] of frontier) {
-      for (const [nc, nr] of getNeighbors(c, r, COLS, ROWS)) {
+      for (const [nc, nr] of effectiveGetNeighbors(c, r, COLS, ROWS)) {
         const key = `${nc},${nr}`;
         if (predecessors.has(key)) continue;
         if (mountains.has(key)) continue;
@@ -876,7 +941,7 @@ export function bfsDistance(state: GameState, fromCol: number, fromRow: number, 
         maybeTrimPathCaches();
         return dist;
       }
-      for (const [nc, nr] of getNeighbors(c, r, COLS, ROWS)) {
+      for (const [nc, nr] of effectiveGetNeighbors(c, r, COLS, ROWS)) {
         const key = `${nc},${nr}`;
         if (visited.has(key) || mountains.has(key)) continue;
         visited.add(key);
@@ -1041,7 +1106,7 @@ function analyzeFlanking(state: GameState, attacker: Unit, defender: Unit): {
   extraSum: number;
   extraFlankingFrom: { name: string; bonusPct: number }[];
 } {
-  const neighbors = getNeighbors(defender.col, defender.row, COLS, ROWS);
+  const neighbors = effectiveGetNeighbors(defender.col, defender.row, COLS, ROWS);
   const flankers: Unit[] = [];
   for (const [nc, nr] of neighbors) {
     if (nc === attacker.col && nr === attacker.row) continue;
@@ -1131,7 +1196,7 @@ function limitArtilleryBlocksRanged(state: GameState, unit: Unit): boolean {
   const ut = unitTypeForUnit(unit);
   if (!ut.range) return false;
   const enemy: Owner = unit.owner === PLAYER ? AI : PLAYER;
-  for (const [c, r] of getNeighbors(unit.col, unit.row, COLS, ROWS)) {
+  for (const [c, r] of effectiveGetNeighbors(unit.col, unit.row, COLS, ROWS)) {
     const u = getUnit(state, c, r);
     if (u && u.owner === enemy) return true;
   }
@@ -1143,7 +1208,7 @@ function isRangedCombat(state: GameState, attacker: Unit, defender: Unit): boole
   const ut = unitTypeForUnit(attacker);
   if (!ut.range) return false;
   if (limitArtilleryBlocksRanged(state, attacker)) return false;
-  const d = hexDistance(attacker.col, attacker.row, defender.col, defender.row, COLS, ROWS);
+  const d = effectiveHexDistance(attacker.col, attacker.row, defender.col, defender.row);
   return d >= 2 && d <= ut.range;
 }
 
@@ -1156,7 +1221,7 @@ export function getRangedAttackTargets(state: GameState, unit: Unit): Unit[] {
   const out: Unit[] = [];
   for (const u of state.units) {
     if (u.owner !== enemy) continue;
-    const d = hexDistance(unit.col, unit.row, u.col, u.row, COLS, ROWS);
+    const d = effectiveHexDistance(unit.col, unit.row, u.col, u.row);
     if (d >= 2 && d <= ut.range) out.push(u);
   }
   return out;
@@ -1482,6 +1547,7 @@ function noteDominationBreakthroughIfHomeRowCleared(
   attackerDied: boolean,
 ): void {
   if (state.gameMode !== 'domination' || attackerDied) return;
+  if (_activeTerritoryGraph) return; // territory maps don't use home row breakthrough
   const defenderHomeRow = defenderOwner === PLAYER ? ROWS - 1 : 0;
   if (defenderRow !== defenderHomeRow) return;
   if (state.units.some(u => u.owner === defenderOwner && u.row === defenderHomeRow)) return;
@@ -1559,6 +1625,28 @@ function checkVictory(state: GameState): void {
     }
     if (cp[AI] <= 0) endMatch(state, PLAYER, 'cq_cp_depleted');
     else if (cp[PLAYER] <= 0) endMatch(state, AI, 'cq_cp_depleted');
+    return;
+  }
+
+  // Territory map domination: conquer all non-mountain territories
+  if (_activeTerritoryGraph && state.gameMode === 'domination') {
+    const g = _activeTerritoryGraph;
+    const noAI = !state.units.some(u => u.owner === AI);
+    const noHuman = !state.units.some(u => u.owner === PLAYER);
+    const allPlayerOwned = g.passableTerritoryIds.every(id => {
+      const t = g.territories[id];
+      const hs = t ? state.hexStates[t.virtualKey] : undefined;
+      return hs && hs.owner === PLAYER;
+    });
+    const allAiOwned = g.passableTerritoryIds.every(id => {
+      const t = g.territories[id];
+      const hs = t ? state.hexStates[t.virtualKey] : undefined;
+      return hs && hs.owner === AI;
+    });
+    if (allPlayerOwned) endMatch(state, PLAYER, 'dom_annihilation');
+    else if (noAI) endMatch(state, PLAYER, 'dom_annihilation');
+    else if (allAiOwned) endMatch(state, AI, 'dom_annihilation');
+    else if (noHuman) endMatch(state, AI, 'dom_annihilation');
     return;
   }
 
@@ -1694,6 +1782,7 @@ function healUnits(state: GameState): { col: number; row: number; amount: number
 // ── Initial state ─────────────────────────────────────────────────────────────
 
 export function createInitialState(): GameState {
+  setActiveTerritoryGraph(null);
   unitIdCounter = 0;
   const gm = config.gameMode as GameMode;
   const breakthroughAttackerOwnerForState: Owner | undefined =
@@ -1908,6 +1997,7 @@ export function createInitialState(): GameState {
  * reset like {@link createInitialState}.
  */
 export function createInitialStatePreservingTerrain(previous: GameState): GameState {
+  setActiveTerritoryGraph(null);
   unitIdCounter = 0;
   const gm = config.gameMode as GameMode;
   const mountainHexes = [...previous.mountainHexes];
@@ -2616,7 +2706,7 @@ function buildDistanceToOpponentHomeRowMap(state: GameState, mover: Owner): Map<
   for (let i = 0; i < q.length; i++) {
     const [c, r] = q[i]!;
     const base = dist.get(`${c},${r}`) ?? 0;
-    for (const [nc, nr] of getNeighbors(c, r, COLS, ROWS)) {
+    for (const [nc, nr] of effectiveGetNeighbors(c, r, COLS, ROWS)) {
       const nk = `${nc},${nr}`;
       if (mountains.has(nk) || dist.has(nk)) continue;
       dist.set(nk, base + 1);
@@ -2636,7 +2726,7 @@ function scoreAiProductionPlacement(
   distToGoalMap: Map<string, number>,
   occupiedByEnemy: Set<string>,
 ): number {
-  const neighbors = getNeighbors(col, row, COLS, ROWS);
+  const neighbors = effectiveGetNeighbors(col, row, COLS, ROWS);
   let adjacentEnemy = 0;
   let expandNeighbor = 0;
   for (const [nc, nr] of neighbors) {
@@ -3516,4 +3606,177 @@ export function advancePhase(state: GameState): GameState {
   }
 
   return state;
+}
+
+// ── Territory map initial state ───────────────────────────────────────────────
+
+function buildTerritoryState(
+  graph: TerritoryGraphData,
+  units: Unit[],
+  hexStates: Record<string, HexState>,
+  mountainHexes: string[],
+  gameMode: GameMode,
+  opts: {
+    controlPointHexes: string[];
+    conquestPoints: Record<Owner, number> | null;
+    sectorOwners: Owner[];
+    sectorHexes: string[][];
+    sectorIndexByHex: Record<string, number>;
+    sectorControlPointHex: string[];
+    breakthroughCpOccupation: number[];
+    breakthroughAttackerOwner: Owner | undefined;
+    productionPoints: Record<Owner, number>;
+  },
+): GameState {
+  const pkgs = snapshotActiveUnitPackagesForSave();
+  return {
+    units,
+    hexStates,
+    mountainHexes,
+    riverHexes: [],
+    boardCols: graph.virtualCols,
+    boardRows: graph.virtualRows,
+    gameMode,
+    unitPackage: pkgs.unitPackage,
+    unitPackagePlayer2: pkgs.unitPackagePlayer2,
+    controlPointHexes: opts.controlPointHexes,
+    conquestPoints: opts.conquestPoints,
+    sectorHexes: opts.sectorHexes,
+    sectorOwners: opts.sectorOwners,
+    sectorControlPointHex: opts.sectorControlPointHex,
+    breakthroughCpOccupation: opts.breakthroughCpOccupation,
+    sectorIndexByHex: opts.sectorIndexByHex,
+    breakthroughAttackerOwner: opts.breakthroughAttackerOwner,
+    turn: 1,
+    phase: 'production' as const,
+    activePlayer: PLAYER,
+    selectedUnit: null,
+    productionPoints: opts.productionPoints,
+    log: ['Game started. Your turn — Production phase.'],
+    winner: null,
+    matchStartedAtMs: Date.now(),
+    battleStats: initBattleStatsFromUnits(units),
+    customMapGraph: graph,
+  };
+}
+
+export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, gameMode: GameMode): GameState {
+  const graph = buildTerritoryGraph(mapDef);
+  setActiveTerritoryGraph(graph);
+  updateConfig({ boardCols: graph.virtualCols, boardRows: graph.virtualRows });
+  syncDimensions();
+  unitIdCounter = 0;
+
+  // Place one unit per home territory
+  const units: Unit[] = [
+    ...graph.playerHomeTerritoryIds.map(id => {
+      const t = graph.territories[id]!;
+      return makeUnit(PLAYER, t.virtualCol, t.virtualRow);
+    }),
+    ...graph.aiHomeTerritoryIds.map(id => {
+      const t = graph.territories[id]!;
+      return makeUnit(AI, t.virtualCol, t.virtualRow);
+    }),
+  ];
+
+  const mountainHexes = graph.mountainTerritoryIds.map(id => graph.territories[id]!.virtualKey);
+
+  const hexStates: Record<string, HexState> = {};
+
+  if (gameMode === 'breakthrough') {
+    // Sector without CP = attacker's home sector
+    const cpTids = new Set(Object.values(graph.controlPoints).map(cp => cp.territoryId));
+    const attackerSectorIdx = graph.sectors.findIndex(sec => !sec.territoryIds.some(tid => cpTids.has(tid)));
+    const attackerSector = graph.sectors[attackerSectorIdx];
+    const aiInAttacker = attackerSector?.territoryIds.some(tid => graph.aiHomeTerritoryIds.includes(tid)) ?? false;
+    const attackerOwner: Owner = aiInAttacker ? AI : PLAYER;
+    const defenderOwner: Owner = attackerOwner === AI ? PLAYER : AI;
+
+    const sectorOwners: Owner[] = graph.sectors.map((_, i) => i === attackerSectorIdx ? attackerOwner : defenderOwner);
+    const sectorHexes = graph.sectors.map(sec =>
+      sec.territoryIds
+        .map(id => graph.territories[id])
+        .filter(t => t && t.state !== 'mountain')
+        .map(t => t!.virtualKey),
+    );
+    const sectorIndexByHex: Record<string, number> = {};
+    sectorHexes.forEach((hexes, i) => { for (const k of hexes) sectorIndexByHex[k] = i; });
+
+    // All territories owned by their sector's owner
+    for (let s = 0; s < graph.sectors.length; s++) {
+      const owner = sectorOwners[s]!;
+      for (const k of sectorHexes[s]!) hexStates[k] = { owner, stableFor: 0, isProduction: false };
+    }
+
+    // Sector CPs from JSON (attacker sector has none)
+    const sectorControlPointHex = graph.sectors.map((sec, i) => {
+      if (i === attackerSectorIdx) return '';
+      const cpEntry = Object.values(graph.controlPoints).find(cp => sec.territoryIds.includes(cp.territoryId));
+      if (!cpEntry) return '';
+      const t = graph.territories[cpEntry.territoryId];
+      return t ? t.virtualKey : '';
+    });
+
+    primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
+
+    // Compute active CP (first defender sector from attacker perspective)
+    let activeCpHex = '';
+    if (attackerOwner === PLAYER) {
+      const idx = sectorOwners.findIndex(o => o !== attackerOwner);
+      if (idx >= 0) activeCpHex = sectorControlPointHex[idx] ?? '';
+    } else {
+      for (let i = sectorOwners.length - 1; i >= 0; i--) {
+        if (sectorOwners[i] !== attackerOwner) { activeCpHex = sectorControlPointHex[i] ?? ''; break; }
+      }
+    }
+    const controlPointHexes = activeCpHex ? [activeCpHex] : [];
+
+    const pp: Record<Owner, number> = { 1: 0, 2: 0 };
+    pp[attackerOwner] = config.breakthroughAttackerStartingPP;
+    pp[defenderOwner] = config.productionPointsPerTurn;
+
+    return buildTerritoryState(graph, units, hexStates, mountainHexes, gameMode, {
+      controlPointHexes,
+      conquestPoints: null,
+      sectorOwners,
+      sectorHexes,
+      sectorIndexByHex,
+      sectorControlPointHex,
+      breakthroughCpOccupation: graph.sectors.map(() => 0),
+      breakthroughAttackerOwner: attackerOwner,
+      productionPoints: pp,
+    });
+
+  } else {
+    // Domination or Conquest: allied=player, enemy=AI, neutral=unowned
+    for (const id of graph.playerHomeTerritoryIds) {
+      const t = graph.territories[id]!;
+      hexStates[t.virtualKey] = { owner: PLAYER, stableFor: 0, isProduction: false };
+    }
+    for (const id of graph.aiHomeTerritoryIds) {
+      const t = graph.territories[id]!;
+      hexStates[t.virtualKey] = { owner: AI, stableFor: 0, isProduction: false };
+    }
+
+    const controlPointHexes = gameMode === 'conquest'
+      ? Object.values(graph.controlPoints)
+          .map(cp => graph.territories[cp.territoryId]?.virtualKey)
+          .filter(Boolean) as string[]
+      : [];
+    const conquestPoints = gameMode === 'conquest'
+      ? ({ [PLAYER]: config.conquestPointsPlayer, [AI]: config.conquestPointsAi } as Record<Owner, number>)
+      : null;
+
+    return buildTerritoryState(graph, units, hexStates, mountainHexes, gameMode, {
+      controlPointHexes,
+      conquestPoints,
+      sectorOwners: [],
+      sectorHexes: [],
+      sectorIndexByHex: {},
+      sectorControlPointHex: [],
+      breakthroughCpOccupation: [],
+      breakthroughAttackerOwner: undefined,
+      productionPoints: { [PLAYER]: config.productionPointsPerTurn, [AI]: config.productionPointsPerTurnAi } as Record<Owner, number>,
+    });
+  }
 }

@@ -1,5 +1,8 @@
 // Shared types for the game engine
 
+import type { TerritoryGraphData } from './territoryMap';
+export type { TerritoryGraphData };
+
 export type Owner = 1 | 2;
 
 /**
@@ -143,6 +146,8 @@ export interface GameState {
   matchDurationMs?: number;
   /** Match statistics; omitted in older saves — normalized on load. */
   battleStats?: Record<Owner, BattleStatsSide>;
+  /** Territory graph for polygon-based maps (tutorial map etc.); omitted for hex grid games. */
+  customMapGraph?: TerritoryGraphData;
 }
 
 /** One AI turn animation step, in chronological order (same order as aiMovement resolves). */
