@@ -566,7 +566,7 @@ function render(): void {
     defsEl = document.createElementNS(SVG_NS, 'defs') as SVGDefsElement;
     svgEl.prepend(defsEl);
   }
-  // Rebuild defs clip paths
+  // Rebuild defs clip paths and outer-border pattern
   defsEl.innerHTML = '';
 
   for (const t of territories) {
@@ -578,12 +578,99 @@ function render(): void {
     defsEl.appendChild(clipPath);
   }
 
+  // Pattern for outer border
+  const outerPattern = document.createElementNS(SVG_NS, 'pattern');
+  outerPattern.setAttribute('id', 'ev2-outer-border-pattern');
+  outerPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  outerPattern.setAttribute('width', '200');
+  outerPattern.setAttribute('height', '74');
+  const outerPatternImg = document.createElementNS(SVG_NS, 'image');
+  outerPatternImg.setAttribute('href', 'images/misc/outside-border-pattern.png');
+  outerPatternImg.setAttribute('width', '200');
+  outerPatternImg.setAttribute('height', '74');
+  outerPattern.appendChild(outerPatternImg);
+  defsEl.appendChild(outerPattern);
+
   // ── Territory layer ──────────────────────────────────────────────────────
   const territoryLayer = svgEl.querySelector('#ev2-territory-layer') as SVGGElement;
   territoryLayer.innerHTML = '';
   territoryLayer.style.pointerEvents = mode === 'territory' ? 'auto' : 'none';
 
   const edgeIndex = buildEdgeTerritoryIndex();
+
+  // ── Outer border layer ───────────────────────────────────────────────────
+  // Build a unified perimeter path from all outer edges (touching only 1 territory).
+  // Stroke it 144px wide (half inside, half outside) — the territory layer covers
+  // the inner half, leaving 72px of pattern border visible around the map.
+  const outerBorderLayer = svgEl.querySelector('#ev2-outer-border-layer') as SVGGElement;
+  outerBorderLayer.innerHTML = '';
+  outerBorderLayer.setAttribute('pointer-events', 'none');
+
+  if (territories.length > 0) {
+    // Collect outer edge segments as [pa, pb] pairs
+    const outerSegments: Array<[Pt, Pt]> = [];
+    for (const edge of edges) {
+      const terrs = edgeIndex.get(undirectedEdgeKey(edge.a, edge.b));
+      if (!terrs || terrs.length !== 1) continue;
+      const pa = ptById(edge.a);
+      const pb = ptById(edge.b);
+      if (pa && pb) outerSegments.push([pa, pb]);
+    }
+
+    // Chain segments into continuous polylines
+    if (outerSegments.length > 0) {
+      // Build adjacency: point id → connected point ids in outer perimeter
+      const adj = new Map<string, string[]>();
+      for (const [pa, pb] of outerSegments) {
+        if (!adj.has(pa.id)) adj.set(pa.id, []);
+        if (!adj.has(pb.id)) adj.set(pb.id, []);
+        adj.get(pa.id)!.push(pb.id);
+        adj.get(pb.id)!.push(pa.id);
+      }
+
+      const visited = new Set<string>();
+      const chains: Pt[][] = [];
+
+      for (const [startPt] of outerSegments) {
+        if (visited.has(startPt.id)) continue;
+        // Walk the chain
+        const chain: Pt[] = [startPt];
+        visited.add(startPt.id);
+        let cur = startPt;
+        let prevId: string | null = null;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const neighbors = adj.get(cur.id) ?? [];
+          const next = neighbors.find(id => id !== prevId && !visited.has(id));
+          if (next === undefined) break;
+          visited.add(next);
+          prevId = cur.id;
+          cur = ptById(next)!;
+          chain.push(cur);
+        }
+        chains.push(chain);
+      }
+
+      // Build SVG path from all chains
+      let d = '';
+      for (const chain of chains) {
+        if (chain.length < 2) continue;
+        d += `M ${chain[0]!.x},${chain[0]!.y}`;
+        for (let i = 1; i < chain.length; i++) d += ` L ${chain[i]!.x},${chain[i]!.y}`;
+      }
+
+      if (d) {
+        const perimPath = document.createElementNS(SVG_NS, 'path');
+        perimPath.setAttribute('d', d);
+        perimPath.setAttribute('fill', 'none');
+        perimPath.setAttribute('stroke', 'url(#ev2-outer-border-pattern)');
+        perimPath.setAttribute('stroke-width', '144');
+        perimPath.setAttribute('stroke-linecap', 'butt');
+        perimPath.setAttribute('stroke-linejoin', 'miter');
+        outerBorderLayer.appendChild(perimPath);
+      }
+    }
+  }
 
   for (const t of territories) {
     const pts_str = territoryPointsAttr(t);
@@ -1041,7 +1128,7 @@ export function initEditorV2(onBack: () => void): void {
   panelTerritory = document.getElementById('ev2-panel-territory') as HTMLElement;
 
   // Create SVG layers
-  for (const id of ['ev2-territory-layer', 'ev2-edge-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
+  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-edge-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('id', id);
     svgEl.appendChild(g);
