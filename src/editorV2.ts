@@ -1232,7 +1232,7 @@ export function initEditorV2(onBack: () => void): void {
   panelTerritory = document.getElementById('ev2-panel-territory') as HTMLElement;
 
   // Create SVG layers
-  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-cp-layer', 'ev2-edge-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
+  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-edge-layer', 'ev2-cp-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('id', id);
     svgEl.appendChild(g);
