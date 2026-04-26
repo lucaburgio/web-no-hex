@@ -473,8 +473,21 @@ function render(): void {
     defsEl = document.createElementNS(SVG_NS, 'defs') as SVGDefsElement;
     svgEl.prepend(defsEl);
   }
-  // Rebuild defs clip paths
+  // Rebuild defs
   defsEl.innerHTML = '';
+
+  // Shared erode filter for inset territory borders
+  const erodeFilter = document.createElementNS(SVG_NS, 'filter');
+  erodeFilter.setAttribute('id', 'ev2-border-erode');
+  erodeFilter.setAttribute('x', '-50%');
+  erodeFilter.setAttribute('y', '-50%');
+  erodeFilter.setAttribute('width', '200%');
+  erodeFilter.setAttribute('height', '200%');
+  const feMorph = document.createElementNS(SVG_NS, 'feMorphology');
+  feMorph.setAttribute('operator', 'erode');
+  feMorph.setAttribute('radius', '10');
+  erodeFilter.appendChild(feMorph);
+  defsEl.appendChild(erodeFilter);
 
   for (const t of territories) {
     const clipPath = document.createElementNS(SVG_NS, 'clipPath');
@@ -483,6 +496,16 @@ function render(): void {
     clipPoly.setAttribute('points', territoryPointsAttr(t));
     clipPath.appendChild(clipPoly);
     defsEl.appendChild(clipPath);
+
+    // Eroded mask: territory polygon shrunk by 10px inward, for offset borders
+    const mask = document.createElementNS(SVG_NS, 'mask');
+    mask.setAttribute('id', `ev2-mask-${t.id}`);
+    const maskPoly = document.createElementNS(SVG_NS, 'polygon');
+    maskPoly.setAttribute('points', territoryPointsAttr(t));
+    maskPoly.setAttribute('fill', 'white');
+    maskPoly.setAttribute('filter', 'url(#ev2-border-erode)');
+    mask.appendChild(maskPoly);
+    defsEl.appendChild(mask);
   }
 
   // ── Territory layer ──────────────────────────────────────────────────────
@@ -521,10 +544,10 @@ function render(): void {
         seg.setAttribute('x2', String(pb.x));
         seg.setAttribute('y2', String(pb.y));
         seg.setAttribute('stroke', borderColor);
-        seg.setAttribute('stroke-width', '8');
+        seg.setAttribute('stroke-width', '28');
         seg.setAttribute('stroke-linecap', 'square');
         seg.setAttribute('fill', 'none');
-        seg.setAttribute('clip-path', `url(#ev2-clip-${t.id})`);
+        seg.setAttribute('mask', `url(#ev2-mask-${t.id})`);
         if (mode === 'territory') seg.setAttribute('pointer-events', 'none');
         group.appendChild(seg);
       }
@@ -555,6 +578,15 @@ function render(): void {
       hit.setAttribute('pointer-events', 'stroke');
       edgeLayer.appendChild(hit);
     }
+    const glow = document.createElementNS(SVG_NS, 'line');
+    glow.setAttribute('class', 'ev2-edge-glow');
+    glow.setAttribute('x1', String(pa.x));
+    glow.setAttribute('y1', String(pa.y));
+    glow.setAttribute('x2', String(pb.x));
+    glow.setAttribute('y2', String(pb.y));
+    glow.setAttribute('pointer-events', 'none');
+    edgeLayer.appendChild(glow);
+
     const line = document.createElementNS(SVG_NS, 'line');
     let cls = 'ev2-edge';
     if (mode === 'borders' && selectedEdgeIds.has(edge.id)) cls += ' ev2-edge-selected';
