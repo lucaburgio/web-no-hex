@@ -4,7 +4,7 @@
  * Requires editorV2.css (loaded via index.html).
  */
 
-import type { GameState, Owner } from './types';
+import type { GameState, HexState, Owner, Unit } from './types';
 import type { TerritoryGraphData, TerritoryMapTerritory, TerritoryMapDef } from './territoryMap';
 import { getValidMoves, isValidProductionPlacement } from './game';
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
@@ -28,6 +28,12 @@ interface RendererState {
 }
 
 const rendererStateMap = new WeakMap<SVGSVGElement, RendererState>();
+
+/** Optional draw overrides for move / combat animation frames (mirrors {@link renderState} ideas). */
+export interface RenderTerritoryStateOptions {
+  unitDrawOverride?: readonly Unit[] | null;
+  hexStatesDrawOverride?: Record<string, HexState> | null;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -478,12 +484,16 @@ export function renderTerritoryState(
   _productionKey: string | null,
   hiddenUnitIds: Set<number>,
   localPlayer: Owner,
+  opts?: RenderTerritoryStateOptions | null,
 ): void {
   const rs = rendererStateMap.get(svgElement);
   if (!rs || rs.graph !== graph) initTerritoryRenderer(svgElement, graph);
 
   const { mapDef, points, territories } = graph;
   const edgeTerritoryIndex = rendererStateMap.get(svgElement)!.edgeTerritoryIndex;
+
+  const unitsForDraw = opts?.unitDrawOverride != null ? opts.unitDrawOverride : state.units;
+  const hexStatesForDraw = opts?.hexStatesDrawOverride != null ? opts.hexStatesDrawOverride : state.hexStates;
 
   const selectedUnit = state.selectedUnit !== null
     ? (state.units.find(u => u.id === state.selectedUnit) ?? null)
@@ -504,7 +514,7 @@ export function renderTerritoryState(
   function ownerState(tid: string): 'neutral' | 'allied' | 'enemy' {
     const node = territories[tid];
     if (!node) return 'neutral';
-    const hs = state.hexStates[node.virtualKey];
+    const hs = hexStatesForDraw[node.virtualKey];
     if (!hs) return 'neutral';
     return hs.owner === localPlayer ? 'allied' : 'enemy';
   }
@@ -661,7 +671,7 @@ export function renderTerritoryState(
   }
   const seenUnits = new Set<number>();
 
-  for (const unit of state.units) {
+  for (const unit of unitsForDraw) {
     if (hiddenUnitIds.has(unit.id)) continue;
     const node = territories[graph.keyToId[`${unit.col},${unit.row}`] ?? ''];
     if (!node) continue;

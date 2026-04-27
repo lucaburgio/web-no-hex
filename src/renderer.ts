@@ -27,6 +27,8 @@ import mountainHex05 from '../public/images/misc/mountain-hex/mountain-05.png';
 import mountainHex06 from '../public/images/misc/mountain-hex/mountain-06.png';
 import mountainHex07 from '../public/images/misc/mountain-hex/mountain-07.png';
 import { riverSegmentDisplay } from './rivers';
+import type { TerritoryGraphData } from './territoryMap';
+import { boardPixelForVirtualHex } from './territoryMap';
 
 const MOUNTAIN_HEX_TEXTURES = [mountainHex01, mountainHex02, mountainHex03, mountainHex04, mountainHex05, mountainHex06, mountainHex07] as const;
 
@@ -300,12 +302,15 @@ function positionAnimLayer(svgElement: SVGSVGElement, aboveStaticUnits: boolean)
     animLayer.setAttribute('pointer-events', 'none');
   }
   const unitLayer = parent.querySelector('#unit-layer');
+  const trrUnits = parent.querySelector('#trr-units');
   const hexHitLayer = parent.querySelector('#hex-hit-layer');
   if (aboveStaticUnits) {
     if (hexHitLayer) parent.insertBefore(animLayer, hexHitLayer);
+    else if (trrUnits) parent.insertBefore(animLayer, trrUnits.nextSibling);
     else parent.appendChild(animLayer);
   } else {
     if (unitLayer) parent.insertBefore(animLayer, unitLayer);
+    else if (trrUnits) parent.insertBefore(animLayer, trrUnits);
     else parent.appendChild(animLayer);
   }
   return animLayer;
@@ -532,11 +537,29 @@ function positionOnPolyline(points: { x: number; y: number }[], t01: number): { 
   return points[points.length - 1]!;
 }
 
-function pixelPathForAnimation(anim: MoveAnimation): { x: number; y: number }[] {
-  if (anim.pathHexes && anim.pathHexes.length >= 2) {
-    return anim.pathHexes.map(([c, r]) => hexToPixel(c, r));
+function boardPixelForMoveAnim(
+  col: number,
+  row: number,
+  territoryGraph: TerritoryGraphData | null | undefined,
+): { x: number; y: number } {
+  if (territoryGraph) {
+    const p = boardPixelForVirtualHex(territoryGraph, col, row);
+    if (p) return p;
   }
-  return [hexToPixel(anim.fromCol, anim.fromRow), hexToPixel(anim.toCol, anim.toRow)];
+  return hexToPixel(col, row);
+}
+
+function pixelPathForAnimation(
+  anim: MoveAnimation,
+  territoryGraph?: TerritoryGraphData | null,
+): { x: number; y: number }[] {
+  if (anim.pathHexes && anim.pathHexes.length >= 2) {
+    return anim.pathHexes.map(([c, r]) => boardPixelForMoveAnim(c, r, territoryGraph));
+  }
+  return [
+    boardPixelForMoveAnim(anim.fromCol, anim.fromRow, territoryGraph),
+    boardPixelForMoveAnim(anim.toCol, anim.toRow, territoryGraph),
+  ];
 }
 
 function unitIcon(unitTypeId: string): string | undefined {
@@ -1962,6 +1985,8 @@ export function animateMoves(
   /** False = draw below `#unit-layer` (e.g. losing attacker); true = above units, under hex hits. */
   stackAboveStaticUnits: boolean = true,
   localPlayer: Owner = PLAYER,
+  /** When set, move paths use territory centroids (polygon maps) instead of {@link hexToPixel}. */
+  territoryGraph?: TerritoryGraphData | null,
 ): { cancel: () => void } {
   const noopCancel = (): void => {};
 
@@ -1996,7 +2021,7 @@ export function animateMoves(
   let completed = 0;
 
   for (const anim of animations) {
-    const pixelPath = pixelPathForAnimation(anim);
+    const pixelPath = pixelPathForAnimation(anim, territoryGraph);
     const baseColor = paletteBaseForOwner(anim.unit.owner, localPlayer, c);
 
     const spriteRoot = flipBoardY ? svgEl('g') : null;
@@ -2111,6 +2136,7 @@ export function animateStrikeAndReturn(
   liveStateForHp?: GameState | null,
   stackAboveStaticUnits: boolean = true,
   localPlayer: Owner = PLAYER,
+  territoryGraph?: TerritoryGraphData | null,
 ): { cancel: () => void } {
   const noopCancel = (): void => {};
   const { unit, fromCol, fromRow, enemyCol, enemyRow, durationMs, onHit } = params;
@@ -2123,9 +2149,9 @@ export function animateStrikeAndReturn(
   }
 
   const pixelPath = [
-    hexToPixel(fromCol, fromRow),
-    hexToPixel(enemyCol, enemyRow),
-    hexToPixel(fromCol, fromRow),
+    boardPixelForMoveAnim(fromCol, fromRow, territoryGraph),
+    boardPixelForMoveAnim(enemyCol, enemyRow, territoryGraph),
+    boardPixelForMoveAnim(fromCol, fromRow, territoryGraph),
   ];
 
   const c = colors();
@@ -2259,6 +2285,7 @@ function showHexFloatBadges(
   durationMs: number,
   onDone: () => void,
   kind: FloatBadgeKind,
+  territoryGraph?: TerritoryGraphData | null,
 ): { cancel: () => void } {
   const noopCancel = (): void => {};
 
@@ -2301,7 +2328,7 @@ function showHexFloatBadges(
   const stackIndexByHex = new Map<string, number>();
   const STACK_STEP = 20;
   for (const e of entries) {
-    const { x, y } = hexToPixel(e.col, e.row);
+    const { x, y } = boardPixelForMoveAnim(e.col, e.row, territoryGraph);
     const key = `${e.col},${e.row}`;
     const stack = stackIndexByHex.get(key) ?? 0;
     stackIndexByHex.set(key, stack + 1);
@@ -2360,8 +2387,9 @@ export function showDamageFloats(
   entries: { col: number; row: number; amount: number }[],
   durationMs: number,
   onDone: () => void,
+  territoryGraph?: TerritoryGraphData | null,
 ): { cancel: () => void } {
-  return showHexFloatBadges(svgElement, entries, durationMs, onDone, 'damage');
+  return showHexFloatBadges(svgElement, entries, durationMs, onDone, 'damage', territoryGraph);
 }
 
 /** Green +N badges for end-of-turn healing (same motion/layout as damage floats). */
@@ -2370,8 +2398,9 @@ export function showHealFloats(
   entries: { col: number; row: number; amount: number }[],
   durationMs: number,
   onDone: () => void,
+  territoryGraph?: TerritoryGraphData | null,
 ): { cancel: () => void } {
-  return showHexFloatBadges(svgElement, entries, durationMs, onDone, 'heal');
+  return showHexFloatBadges(svgElement, entries, durationMs, onDone, 'heal', territoryGraph);
 }
 
 /** Clears combat VFX layers (#anim-layer, #vfx-layer) without invoking callbacks. */
@@ -2394,6 +2423,7 @@ export function playRangedArtilleryHexBarrageVfx(
   col: number,
   row: number,
   onComplete?: () => void,
+  territoryGraph?: TerritoryGraphData | null,
 ): ArtilleryProjectileHandle {
   let vfxLayer = svgElement.querySelector('#vfx-layer') as SVGGElement | null;
   if (!vfxLayer) {
@@ -2402,7 +2432,7 @@ export function playRangedArtilleryHexBarrageVfx(
     vfxLayer.setAttribute('pointer-events', 'none');
     getBoardVfxParent(svgElement).appendChild(vfxLayer);
   }
-  const { x, y } = hexToPixel(col, row);
+  const { x, y } = boardPixelForMoveAnim(col, row, territoryGraph);
   return playDefenderHexBarrage({
     parent: vfxLayer,
     center: { x, y },

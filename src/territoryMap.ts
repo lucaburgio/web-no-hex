@@ -218,6 +218,18 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
   };
 }
 
+/** Board-space pixel center for a virtual (col,row) cell — same as static unit placement (territory centroid). */
+export function boardPixelForVirtualHex(
+  graph: TerritoryGraphData,
+  col: number,
+  row: number,
+): { x: number; y: number } | null {
+  const tid = graph.keyToId[`${col},${row}`];
+  if (!tid) return null;
+  const node = graph.territories[tid];
+  return node ? { x: node.centroid.x, y: node.centroid.y } : null;
+}
+
 function computeCentroid(
   pointIds: string[],
   points: Record<string, { x: number; y: number }>,
