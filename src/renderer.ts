@@ -30,6 +30,22 @@ import { riverSegmentDisplay } from './rivers';
 import type { TerritoryGraphData } from './territoryMap';
 import { boardPixelForVirtualHex } from './territoryMap';
 
+//All unit settings
+const unitTagSizeMultiplier = 1.24;
+const unitIconSizeMultiplier = 0.5;
+
+const unitHpBarWMultiplier = 0.96;
+const unitHpBarHMultiplier = 0.1;
+
+const unitStarsOuterMultiplier = 0.26;
+
+const unitBracketsContainerMultiplier = 0.34;
+const unitBracketsXMultiplier = 0.05;
+const unitBracketsYMultiplier = 0.16;
+const unitBracketsLegMultiplier = 0.26;
+const unitBracketsHalfMultiplier = 0.44;
+const unitBracketsHalfHMultiplier = 0.48;
+
 const MOUNTAIN_HEX_TEXTURES = [mountainHex01, mountainHex02, mountainHex03, mountainHex04, mountainHex05, mountainHex06, mountainHex07] as const;
 
 /** Shield silhouette in 50×64 design space; scaled in JS. Styled via `.board-unit__body` in `style.css`. */
@@ -782,7 +798,7 @@ function statePackageForUnitOwner(state: GameState, owner: Owner): string {
   const p2 = state.unitPackagePlayer2 || p1;
   return owner === PLAYER ? p1 : p2;
 }
-
+//unit faction icons
 function factionIconHrefFromPackage(pkg: string): string {
   const map: Record<string, string> = {
     'us-ww2': '/icons/scenarios/us-ww2.svg',
@@ -865,7 +881,7 @@ function boardUnitBracketsPathD(cx: number, cy: number, halfW: number, halfH: nu
     `M ${cx + hw - l} ${cy + hh} L ${cx + hw} ${cy + hh} L ${cx + hw} ${cy + hh - l}`,
   ].join(' ');
 }
-//unit faction icon
+//unit faction icon position
 function svgFactionImage(x: number, y: number, w: number, h: number, href: string): SVGImageElement {
   const im = svgEl('image');
   im.setAttribute('class', 'board-unit__faction');
@@ -892,7 +908,7 @@ function appendBoardUnitStars(
   g.setAttribute('class', 'board-unit__stars');
   g.setAttribute('pointer-events', 'none');
   const spacing = starSize * 1.2;
-  const totalW = (starCount - 1) * spacing;
+  const totalW = (starCount - 0.65) * spacing;
   for (let i = 0; i < starCount; i++) {
     const cx = xCenter - totalW / 2 + i * spacing;
     const starG = inlineIcon('icons/star.svg', cx, starCenterY, starSize, '#0a0a0a', '1');
@@ -947,7 +963,7 @@ export function mountBoardUnitChipContents(
   const iconOpacity = tired ? String(config.tiredIconOpacity) : '1';
   const showAim = p.showRangedAimOverlay !== false;
 
-  const sc = (HEX_SIZE * 1.24) / 50;
+  const sc = (HEX_SIZE * unitTagSizeMultiplier) / 50;
   const unitEl = svgEl('path');
   unitEl.setAttribute('class', 'board-unit__body');
   unitEl.setAttribute('d', BOARD_UNIT_SILHOUETTE_D);
@@ -962,8 +978,8 @@ export function mountBoardUnitChipContents(
   unitWrap.appendChild(unitEl);
 
   //unit health bar
-  const barW = HEX_SIZE * 0.96;
-  const barH = HEX_SIZE * 0.1;
+  const barW = HEX_SIZE * unitHpBarWMultiplier;
+  const barH = HEX_SIZE * unitHpBarHMultiplier;
   const barX = p.x - barW / 1.83;
   const barY = p.y + HEX_SIZE * 0.46;
 
@@ -989,11 +1005,11 @@ export function mountBoardUnitChipContents(
   unitWrap.appendChild(barFill);
 
   //unit brackets
-  const iconCx = p.x - HEX_SIZE * 0.05;
-  const iconCy = p.y - HEX_SIZE * 0.16;
-  const bracketHalf = HEX_SIZE * 0.44;
-  const bracketHalfH = HEX_SIZE * 0.48;
-  const bracketLeg = HEX_SIZE * 0.26;
+  const iconCx = p.x - HEX_SIZE * unitBracketsXMultiplier;
+  const iconCy = p.y - HEX_SIZE * unitBracketsYMultiplier;
+  const bracketHalf = HEX_SIZE * unitBracketsHalfMultiplier;
+  const bracketHalfH = HEX_SIZE * unitBracketsHalfHMultiplier;
+  const bracketLeg = HEX_SIZE * unitBracketsLegMultiplier;
   const bracketPath = svgEl('path');
   bracketPath.setAttribute('class', 'board-unit__brackets');
   bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketHalfH, bracketLeg));
@@ -1011,12 +1027,12 @@ export function mountBoardUnitChipContents(
   unitWrap.appendChild(svgFactionImage(facX, facY, facW, facW, facHref));
 
   const icon = p.unit.icon ?? unitIcon(p.unit.unitTypeId);
-  const iconEl = inlineIcon(icon, iconCx, iconCy, HEX_SIZE * 0.4, chip.iconColor, iconOpacity, 'board-unit__icon');
+  const iconEl = inlineIcon(icon, iconCx, iconCy, HEX_SIZE * unitIconSizeMultiplier, chip.iconColor, iconOpacity, 'board-unit__icon');
   if (iconEl) unitWrap.appendChild(iconEl);
 
   const starN = boardUnitUpgradeStarCount(p.unit);
-  const starSize = HEX_SIZE * 0.14;
-  const starY = p.y - 32 * sc - starSize * 0.55;
+  const starSize = HEX_SIZE * unitStarsOuterMultiplier;
+  const starY = p.y - 36 * sc - starSize * 0.55;
   appendBoardUnitStars(unitWrap, p.x, starY, starN, starSize);
 
   if (showAim && isRangedTarget) {
@@ -2278,7 +2294,7 @@ export function animateMoves(
     const layer: SVGGElement = spriteRoot ?? animLayer!;
     if (spriteRoot) animLayer!.appendChild(spriteRoot);
 
-    const unitSc = (HEX_SIZE * 1.1) / 50;
+    const unitSc = (HEX_SIZE * unitTagSizeMultiplier) / 50;
     const unitWrap = svgEl('g');
     unitWrap.setAttribute('class', 'board-unit board-unit--moving');
     layer.appendChild(unitWrap);
@@ -2314,8 +2330,8 @@ export function animateMoves(
     unitBody.setAttribute('pointer-events', 'none');
     unitWrap.appendChild(unitBody);
 
-    const animBarW = HEX_SIZE * 0.58;
-    const barH = HEX_SIZE * 0.1;
+    const animBarW = HEX_SIZE * unitHpBarWMultiplier;
+    const barH = HEX_SIZE * unitHpBarHMultiplier;
     const barBg = svgEl('rect');
     barBg.setAttribute('class', 'board-unit__hp-bg');
     barBg.setAttribute('width', String(animBarW)); barBg.setAttribute('height', String(barH));
@@ -2334,11 +2350,11 @@ export function animateMoves(
     unitWrap.appendChild(barFill);
 
     const hex0 = boardPixelForMoveAnim(anim.fromCol, anim.fromRow, territoryGraph);
-    const iconCx0 = hex0.x;
-    const iconCy0 = hex0.y - HEX_SIZE * 0.34;
-    const bracketHalf = HEX_SIZE * 0.22;
-    const bracketHalfH = HEX_SIZE * 0.42;
-    const bracketLeg = HEX_SIZE * 0.11;
+    const iconCx0 = hex0.x - HEX_SIZE * unitBracketsXMultiplier;
+    const iconCy0 = hex0.y - HEX_SIZE * unitBracketsYMultiplier;
+    const bracketHalf = HEX_SIZE * unitBracketsHalfMultiplier;
+    const bracketHalfH = HEX_SIZE * unitBracketsHalfHMultiplier;
+    const bracketLeg = HEX_SIZE * unitBracketsLegMultiplier;
     const bracketPath = svgEl('path');
     bracketPath.setAttribute('class', 'board-unit__brackets');
     bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx0, iconCy0, bracketHalf, bracketHalfH, bracketLeg));
@@ -2361,7 +2377,7 @@ export function animateMoves(
     unitWrap.appendChild(factionImg);
 
     const iconSrc = anim.unit.icon ?? unitIcon(anim.unit.unitTypeId);
-    const iconSize = HEX_SIZE * 0.4;
+    const iconSize = HEX_SIZE * unitIconSizeMultiplier;
     const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, chip0.iconColor, '1', 'board-unit__icon');
     const iconWrapper = svgEl('g');
     iconWrapper.setAttribute('pointer-events', 'none');
@@ -2369,7 +2385,7 @@ export function animateMoves(
     unitWrap.appendChild(iconWrapper);
 
     const starN = boardUnitUpgradeStarCount(anim.unit);
-    const starSize = HEX_SIZE * 0.14;
+    const starSize = HEX_SIZE * unitStarsOuterMultiplier;
     const starsOuter = svgEl('g');
     starsOuter.setAttribute('class', 'board-unit__stars');
     starsOuter.setAttribute('pointer-events', 'none');
@@ -2408,7 +2424,7 @@ export function animateMoves(
 
       
       const iconCx = x;
-      const iconCy = y - HEX_SIZE * 0.34;
+      const iconCy = y - HEX_SIZE * unitBracketsContainerMultiplier;
       bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketHalfH, bracketLeg));
       factionImg.setAttribute('x', String(x - 25 * unitSc + 2.5 * unitSc));
       factionImg.setAttribute('y', String(y - 32 * unitSc + 2 * unitSc));
@@ -2540,7 +2556,7 @@ export function animateStrikeAndReturn(
   const maxHp0 = live0?.maxHp ?? unit.maxHp;
   const displayHp0 = live0 ? getBoardVisualHp(live0, performance.now()) : unit.hp;
   const hpRatio0 = maxHp0 > 0 ? Math.min(1, Math.max(0, displayHp0 / maxHp0)) : 0;
-  const unitSc = (HEX_SIZE * 1.1) / 50;
+  const unitSc = (HEX_SIZE * unitTagSizeMultiplier) / 50;
   const chip0 = chipFromLiveStrike(liveStateForHp ?? null, unit, performance.now());
 
   const unitWrap = svgEl('g');
@@ -2556,8 +2572,8 @@ export function animateStrikeAndReturn(
   unitBody.setAttribute('pointer-events', 'none');
   unitWrap.appendChild(unitBody);
 
-  const animBarW = HEX_SIZE * 0.58;
-  const barH = HEX_SIZE * 0.1;
+  const animBarW = HEX_SIZE * unitHpBarWMultiplier;
+  const barH = HEX_SIZE * unitHpBarHMultiplier;
   const barBg = svgEl('rect');
   barBg.setAttribute('class', 'board-unit__hp-bg');
   barBg.setAttribute('width', String(animBarW));
@@ -2574,11 +2590,11 @@ export function animateStrikeAndReturn(
   unitWrap.appendChild(barFill);
 
   const hex0 = boardPixelForMoveAnim(fromCol, fromRow, territoryGraph);
-  const iconCx0 = hex0.x;
-  const iconCy0 = hex0.y - HEX_SIZE * 0.34;
-  const bracketHalf = HEX_SIZE * 0.22;
-  const bracketHalfH = HEX_SIZE * 0.42;
-  const bracketLeg = HEX_SIZE * 0.11;
+  const iconCx0 = hex0.x - HEX_SIZE * unitBracketsXMultiplier;
+  const iconCy0 = hex0.y - HEX_SIZE * unitBracketsYMultiplier;
+  const bracketHalf = HEX_SIZE * unitBracketsHalfMultiplier;
+  const bracketHalfH = HEX_SIZE * unitBracketsHalfHMultiplier;
+  const bracketLeg = HEX_SIZE * unitBracketsLegMultiplier;
   const bracketPath = svgEl('path');
   bracketPath.setAttribute('class', 'board-unit__brackets');
   bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx0, iconCy0, bracketHalf, bracketHalfH, bracketLeg));
@@ -2601,7 +2617,7 @@ export function animateStrikeAndReturn(
   unitWrap.appendChild(factionImg);
 
   const iconSrc = unit.icon ?? unitIcon(unit.unitTypeId);
-  const iconSize = HEX_SIZE * 0.4;
+  const iconSize = HEX_SIZE * unitIconSizeMultiplier;
   const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, chip0.iconColor, '1', 'board-unit__icon');
   const iconWrapper = svgEl('g');
   iconWrapper.setAttribute('pointer-events', 'none');
@@ -2609,7 +2625,7 @@ export function animateStrikeAndReturn(
   unitWrap.appendChild(iconWrapper);
 
   const starN = boardUnitUpgradeStarCount(unit);
-  const starSize = HEX_SIZE * 0.14;
+  const starSize = HEX_SIZE * unitStarsOuterMultiplier;
   const starsOuter = svgEl('g');
   starsOuter.setAttribute('class', 'board-unit__stars');
   starsOuter.setAttribute('pointer-events', 'none');
