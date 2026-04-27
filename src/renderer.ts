@@ -2880,16 +2880,25 @@ export function playRangedArtilleryHexBarrageVfx(
 }
 
 export function getHexFromEvent(e: MouseEvent): { col: number; row: number } | null {
-  const target = (e.target as Element).closest('[data-col]') as HTMLElement | null;
-  if (!target) return null;
-  return { col: parseInt(target.dataset['col']!), row: parseInt(target.dataset['row']!) };
+  const el = (e.target as Element).closest('[data-col]');
+  if (!el) return null;
+  // getAttribute: reliable on SVG in WKWebView/Safari; .dataset is not always.
+  const cStr = el.getAttribute('data-col');
+  const rStr = el.getAttribute('data-row');
+  if (cStr == null || rStr == null) return null;
+  const col = parseInt(cStr, 10);
+  const row = parseInt(rStr, 10);
+  if (Number.isNaN(col) || Number.isNaN(row)) return null;
+  return { col, row };
 }
 
 /** True when the event hit the interactive unit chip (not the full hex / territory). */
 export function eventTargetIsOnBoardUnitChip(e: MouseEvent | { target: EventTarget | null }): boolean {
   const t = e.target;
   if (!(t instanceof Element)) return false;
-  return t.closest('g.board-unit') !== null;
+  // Use class only, not "g.board-unit" — the tag selector is unreliable in SVG nextElement/closest
+  // in some WebKit builds (Tauri/embedded WKWebView).
+  return t.closest('.board-unit') !== null;
 }
 
 // Draw (or clear) the movement path preview from the unit to a hovered valid-move hex.
