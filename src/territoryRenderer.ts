@@ -6,7 +6,8 @@
 
 import type { GameState, HexState, Owner, Unit } from './types';
 import type { TerritoryGraphData, TerritoryMapTerritory, TerritoryMapDef } from './territoryMap';
-import { getValidMoves, isValidProductionPlacement } from './game';
+import { getValidMoves, isValidProductionPlacement, getRangedAttackTargets } from './game';
+import { mountBoardUnitChipContents } from './renderer';
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
 import outsideBorderPatternSrc from '../public/images/misc/outside-border-pattern.png';
 
@@ -17,10 +18,6 @@ const COLOR_SELECTED_STROKE   = '#fbbf24';
 const COLOR_VALID_MOVE_STROKE = '#22c55e';
 const COLOR_PRODUCTION_STROKE = '#3b82f6';
 const STROKE_WIDTH_HIGHLIGHT  = 3;
-
-const HP_BAR_WIDTH  = 36;
-const HP_BAR_HEIGHT = 5;
-const UNIT_IMG_SIZE = 28;
 
 interface RendererState {
   graph: TerritoryGraphData;
@@ -662,7 +659,26 @@ export function renderTerritoryState(
   }
   for (const [cpid, el] of existingCP) if (!seenCP.has(cpid)) el.remove();
 
-  // ── trr-units ─────────────────────────────────────────────────────────────────
+  // ── trr-units (same map chip as hex {@link mountBoardUnitChipContents}) ───────
+  let selectedUnitTr =
+    state.selectedUnit !== null ? (state.units.find(u => u.id === state.selectedUnit) ?? null) : null;
+  if (selectedUnitTr && selectedUnitTr.owner !== localPlayer) selectedUnitTr = null;
+  if (
+    selectedUnitTr &&
+    state.activePlayer !== localPlayer &&
+    selectedUnitTr.owner === localPlayer
+  ) {
+    selectedUnitTr = null;
+  }
+  const rangedTargetKeysTr = new Set<string>();
+  if (selectedUnitTr && state.phase === 'movement' && state.activePlayer === localPlayer) {
+    for (const t of getRangedAttackTargets(state, selectedUnitTr)) {
+      rangedTargetKeysTr.add(`${t.col},${t.row}`);
+    }
+  }
+  const productionTiredVisualTr =
+    state.phase === 'production' && state.activePlayer === localPlayer;
+
   const unitsLayer = svgElement.querySelector('#trr-units')!;
   const existingUnits = new Map<number, SVGGElement>();
   for (const child of Array.from(unitsLayer.children)) {
@@ -683,52 +699,29 @@ export function renderTerritoryState(
       g.setAttribute('data-unit-id', String(unit.id));
       g.setAttribute('data-territory-id', graph.keyToId[`${unit.col},${unit.row}`] ?? '');
       unitsLayer.appendChild(g);
-
-      const img = document.createElementNS(SVG_NS, 'image') as SVGImageElement;
-      img.setAttribute('data-role', 'icon');
-      img.setAttribute('width', String(UNIT_IMG_SIZE));
-      img.setAttribute('height', String(UNIT_IMG_SIZE));
-      img.setAttribute('x', String(-UNIT_IMG_SIZE / 2));
-      img.setAttribute('y', String(-UNIT_IMG_SIZE / 2));
-      img.setAttribute('pointer-events', 'none');
-      g.appendChild(img);
-
-      const hpBg = document.createElementNS(SVG_NS, 'rect') as SVGRectElement;
-      hpBg.setAttribute('data-role', 'hp-bg');
-      hpBg.setAttribute('x', String(-HP_BAR_WIDTH / 2));
-      hpBg.setAttribute('y', String(UNIT_IMG_SIZE / 2 + 2));
-      hpBg.setAttribute('width', String(HP_BAR_WIDTH));
-      hpBg.setAttribute('height', String(HP_BAR_HEIGHT));
-      hpBg.setAttribute('rx', '2');
-      hpBg.setAttribute('fill', '#374151');
-      hpBg.setAttribute('pointer-events', 'none');
-      g.appendChild(hpBg);
-
-      const hpFill = document.createElementNS(SVG_NS, 'rect') as SVGRectElement;
-      hpFill.setAttribute('data-role', 'hp-fill');
-      hpFill.setAttribute('x', String(-HP_BAR_WIDTH / 2));
-      hpFill.setAttribute('y', String(UNIT_IMG_SIZE / 2 + 2));
-      hpFill.setAttribute('height', String(HP_BAR_HEIGHT));
-      hpFill.setAttribute('rx', '2');
-      hpFill.setAttribute('pointer-events', 'none');
-      g.appendChild(hpFill);
     }
 
-    const cx = node.centroid.x, cy = node.centroid.y;
+    const cx = node.centroid.x;
+    const cy = node.centroid.y;
+    setAttrIfChanged(g, 'class', 'board-unit');
+    setAttrIfChanged(g, 'data-col', String(node.virtualCol));
+    setAttrIfChanged(g, 'data-row', String(node.virtualRow));
     setAttrIfChanged(g, 'transform', `translate(${cx},${cy})`);
+    g.style.opacity = '1';
 
-    const img = g.querySelector<SVGImageElement>('[data-role="icon"]');
-    if (img && unit.icon) setAttrIfChanged(img, 'href', unit.icon);
-
-    const hpFill = g.querySelector<SVGRectElement>('[data-role="hp-fill"]');
-    if (hpFill) {
-      const pct = Math.max(0, Math.min(1, unit.hp / unit.maxHp));
-      setAttrIfChanged(hpFill, 'width', String(Math.round(pct * HP_BAR_WIDTH)));
-      const hpColor = pct > 0.6 ? '#22c55e' : pct > 0.3 ? '#eab308' : '#ef4444';
-      setAttrIfChanged(hpFill, 'fill', hpColor);
-    }
-
-    g.style.opacity = (unit.movesUsed >= unit.movement && state.phase === 'movement') ? '0.5' : '1';
+    mountBoardUnitChipContents(g, {
+      state,
+      unit,
+      localPlayer,
+      x: cx,
+      y: cy,
+      dc: node.virtualCol,
+      dr: node.virtualRow,
+      displayHp: unit.hp,
+      productionTiredVisual: productionTiredVisualTr,
+      rangedTargetKeys: rangedTargetKeysTr,
+      localSpectatorInspectUnitId: null,
+    });
   }
   for (const [uid, el] of existingUnits) if (!seenUnits.has(uid)) el.remove();
 }

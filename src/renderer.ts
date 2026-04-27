@@ -900,6 +900,133 @@ function appendBoardUnitStars(
   parent.appendChild(g);
 }
 
+/** Arguments for {@link mountBoardUnitChipContents} (hex grid + polygon territory). */
+export interface MountBoardUnitChipParams {
+  state: GameState;
+  unit: Unit;
+  localPlayer: Owner;
+  /** Board pixel center (hex center or territory centroid). */
+  x: number;
+  y: number;
+  dc: number;
+  dr: number;
+  displayHp: number;
+  productionTiredVisual: boolean;
+  rangedTargetKeys: Set<string>;
+  localSpectatorInspectUnitId?: number | null;
+  /** When false, skip ranged artillery aim decoration (optional). */
+  showRangedAimOverlay?: boolean;
+}
+
+/** Clears `unitWrap` children and repaints the map unit chip (shield, brackets, faction, icon, stars, HP). */
+export function mountBoardUnitChipContents(
+  unitWrap: SVGGElement,
+  p: MountBoardUnitChipParams,
+): void {
+  while (unitWrap.firstChild) unitWrap.removeChild(unitWrap.firstChild);
+
+  const c = colors();
+  const hpRatio = p.unit.maxHp > 0 ? Math.min(1, Math.max(0, p.displayHp / p.unit.maxHp)) : 0;
+  const isSelected = unitIsVisuallySelectedForBoard(p.state, p.unit, p.localPlayer, p.localSpectatorInspectUnitId);
+  const isRangedTarget = p.rangedTargetKeys.has(`${p.dc},${p.dr}`);
+  const movementTired =
+    p.state.phase === 'movement' &&
+    p.state.activePlayer === p.unit.owner &&
+    p.unit.movesUsed >= p.unit.movement;
+  const tired = movementTired || p.productionTiredVisual;
+  const isFriendly = p.unit.owner === p.localPlayer;
+  const friendlyMovementTired = movementTired && isFriendly;
+  const chip = mapUnitChipStyle(c, {
+    isSelected,
+    isFriendly,
+    isRangedTarget,
+    friendlyMovementTired,
+  });
+  const opacity = '1';
+  const iconOpacity = tired ? String(config.tiredIconOpacity) : '1';
+  const showAim = p.showRangedAimOverlay !== false;
+
+  const sc = (HEX_SIZE * 1.1) / 50;
+  const unitEl = svgEl('path');
+  unitEl.setAttribute('class', 'board-unit__body');
+  unitEl.setAttribute('d', BOARD_UNIT_SILHOUETTE_D);
+  unitEl.setAttribute('fill', chip.bodyFill);
+  unitEl.setAttribute('stroke', chip.bodyStroke);
+  unitEl.setAttribute('stroke-width', String(chip.bodyStrokeW / sc));
+  unitEl.setAttribute('opacity', opacity);
+  unitEl.setAttribute('data-col', String(p.dc));
+  unitEl.setAttribute('data-row', String(p.dr));
+  unitEl.setAttribute('transform', `translate(${p.x - 25 * sc},${p.y - 32 * sc}) scale(${sc})`);
+  unitEl.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
+  unitWrap.appendChild(unitEl);
+
+  const barW = HEX_SIZE * 0.58;
+  const barH = HEX_SIZE * 0.1;
+  const barX = p.x - barW / 2;
+  const barY = p.y + HEX_SIZE * 0.13;
+
+  const barBg = svgEl('rect');
+  barBg.setAttribute('class', 'board-unit__hp-bg');
+  barBg.setAttribute('x', String(barX));
+  barBg.setAttribute('y', String(barY));
+  barBg.setAttribute('width', String(barW));
+  barBg.setAttribute('height', String(barH));
+  barBg.setAttribute('pointer-events', 'none');
+  barBg.setAttribute('opacity', opacity);
+  unitWrap.appendChild(barBg);
+
+  const barFill = svgEl('rect');
+  barFill.setAttribute('class', 'board-unit__hp-fill');
+  barFill.setAttribute('x', String(barX));
+  barFill.setAttribute('y', String(barY));
+  barFill.setAttribute('width', String(barW * hpRatio));
+  barFill.setAttribute('height', String(barH));
+  barFill.setAttribute('fill', chip.hpFill);
+  barFill.setAttribute('pointer-events', 'none');
+  barFill.setAttribute('opacity', opacity);
+  unitWrap.appendChild(barFill);
+
+  const iconCx = p.x;
+  const iconCy = p.y - HEX_SIZE * 0.34;
+  const bracketHalf = HEX_SIZE * 0.22;
+  const bracketLeg = HEX_SIZE * 0.11;
+  const bracketPath = svgEl('path');
+  bracketPath.setAttribute('class', 'board-unit__brackets');
+  bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketLeg));
+  bracketPath.setAttribute('fill', 'none');
+  bracketPath.setAttribute('stroke', chip.bracketStroke);
+  bracketPath.setAttribute('stroke-width', String(chip.bracketStrokeW));
+  bracketPath.setAttribute('stroke-linecap', 'square');
+  bracketPath.setAttribute('pointer-events', 'none');
+  unitWrap.appendChild(bracketPath);
+
+  const facHref = factionIconHrefFromPackage(packageForUnitOnBoard(p.unit, p.state));
+  const facW = 11 * sc;
+  const facX = p.x - 25 * sc + 2.5 * sc;
+  const facY = p.y - 32 * sc + 2 * sc;
+  unitWrap.appendChild(svgFactionImage(facX, facY, facW, facW, facHref));
+
+  const icon = p.unit.icon ?? unitIcon(p.unit.unitTypeId);
+  const iconEl = inlineIcon(icon, iconCx, iconCy, HEX_SIZE * 0.4, chip.iconColor, iconOpacity, 'board-unit__icon');
+  if (iconEl) unitWrap.appendChild(iconEl);
+
+  const starN = boardUnitUpgradeStarCount(p.unit);
+  const starSize = HEX_SIZE * 0.14;
+  const starY = p.y - 32 * sc - starSize * 0.55;
+  appendBoardUnitStars(unitWrap, p.x, starY, starN, starSize);
+
+  if (showAim && isRangedTarget) {
+    const aim = inlineIcon('icons/artillery.svg', p.x, p.y - HEX_SIZE * 1, HEX_SIZE * 0.5, c.rangedTarget, opacity);
+    if (aim) {
+      const aimWrap = svgEl('g');
+      aimWrap.setAttribute('class', 'ranged-target-aim');
+      aimWrap.setAttribute('pointer-events', 'none');
+      aimWrap.appendChild(aim);
+      unitWrap.appendChild(aimWrap);
+    }
+  }
+}
+
 // Neighbor direction → edge index mapping (edge i spans vertex i to vertex (i+1)%6).
 // Vertex i sits at angle (60*i − 30)° in pointy-top orientation (y-axis down).
 //   Edge 0 (v0–v1): right (E)        Edge 3 (v3–v4): left (W)
@@ -2060,28 +2187,6 @@ export function renderState(
     const dc = unit.col;
     const dr = unit.row;
     const { x, y } = hexToPixel(dc, dr);
-    const isSelected = isUnitVisuallySelected(unit);
-    const displayHp  = displayHpByUnit.get(unit.id) ?? unit.hp;
-    const hpRatio    = displayHp / unit.maxHp;
-
-    const isRangedTarget = rangedTargetKeys.has(`${dc},${dr}`);
-    const movementTired =
-      state.phase === 'movement' &&
-      state.activePlayer === unit.owner &&
-      unit.movesUsed >= unit.movement;
-    const productionTiredVisual =
-      state.phase === 'production' && productionFocusHexes.size > 0;
-    const tired = movementTired || productionTiredVisual;
-    const isFriendly = unit.owner === localPlayer;
-    const friendlyMovementTired = movementTired && isFriendly;
-    const chip = mapUnitChipStyle(c, {
-      isSelected,
-      isFriendly,
-      isRangedTarget,
-      friendlyMovementTired,
-    });
-    const opacity = '1';
-    const iconOpacity = tired ? String(config.tiredIconOpacity) : '1';
 
     const unitRoot = flipBoardY ? svgUprightAt(x, y) : null;
     if (unitRoot) unitLayer.appendChild(unitRoot);
@@ -2093,82 +2198,19 @@ export function renderState(
     unitWrap.setAttribute('data-row', String(dr));
     uParent.appendChild(unitWrap);
 
-    const sc = (HEX_SIZE * 1.1) / 50;
-    const unitEl = svgEl('path');
-    unitEl.setAttribute('class', 'board-unit__body');
-    unitEl.setAttribute('d', BOARD_UNIT_SILHOUETTE_D);
-    unitEl.setAttribute('fill', chip.bodyFill);
-    unitEl.setAttribute('stroke', chip.bodyStroke);
-    unitEl.setAttribute('stroke-width', String(chip.bodyStrokeW / sc));
-    unitEl.setAttribute('opacity', opacity);
-    unitEl.setAttribute('data-col', String(dc));
-    unitEl.setAttribute('data-row', String(dr));
-    unitEl.setAttribute('transform', `translate(${x - 25 * sc},${y - 32 * sc}) scale(${sc})`);
-    unitEl.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
-    unitWrap.appendChild(unitEl);
-
-    // HP bar (inside shape): track = empty HP, fill = ally / enemy / selected hue × current HP
-    const barW = HEX_SIZE * 0.58;
-    const barH = HEX_SIZE * 0.1;
-    const barX = x - barW / 2;
-    const barY = y + HEX_SIZE * 0.13;
-
-    const barBg = svgEl('rect');
-    barBg.setAttribute('class', 'board-unit__hp-bg');
-    barBg.setAttribute('x', String(barX)); barBg.setAttribute('y', String(barY));
-    barBg.setAttribute('width', String(barW)); barBg.setAttribute('height', String(barH));
-    barBg.setAttribute('pointer-events', 'none');
-    barBg.setAttribute('opacity', opacity);
-    unitWrap.appendChild(barBg);
-
-    const barFill = svgEl('rect');
-    barFill.setAttribute('class', 'board-unit__hp-fill');
-    barFill.setAttribute('x', String(barX)); barFill.setAttribute('y', String(barY));
-    barFill.setAttribute('width', String(barW * hpRatio)); barFill.setAttribute('height', String(barH));
-    barFill.setAttribute('fill', chip.hpFill);
-    barFill.setAttribute('pointer-events', 'none');
-    barFill.setAttribute('opacity', opacity);
-    unitWrap.appendChild(barFill);
-
-    const iconCx = x;
-    const iconCy = y - HEX_SIZE * 0.34;
-    const bracketHalf = HEX_SIZE * 0.22;
-    const bracketLeg = HEX_SIZE * 0.11;
-    const bracketPath = svgEl('path');
-    bracketPath.setAttribute('class', 'board-unit__brackets');
-    bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketLeg));
-    bracketPath.setAttribute('fill', 'none');
-    bracketPath.setAttribute('stroke', chip.bracketStroke);
-    bracketPath.setAttribute('stroke-width', String(chip.bracketStrokeW));
-    bracketPath.setAttribute('stroke-linecap', 'square');
-    bracketPath.setAttribute('pointer-events', 'none');
-    unitWrap.appendChild(bracketPath);
-
-    const facHref = factionIconHrefFromPackage(packageForUnitOnBoard(unit, state));
-    const facW = 11 * sc;
-    const facX = x - 25 * sc + 2.5 * sc;
-    const facY = y - 32 * sc + 2 * sc;
-    unitWrap.appendChild(svgFactionImage(facX, facY, facW, facW, facHref));
-
-    const icon = unit.icon ?? unitIcon(unit.unitTypeId);
-    const iconEl = inlineIcon(icon, iconCx, iconCy, HEX_SIZE * 0.4, chip.iconColor, iconOpacity, 'board-unit__icon');
-    if (iconEl) unitWrap.appendChild(iconEl);
-
-    const starN = boardUnitUpgradeStarCount(unit);
-    const starSize = HEX_SIZE * 0.14;
-    const starY = y - 32 * sc - starSize * 0.55;
-    appendBoardUnitStars(unitWrap, x, starY, starN, starSize);
-
-    if (isRangedTarget) {
-      const aim = inlineIcon('icons/artillery.svg', x, y - HEX_SIZE * 1, HEX_SIZE * 0.5, c.rangedTarget, opacity);
-      if (aim) {
-        const aimWrap = svgEl('g');
-        aimWrap.setAttribute('class', 'ranged-target-aim');
-        aimWrap.setAttribute('pointer-events', 'none');
-        aimWrap.appendChild(aim);
-        unitWrap.appendChild(aimWrap);
-      }
-    }
+    mountBoardUnitChipContents(unitWrap, {
+      state,
+      unit,
+      localPlayer,
+      x,
+      y,
+      dc,
+      dr,
+      displayHp: displayHpByUnit.get(unit.id) ?? unit.hp,
+      productionTiredVisual: productionFocusHexes.size > 0,
+      rangedTargetKeys,
+      localSpectatorInspectUnitId,
+    });
   }
   perfRecord('render.unitsPass', performance.now() - tUnitsStart);
   perfRecord('render.total', performance.now() - tRenderStart);

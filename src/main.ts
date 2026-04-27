@@ -498,7 +498,7 @@ let boardPointerHoverHex: { col: number; row: number } | null = null;
 function applyBoardPointerHoverClasses(): void {
   if (svg.id !== 'board') return;
   const want = boardPointerHoverHex;
-  for (const node of svg.querySelectorAll('#unit-layer g.board-unit')) {
+  for (const node of svg.querySelectorAll('#unit-layer g.board-unit, #trr-units g.board-unit')) {
     const el = node as SVGGElement;
     const col = parseInt(el.dataset.col ?? '', 10);
     const row = parseInt(el.dataset.row ?? '', 10);
