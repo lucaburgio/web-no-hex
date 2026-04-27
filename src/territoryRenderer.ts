@@ -460,16 +460,41 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
 export function getTerritoryFromEvent(e: MouseEvent, svgEl: SVGSVGElement): { col: number; row: number } | null {
   const rs = rendererStateMap.get(svgEl);
   if (!rs) return null;
-  let el: Element | null = e.target as Element | null;
+  const g = rs.graph;
+  const raw = e.target;
+  const startEl: Element | null =
+    raw instanceof Element ? raw : raw instanceof Text ? raw.parentElement : null;
+  if (!startEl) return null;
+
+  // 1) Prefer [data-col][data-row] (map chip, hit layers). Matches unit g under #trr-units even
+  // when data-territory-id is empty or territories[tid] is out of sync.
+  const withV = startEl.closest('[data-col][data-row]');
+  if (withV) {
+    const cStr = withV.getAttribute('data-col');
+    const rStr = withV.getAttribute('data-row');
+    if (cStr != null && rStr != null) {
+      const col = parseInt(cStr, 10);
+      const row = parseInt(rStr, 10);
+      if (!Number.isNaN(col) && !Number.isNaN(row) && graphHasVirtualCell(g, col, row)) {
+        return { col, row };
+      }
+    }
+  }
+  // 2) ev2-territory / notes: walk up and resolve from territory id
+  let el: Element | null = startEl;
   while (el && el !== svgEl) {
-    const tid = el.getAttribute('data-territory-id');
+    const tid = el.getAttribute('data-territory-id') || el.getAttribute('data-ev2-territory-id');
     if (tid) {
-      const t = rs.graph.territories[tid];
+      const t = g.territories[tid];
       if (t) return { col: t.virtualCol, row: t.virtualRow };
     }
     el = el.parentElement;
   }
   return null;
+}
+
+function graphHasVirtualCell(gra: { keyToId: Record<string, string> }, col: number, row: number): boolean {
+  return gra.keyToId[`${col},${row}`] !== undefined;
 }
 
 // ── renderTerritoryState ──────────────────────────────────────────────────────

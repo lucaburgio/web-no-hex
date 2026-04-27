@@ -2894,11 +2894,19 @@ export function getHexFromEvent(e: MouseEvent): { col: number; row: number } | n
 
 /** True when the event hit the interactive unit chip (not the full hex / territory). */
 export function eventTargetIsOnBoardUnitChip(e: MouseEvent | { target: EventTarget | null }): boolean {
-  const t = e.target;
-  if (!(t instanceof Element)) return false;
-  // Use class only, not "g.board-unit" — the tag selector is unreliable in SVG nextElement/closest
-  // in some WebKit builds (Tauri/embedded WKWebView).
-  return t.closest('.board-unit') !== null;
+  const raw = e.target;
+  const t = raw instanceof Element ? raw : raw instanceof Text ? raw.parentElement : null;
+  if (!t) return false;
+  if (t.closest('.board-un' + 'it') != null) return true;
+  // SVG <path> classList/closest(.board-un' + it) is flaky in some engines; any gridded node under the unit layers counts
+  if (
+    t.hasAttribute('data-col') &&
+    t.hasAttribute('data-row') &&
+    t.closest('#unit-layer, #trr-units') != null
+  ) {
+    return true;
+  }
+  return false;
 }
 
 // Draw (or clear) the movement path preview from the unit to a hovered valid-move hex.

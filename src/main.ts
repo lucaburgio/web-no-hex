@@ -156,6 +156,7 @@ const WS_URL = relayWebSocketUrl();
 
 const svg        = document.getElementById('board') as unknown as SVGSVGElement;
 const gameAreaEl = document.getElementById('game-area') as HTMLElement | null;
+const boardWrapEl = document.getElementById('board-wrap') as HTMLElement | null;
 
 /** Last move-path preview key; redraw only when unit position or hovered destination changes. */
 let movePathPreviewKey: string | null = null;
@@ -3412,7 +3413,6 @@ function syncMovementUnitCard(): void {
     state.phase === 'movement' &&
     state.activePlayer === localPlayer &&
     state.selectedUnit !== null;
-
   if (!offTurnInspect && !onTurnEligible) {
     movementUnitCardEl.innerHTML = '';
     upgradePickerPanelEl.innerHTML = '';
@@ -3461,6 +3461,7 @@ function syncMovementUnitCard(): void {
 // ── Board click ───────────────────────────────────────────────────────────────
 
 svg.addEventListener('click', (e: MouseEvent) => {
+  try {
   if (state.winner) return;
 
   const hex = state.customMapGraph
@@ -3885,18 +3886,28 @@ svg.addEventListener('click', (e: MouseEvent) => {
   if (didInterruptHumanMove && state.phase === 'movement' && state.activePlayer === localPlayer) {
     maybeAutoEnd();
   }
+  } finally {
+    // Clicks on the map must not reach document.body: the "click outside" handler can treat a
+    // spurious or wrap-targeted event as outside #board, clearing selection right after a unit is chosen.
+    e.stopPropagation();
+  }
 });
 
-// Deselect when clicking outside the SVG (header, footer, game-area padding). Bubble order runs the
-// #board handler before this, so hex/unit clicks never hit this path. Movement HUD (unit card,
-// upgrade picker) and the production unit picker are outside the SVG — exclude them so clicks
-// there do not clear selection.
+// Deselect when clicking outside the board (header, footer, game-area padding). Clicks on #board and
+// #board-wrap are ignored here; the #board listener stops propagation for hits on the actual SVG
+// (see above). movement-hud-stack, unit picker, etc. are also excluded.
 document.body.addEventListener('click', (e: MouseEvent) => {
   if (state.winner) return;
 
   const t = e.target;
   if (!(t instanceof Element)) return;
-  if (svg.contains(t)) return;
+  // Retargeting / follow-up events can have target on html/body/game-area even when the same user
+  // action originated on the map; use composedPath (when available) so we do not deselect.
+  if (e.composedPath) {
+    const p = e.composedPath() as (EventTarget & { id?: string } | null | undefined)[];
+    if (p?.some(n => n === svg || n === boardWrapEl)) return;
+  }
+  if (svg.contains(t) || (boardWrapEl != null && boardWrapEl.contains(t))) return;
 
   if (state.activePlayer !== localPlayer) {
     if (
