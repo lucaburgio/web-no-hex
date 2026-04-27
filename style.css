@@ -133,9 +133,9 @@ img {
     /* Map unit shield card (board / recap); HP hue = ally / enemy / selected, not HP tier */
     --color-board-unit-card-fill: #ffffff;
     --color-board-unit-border: #c8c8c8;
-    --color-board-unit-border-width: 2;
+    --color-board-unit-border-width: 3.5;
     --color-board-unit-border-selected: #000000;
-    --color-board-unit-border-selected-width: 2;
+    --color-board-unit-border-selected-width: 3.5;
     --color-board-unit-bracket: #c8c8c8;
     --color-board-unit-bracket-width: 2;
     --color-board-unit-bracket-selected: #000000;

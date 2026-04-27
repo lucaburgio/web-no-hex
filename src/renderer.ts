@@ -34,7 +34,7 @@ const MOUNTAIN_HEX_TEXTURES = [mountainHex01, mountainHex02, mountainHex03, moun
 
 /** Shield silhouette in 50×64 design space; scaled in JS. Styled via `.board-unit__body` in `style.css`. */
 export const BOARD_UNIT_SILHOUETTE_D =
-  'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
+  'M0 0h47v58l-23.5 5L0 58z';
 
 /** BFS path distance: hexes with distance 0, 1, or 2 from any friendly unit are in vision. */
 const FOG_VISION_HEX_DISTANCE = 2;
@@ -748,11 +748,11 @@ function colors(): Colors {
 
     boardUnitCardFill:            v('--color-board-unit-card-fill') || '#FFFFFF',
     boardUnitBorder:              v('--color-board-unit-border') || '#C8C8C8',
-    boardUnitBorderWidth:         readCssNumber(v('--color-board-unit-border-width'), 1.25),
+    boardUnitBorderWidth:         readCssNumber(v('--color-board-unit-border-width'), 3.5),
     boardUnitBorderSelected:      v('--color-board-unit-border-selected') || '#000000',
-    boardUnitBorderSelectedWidth: readCssNumber(v('--color-board-unit-border-selected-width'), 2.5),
+    boardUnitBorderSelectedWidth: readCssNumber(v('--color-board-unit-border-selected-width'), 3.5),
     boardUnitBracket:             v('--color-board-unit-bracket') || '#C8C8C8',
-    boardUnitBracketWidth:        readCssNumber(v('--color-board-unit-bracket-width'), 1.1),
+    boardUnitBracketWidth:        readCssNumber(v('--color-board-unit-bracket-width'), 3),
     boardUnitBracketSelected:     v('--color-board-unit-bracket-selected') || '#000000',
     boardUnitBracketSelectedWidth: readCssNumber(v('--color-board-unit-bracket-selected-width'), 2),
     boardUnitHpFriendly:          v('--color-board-unit-hp-friendly') || '#7FBFFF',
@@ -854,14 +854,15 @@ function mapUnitChipStyle(
   return { bodyFill, bodyStroke, bodyStrokeW, bracketStroke, bracketStrokeW, hpFill, iconColor };
 }
 
-function boardUnitBracketsPathD(cx: number, cy: number, half: number, leg: number): string {
-  const h = half;
+function boardUnitBracketsPathD(cx: number, cy: number, halfW: number, halfH: number, leg: number): string {
+  const hw = halfW;
+  const hh = halfH;
   const l = leg;
   return [
-    `M ${cx - h} ${cy - h + l} L ${cx - h} ${cy - h} L ${cx - h + l} ${cy - h}`,
-    `M ${cx + h - l} ${cy - h} L ${cx + h} ${cy - h} L ${cx + h} ${cy - h + l}`,
-    `M ${cx - h} ${cy + h - l} L ${cx - h} ${cy + h} L ${cx - h + l} ${cy + h}`,
-    `M ${cx + h - l} ${cy + h} L ${cx + h} ${cy + h} L ${cx + h} ${cy + h - l}`,
+    `M ${cx - hw} ${cy - hh + l} L ${cx - hw} ${cy - hh} L ${cx - hw + l} ${cy - hh}`,
+    `M ${cx + hw - l} ${cy - hh} L ${cx + hw} ${cy - hh} L ${cx + hw} ${cy - hh + l}`,
+    `M ${cx - hw} ${cy + hh - l} L ${cx - hw} ${cy + hh} L ${cx - hw + l} ${cy + hh}`,
+    `M ${cx + hw - l} ${cy + hh} L ${cx + hw} ${cy + hh} L ${cx + hw} ${cy + hh - l}`,
   ].join(' ');
 }
 
@@ -960,10 +961,10 @@ export function mountBoardUnitChipContents(
   unitEl.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
   unitWrap.appendChild(unitEl);
 
-  const barW = HEX_SIZE * 0.58;
+  const barW = HEX_SIZE * 0.74;
   const barH = HEX_SIZE * 0.1;
-  const barX = p.x - barW / 2;
-  const barY = p.y + HEX_SIZE * 0.13;
+  const barX = p.x - barW / 1.83;
+  const barY = p.y + HEX_SIZE * 0.38;
 
   const barBg = svgEl('rect');
   barBg.setAttribute('class', 'board-unit__hp-bg');
@@ -986,13 +987,14 @@ export function mountBoardUnitChipContents(
   barFill.setAttribute('opacity', opacity);
   unitWrap.appendChild(barFill);
 
-  const iconCx = p.x;
-  const iconCy = p.y - HEX_SIZE * 0.34;
-  const bracketHalf = HEX_SIZE * 0.22;
-  const bracketLeg = HEX_SIZE * 0.11;
+  const iconCx = p.x - HEX_SIZE * 0.03;
+  const iconCy = p.y - HEX_SIZE * 0.12;
+  const bracketHalf = HEX_SIZE * 0.36;
+  const bracketHalfH = HEX_SIZE * 0.4;
+  const bracketLeg = HEX_SIZE * 0.2;
   const bracketPath = svgEl('path');
   bracketPath.setAttribute('class', 'board-unit__brackets');
-  bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketLeg));
+  bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketHalfH, bracketLeg));
   bracketPath.setAttribute('fill', 'none');
   bracketPath.setAttribute('stroke', chip.bracketStroke);
   bracketPath.setAttribute('stroke-width', String(chip.bracketStrokeW));
@@ -2333,10 +2335,11 @@ export function animateMoves(
     const iconCx0 = hex0.x;
     const iconCy0 = hex0.y - HEX_SIZE * 0.34;
     const bracketHalf = HEX_SIZE * 0.22;
+    const bracketHalfH = HEX_SIZE * 0.42;
     const bracketLeg = HEX_SIZE * 0.11;
     const bracketPath = svgEl('path');
     bracketPath.setAttribute('class', 'board-unit__brackets');
-    bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx0, iconCy0, bracketHalf, bracketLeg));
+    bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx0, iconCy0, bracketHalf, bracketHalfH, bracketLeg));
     bracketPath.setAttribute('fill', 'none');
     bracketPath.setAttribute('stroke', chip0.bracketStroke);
     bracketPath.setAttribute('stroke-width', String(chip0.bracketStrokeW));
@@ -2403,7 +2406,7 @@ export function animateMoves(
 
       const iconCx = x;
       const iconCy = y - HEX_SIZE * 0.34;
-      bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketLeg));
+      bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketHalfH, bracketLeg));
       factionImg.setAttribute('x', String(x - 25 * unitSc + 2.5 * unitSc));
       factionImg.setAttribute('y', String(y - 32 * unitSc + 2 * unitSc));
       factionImg.setAttribute('width', String(facW));
@@ -2571,10 +2574,11 @@ export function animateStrikeAndReturn(
   const iconCx0 = hex0.x;
   const iconCy0 = hex0.y - HEX_SIZE * 0.34;
   const bracketHalf = HEX_SIZE * 0.22;
+  const bracketHalfH = HEX_SIZE * 0.42;
   const bracketLeg = HEX_SIZE * 0.11;
   const bracketPath = svgEl('path');
   bracketPath.setAttribute('class', 'board-unit__brackets');
-  bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx0, iconCy0, bracketHalf, bracketLeg));
+  bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx0, iconCy0, bracketHalf, bracketHalfH, bracketLeg));
   bracketPath.setAttribute('fill', 'none');
   bracketPath.setAttribute('stroke', chip0.bracketStroke);
   bracketPath.setAttribute('stroke-width', String(chip0.bracketStrokeW));
@@ -2646,7 +2650,7 @@ export function animateStrikeAndReturn(
 
     const iconCx = x;
     const iconCy = y - HEX_SIZE * 0.34;
-    bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketLeg));
+    bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketHalfH, bracketLeg));
     factionImg.setAttribute('x', String(x - 25 * unitSc + 2.5 * unitSc));
     factionImg.setAttribute('y', String(y - 32 * unitSc + 2 * unitSc));
     factionImg.setAttribute('width', String(facW));
