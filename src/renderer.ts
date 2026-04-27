@@ -28,7 +28,7 @@ import mountainHex06 from '../public/images/misc/mountain-hex/mountain-06.png';
 import mountainHex07 from '../public/images/misc/mountain-hex/mountain-07.png';
 import { riverSegmentDisplay } from './rivers';
 import type { TerritoryGraphData } from './territoryMap';
-import { boardPixelForVirtualHex } from './territoryMap';
+import { boardPixelForVirtualHex, territoryPolygonPointsForVirtualHex } from './territoryMap';
 
 // All unit layout (static board chip + move/strike sprites — keep in sync).
 const unitTagSizeMultiplier = 1.24;
@@ -355,16 +355,6 @@ function positionAnimLayer(svgElement: SVGSVGElement, aboveStaticUnits: boolean)
 function resetAnimLayerStackOrder(svgElement: SVGSVGElement): void {
   positionAnimLayer(svgElement, true);
 }
-
-/** Hover move-path preview timeline (legacy; chevron train uses SMIL + CSS). */
-let movePathPreviewTl: gsap.core.Timeline | null = null;
-
-/** Chevron shape; timing scales with path length so spacing feels even (proposal 23 family). */
-const MOVE_PATH_CHEVRON_POINTS = '-20,-10 -6,-10 3,0 -6,10 -20,10 -10,0';
-/** Chevrons per hex edge along the route (1 hex step → this many; 2 steps → 2×, etc.). */
-const MOVE_PATH_CHEVRONS_PER_HEX_STEP = 2;
-/** Phase gap between consecutive chevrons; one loop duration = chevronCount × this. */
-const MOVE_PATH_CHEVRON_STAGGER_SEC = 0.4;
 
 export interface MoveAnimation {
   unit: Unit;      // snapshot of the unit before moving (owner/hp for colour)
@@ -1524,31 +1514,39 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   boundary.setAttribute('pointer-events', 'none');
   hexLayer.appendChild(boundary);
 
-  // Movement path preview (above hex layer, below units): dashed track + SMIL chevron train (proposal 23).
+  // Movement path preview (above hex layer, below units): dashed line, destination ring, end dot.
   const movePathLayer = svgEl('g');
   movePathLayer.id = 'move-path-layer';
   movePathLayer.setAttribute('pointer-events', 'none');
   boardViewRoot.insertBefore(movePathLayer, unitLayer);
-
-  const movePathDefs = svgEl('defs');
-  const movePathGeom = svgEl('path');
-  movePathGeom.id = `${svgElement.id}-move-path-geom`;
-  movePathGeom.setAttribute('d', 'M0,0');
-  movePathGeom.setAttribute('fill', 'none');
-  movePathGeom.setAttribute('stroke', 'none');
-  movePathDefs.appendChild(movePathGeom);
 
   const pathLine = svgEl('polyline');
   pathLine.id = 'move-path-line';
   pathLine.setAttribute('fill', 'none');
   pathLine.setAttribute('pointer-events', 'none');
 
-  const movePathChevronTrain = svgEl('g');
-  movePathChevronTrain.setAttribute('class', 'move-path-chevron-train');
+  const destOutline = svgEl('polygon');
+  destOutline.id = 'move-path-dest-outline';
+  destOutline.setAttribute('class', 'move-path-dest-outline');
+  destOutline.setAttribute('fill', 'none');
+  destOutline.setAttribute('pointer-events', 'none');
 
-  movePathLayer.appendChild(movePathDefs);
+  const endDot = svgEl('g');
+  endDot.id = 'move-path-end-dot';
+  endDot.setAttribute('pointer-events', 'none');
+  const endDotOuter = svgEl('circle');
+  endDotOuter.setAttribute('class', 'move-path-end-dot-outer');
+  const endDotInner = svgEl('circle');
+  endDotInner.setAttribute('class', 'move-path-end-dot-inner');
+  endDot.appendChild(endDotOuter);
+  endDot.appendChild(endDotInner);
+  endDotOuter.setAttribute('r', '6');
+  endDotInner.setAttribute('r', '2.5');
+  endDot.setAttribute('display', 'none');
+
   movePathLayer.appendChild(pathLine);
-  movePathLayer.appendChild(movePathChevronTrain);
+  movePathLayer.appendChild(destOutline);
+  movePathLayer.appendChild(endDot);
 
   // Full-hex invisible targets above empty cells; occupied cells clear the top hit in renderState
   // so the unit chip (or the terrain hex) receives the event (see eventTargetIsOnBoardUnitChip in main).
@@ -1595,35 +1593,77 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
 }
 
 /**
- * Territory boards skip {@link initRenderer}; they still need the hover move-path preview DOM
- * (#move-path-line, defs geometry, chevron train). Idempotent.
+ * Territory boards skip {@link initRenderer}; they still need the hover move-path preview DOM.
+ * Idempotent; upgrades older layers that lack destination outline / end dot.
  */
 export function ensureMovePathPreviewLayer(svgElement: SVGSVGElement): void {
-  if (svgElement.querySelector('#move-path-line')) return;
+  const upgradeLegacyMovePathLayer = (movePathLayer: SVGGElement): void => {
+    if (movePathLayer.querySelector('#move-path-dest-outline')) return;
+    movePathLayer.querySelector('defs')?.remove();
+    movePathLayer.querySelector('g.move-path-chevron-train')?.remove();
+
+    const destOutline = svgEl('polygon');
+    destOutline.id = 'move-path-dest-outline';
+    destOutline.setAttribute('class', 'move-path-dest-outline');
+    destOutline.setAttribute('fill', 'none');
+    destOutline.setAttribute('pointer-events', 'none');
+
+    const endDot = svgEl('g');
+    endDot.id = 'move-path-end-dot';
+    endDot.setAttribute('pointer-events', 'none');
+    endDot.setAttribute('display', 'none');
+    const endDotOuter = svgEl('circle');
+    endDotOuter.setAttribute('class', 'move-path-end-dot-outer');
+    const endDotInner = svgEl('circle');
+    endDotInner.setAttribute('class', 'move-path-end-dot-inner');
+    endDot.appendChild(endDotOuter);
+    endDot.appendChild(endDotInner);
+    endDotOuter.setAttribute('r', '6');
+    endDotInner.setAttribute('r', '2.5');
+
+    const pathLine = movePathLayer.querySelector('#move-path-line');
+    if (pathLine) pathLine.after(destOutline);
+    else movePathLayer.appendChild(destOutline);
+    movePathLayer.appendChild(endDot);
+  };
+
+  const existingLayer = svgElement.querySelector('#move-path-layer') as SVGGElement | null;
+  if (svgElement.querySelector('#move-path-line')) {
+    if (existingLayer) upgradeLegacyMovePathLayer(existingLayer);
+    return;
+  }
 
   const movePathLayer = svgEl('g');
   movePathLayer.id = 'move-path-layer';
   movePathLayer.setAttribute('pointer-events', 'none');
-
-  const movePathDefs = svgEl('defs');
-  const movePathGeom = svgEl('path');
-  movePathGeom.id = `${svgElement.id}-move-path-geom`;
-  movePathGeom.setAttribute('d', 'M0,0');
-  movePathGeom.setAttribute('fill', 'none');
-  movePathGeom.setAttribute('stroke', 'none');
-  movePathDefs.appendChild(movePathGeom);
 
   const pathLine = svgEl('polyline');
   pathLine.id = 'move-path-line';
   pathLine.setAttribute('fill', 'none');
   pathLine.setAttribute('pointer-events', 'none');
 
-  const movePathChevronTrain = svgEl('g');
-  movePathChevronTrain.setAttribute('class', 'move-path-chevron-train');
+  const destOutline = svgEl('polygon');
+  destOutline.id = 'move-path-dest-outline';
+  destOutline.setAttribute('class', 'move-path-dest-outline');
+  destOutline.setAttribute('fill', 'none');
+  destOutline.setAttribute('pointer-events', 'none');
 
-  movePathLayer.appendChild(movePathDefs);
+  const endDot = svgEl('g');
+  endDot.id = 'move-path-end-dot';
+  endDot.setAttribute('pointer-events', 'none');
+  const endDotOuter = svgEl('circle');
+  endDotOuter.setAttribute('class', 'move-path-end-dot-outer');
+  const endDotInner = svgEl('circle');
+  endDotInner.setAttribute('class', 'move-path-end-dot-inner');
+  endDot.appendChild(endDotOuter);
+  endDot.appendChild(endDotInner);
+  endDotOuter.setAttribute('r', '6');
+  endDotInner.setAttribute('r', '2.5');
+  endDot.setAttribute('display', 'none');
+
   movePathLayer.appendChild(pathLine);
-  movePathLayer.appendChild(movePathChevronTrain);
+  movePathLayer.appendChild(destOutline);
+  movePathLayer.appendChild(endDot);
 
   const trrUnits = svgElement.querySelector('#trr-units');
   if (trrUnits?.parentNode === svgElement) {
@@ -3013,7 +3053,6 @@ export function eventTargetIsOnBoardUnitChip(e: MouseEvent | { target: EventTarg
 
 // Draw (or clear) the movement path preview from the unit to a hovered valid-move hex.
 // `path` is an array of [col, row] pairs including the unit's start hex; pass [] to clear.
-// Visual style matches public/move-path-proposals.html proposal 23: marching dashed track + glowing chevron train.
 export function renderMovePath(
   svgElement: SVGSVGElement,
   path: [number, number][],
@@ -3022,66 +3061,64 @@ export function renderMovePath(
   const pathLine = svgElement.querySelector('#move-path-line') as SVGPolylineElement | null;
   if (!pathLine) return;
 
-  movePathPreviewTl?.kill();
-  movePathPreviewTl = null;
   gsap.killTweensOf(pathLine);
   pathLine.removeAttribute('style');
 
-  const movePathLayer = pathLine.parentElement as SVGGElement | null;
-  const geomId = `${svgElement.id}-move-path-geom`;
-  const geom = svgElement.querySelector(`#${geomId}`) as SVGPathElement | null;
-  const chevronTrain = movePathLayer?.querySelector('g.move-path-chevron-train') ?? null;
+  const destOutline = svgElement.querySelector('#move-path-dest-outline') as SVGPolygonElement | null;
+  const endDot = svgElement.querySelector('#move-path-end-dot') as SVGGElement | null;
+  const endDotOuter = endDot?.querySelector('.move-path-end-dot-outer') as SVGCircleElement | null;
+  const endDotInner = endDot?.querySelector('.move-path-end-dot-inner') as SVGCircleElement | null;
+  const chevronTrain = svgElement.querySelector('g.move-path-chevron-train');
+
+  const clearDecor = (): void => {
+    if (destOutline) destOutline.setAttribute('points', '');
+    if (endDot) endDot.setAttribute('display', 'none');
+    if (chevronTrain) chevronTrain.replaceChildren();
+    const geomId = `${svgElement.id}-move-path-geom`;
+    const geom = svgElement.ownerDocument.getElementById(geomId) as SVGPathElement | null;
+    if (geom) geom.setAttribute('d', '');
+  };
 
   if (path.length < 2) {
     pathLine.setAttribute('points', '');
     pathLine.removeAttribute('stroke-dasharray');
     pathLine.removeAttribute('stroke-dashoffset');
     pathLine.removeAttribute('class');
-    if (geom) geom.setAttribute('d', '');
-    if (chevronTrain) chevronTrain.replaceChildren();
+    clearDecor();
     return;
   }
 
   const xy = path.map(([c, r]) => boardPixelForMoveAnim(c, r, territoryGraph));
   const pointsAttr = xy.map(({ x, y }) => `${x},${y}`).join(' ');
-  const d = `M ${xy.map(({ x, y }) => `${x},${y}`).join(' L ')}`;
 
   pathLine.setAttribute('points', pointsAttr);
   pathLine.setAttribute('class', 'move-path-preview-track');
   pathLine.setAttribute('fill', 'none');
 
-  if (geom) geom.setAttribute('d', d);
+  const [destCol, destRow] = path[path.length - 1]!;
+  let destPolyPoints: string | null = null;
+  if (territoryGraph) {
+    destPolyPoints = territoryPolygonPointsForVirtualHex(territoryGraph, destCol, destRow);
+  } else {
+    const { x: cx, y: cy } = hexToPixel(destCol, destRow);
+    destPolyPoints = hexPoints(cx, cy);
+  }
+  if (destOutline && destPolyPoints) {
+    destOutline.setAttribute('points', destPolyPoints);
+  } else if (destOutline) {
+    destOutline.setAttribute('points', '');
+  }
 
-  if (chevronTrain) {
-    chevronTrain.replaceChildren();
-    const href = `#${geomId}`;
-    const hexSteps = path.length - 1;
-    const chevronCount = MOVE_PATH_CHEVRONS_PER_HEX_STEP * hexSteps;
-    const durSec = chevronCount * MOVE_PATH_CHEVRON_STAGGER_SEC;
-
-    for (let i = 0; i < chevronCount; i++) {
-      const poly = svgEl('polygon');
-      poly.setAttribute('class', 'move-path-chev');
-      poly.setAttribute('fill', 'var(--color-yellow-500)');
-      poly.setAttribute('points', MOVE_PATH_CHEVRON_POINTS);
-
-      const am = svgEl('animateMotion');
-      am.setAttribute('dur', `${durSec}s`);
-      am.setAttribute('repeatCount', 'indefinite');
-      am.setAttribute('rotate', 'auto');
-      am.setAttribute('calcMode', 'linear');
-      am.setAttribute('keyPoints', '0;1');
-      am.setAttribute('keyTimes', '0;1');
-      if (i > 0) {
-        am.setAttribute('begin', `-${(i * MOVE_PATH_CHEVRON_STAGGER_SEC).toFixed(2)}s`);
-      }
-
-      const mp = svgEl('mpath');
-      mp.setAttribute('href', href);
-
-      am.appendChild(mp);
-      poly.appendChild(am);
-      chevronTrain.appendChild(poly);
-    }
+  const last = xy[xy.length - 1]!;
+  if (endDot && endDotOuter && endDotInner) {
+    endDot.removeAttribute('display');
+    const ocx = String(last.x);
+    const ocy = String(last.y);
+    endDotOuter.setAttribute('cx', ocx);
+    endDotOuter.setAttribute('cy', ocy);
+    endDotOuter.setAttribute('r', '6');
+    endDotInner.setAttribute('cx', ocx);
+    endDotInner.setAttribute('cy', ocy);
+    endDotInner.setAttribute('r', '2.5');
   }
 }

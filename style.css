@@ -560,40 +560,41 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   display: block;
 }
 
-/* Territory map: movement selection uses same inset border as allied/enemy (ev2-border-line / glow) */
-#board .ev2-territory-fill.ev2-trr-move-highlight-fill,
-#recap-board .ev2-territory-fill.ev2-trr-move-highlight-fill {
-  fill: var(--color-yellow-50);
-}
+/* Territory map: valid-move / selection inset border (fill stays owner state; hover ring is #move-path-dest-outline). */
 #board .ev2-territory-border.ev2-border-move-highlight,
 #recap-board .ev2-territory-border.ev2-border-move-highlight {
   --ev2-border-color: var(--color-yellow-500);
 }
 
-/* Move path hover preview — proposal 23 in public/move-path-proposals.html (dashed track + chevron train). */
-#board #move-path-line.move-path-preview-track {
+/* Move path hover preview: 4px dashed track, destination polygon ring, end dot. */
+#board #move-path-line.move-path-preview-track,
+#recap-board #move-path-line.move-path-preview-track {
   stroke: var(--color-yellow-500);
-  stroke-opacity: 0.55;
-  stroke-width: 20;
-  stroke-dasharray: 8 10;
-  stroke-linecap: square;
+  stroke-opacity: 1;
+  stroke-width: 4;
+  stroke-dasharray: 6 8;
+  stroke-linecap: butt;
   stroke-linejoin: round;
-  animation: move-path-preview-track-flow 0.75s linear infinite;
-  opacity: 1;
 }
 
-@keyframes move-path-preview-track-flow {
-  to {
-    stroke-dashoffset: -18;
-  }
-}
-
-#board .move-path-chevron-train {
-  /* filter: drop-shadow(0 0 4px rgba(255, 230, 160, 1)) drop-shadow(0 0 10px rgba(255, 150, 50, 0.7)) drop-shadow(0 0 18px rgba(199, 126, 0, 0.35)); */
-}
-
-#board .move-path-chev {
+#board polygon.move-path-dest-outline,
+#recap-board polygon.move-path-dest-outline {
+  fill: none;
+  stroke: var(--color-yellow-500);
+  stroke-width: 10;
   stroke-linejoin: round;
+}
+
+#board .move-path-end-dot-outer,
+#recap-board .move-path-end-dot-outer {
+  fill: var(--color-yellow-500);
+  stroke: none;
+}
+
+#board .move-path-end-dot-inner,
+#recap-board .move-path-end-dot-inner {
+  fill: #ffffff;
+  stroke: none;
 }
 
 /* Chromatic pointer-hover on selectable units (proposal 19 in public/unit-hover-proposals.html).

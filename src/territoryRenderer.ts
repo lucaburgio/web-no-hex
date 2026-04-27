@@ -583,8 +583,7 @@ export function renderTerritoryState(
 
     if (fillPoly) {
       const baseFill = `ev2-territory-fill ev2-state-${vizState}`;
-      const fillCls = isMoveHl ? `${baseFill} ev2-trr-move-highlight-fill` : baseFill;
-      if (fillPoly.getAttribute('class') !== fillCls) fillPoly.setAttribute('class', fillCls);
+      if (fillPoly.getAttribute('class') !== baseFill) fillPoly.setAttribute('class', baseFill);
     }
 
     if (borderGroup) {
