@@ -13,8 +13,9 @@
   --color-unit-selected: #C77E00;
 
   /* ── Hex fill states ─────────────────────────────────────────────────────── */
-  --color-hex-selected:      #FFBE00;
-  --color-hex-valid-move:    #ECDBAA;
+  --color-hex-selected:      var(--color-yellow-50, #FFFBF3);
+  --color-hex-valid-move:    var(--color-yellow-50, #FFFBF3);
+  --color-hex-move-highlight-stroke: var(--color-yellow-500, #FFC13A);
   --color-hex-player:        #7e9fd8;
   --color-hex-ai:            #df8080;
   --color-hex-player-dimmed: #5f7fb0;
@@ -29,7 +30,7 @@
   --color-hex-stroke:        #000;
 
   /* ── Movement area perimeter outline ────────────────────────────────────── */
-  --color-move-border: rgba(199, 126, 0, 1);
+  --color-move-border: var(--color-yellow-500, #FFC13A);
 
   /* ── Unit icon & HP bar thresholds ──────────────────────────────────────── */
   --color-unit-icon: #FFF;

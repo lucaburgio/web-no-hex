@@ -696,6 +696,8 @@ interface Colors {
   hexNeutral: string;
   hexStroke: string;
   hexProdStroke: string;
+  /** Solid stroke on selected hex and valid-move destination hexes */
+  hexMoveHighlightStroke: string;
   unitIconColor: string;
   moveBorder: string;
   hpHigh: string;
@@ -765,6 +767,8 @@ function colors(): Colors {
     hexNeutral:      v('--color-hex-neutral'),
     hexStroke:       v('--color-hex-stroke'),
     hexProdStroke:   v('--color-hex-prod-stroke'),
+    hexMoveHighlightStroke:
+      v('--color-hex-move-highlight-stroke') || v('--color-yellow-500'),
     unitIconColor:   v('--color-unit-icon'),
     moveBorder:      v('--color-move-border'),
     hpHigh:          v('--color-hp-high'),
@@ -1770,11 +1774,13 @@ export function renderState(
       if (isMountain) {
         fill = mountainTerritoryFillByKey.get(key) ?? c.hexNeutral;
       } else if (isSelectedHex) {
-        fill = c.hexSelected;
+        fill   = c.hexSelected;
+        stroke = c.hexMoveHighlightStroke;
       } else if (isZoc) {
         fill = c.hexZoc;
       } else if (isValidMove) {
-        fill = c.hexMove;
+        fill   = c.hexMove;
+        stroke = c.hexMoveHighlightStroke;
       } else if (isProdSelected) {
         fill   = c.hexProdSelected;
         stroke = c.hexProdStroke;
@@ -1815,6 +1821,11 @@ export function renderState(
       if (stroke === 'transparent') {
         poly.setAttribute('stroke', 'none');
         poly.setAttribute('stroke-width', '0');
+        poly.removeAttribute('stroke-dasharray');
+        poly.removeAttribute('stroke-dashoffset');
+      } else if (isSelectedHex || isValidMove) {
+        poly.setAttribute('stroke', stroke);
+        poly.setAttribute('stroke-width', '2.5');
         poly.removeAttribute('stroke-dasharray');
         poly.removeAttribute('stroke-dashoffset');
       } else {
@@ -3008,7 +3019,7 @@ export function renderMovePath(svgElement: SVGSVGElement, path: [number, number]
     for (let i = 0; i < chevronCount; i++) {
       const poly = svgEl('polygon');
       poly.setAttribute('class', 'move-path-chev');
-      poly.setAttribute('fill', 'var(--color-unit-selected)');
+      poly.setAttribute('fill', 'var(--color-yellow-500)');
       poly.setAttribute('points', MOVE_PATH_CHEVRON_POINTS);
 
       const am = svgEl('animateMotion');

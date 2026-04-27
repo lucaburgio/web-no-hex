@@ -435,8 +435,8 @@ const config: GameConfig = {
   // Max river length = floor(boardCols × this); keeps long snakes off wide boards
   riverMaxLengthBoardWidthMult: 1.5,
 
-  // Color of the movement path preview line shown when hovering a valid move hex
-  movePathColor: '#C77E00',
+  // Color of the movement path preview line shown when hovering a valid move hex (track uses CSS; kept for API parity)
+  movePathColor: '#FFC13A',
 
   // Stroke width of the movement path preview line (in pixels)
   movePathStrokeWidth: 6,

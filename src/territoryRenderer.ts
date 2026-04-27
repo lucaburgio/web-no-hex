@@ -14,8 +14,6 @@ import outsideBorderPatternSrc from '../public/images/misc/outside-border-patter
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // Game-specific highlight colors (no editorV2 equivalent)
-const COLOR_SELECTED_STROKE   = '#fbbf24';
-const COLOR_VALID_MOVE_STROKE = '#22c55e';
 const COLOR_PRODUCTION_STROKE = '#3b82f6';
 const STROKE_WIDTH_HIGHLIGHT  = 3;
 
@@ -517,10 +515,17 @@ export function renderTerritoryState(
   const unitsForDraw = opts?.unitDrawOverride != null ? opts.unitDrawOverride : state.units;
   const hexStatesForDraw = opts?.hexStatesDrawOverride != null ? opts.hexStatesDrawOverride : state.hexStates;
 
-  const selectedUnit = state.selectedUnit !== null
-    ? (state.units.find(u => u.id === state.selectedUnit) ?? null)
-    : null;
-  const validMoves = selectedUnit ? getValidMoves(state, selectedUnit) : [];
+  let selectedUnitHl =
+    state.selectedUnit !== null ? (state.units.find(u => u.id === state.selectedUnit) ?? null) : null;
+  if (selectedUnitHl && selectedUnitHl.owner !== localPlayer) selectedUnitHl = null;
+  if (
+    selectedUnitHl &&
+    state.activePlayer !== localPlayer &&
+    selectedUnitHl.owner === localPlayer
+  ) {
+    selectedUnitHl = null;
+  }
+  const validMoves = selectedUnitHl ? getValidMoves(state, selectedUnitHl) : [];
   const validMoveKeys = new Set(validMoves.map(([c, r]) => `${c},${r}`));
 
   const productionPlacementKeys = new Set<string>();
@@ -595,14 +600,22 @@ export function renderTerritoryState(
     if (!node) continue;
     const key = node.virtualKey;
 
-    const isSelected = !!(selectedUnit && selectedUnit.col === node.virtualCol && selectedUnit.row === node.virtualRow);
+    const isSelected = !!(
+      selectedUnitHl &&
+      selectedUnitHl.col === node.virtualCol &&
+      selectedUnitHl.row === node.virtualRow
+    );
     const isValidMove = validMoveKeys.has(key);
     const isProduction = productionPlacementKeys.has(key);
 
     let stroke: string | null = null;
-    if (isSelected) stroke = COLOR_SELECTED_STROKE;
-    else if (isValidMove) stroke = COLOR_VALID_MOVE_STROKE;
-    else if (isProduction) stroke = COLOR_PRODUCTION_STROKE;
+    let fillHl = 'none';
+    if (isSelected || isValidMove) {
+      stroke = 'var(--color-yellow-500)';
+      fillHl = 'var(--color-yellow-50)';
+    } else if (isProduction) {
+      stroke = COLOR_PRODUCTION_STROKE;
+    }
 
     if (stroke) {
       seenHL.add(t.id);
@@ -610,11 +623,11 @@ export function renderTerritoryState(
       if (!pathEl) {
         pathEl = document.createElementNS(SVG_NS, 'path') as SVGPathElement;
         pathEl.setAttribute('data-territory-id', t.id);
-        pathEl.setAttribute('fill', 'none');
         pathEl.setAttribute('pointer-events', 'none');
         highlightLayer.appendChild(pathEl);
       }
       setAttrIfChanged(pathEl, 'd', territoryPathD(t, points));
+      setAttrIfChanged(pathEl, 'fill', fillHl);
       setAttrIfChanged(pathEl, 'stroke', stroke);
       setAttrIfChanged(pathEl, 'stroke-width', String(STROKE_WIDTH_HIGHLIGHT));
       setAttrIfChanged(pathEl, 'stroke-linejoin', 'round');

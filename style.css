@@ -56,6 +56,7 @@ img {
   --color-yellow-900: #9F5A15;
   --color-yellow-500: #FFC13A;
   --color-yellow-100: #EDE1C7;
+  --color-yellow-50: #FFFBF3;
 
   --color-gray-700: #595959;
   --color-gray-600: #797979;
@@ -99,8 +100,10 @@ img {
     --color-unit-selected: var(--color-yellow-900);
   
     /* ── Hex fill states ─────────────────────────────────────────────────────── */
-    --color-hex-selected:      var(--color-yellow-500);
-    --color-hex-valid-move:    #ECDBAA;
+    /* Movement selection: light fill + visible stroke (see renderer hex pass) */
+    --color-hex-selected:      var(--color-yellow-50);
+    --color-hex-valid-move:    var(--color-yellow-50);
+    --color-hex-move-highlight-stroke: var(--color-yellow-500);
     --color-hex-player:        var(--color-gray-200);
     --color-hex-ai:            #e0c5c5; /* gray-100 C3B3B3 e0c5c5 */
     /* Production phase: owned territory not in focus (replaces opacity dimming) */
@@ -119,7 +122,7 @@ img {
     --color-hex-stroke:        transparent;
   
     /* ── Movement area perimeter outline ────────────────────────────────────── */
-    --color-move-border: var(--color-yellow-900);
+    --color-move-border: var(--color-yellow-500);
 
     /* Domination / Conquest: SVG stroke on hex edges between opposing owned territory */
     --color-faction-frontline-border: rgba(0, 0, 0, 1);
@@ -559,13 +562,14 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 /* Move path hover preview — proposal 23 in public/move-path-proposals.html (dashed track + chevron train). */
 #board #move-path-line.move-path-preview-track {
-  stroke: rgba(199, 126, 0, 0.45);
+  stroke: var(--color-yellow-500);
+  stroke-opacity: 0.55;
   stroke-width: 20;
   stroke-dasharray: 8 10;
   stroke-linecap: square;
   stroke-linejoin: round;
   animation: move-path-preview-track-flow 0.75s linear infinite;
-  opacity: 0;
+  opacity: 1;
 }
 
 @keyframes move-path-preview-track-flow {
