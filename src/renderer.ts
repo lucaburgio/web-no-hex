@@ -1594,6 +1594,45 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   if (svgElement.id === 'board') clearHpBarAnimationState();
 }
 
+/**
+ * Territory boards skip {@link initRenderer}; they still need the hover move-path preview DOM
+ * (#move-path-line, defs geometry, chevron train). Idempotent.
+ */
+export function ensureMovePathPreviewLayer(svgElement: SVGSVGElement): void {
+  if (svgElement.querySelector('#move-path-line')) return;
+
+  const movePathLayer = svgEl('g');
+  movePathLayer.id = 'move-path-layer';
+  movePathLayer.setAttribute('pointer-events', 'none');
+
+  const movePathDefs = svgEl('defs');
+  const movePathGeom = svgEl('path');
+  movePathGeom.id = `${svgElement.id}-move-path-geom`;
+  movePathGeom.setAttribute('d', 'M0,0');
+  movePathGeom.setAttribute('fill', 'none');
+  movePathGeom.setAttribute('stroke', 'none');
+  movePathDefs.appendChild(movePathGeom);
+
+  const pathLine = svgEl('polyline');
+  pathLine.id = 'move-path-line';
+  pathLine.setAttribute('fill', 'none');
+  pathLine.setAttribute('pointer-events', 'none');
+
+  const movePathChevronTrain = svgEl('g');
+  movePathChevronTrain.setAttribute('class', 'move-path-chevron-train');
+
+  movePathLayer.appendChild(movePathDefs);
+  movePathLayer.appendChild(pathLine);
+  movePathLayer.appendChild(movePathChevronTrain);
+
+  const trrUnits = svgElement.querySelector('#trr-units');
+  if (trrUnits?.parentNode === svgElement) {
+    svgElement.insertBefore(movePathLayer, trrUnits);
+  } else {
+    svgElement.appendChild(movePathLayer);
+  }
+}
+
 export function renderState(
   svgElement: SVGSVGElement,
   state: GameState,
@@ -2975,7 +3014,11 @@ export function eventTargetIsOnBoardUnitChip(e: MouseEvent | { target: EventTarg
 // Draw (or clear) the movement path preview from the unit to a hovered valid-move hex.
 // `path` is an array of [col, row] pairs including the unit's start hex; pass [] to clear.
 // Visual style matches public/move-path-proposals.html proposal 23: marching dashed track + glowing chevron train.
-export function renderMovePath(svgElement: SVGSVGElement, path: [number, number][]): void {
+export function renderMovePath(
+  svgElement: SVGSVGElement,
+  path: [number, number][],
+  territoryGraph?: TerritoryGraphData | null,
+): void {
   const pathLine = svgElement.querySelector('#move-path-line') as SVGPolylineElement | null;
   if (!pathLine) return;
 
@@ -2999,7 +3042,7 @@ export function renderMovePath(svgElement: SVGSVGElement, path: [number, number]
     return;
   }
 
-  const xy = path.map(([c, r]) => hexToPixel(c, r));
+  const xy = path.map(([c, r]) => boardPixelForMoveAnim(c, r, territoryGraph));
   const pointsAttr = xy.map(({ x, y }) => `${x},${y}`).join(' ');
   const d = `M ${xy.map(({ x, y }) => `${x},${y}`).join(' L ')}`;
 

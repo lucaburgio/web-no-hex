@@ -7,7 +7,7 @@
 import type { GameState, HexState, Owner, Unit } from './types';
 import type { TerritoryGraphData, TerritoryMapTerritory, TerritoryMapDef } from './territoryMap';
 import { getValidMoves, isValidProductionPlacement, getRangedAttackTargets } from './game';
-import { mountBoardUnitChipContents } from './renderer';
+import { ensureMovePathPreviewLayer, mountBoardUnitChipContents } from './renderer';
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
 import outsideBorderPatternSrc from '../public/images/misc/outside-border-pattern.png';
 
@@ -449,6 +449,8 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
 
     noteLayer.appendChild(g);
   }
+
+  ensureMovePathPreviewLayer(svgEl);
 
   rendererStateMap.set(svgEl, { graph, edgeTerritoryIndex });
 }

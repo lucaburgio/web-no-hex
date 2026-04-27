@@ -4709,7 +4709,7 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
   const pathKey = `${attacker.id}:${attacker.col},${attacker.row}->${hex.col},${hex.row}`;
   if (isValidMove) {
     if (movePathPreviewKey !== pathKey) {
-      renderMovePath(svg, getMovePath(state, attacker, hex.col, hex.row));
+      renderMovePath(svg, getMovePath(state, attacker, hex.col, hex.row), state.customMapGraph ?? null);
       movePathPreviewKey = pathKey;
     }
   } else {
