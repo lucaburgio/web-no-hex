@@ -572,7 +572,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   stroke: var(--color-yellow-500);
   stroke-opacity: 1;
   stroke-width: 4;
-  stroke-dasharray: 6 8;
+  stroke-dasharray: 4 4;
   stroke-linecap: butt;
   stroke-linejoin: round;
   animation: move-path-preview-track-flow 0.65s linear infinite;
@@ -586,10 +586,10 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 @keyframes move-path-end-dot-border-pulse {
   from {
-    stroke-width: 0;
+    stroke-width: 10;
   }
   to {
-    stroke-width: 5;
+    stroke-width: 20;
   }
 }
 
@@ -604,7 +604,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #board .move-path-end-dot-outer,
 #recap-board .move-path-end-dot-outer {
   fill: var(--color-yellow-500);
-  stroke: #ffffff;
+  stroke: var(--color-yellow-500);
   stroke-width: 0;
   paint-order: stroke fill;
   animation: move-path-end-dot-border-pulse 0.85s ease-in-out infinite alternate;
@@ -612,7 +612,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 #board .move-path-end-dot-inner,
 #recap-board .move-path-end-dot-inner {
-  fill: #ffffff;
+  fill: #000;
   stroke: none;
 }
 
