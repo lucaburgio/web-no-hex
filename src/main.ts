@@ -182,6 +182,7 @@ function clearMovePathPreview(): void {
   if (movePathPreviewKey === null) return;
   renderMovePath(svg, []);
   movePathPreviewKey = null;
+  if (!state.customMapGraph) render();
 }
 const MODE_DEFS = [
   { id: 'domination', name: 'DOMINATION', icon: modeIconDomination, image: modeImgDomination, desc: 'ADVANCE ON THE FIELD AND ANNIHILATE THE ENEMY' },
@@ -4711,6 +4712,7 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
     if (movePathPreviewKey !== pathKey) {
       renderMovePath(svg, getMovePath(state, attacker, hex.col, hex.row), state.customMapGraph ?? null);
       movePathPreviewKey = pathKey;
+      if (!state.customMapGraph) render();
     }
   } else {
     clearMovePathPreview();
@@ -4760,6 +4762,7 @@ svg.addEventListener('mouseleave', () => {
   svg.classList.remove('cursor-fight');
   renderMovePath(svg, []);
   movePathPreviewKey = null;
+  if (!state.customMapGraph) render();
   if (boardPointerHoverHex !== null) {
     boardPointerHoverHex = null;
     queueBoardUnitPointerHoverApply();

@@ -356,6 +356,9 @@ function resetAnimLayerStackOrder(svgElement: SVGSVGElement): void {
   positionAnimLayer(svgElement, true);
 }
 
+/** Virtual key of hovered move-path destination; hex board uses it to skip valid-move tint under the ring. */
+let movePathHoverDestKey: string | null = null;
+
 export interface MoveAnimation {
   unit: Unit;      // snapshot of the unit before moving (owner/hp for colour)
   fromCol: number;
@@ -1858,8 +1861,18 @@ export function renderState(
       } else if (isZoc) {
         fill = c.hexZoc;
       } else if (isValidMove) {
-        fill   = c.hexMove;
-        stroke = c.hexMoveHighlightStroke;
+        const isHoverPathDest = !state.customMapGraph && movePathHoverDestKey === key;
+        if (isHoverPathDest) {
+          if (isConquered && hexState) {
+            fill = hexState.owner === localPlayer ? c.hexPlayer : c.hexAi;
+          } else {
+            fill = c.hexNeutral;
+          }
+          stroke = 'transparent';
+        } else {
+          fill   = c.hexMove;
+          stroke = c.hexMoveHighlightStroke;
+        }
       } else if (isProdSelected) {
         fill   = c.hexProdSelected;
         stroke = c.hexProdStroke;
@@ -3071,6 +3084,7 @@ export function renderMovePath(
   const chevronTrain = svgElement.querySelector('g.move-path-chevron-train');
 
   const clearDecor = (): void => {
+    movePathHoverDestKey = null;
     if (destOutline) destOutline.setAttribute('points', '');
     if (endDot) endDot.setAttribute('display', 'none');
     if (chevronTrain) chevronTrain.replaceChildren();
@@ -3087,6 +3101,8 @@ export function renderMovePath(
     clearDecor();
     return;
   }
+
+  movePathHoverDestKey = `${path[path.length - 1]![0]},${path[path.length - 1]![1]}`;
 
   const xy = path.map(([c, r]) => boardPixelForMoveAnim(c, r, territoryGraph));
   const pointsAttr = xy.map(({ x, y }) => `${x},${y}`).join(' ');
