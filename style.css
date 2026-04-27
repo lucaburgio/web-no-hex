@@ -133,11 +133,11 @@ img {
     /* Map unit shield card (board / recap); HP hue = ally / enemy / selected, not HP tier */
     --color-board-unit-card-fill: #ffffff;
     --color-board-unit-border: #c8c8c8;
-    --color-board-unit-border-width: 1.25;
+    --color-board-unit-border-width: 2;
     --color-board-unit-border-selected: #000000;
-    --color-board-unit-border-selected-width: 2.5;
+    --color-board-unit-border-selected-width: 2;
     --color-board-unit-bracket: #c8c8c8;
-    --color-board-unit-bracket-width: 1.1;
+    --color-board-unit-bracket-width: 2;
     --color-board-unit-bracket-selected: #000000;
     --color-board-unit-bracket-selected-width: 2;
     --color-board-unit-hp-track: #e8e8e8;
@@ -549,7 +549,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   --board-perimeter-dasharray: 4 4;
 
   --board-unit-body-filter: none;
-  --board-unit-hp-track-rx: 1px;
+  --board-unit-hp-track-rx: 0px;
   --board-unit-icon-filter: none;
 }
 
@@ -602,6 +602,7 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #board .board-unit__body,
 #recap-board .board-unit__body {
   filter: var(--board-unit-body-filter);
+  paint-order: stroke fill;
 }
 
 #board .board-unit__hp-bg,
