@@ -892,7 +892,7 @@ function svgFactionImage(x: number, y: number, w: number, h: number, href: strin
   im.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   im.setAttribute('href', href);
   im.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
-  im.setAttribute('pointer-events', 'none');
+  im.setAttribute('pointer-events', 'all');
   return im;
 }
 
@@ -974,6 +974,7 @@ export function mountBoardUnitChipContents(
   unitEl.setAttribute('data-col', String(p.dc));
   unitEl.setAttribute('data-row', String(p.dr));
   unitEl.setAttribute('transform', `translate(${p.x - 25 * sc},${p.y - 32 * sc}) scale(${sc})`);
+  unitEl.setAttribute('pointer-events', 'all');
   unitEl.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
   unitWrap.appendChild(unitEl);
 
@@ -1028,7 +1029,10 @@ export function mountBoardUnitChipContents(
 
   const icon = p.unit.icon ?? unitIcon(p.unit.unitTypeId);
   const iconEl = inlineIcon(icon, iconCx, iconCy, HEX_SIZE * unitIconSizeMultiplier, chip.iconColor, iconOpacity, 'board-unit__icon');
-  if (iconEl) unitWrap.appendChild(iconEl);
+  if (iconEl) {
+    iconEl.setAttribute('pointer-events', 'all');
+    unitWrap.appendChild(iconEl);
+  }
 
   const starN = boardUnitUpgradeStarCount(p.unit);
   const starSize = HEX_SIZE * unitStarsOuterMultiplier;
@@ -1415,7 +1419,6 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
 
   const unitLayer = svgEl('g');
   unitLayer.id = 'unit-layer';
-  unitLayer.setAttribute('pointer-events', 'none');
   boardViewRoot.appendChild(unitLayer);
 
   const hexPolys: SVGPolygonElement[][] = [];
@@ -1502,7 +1505,8 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   movePathLayer.appendChild(pathLine);
   movePathLayer.appendChild(movePathChevronTrain);
 
-  // Full-hex invisible targets on top of unit artwork so clicks always map to a cell (getHexFromEvent).
+  // Full-hex invisible targets above empty cells; occupied cells clear the top hit in renderState
+  // so the unit chip (or the terrain hex) receives the event (see eventTargetIsOnBoardUnitChip in main).
   const hexHitLayer = svgEl('g');
   hexHitLayer.id = 'hex-hit-layer';
   const hexHitPolys: SVGPolygonElement[][] = [];
@@ -1784,7 +1788,11 @@ export function renderState(
         state.phase === 'production' && state.activePlayer === localPlayer && canPlace && !isProdSelected;
       poly.classList.toggle('hex-prod-candidate', isProdPassThrough);
       const hit = domCache?.hexHitPolys?.[r]?.[col];
-      if (hit) hit.setAttribute('pointer-events', isProdPassThrough ? 'none' : 'all');
+      // Unoccupied: full-hex target for getHexFromEvent. Occupied: no top hit so the unit chip
+      // (or the terrain hex under it) receives clicks — selection is gated in main to the chip.
+      if (hit) {
+        hit.setAttribute('pointer-events', isProdPassThrough || hexOccupied ? 'none' : 'all');
+      }
 
       if (prodOverlayStroke && prodStrokeLayer) {
         const overlay = svgEl('polygon');
@@ -2875,6 +2883,13 @@ export function getHexFromEvent(e: MouseEvent): { col: number; row: number } | n
   const target = (e.target as Element).closest('[data-col]') as HTMLElement | null;
   if (!target) return null;
   return { col: parseInt(target.dataset['col']!), row: parseInt(target.dataset['row']!) };
+}
+
+/** True when the event hit the interactive unit chip (not the full hex / territory). */
+export function eventTargetIsOnBoardUnitChip(e: MouseEvent | { target: EventTarget | null }): boolean {
+  const t = e.target;
+  if (!(t instanceof Element)) return false;
+  return t.closest('g.board-unit') !== null;
 }
 
 // Draw (or clear) the movement path preview from the unit to a hovered valid-move hex.

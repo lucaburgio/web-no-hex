@@ -171,8 +171,8 @@ img {
   stroke: var(--color-faction-frontline-border-production);
 }
 
-/* Board: production phase placement hexes (empty + targets). #hex-hit-layer uses pointer-events: none
-   for these so the terrain hex receives :hover. Class set in renderer. */
+/* Board: production pass-through; empty-hex :hover. #hex-hit-layer also skips occupied cells so the
+   unit chip receives the pointer. Class/attrs set in renderer. */
    #board polygon.hex-prod-candidate {
     transition-duration: 0.3s;
    }
