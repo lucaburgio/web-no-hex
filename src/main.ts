@@ -4982,7 +4982,10 @@ recapCloseBtn.addEventListener('click', () => {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
-loadIconDefs(config.unitTypes.map(t => t.icon).filter((i): i is string => !!i));
+loadIconDefs([
+  ...config.unitTypes.map(t => t.icon).filter((i): i is string => !!i),
+  'icons/star.svg',
+]);
 showMainMenu();
 
 // ── Dev shortcuts (URL param ?dev=<screen>) ───────────────────────────────────

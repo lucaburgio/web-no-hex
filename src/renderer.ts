@@ -676,6 +676,21 @@ interface Colors {
   aiDuringProduction: string;
   rangedTarget: string;
   colorDark: string;
+  /** Map unit shield card (design ref). */
+  boardUnitCardFill: string;
+  boardUnitBorder: string;
+  boardUnitBorderWidth: number;
+  boardUnitBorderSelected: string;
+  boardUnitBorderSelectedWidth: number;
+  boardUnitBracket: string;
+  boardUnitBracketWidth: number;
+  boardUnitBracketSelected: string;
+  boardUnitBracketSelectedWidth: number;
+  boardUnitHpFriendly: string;
+  boardUnitHpFriendlyTired: string;
+  boardUnitHpEnemy: string;
+  boardUnitHpSelected: string;
+  boardUnitIconSilhouette: string;
 }
 
 /** Local side uses theme `--color-player*`; opponent uses `--color-ai*` — same for P1 and P2 (no CSS guest swap). */
@@ -688,6 +703,13 @@ let C: Colors | null = null;
 /** Call after theme CSS variables change so the next draw re-reads :root. */
 export function invalidateColorsCache(): void {
   C = null;
+}
+
+function readCssNumber(raw: string, fallback: number): number {
+  const t = raw.trim().replace(/px$/i, '');
+  if (!t) return fallback;
+  const n = parseFloat(t);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function colors(): Colors {
@@ -723,8 +745,159 @@ function colors(): Colors {
     aiDuringProduction: v('--color-ai-during-production'),
     rangedTarget:    v('--color-red-700'),
     colorDark:       v('--color-dark'),
+
+    boardUnitCardFill:            v('--color-board-unit-card-fill') || '#FFFFFF',
+    boardUnitBorder:              v('--color-board-unit-border') || '#C8C8C8',
+    boardUnitBorderWidth:         readCssNumber(v('--color-board-unit-border-width'), 1.25),
+    boardUnitBorderSelected:      v('--color-board-unit-border-selected') || '#000000',
+    boardUnitBorderSelectedWidth: readCssNumber(v('--color-board-unit-border-selected-width'), 2.5),
+    boardUnitBracket:             v('--color-board-unit-bracket') || '#C8C8C8',
+    boardUnitBracketWidth:        readCssNumber(v('--color-board-unit-bracket-width'), 1.1),
+    boardUnitBracketSelected:     v('--color-board-unit-bracket-selected') || '#000000',
+    boardUnitBracketSelectedWidth: readCssNumber(v('--color-board-unit-bracket-selected-width'), 2),
+    boardUnitHpFriendly:          v('--color-board-unit-hp-friendly') || '#7FBFFF',
+    boardUnitHpFriendlyTired:     v('--color-board-unit-hp-friendly-tired') || '#6BA8E6',
+    boardUnitHpEnemy:             v('--color-board-unit-hp-enemy') || '#FF8C8C',
+    boardUnitHpSelected:          v('--color-board-unit-hp-selected') || '#FFCC00',
+    boardUnitIconSilhouette:      v('--color-board-unit-icon-silhouette') || '#0A0A0A',
   };
   return C;
+}
+
+/** Selection ring for map unit chip (same rules as hex/unit selection in {@link renderState}). */
+export function unitIsVisuallySelectedForBoard(
+  state: GameState,
+  unit: Unit,
+  localPlayer: Owner,
+  localSpectatorInspectUnitId?: number | null,
+): boolean {
+  if (localSpectatorInspectUnitId != null && unit.id === localSpectatorInspectUnitId) return true;
+  if (state.selectedUnit !== unit.id) return false;
+  if (state.activePlayer === localPlayer) return true;
+  return unit.owner === state.activePlayer;
+}
+
+function statePackageForUnitOwner(state: GameState, owner: Owner): string {
+  const p1 = state.unitPackage ?? 'standard';
+  const p2 = state.unitPackagePlayer2 || p1;
+  return owner === PLAYER ? p1 : p2;
+}
+
+function factionIconHrefFromPackage(pkg: string): string {
+  const map: Record<string, string> = {
+    'us-ww2': '/icons/scenarios/us-ww2.svg',
+    'de-ww2': '/icons/scenarios/de-ww2.svg',
+    'ru-ww2': '/icons/scenarios/ru-ww2.svg',
+    'jp-ww2': '/icons/scenarios/jp-ww2.svg',
+  };
+  return map[pkg] ?? '/icons/shield.svg';
+}
+
+function packageForUnitOnBoard(unit: Unit, state: GameState | null | undefined): string {
+  if (state) return statePackageForUnitOwner(state, unit.owner);
+  const ut = config.unitTypes.find(t => t.id === unit.unitTypeId);
+  return ut?.package ?? 'standard';
+}
+
+function boardUnitUpgradeStarCount(unit: Unit): number {
+  const n =
+    unit.upgradeAttack + unit.upgradeDefense + unit.upgradeFlanking + unit.upgradeHeal;
+  return Math.min(5, Math.max(0, n));
+}
+
+function mapUnitHpFillColor(
+  c: Colors,
+  isSelected: boolean,
+  isFriendly: boolean,
+  friendlyMovementTired: boolean,
+): string {
+  if (isSelected) return c.boardUnitHpSelected;
+  if (isFriendly) return friendlyMovementTired ? c.boardUnitHpFriendlyTired : c.boardUnitHpFriendly;
+  return c.boardUnitHpEnemy;
+}
+
+interface MapUnitChipStyle {
+  bodyFill: string;
+  bodyStroke: string;
+  bodyStrokeW: number;
+  bracketStroke: string;
+  bracketStrokeW: number;
+  hpFill: string;
+  iconColor: string;
+}
+
+function mapUnitChipStyle(
+  c: Colors,
+  opts: {
+    isSelected: boolean;
+    isFriendly: boolean;
+    isRangedTarget: boolean;
+    friendlyMovementTired: boolean;
+  },
+): MapUnitChipStyle {
+  const bodyFill = c.boardUnitCardFill;
+  const bodyStroke = opts.isSelected ? c.boardUnitBorderSelected : c.boardUnitBorder;
+  const bodyStrokeW = opts.isSelected ? c.boardUnitBorderSelectedWidth : c.boardUnitBorderWidth;
+  let bracketStroke = opts.isSelected ? c.boardUnitBracketSelected : c.boardUnitBracket;
+  let bracketStrokeW = opts.isSelected ? c.boardUnitBracketSelectedWidth : c.boardUnitBracketWidth;
+  if (opts.isRangedTarget && !opts.isSelected) {
+    bracketStroke = c.rangedTarget;
+    bracketStrokeW = Math.max(bracketStrokeW, 1.6);
+  }
+  const hpFill = mapUnitHpFillColor(
+    c,
+    opts.isSelected,
+    opts.isFriendly,
+    opts.friendlyMovementTired,
+  );
+  const iconColor = c.boardUnitIconSilhouette;
+  return { bodyFill, bodyStroke, bodyStrokeW, bracketStroke, bracketStrokeW, hpFill, iconColor };
+}
+
+function boardUnitBracketsPathD(cx: number, cy: number, half: number, leg: number): string {
+  const h = half;
+  const l = leg;
+  return [
+    `M ${cx - h} ${cy - h + l} L ${cx - h} ${cy - h} L ${cx - h + l} ${cy - h}`,
+    `M ${cx + h - l} ${cy - h} L ${cx + h} ${cy - h} L ${cx + h} ${cy - h + l}`,
+    `M ${cx - h} ${cy + h - l} L ${cx - h} ${cy + h} L ${cx - h + l} ${cy + h}`,
+    `M ${cx + h - l} ${cy + h} L ${cx + h} ${cy + h} L ${cx + h} ${cy + h - l}`,
+  ].join(' ');
+}
+
+function svgFactionImage(x: number, y: number, w: number, h: number, href: string): SVGImageElement {
+  const im = svgEl('image');
+  im.setAttribute('class', 'board-unit__faction');
+  im.setAttribute('x', String(x));
+  im.setAttribute('y', String(y));
+  im.setAttribute('width', String(w));
+  im.setAttribute('height', String(h));
+  im.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  im.setAttribute('href', href);
+  im.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
+  im.setAttribute('pointer-events', 'none');
+  return im;
+}
+
+function appendBoardUnitStars(
+  parent: SVGGElement,
+  xCenter: number,
+  starCenterY: number,
+  starCount: number,
+  starSize: number,
+): void {
+  if (starCount <= 0) return;
+  const g = svgEl('g');
+  g.setAttribute('class', 'board-unit__stars');
+  g.setAttribute('pointer-events', 'none');
+  const spacing = starSize * 1.2;
+  const totalW = (starCount - 1) * spacing;
+  for (let i = 0; i < starCount; i++) {
+    const cx = xCenter - totalW / 2 + i * spacing;
+    const starG = inlineIcon('icons/star.svg', cx, starCenterY, starSize, '#0a0a0a', '1');
+    if (starG) g.appendChild(starG);
+  }
+  parent.appendChild(g);
 }
 
 // Neighbor direction → edge index mapping (edge i spans vertex i to vertex (i+1)%6).
@@ -1325,13 +1498,8 @@ export function renderState(
   }
 
   /** Tint for unit shape only — hex/move overlays use `selectedUnit` above. */
-  const isUnitVisuallySelected = (unit: Unit): boolean => {
-    if (localSpectatorInspectUnitId != null && unit.id === localSpectatorInspectUnitId) return true;
-    if (state.selectedUnit !== unit.id) return false;
-    if (state.activePlayer === localPlayer) return true;
-    // Opponent's turn: show their selection only on units they own (moving), not when they inspect yours
-    return unit.owner === state.activePlayer;
-  };
+  const isUnitVisuallySelected = (unit: Unit): boolean =>
+    unitIsVisuallySelectedForBoard(state, unit, localPlayer, localSpectatorInspectUnitId);
 
   const rangedTargetKeys = new Set<string>();
   if (selectedUnit && state.phase === 'movement' && state.activePlayer === localPlayer) {
@@ -1896,7 +2064,6 @@ export function renderState(
     const displayHp  = displayHpByUnit.get(unit.id) ?? unit.hp;
     const hpRatio    = displayHp / unit.maxHp;
 
-    const baseColor = paletteBaseForOwner(unit.owner, localPlayer, c);
     const isRangedTarget = rangedTargetKeys.has(`${dc},${dr}`);
     const movementTired =
       state.phase === 'movement' &&
@@ -1905,14 +2072,14 @@ export function renderState(
     const productionTiredVisual =
       state.phase === 'production' && productionFocusHexes.size > 0;
     const tired = movementTired || productionTiredVisual;
-    const tiredBase =
-      unit.owner === localPlayer
-        ? c.playerTired
-        : productionTiredVisual
-          ? c.aiDuringProduction
-          : c.aiTired;
-    const fill =
-      isRangedTarget ? c.rangedTarget : isSelected ? c.unitSelected : tired ? tiredBase : baseColor;
+    const isFriendly = unit.owner === localPlayer;
+    const friendlyMovementTired = movementTired && isFriendly;
+    const chip = mapUnitChipStyle(c, {
+      isSelected,
+      isFriendly,
+      isRangedTarget,
+      friendlyMovementTired,
+    });
     const opacity = '1';
     const iconOpacity = tired ? String(config.tiredIconOpacity) : '1';
 
@@ -1930,7 +2097,9 @@ export function renderState(
     const unitEl = svgEl('path');
     unitEl.setAttribute('class', 'board-unit__body');
     unitEl.setAttribute('d', BOARD_UNIT_SILHOUETTE_D);
-    unitEl.setAttribute('fill', fill);
+    unitEl.setAttribute('fill', chip.bodyFill);
+    unitEl.setAttribute('stroke', chip.bodyStroke);
+    unitEl.setAttribute('stroke-width', String(chip.bodyStrokeW / sc));
     unitEl.setAttribute('opacity', opacity);
     unitEl.setAttribute('data-col', String(dc));
     unitEl.setAttribute('data-row', String(dr));
@@ -1938,7 +2107,7 @@ export function renderState(
     unitEl.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
     unitWrap.appendChild(unitEl);
 
-    // HP bar (inside shape)
+    // HP bar (inside shape): track = empty HP, fill = ally / enemy / selected hue × current HP
     const barW = HEX_SIZE * 0.58;
     const barH = HEX_SIZE * 0.1;
     const barX = x - barW / 2;
@@ -1952,21 +2121,43 @@ export function renderState(
     barBg.setAttribute('opacity', opacity);
     unitWrap.appendChild(barBg);
 
-    const barColor = tired ? c.hpTired : hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
     const barFill = svgEl('rect');
     barFill.setAttribute('class', 'board-unit__hp-fill');
     barFill.setAttribute('x', String(barX)); barFill.setAttribute('y', String(barY));
     barFill.setAttribute('width', String(barW * hpRatio)); barFill.setAttribute('height', String(barH));
-    barFill.setAttribute('fill', barColor);
+    barFill.setAttribute('fill', chip.hpFill);
     barFill.setAttribute('pointer-events', 'none');
     barFill.setAttribute('opacity', opacity);
     unitWrap.appendChild(barFill);
 
-    // Icon (shifted up inside shape)
+    const iconCx = x;
+    const iconCy = y - HEX_SIZE * 0.34;
+    const bracketHalf = HEX_SIZE * 0.22;
+    const bracketLeg = HEX_SIZE * 0.11;
+    const bracketPath = svgEl('path');
+    bracketPath.setAttribute('class', 'board-unit__brackets');
+    bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketLeg));
+    bracketPath.setAttribute('fill', 'none');
+    bracketPath.setAttribute('stroke', chip.bracketStroke);
+    bracketPath.setAttribute('stroke-width', String(chip.bracketStrokeW));
+    bracketPath.setAttribute('stroke-linecap', 'square');
+    bracketPath.setAttribute('pointer-events', 'none');
+    unitWrap.appendChild(bracketPath);
+
+    const facHref = factionIconHrefFromPackage(packageForUnitOnBoard(unit, state));
+    const facW = 11 * sc;
+    const facX = x - 25 * sc + 2.5 * sc;
+    const facY = y - 32 * sc + 2 * sc;
+    unitWrap.appendChild(svgFactionImage(facX, facY, facW, facW, facHref));
+
     const icon = unit.icon ?? unitIcon(unit.unitTypeId);
-    const iconColor = isRangedTarget ? '#ffffff' : c.unitIconColor;
-    const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.34, HEX_SIZE * 0.4, iconColor, iconOpacity, 'board-unit__icon');
+    const iconEl = inlineIcon(icon, iconCx, iconCy, HEX_SIZE * 0.4, chip.iconColor, iconOpacity, 'board-unit__icon');
     if (iconEl) unitWrap.appendChild(iconEl);
+
+    const starN = boardUnitUpgradeStarCount(unit);
+    const starSize = HEX_SIZE * 0.14;
+    const starY = y - 32 * sc - starSize * 0.55;
+    appendBoardUnitStars(unitWrap, x, starY, starN, starSize);
 
     if (isRangedTarget) {
       const aim = inlineIcon('icons/artillery.svg', x, y - HEX_SIZE * 1, HEX_SIZE * 0.5, c.rangedTarget, opacity);
@@ -2036,22 +2227,44 @@ export function animateMoves(
 
   for (const anim of animations) {
     const pixelPath = pixelPathForAnimation(anim, territoryGraph);
-    const baseColor = paletteBaseForOwner(anim.unit.owner, localPlayer, c);
 
     const spriteRoot = flipBoardY ? svgEl('g') : null;
     const layer: SVGGElement = spriteRoot ?? animLayer!;
     if (spriteRoot) animLayer!.appendChild(spriteRoot);
 
-    const animFill = baseColor;
     const unitSc = (HEX_SIZE * 1.1) / 50;
     const unitWrap = svgEl('g');
     unitWrap.setAttribute('class', 'board-unit board-unit--moving');
     layer.appendChild(unitWrap);
 
+    const chipFromLive = (st: GameState | null | undefined, u: Unit, _nowMs: number): MapUnitChipStyle => {
+      const liveU = st ? getUnitById(st, u.id) : null;
+      const movesUsed = liveU?.movesUsed ?? u.movesUsed;
+      const stForSel = st;
+      const isSelected = stForSel ? unitIsVisuallySelectedForBoard(stForSel, u, localPlayer, null) : false;
+      const isFriendly = u.owner === localPlayer;
+      const friendlyMt =
+        !!st &&
+        st.phase === 'movement' &&
+        st.activePlayer === u.owner &&
+        movesUsed >= u.movement &&
+        isFriendly;
+      return mapUnitChipStyle(c, {
+        isSelected,
+        isFriendly,
+        isRangedTarget: false,
+        friendlyMovementTired: friendlyMt,
+      });
+    };
+
+    const chip0 = chipFromLive(liveStateForHp ?? null, anim.unit, performance.now());
+
     const unitBody = svgEl('path');
     unitBody.setAttribute('class', 'board-unit__body');
     unitBody.setAttribute('d', BOARD_UNIT_SILHOUETTE_D);
-    unitBody.setAttribute('fill', animFill);
+    unitBody.setAttribute('fill', chip0.bodyFill);
+    unitBody.setAttribute('stroke', chip0.bodyStroke);
+    unitBody.setAttribute('stroke-width', String(chip0.bodyStrokeW / unitSc));
     unitBody.setAttribute('pointer-events', 'none');
     unitWrap.appendChild(unitBody);
 
@@ -2067,22 +2280,62 @@ export function animateMoves(
     const maxHp0 = live0?.maxHp ?? anim.unit.maxHp;
     const displayHp0 = live0 ? getBoardVisualHp(live0, performance.now()) : anim.unit.hp;
     const hpRatio0 = maxHp0 > 0 ? Math.min(1, Math.max(0, displayHp0 / maxHp0)) : 0;
-    const barColor0 = hpRatio0 > 0.6 ? c.hpHigh : hpRatio0 > 0.3 ? c.hpMid : c.hpLow;
     const barFill = svgEl('rect');
     barFill.setAttribute('class', 'board-unit__hp-fill');
     barFill.setAttribute('width', String(animBarW * hpRatio0)); barFill.setAttribute('height', String(barH));
-    barFill.setAttribute('fill', barColor0);
+    barFill.setAttribute('fill', chip0.hpFill);
     barFill.setAttribute('pointer-events', 'none');
     unitWrap.appendChild(barFill);
 
+    const hex0 = boardPixelForMoveAnim(anim.fromCol, anim.fromRow, territoryGraph);
+    const iconCx0 = hex0.x;
+    const iconCy0 = hex0.y - HEX_SIZE * 0.34;
+    const bracketHalf = HEX_SIZE * 0.22;
+    const bracketLeg = HEX_SIZE * 0.11;
+    const bracketPath = svgEl('path');
+    bracketPath.setAttribute('class', 'board-unit__brackets');
+    bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx0, iconCy0, bracketHalf, bracketLeg));
+    bracketPath.setAttribute('fill', 'none');
+    bracketPath.setAttribute('stroke', chip0.bracketStroke);
+    bracketPath.setAttribute('stroke-width', String(chip0.bracketStrokeW));
+    bracketPath.setAttribute('stroke-linecap', 'square');
+    bracketPath.setAttribute('pointer-events', 'none');
+    unitWrap.appendChild(bracketPath);
+
+    const facHref = factionIconHrefFromPackage(packageForUnitOnBoard(anim.unit, liveStateForHp));
+    const facW = 11 * unitSc;
+    const factionImg = svgFactionImage(
+      hex0.x - 25 * unitSc + 2.5 * unitSc,
+      hex0.y - 32 * unitSc + 2 * unitSc,
+      facW,
+      facW,
+      facHref,
+    );
+    unitWrap.appendChild(factionImg);
+
     const iconSrc = anim.unit.icon ?? unitIcon(anim.unit.unitTypeId);
     const iconSize = HEX_SIZE * 0.4;
-    // Place icon at (0,0) so its internal scale stays fixed; a wrapper <g> handles translation each frame.
-    const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, c.unitIconColor, '1', 'board-unit__icon');
+    const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, chip0.iconColor, '1', 'board-unit__icon');
     const iconWrapper = svgEl('g');
     iconWrapper.setAttribute('pointer-events', 'none');
     if (iconEl) iconWrapper.appendChild(iconEl);
     unitWrap.appendChild(iconWrapper);
+
+    const starN = boardUnitUpgradeStarCount(anim.unit);
+    const starSize = HEX_SIZE * 0.14;
+    const starsOuter = svgEl('g');
+    starsOuter.setAttribute('class', 'board-unit__stars');
+    starsOuter.setAttribute('pointer-events', 'none');
+    if (starN > 0) {
+      const spacing = starSize * 1.2;
+      const totalW = (starN - 1) * spacing;
+      for (let si = 0; si < starN; si++) {
+        const lx = -totalW / 2 + si * spacing;
+        const sg = inlineIcon('icons/star.svg', lx, 0, starSize, '#0a0a0a', '1');
+        if (sg) starsOuter.appendChild(sg);
+      }
+      unitWrap.appendChild(starsOuter);
+    }
 
     const startTime = performance.now();
 
@@ -2097,9 +2350,25 @@ export function animateMoves(
       const maxHp = live?.maxHp ?? anim.unit.maxHp;
       const displayHp = live ? getBoardVisualHp(live, now) : anim.unit.hp;
       const hpRatio = maxHp > 0 ? Math.min(1, Math.max(0, displayHp / maxHp)) : 0;
-      const barColor = hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
+      const chip = chipFromLive(liveStateForHp ?? null, anim.unit, now);
       barFill.setAttribute('width', String(animBarW * hpRatio));
-      barFill.setAttribute('fill', barColor);
+      barFill.setAttribute('fill', chip.hpFill);
+      unitBody.setAttribute('fill', chip.bodyFill);
+      unitBody.setAttribute('stroke', chip.bodyStroke);
+      unitBody.setAttribute('stroke-width', String(chip.bodyStrokeW / unitSc));
+      bracketPath.setAttribute('stroke', chip.bracketStroke);
+      bracketPath.setAttribute('stroke-width', String(chip.bracketStrokeW));
+
+      const iconCx = x;
+      const iconCy = y - HEX_SIZE * 0.34;
+      bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketLeg));
+      factionImg.setAttribute('x', String(x - 25 * unitSc + 2.5 * unitSc));
+      factionImg.setAttribute('y', String(y - 32 * unitSc + 2 * unitSc));
+      factionImg.setAttribute('width', String(facW));
+      factionImg.setAttribute('height', String(facW));
+      if (starN > 0) {
+        starsOuter.setAttribute('transform', `translate(${x},${y - 32 * unitSc - starSize * 0.55})`);
+      }
 
       if (spriteRoot) {
         spriteRoot.setAttribute('transform', `translate(${x},${y}) scale(-1,-1) translate(${-x},${-y})`);
@@ -2200,12 +2469,31 @@ export function animateStrikeAndReturn(
   const layer: SVGGElement = spriteRoot ?? animLayer!;
   if (spriteRoot) animLayer.appendChild(spriteRoot);
 
-  const baseColor = paletteBaseForOwner(unit.owner, localPlayer, c);
+  const chipFromLiveStrike = (st: GameState | null | undefined, u: Unit, _now: number): MapUnitChipStyle => {
+    const liveU = st ? getUnitById(st, u.id) : null;
+    const movesUsed = liveU?.movesUsed ?? u.movesUsed;
+    const isSelected = st ? unitIsVisuallySelectedForBoard(st, u, localPlayer, null) : false;
+    const isFriendly = u.owner === localPlayer;
+    const friendlyMt =
+      !!st &&
+      st.phase === 'movement' &&
+      st.activePlayer === u.owner &&
+      movesUsed >= u.movement &&
+      isFriendly;
+    return mapUnitChipStyle(c, {
+      isSelected,
+      isFriendly,
+      isRangedTarget: false,
+      friendlyMovementTired: friendlyMt,
+    });
+  };
+
   const live0 = liveStateForHp ? getUnitById(liveStateForHp, unit.id) : null;
   const maxHp0 = live0?.maxHp ?? unit.maxHp;
   const displayHp0 = live0 ? getBoardVisualHp(live0, performance.now()) : unit.hp;
   const hpRatio0 = maxHp0 > 0 ? Math.min(1, Math.max(0, displayHp0 / maxHp0)) : 0;
   const unitSc = (HEX_SIZE * 1.1) / 50;
+  const chip0 = chipFromLiveStrike(liveStateForHp ?? null, unit, performance.now());
 
   const unitWrap = svgEl('g');
   unitWrap.setAttribute('class', 'board-unit board-unit--moving');
@@ -2214,7 +2502,9 @@ export function animateStrikeAndReturn(
   const unitBody = svgEl('path');
   unitBody.setAttribute('class', 'board-unit__body');
   unitBody.setAttribute('d', BOARD_UNIT_SILHOUETTE_D);
-  unitBody.setAttribute('fill', baseColor);
+  unitBody.setAttribute('fill', chip0.bodyFill);
+  unitBody.setAttribute('stroke', chip0.bodyStroke);
+  unitBody.setAttribute('stroke-width', String(chip0.bodyStrokeW / unitSc));
   unitBody.setAttribute('pointer-events', 'none');
   unitWrap.appendChild(unitBody);
 
@@ -2227,22 +2517,63 @@ export function animateStrikeAndReturn(
   barBg.setAttribute('pointer-events', 'none');
   unitWrap.appendChild(barBg);
 
-  const barColor0 = hpRatio0 > 0.6 ? c.hpHigh : hpRatio0 > 0.3 ? c.hpMid : c.hpLow;
   const barFill = svgEl('rect');
   barFill.setAttribute('class', 'board-unit__hp-fill');
   barFill.setAttribute('width', String(animBarW * hpRatio0));
   barFill.setAttribute('height', String(barH));
-  barFill.setAttribute('fill', barColor0);
+  barFill.setAttribute('fill', chip0.hpFill);
   barFill.setAttribute('pointer-events', 'none');
   unitWrap.appendChild(barFill);
 
+  const hex0 = boardPixelForMoveAnim(fromCol, fromRow, territoryGraph);
+  const iconCx0 = hex0.x;
+  const iconCy0 = hex0.y - HEX_SIZE * 0.34;
+  const bracketHalf = HEX_SIZE * 0.22;
+  const bracketLeg = HEX_SIZE * 0.11;
+  const bracketPath = svgEl('path');
+  bracketPath.setAttribute('class', 'board-unit__brackets');
+  bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx0, iconCy0, bracketHalf, bracketLeg));
+  bracketPath.setAttribute('fill', 'none');
+  bracketPath.setAttribute('stroke', chip0.bracketStroke);
+  bracketPath.setAttribute('stroke-width', String(chip0.bracketStrokeW));
+  bracketPath.setAttribute('stroke-linecap', 'square');
+  bracketPath.setAttribute('pointer-events', 'none');
+  unitWrap.appendChild(bracketPath);
+
+  const facHref = factionIconHrefFromPackage(packageForUnitOnBoard(unit, liveStateForHp));
+  const facW = 11 * unitSc;
+  const factionImg = svgFactionImage(
+    hex0.x - 25 * unitSc + 2.5 * unitSc,
+    hex0.y - 32 * unitSc + 2 * unitSc,
+    facW,
+    facW,
+    facHref,
+  );
+  unitWrap.appendChild(factionImg);
+
   const iconSrc = unit.icon ?? unitIcon(unit.unitTypeId);
   const iconSize = HEX_SIZE * 0.4;
-  const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, c.unitIconColor, '1', 'board-unit__icon');
+  const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, chip0.iconColor, '1', 'board-unit__icon');
   const iconWrapper = svgEl('g');
   iconWrapper.setAttribute('pointer-events', 'none');
   if (iconEl) iconWrapper.appendChild(iconEl);
   unitWrap.appendChild(iconWrapper);
+
+  const starN = boardUnitUpgradeStarCount(unit);
+  const starSize = HEX_SIZE * 0.14;
+  const starsOuter = svgEl('g');
+  starsOuter.setAttribute('class', 'board-unit__stars');
+  starsOuter.setAttribute('pointer-events', 'none');
+  if (starN > 0) {
+    const spacing = starSize * 1.2;
+    const totalW = (starN - 1) * spacing;
+    for (let si = 0; si < starN; si++) {
+      const lx = -totalW / 2 + si * spacing;
+      const sg = inlineIcon('icons/star.svg', lx, 0, starSize, '#0a0a0a', '1');
+      if (sg) starsOuter.appendChild(sg);
+    }
+    unitWrap.appendChild(starsOuter);
+  }
 
   const startTime = performance.now();
 
@@ -2262,9 +2593,25 @@ export function animateStrikeAndReturn(
     const maxHp = live?.maxHp ?? unit.maxHp;
     const displayHp = live ? getBoardVisualHp(live, now) : unit.hp;
     const hpRatio = maxHp > 0 ? Math.min(1, Math.max(0, displayHp / maxHp)) : 0;
-    const barColor = hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
+    const chip = chipFromLiveStrike(liveStateForHp ?? null, unit, now);
     barFill.setAttribute('width', String(animBarW * hpRatio));
-    barFill.setAttribute('fill', barColor);
+    barFill.setAttribute('fill', chip.hpFill);
+    unitBody.setAttribute('fill', chip.bodyFill);
+    unitBody.setAttribute('stroke', chip.bodyStroke);
+    unitBody.setAttribute('stroke-width', String(chip.bodyStrokeW / unitSc));
+    bracketPath.setAttribute('stroke', chip.bracketStroke);
+    bracketPath.setAttribute('stroke-width', String(chip.bracketStrokeW));
+
+    const iconCx = x;
+    const iconCy = y - HEX_SIZE * 0.34;
+    bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketLeg));
+    factionImg.setAttribute('x', String(x - 25 * unitSc + 2.5 * unitSc));
+    factionImg.setAttribute('y', String(y - 32 * unitSc + 2 * unitSc));
+    factionImg.setAttribute('width', String(facW));
+    factionImg.setAttribute('height', String(facW));
+    if (starN > 0) {
+      starsOuter.setAttribute('transform', `translate(${x},${y - 32 * unitSc - starSize * 0.55})`);
+    }
 
     if (spriteRoot) {
       spriteRoot.setAttribute('transform', `translate(${x},${y}) scale(-1,-1) translate(${-x},${-y})`);
