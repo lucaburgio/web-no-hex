@@ -1,7 +1,5 @@
 import {
-  createInitialState,
   createInitialStatePreservingTerrain,
-  createInitialStateFromPlayableStory,
   createStoryState,
   createInitialStateFromTerritoryMap,
   playerPlaceUnit,
@@ -44,6 +42,11 @@ import {
   getTerritoryFromEvent,
 } from './territoryRenderer';
 import tutorialMapDef from '../public/maps/tutorial.json';
+const _TERRITORY_MAP_MODULES = import.meta.glob('../public/maps/*.json', { eager: true, import: 'default' }) as Record<string, unknown>;
+const TERRITORY_MAPS_LIST: Array<{ id: string; def: unknown }> = Object.entries(_TERRITORY_MAP_MODULES).map(([path, def]) => ({
+  id: path.replace('../public/maps/', '').replace('.json', ''),
+  def,
+}));
 import {
   initRenderer,
   loadIconDefs,
@@ -90,7 +93,6 @@ import modeIconConquest from '../public/icons/modes/conquest.svg';
 import modeIconBreakthrough from '../public/icons/modes/breakthrough.svg';
 import chevronFilledIcon from '../public/icons/chevron-filled.svg';
 import { STORIES } from './stories';
-import { getHomeRowPassableHexCounts, storyMapHasFullCustomMatchSupport } from './storyMapLayouts';
 import { SCENARIOS, getScenarioById } from './scenarios';
 import {
   loadStoryProgress,
@@ -459,14 +461,15 @@ const STORY_CONFIG_DEFAULTS = {
 };
 let storyConfigSnapshot: typeof STORY_CONFIG_DEFAULTS | null = null;
 
-/** New vs-AI / multiplayer games: fixed terrain when a multi-mode story map is chosen. */
+/** Creates initial state from the selected territory map and game mode. */
 function createInitialStateForMenu(): GameState {
-  const id = config.customMatchMapId;
-  if (id) {
-    const story = STORIES.find(s => s.id === id && storyMapHasFullCustomMatchSupport(s.map));
-    if (story) return createInitialStateFromPlayableStory(story);
-  }
-  return createInitialState();
+  const mapId = config.customMatchMapId;
+  const mapEntry = mapId
+    ? TERRITORY_MAPS_LIST.find(m => m.id === mapId)
+    : TERRITORY_MAPS_LIST[0];
+  const mapDef = mapEntry?.def ?? tutorialMapDef;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return createInitialStateFromTerritoryMap(mapDef as any, config.gameMode);
 }
 
 let state: GameState = createInitialStateForMenu();
@@ -1398,8 +1401,6 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
   ['cfg-startingUnitsPlayer2',     'startingUnitsPlayer2',     1],
   ['cfg-startingUnitsDefender',    'startingUnitsDefender',    1],
   ['cfg-startingUnitsAttacker',    'startingUnitsAttacker',    1],
-  ['cfg-boardCols',               'boardCols',               1],
-  ['cfg-boardRows',               'boardRows',               1],
   ['cfg-productionPointsPerTurn',   'productionPointsPerTurn',   1],
   ['cfg-productionPointsPerTurnAi', 'productionPointsPerTurnAi', 1],
   ['cfg-territoryQuota',          'territoryQuota',          1],
@@ -1419,7 +1420,6 @@ declare const _cfgNumProxy: {
   breakthroughAttackerStartingPP: number; breakthroughSectorCount: number; breakthroughEnemySectorStrengthMult: number;
   breakthroughSectorCaptureBonusPP: number;
   startingUnitsPlayer1: number; startingUnitsPlayer2: number; startingUnitsDefender: number; startingUnitsAttacker: number;
-  boardCols: number; boardRows: number;
   productionPointsPerTurn: number;
   productionPointsPerTurnAi: number;
   territoryQuota: number; pointsPerQuota: number;
@@ -1498,13 +1498,6 @@ const settingsOnOffToggles = new Map<string, SettingsOnOffToggle>();
 /** Tracks game mode across settings UI updates so quota fields can be backed up / restored around Breakthrough. */
 let lastSettingsGameModeForQuota: string | null = null;
 let quotaFieldsBeforeBreakthrough: { territory: string; points: string } | null = null;
-/** Last committed board width (settings); used when width input is empty for snapshots. */
-let lastCommittedBoardCols = config.boardCols;
-
-/** Fixed story map selected: hide BOARD — size and terrain come from the preset. */
-function setBoardSettingsLocked(locked: boolean): void {
-  document.getElementById('settings-board-section')?.classList.toggle('hidden', locked);
-}
 
 function populateSettings(): void {
   lastSettingsGameModeForQuota = null;
@@ -1521,7 +1514,6 @@ function populateSettings(): void {
     startingUnitsPlayer2: config.startingUnitsPlayer2,
     startingUnitsDefender: config.startingUnitsDefender,
     startingUnitsAttacker: config.startingUnitsAttacker,
-    boardCols: config.boardCols, boardRows: config.boardRows,
     productionPointsPerTurn: config.productionPointsPerTurn,
     productionPointsPerTurnAi: config.productionPointsPerTurnAi,
     territoryQuota: config.territoryQuota, pointsPerQuota: config.pointsPerQuota,
@@ -1559,35 +1551,18 @@ function populateSettings(): void {
   const customMapEl = document.getElementById('cfg-customMap') as HTMLSelectElement | null;
   if (customMapEl) {
     customMapEl.innerHTML = '';
-    const autoOpt = document.createElement('option');
-    autoOpt.value = '';
-    autoOpt.textContent = '[generate]';
-    customMapEl.appendChild(autoOpt);
-    for (const s of STORIES.filter(x => storyMapHasFullCustomMatchSupport(x.map))) {
+    for (const m of TERRITORY_MAPS_LIST) {
       const opt = document.createElement('option');
-      opt.value = s.id;
-      opt.textContent = s.title;
+      opt.value = m.id;
+      opt.textContent = m.id.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
       customMapEl.appendChild(opt);
     }
     const cur = config.customMatchMapId ?? '';
-    const valid = cur !== '' && STORIES.some(s => s.id === cur && storyMapHasFullCustomMatchSupport(s.map));
-    customMapEl.value = valid ? cur : '';
-    if (valid && cur) {
-      const st = STORIES.find(s => s.id === cur && storyMapHasFullCustomMatchSupport(s.map));
-      if (st) {
-        (document.getElementById('cfg-boardCols') as HTMLInputElement).value = String(st.map.cols);
-        (document.getElementById('cfg-boardRows') as HTMLInputElement).value = String(st.map.rows);
-        vals.boardCols = st.map.cols;
-        vals.boardRows = st.map.rows;
-      }
-    }
-    setBoardSettingsLocked(!!customMapEl.value.trim());
+    const valid = cur !== '' && TERRITORY_MAPS_LIST.some(m => m.id === cur);
+    customMapEl.value = valid ? cur : (TERRITORY_MAPS_LIST[0]?.id ?? '');
     customMapEl.dispatchEvent(new Event('settings-select-rebuild'));
-  } else {
-    setBoardSettingsLocked(false);
   }
   applyStartingUnitsInputMaxes();
-  lastCommittedBoardCols = vals.boardCols;
 
   const rulesPresetEl = document.getElementById('cfg-rulesPreset') as HTMLSelectElement | null;
   if (rulesPresetEl) {
@@ -1712,28 +1687,24 @@ const STARTING_UNITS_FIELD_IDS = [
   'cfg-startingUnitsAttacker',
 ] as const;
 
-function getSelectedCustomMapStoryForSettings(): (typeof STORIES)[number] | undefined {
+function getSelectedTerritoryMapForSettings(): { id: string; def: unknown } | undefined {
   const customMapEl = document.getElementById('cfg-customMap') as HTMLSelectElement | null;
   if (!customMapEl) return undefined;
   const id = customMapEl.value.trim();
   if (!id) return undefined;
-  return STORIES.find(s => s.id === id && storyMapHasFullCustomMatchSupport(s.map));
+  return TERRITORY_MAPS_LIST.find(m => m.id === id) ?? TERRITORY_MAPS_LIST[0];
 }
 
 /**
- * Sets each starting-units input `max` from board width, or from passable (non-mountain) home rows
- * when a custom map preset is selected. Breakthrough mode maps attacker/defender caps to the correct border.
+ * Sets each starting-units input `max` from the starting territories of the selected territory map.
+ * Breakthrough mode maps attacker/defender caps to the correct border.
  */
 function applyStartingUnitsInputMaxes(): void {
-  const widthEl = document.getElementById('cfg-boardCols') as HTMLInputElement | null;
-  const t = widthEl?.value.trim() ?? '';
-  const parsedW = t === '' ? NaN : parseFloat(t);
-  const width = Number.isFinite(parsedW) ? parsedW : lastCommittedBoardCols;
-
-  const customStory = getSelectedCustomMapStoryForSettings();
-  const { south, north } = customStory
-    ? getHomeRowPassableHexCounts(customStory.map)
-    : { south: width, north: width };
+  const selectedMap = getSelectedTerritoryMapForSettings();
+  const mapDef = selectedMap?.def as { territories?: Array<{ state: string }> } | undefined;
+  const territories = mapDef?.territories ?? [];
+  const south = Math.max(1, territories.filter(t => t.state === 'allied').length);
+  const north = Math.max(1, territories.filter(t => t.state === 'enemy').length);
 
   const p1el = document.getElementById('cfg-startingUnitsPlayer1') as HTMLInputElement | null;
   const p2el = document.getElementById('cfg-startingUnitsPlayer2') as HTMLInputElement | null;
@@ -1765,13 +1736,13 @@ function applyStartingUnitsInputMaxes(): void {
     }
     defEl.max = cap(maxDef);
     attEl.max = cap(maxAtt);
-    p1el.max = cap(width);
-    p2el.max = cap(width);
+    p1el.max = cap(Math.min(south, north));
+    p2el.max = cap(Math.min(south, north));
   } else {
     p1el.max = cap(south);
     p2el.max = cap(north);
-    defEl.max = cap(width);
-    attEl.max = cap(width);
+    defEl.max = cap(south);
+    attEl.max = cap(north);
   }
 
   for (const id of STARTING_UNITS_FIELD_IDS) {
@@ -1917,11 +1888,6 @@ function collectSettings(): Parameters<typeof updateConfig>[0] {
   if (customMapEl) {
     const mapId = customMapEl.value.trim();
     out.customMatchMapId = mapId === '' ? null : mapId;
-    const story = mapId ? STORIES.find(s => s.id === mapId && storyMapHasFullCustomMatchSupport(s.map)) : undefined;
-    if (story) {
-      out.boardCols = story.map.cols;
-      out.boardRows = story.map.rows;
-    }
   }
   return out as Parameters<typeof updateConfig>[0];
 }
@@ -1950,29 +1916,6 @@ for (const [id] of NUM_FIELDS) {
   });
 }
 
-const boardColsSettingsEl = document.getElementById('cfg-boardCols') as HTMLInputElement;
-boardColsSettingsEl.addEventListener('input', () => {
-  const t = boardColsSettingsEl.value.trim();
-  if (t === '') return;
-  const raw = parseFloat(t);
-  if (!Number.isFinite(raw)) return;
-  const min = Number(boardColsSettingsEl.min);
-  const max = Number(boardColsSettingsEl.max);
-  // Do not enforce min while typing (e.g. "1" before "2" in "12"); blur commits min.
-  if (raw > max) {
-    boardColsSettingsEl.value = String(max);
-    applyStartingUnitsInputMaxes();
-    return;
-  }
-  if (raw >= min) {
-    applyStartingUnitsInputMaxes();
-  }
-});
-boardColsSettingsEl.addEventListener('change', () => {
-  const w = clampNumericInputToBounds(boardColsSettingsEl);
-  applyStartingUnitsInputMaxes();
-  lastCommittedBoardCols = w;
-});
 
 // Populate unit package selects from config and build custom widgets
 (function () {
@@ -2019,17 +1962,7 @@ document.getElementById('cfg-rulesPreset')?.addEventListener('change', () => {
   applyRulesPreset(sel.value);
 });
 document.getElementById('cfg-customMap')?.addEventListener('change', () => {
-  const sel = document.getElementById('cfg-customMap') as HTMLSelectElement;
-  const story = sel.value ? STORIES.find(s => s.id === sel.value && storyMapHasFullCustomMatchSupport(s.map)) : undefined;
-  const colsEl = document.getElementById('cfg-boardCols') as HTMLInputElement;
-  const rowsEl = document.getElementById('cfg-boardRows') as HTMLInputElement;
-  if (story) {
-    colsEl.value = String(story.map.cols);
-    rowsEl.value = String(story.map.rows);
-    applyStartingUnitsInputMaxes();
-    lastCommittedBoardCols = story.map.cols;
-  }
-  setBoardSettingsLocked(!!sel.value.trim());
+  applyStartingUnitsInputMaxes();
 });
 document.getElementById('cfg-gameMode')!.addEventListener('change', () => {
   updateModeSpecificSettingsVisibility();
@@ -2196,7 +2129,6 @@ function hideSettings(): void {
 settingsStartBtn.addEventListener('click', () => {
   const settings = collectSettings();
   updateConfig(settings);
-  syncDimensions();
   setActiveUnitPackage(settingsUnitPackage);
   setActiveUnitPackagePlayer2(settingsUnitPackagePlayer2);
   const cb = settingsOnStart;
@@ -3004,8 +2936,8 @@ function updateHeaderModeLabel(s: GameState): void {
   if (activeStoryIndex !== null) {
     mapName = STORIES[activeStoryIndex]!.title;
   } else if (config.customMatchMapId) {
-    const story = STORIES.find(st => st.id === config.customMatchMapId);
-    if (story) mapName = story.title;
+    const mapEntry = TERRITORY_MAPS_LIST.find(m => m.id === config.customMatchMapId);
+    if (mapEntry) mapName = mapEntry.id.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
 
   headerModeLabelEl.textContent = mapName ? `${modeLabel}\n${mapName}` : modeLabel;
