@@ -52,6 +52,8 @@ const unitStarIconFill = '#0a0a0a';
 /** Shield path is 50×64 design units; tag uses `HEX_SIZE * unitTagSizeMultiplier / 50` scale. */
 const unitShieldDesignAnchorX = 25;
 const unitShieldDesignAnchorY = 32;
+/** Added to `<image>` x/y in {@link svgFactionImage}; animation frames must apply the same inset. */
+const unitFactionImageDomInsetPx = 2;
 
 const unitBracketsXMultiplier = 0.05;
 const unitBracketsYMultiplier = 0.16;
@@ -911,12 +913,20 @@ function boardUnitBracketsPathD(cx: number, cy: number, halfW: number, halfH: nu
     `M ${cx + hw - l} ${cy + hh} L ${cx + hw} ${cy + hh} L ${cx + hw} ${cy + hh - l}`,
   ].join(' ');
 }
+/** Logical top-left of faction flag before {@link svgFactionImage} applies {@link unitFactionImageDomInsetPx}. */
+function boardUnitFactionLogicalXY(hexCenterX: number, hexCenterY: number, sc: number): { fx: number; fy: number } {
+  return {
+    fx: hexCenterX - unitShieldDesignAnchorX * sc + 2.5 * sc,
+    fy: hexCenterY - unitShieldDesignAnchorY * sc + 2 * sc,
+  };
+}
+
 //unit faction icon position
 function svgFactionImage(x: number, y: number, w: number, h: number, href: string): SVGImageElement {
   const im = svgEl('image');
   im.setAttribute('class', 'board-unit__faction');
-  im.setAttribute('x', String(x + 2));
-  im.setAttribute('y', String(y + 2));
+  im.setAttribute('x', String(x + unitFactionImageDomInsetPx));
+  im.setAttribute('y', String(y + unitFactionImageDomInsetPx));
   im.setAttribute('width', String(w));
   im.setAttribute('height', String(h));
   im.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1055,8 +1065,7 @@ export function mountBoardUnitChipContents(
 
   const facHref = factionIconHrefFromPackage(packageForUnitOnBoard(p.unit, p.state));
   const facW = 11 * sc;
-  const facX = p.x - unitShieldDesignAnchorX * sc + 2.5 * sc;
-  const facY = p.y - unitShieldDesignAnchorY * sc + 2 * sc;
+  const { fx: facX, fy: facY } = boardUnitFactionLogicalXY(p.x, p.y, sc);
   unitWrap.appendChild(svgFactionImage(facX, facY, facW, facW, facHref));
 
   const icon = p.unit.icon ?? unitIcon(p.unit.unitTypeId);
@@ -2407,13 +2416,8 @@ export function animateMoves(
 
     const facHref = factionIconHrefFromPackage(packageForUnitOnBoard(anim.unit, liveStateForHp));
     const facW = 11 * unitSc;
-    const factionImg = svgFactionImage(
-      hex0.x - unitShieldDesignAnchorX * unitSc + 2.5 * unitSc,
-      hex0.y - unitShieldDesignAnchorY * unitSc + 2 * unitSc,
-      facW,
-      facW,
-      facHref,
-    );
+    const facHex0 = boardUnitFactionLogicalXY(hex0.x, hex0.y, unitSc);
+    const factionImg = svgFactionImage(facHex0.fx, facHex0.fy, facW, facW, facHref);
     unitWrap.appendChild(factionImg);
 
     const iconSrc = anim.unit.icon ?? unitIcon(anim.unit.unitTypeId);
@@ -2466,8 +2470,9 @@ export function animateMoves(
       const iconCx = x - HEX_SIZE * unitBracketsXMultiplier;
       const iconCy = y - HEX_SIZE * unitBracketsYMultiplier;
       bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketHalfH, bracketLeg));
-      factionImg.setAttribute('x', String(x - unitShieldDesignAnchorX * unitSc + 2.5 * unitSc));
-      factionImg.setAttribute('y', String(y - unitShieldDesignAnchorY * unitSc + 2 * unitSc));
+      const facPos = boardUnitFactionLogicalXY(x, y, unitSc);
+      factionImg.setAttribute('x', String(facPos.fx + unitFactionImageDomInsetPx));
+      factionImg.setAttribute('y', String(facPos.fy + unitFactionImageDomInsetPx));
       factionImg.setAttribute('width', String(facW));
       factionImg.setAttribute('height', String(facW));
       if (starN > 0) {
@@ -2656,13 +2661,8 @@ export function animateStrikeAndReturn(
 
   const facHref = factionIconHrefFromPackage(packageForUnitOnBoard(unit, liveStateForHp));
   const facW = 11 * unitSc;
-  const factionImg = svgFactionImage(
-    hex0.x - unitShieldDesignAnchorX * unitSc + 2.5 * unitSc,
-    hex0.y - unitShieldDesignAnchorY * unitSc + 2 * unitSc,
-    facW,
-    facW,
-    facHref,
-  );
+  const facHex0Strike = boardUnitFactionLogicalXY(hex0.x, hex0.y, unitSc);
+  const factionImg = svgFactionImage(facHex0Strike.fx, facHex0Strike.fy, facW, facW, facHref);
   unitWrap.appendChild(factionImg);
 
   const iconSrc = unit.icon ?? unitIcon(unit.unitTypeId);
@@ -2720,8 +2720,9 @@ export function animateStrikeAndReturn(
     const iconCx = x - HEX_SIZE * unitBracketsXMultiplier;
     const iconCy = y - HEX_SIZE * unitBracketsYMultiplier;
     bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketHalfH, bracketLeg));
-    factionImg.setAttribute('x', String(x - unitShieldDesignAnchorX * unitSc + 2.5 * unitSc));
-    factionImg.setAttribute('y', String(y - unitShieldDesignAnchorY * unitSc + 2 * unitSc));
+    const facPosStrike = boardUnitFactionLogicalXY(x, y, unitSc);
+    factionImg.setAttribute('x', String(facPosStrike.fx + unitFactionImageDomInsetPx));
+    factionImg.setAttribute('y', String(facPosStrike.fy + unitFactionImageDomInsetPx));
     factionImg.setAttribute('width', String(facW));
     factionImg.setAttribute('height', String(facW));
     if (starN > 0) {
