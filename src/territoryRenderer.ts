@@ -12,6 +12,9 @@ import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
 import outsideBorderPatternSrc from '../public/images/misc/outside-border-pattern.png';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+/** Match `#board` / `renderer.ts` so SVG territory hits use the app pointer art, not the OS cursor. */
+const TERRITORY_HOVER_CURSOR = "url('/icons/pointer.svg') 13 14, pointer";
+const TERRITORY_MOUNTAIN_CURSOR = "url('/icons/pointer.svg') 13 14, default";
 
 // Game-specific highlight colors (no editorV2 equivalent)
 const COLOR_PRODUCTION_STROKE = '#3b82f6';
@@ -334,10 +337,10 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     fill.setAttribute('class', 'ev2-territory-fill ev2-state-neutral');
     fill.setAttribute('points', territoryPointsAttr(t, points));
     if (t.state === 'mountain') {
-      fill.style.cursor = 'default';
+      fill.style.cursor = TERRITORY_MOUNTAIN_CURSOR;
       fill.setAttribute('pointer-events', 'none');
     } else {
-      fill.style.cursor = 'pointer';
+      fill.style.cursor = TERRITORY_HOVER_CURSOR;
     }
     group.appendChild(fill);
 
