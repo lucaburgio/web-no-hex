@@ -28,7 +28,7 @@ import mountainHex06 from '../public/images/misc/mountain-hex/mountain-06.png';
 import mountainHex07 from '../public/images/misc/mountain-hex/mountain-07.png';
 import { riverSegmentDisplay } from './rivers';
 import type { TerritoryGraphData } from './territoryMap';
-import { boardPixelForVirtualHex, territoryPolygonPointsForVirtualHex } from './territoryMap';
+import { boardPixelForVirtualHex } from './territoryMap';
 
 // All unit layout (static board chip + move/strike sprites — keep in sync).
 const unitTagSizeMultiplier = 1.24;
@@ -3112,17 +3112,14 @@ export function renderMovePath(
   pathLine.setAttribute('fill', 'none');
 
   const [destCol, destRow] = path[path.length - 1]!;
-  let destPolyPoints: string | null = null;
-  if (territoryGraph) {
-    destPolyPoints = territoryPolygonPointsForVirtualHex(territoryGraph, destCol, destRow);
-  } else {
-    const { x: cx, y: cy } = hexToPixel(destCol, destRow);
-    destPolyPoints = hexPoints(cx, cy);
-  }
-  if (destOutline && destPolyPoints) {
-    destOutline.setAttribute('points', destPolyPoints);
-  } else if (destOutline) {
-    destOutline.setAttribute('points', '');
+  // Hex board only: ring at destination. Territory maps use inset borders — a second 10px outline reads as heavy clutter.
+  if (destOutline) {
+    if (territoryGraph) {
+      destOutline.setAttribute('points', '');
+    } else {
+      const { x: cx, y: cy } = hexToPixel(destCol, destRow);
+      destOutline.setAttribute('points', hexPoints(cx, cy));
+    }
   }
 
   const last = xy[xy.length - 1]!;

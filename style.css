@@ -560,13 +560,13 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   display: block;
 }
 
-/* Territory map: valid-move / selection inset border (fill stays owner state; hover ring is #move-path-dest-outline). */
+/* Territory map: valid-move / selection inset border (fill stays owner state). */
 #board .ev2-territory-border.ev2-border-move-highlight,
 #recap-board .ev2-territory-border.ev2-border-move-highlight {
   --ev2-border-color: var(--color-yellow-500);
 }
 
-/* Move path hover preview: 4px dashed track, destination polygon ring, end dot. */
+/* Move path hover preview: 4px dashed track (marching dashes), optional hex dest ring, end dot. */
 #board #move-path-line.move-path-preview-track,
 #recap-board #move-path-line.move-path-preview-track {
   stroke: var(--color-yellow-500);
@@ -575,6 +575,13 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   stroke-dasharray: 6 8;
   stroke-linecap: butt;
   stroke-linejoin: round;
+  animation: move-path-preview-track-flow 0.65s linear infinite;
+}
+
+@keyframes move-path-preview-track-flow {
+  to {
+    stroke-dashoffset: -14;
+  }
 }
 
 #board polygon.move-path-dest-outline,

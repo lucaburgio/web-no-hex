@@ -230,23 +230,6 @@ export function boardPixelForVirtualHex(
   return node ? { x: node.centroid.x, y: node.centroid.y } : null;
 }
 
-/** SVG `points` string for the territory polygon at virtual (col,row), for move-path preview outline. */
-export function territoryPolygonPointsForVirtualHex(
-  graph: TerritoryGraphData,
-  col: number,
-  row: number,
-): string | null {
-  const tid = graph.keyToId[`${col},${row}`];
-  if (!tid) return null;
-  const t = graph.mapDef.territories.find(x => x.id === tid);
-  if (!t) return null;
-  return t.pointIds
-    .map(pid => graph.points[pid])
-    .filter((p): p is { x: number; y: number } => !!p)
-    .map(p => `${p.x},${p.y}`)
-    .join(' ');
-}
-
 function computeCentroid(
   pointIds: string[],
   points: Record<string, { x: number; y: number }>,
