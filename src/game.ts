@@ -706,12 +706,23 @@ export function getUnitById(state: GameState, id: number): Unit | null {
   return state.units.find(u => u.id === id) ?? null;
 }
 
+/**
+ * Territory maps lay hexes in a rectangle; {@link TerritoryGraphData.virtualCols} / virtualRows can
+ * pad the bbox with slots that have no polygon — those must not count for production or supply.
+ */
+function isVirtualHexOnTerritory(state: GameState, col: number, row: number): boolean {
+  const g = state.customMapGraph;
+  if (!g) return true;
+  return g.keyToId[`${col},${row}`] !== undefined;
+}
+
 /** True if the player controls at least one non-mountain hex on their home row (supply from the border). */
 export function hasHomeProductionAccess(state: GameState, localPlayer: Owner): boolean {
   const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
   const mountains = state.mountainHexes ?? [];
   for (let c = 0; c < COLS; c++) {
     if (mountains.includes(`${c},${homeRow}`)) continue;
+    if (!isVirtualHexOnTerritory(state, c, homeRow)) continue;
     const key = `${c},${homeRow}`;
     const hex = state.hexStates[key];
     if (hex) {
@@ -726,6 +737,7 @@ export function hasHomeProductionAccess(state: GameState, localPlayer: Owner): b
 
 export function isValidProductionPlacement(state: GameState, col: number, row: number, localPlayer: Owner = PLAYER): boolean {
   if ((state.mountainHexes ?? []).includes(`${col},${row}`)) return false;
+  if (!isVirtualHexOnTerritory(state, col, row)) return false;
   if (getUnit(state, col, row)) return false;
   if (!hasHomeProductionAccess(state, localPlayer)) return false;
   const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
@@ -2623,6 +2635,7 @@ function collectAiProductionCandidates(state: GameState, occupied: Set<string>):
   for (let c = 0; c < COLS; c++) {
     const key = `${c},0`;
     if (mountains.includes(key)) continue;
+    if (!isVirtualHexOnTerritory(state, c, 0)) continue;
     if (occupied.has(key)) continue;
     const hex = state.hexStates[key];
     if (hex) {
