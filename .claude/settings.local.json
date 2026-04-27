@@ -30,7 +30,8 @@
       "Bash(git stash *)",
       "Bash(git revert *)",
       "WebFetch(domain:localhost)",
-      "Bash(curl -s http://localhost:5173/)"
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(python3 *)"
     ]
   }
 }

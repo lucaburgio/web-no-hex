@@ -790,7 +790,7 @@ function factionIconHrefFromPackage(pkg: string): string {
     'ru-ww2': '/icons/scenarios/ru-ww2.svg',
     'jp-ww2': '/icons/scenarios/jp-ww2.svg',
   };
-  return map[pkg] ?? '/icons/shield.svg';
+  return map[pkg] ?? '/icons/scenarios/us-ww2.svg';
 }
 
 function packageForUnitOnBoard(unit: Unit, state: GameState | null | undefined): string {
@@ -859,18 +859,18 @@ function boardUnitBracketsPathD(cx: number, cy: number, halfW: number, halfH: nu
   const hh = halfH;
   const l = leg;
   return [
-    `M ${cx - hw} ${cy - hh + l} L ${cx - hw} ${cy - hh} L ${cx - hw + l} ${cy - hh}`,
+    
     `M ${cx + hw - l} ${cy - hh} L ${cx + hw} ${cy - hh} L ${cx + hw} ${cy - hh + l}`,
     `M ${cx - hw} ${cy + hh - l} L ${cx - hw} ${cy + hh} L ${cx - hw + l} ${cy + hh}`,
     `M ${cx + hw - l} ${cy + hh} L ${cx + hw} ${cy + hh} L ${cx + hw} ${cy + hh - l}`,
   ].join(' ');
 }
-
+//unit faction icon
 function svgFactionImage(x: number, y: number, w: number, h: number, href: string): SVGImageElement {
   const im = svgEl('image');
   im.setAttribute('class', 'board-unit__faction');
-  im.setAttribute('x', String(x));
-  im.setAttribute('y', String(y));
+  im.setAttribute('x', String(x + 2));
+  im.setAttribute('y', String(y + 2));
   im.setAttribute('width', String(w));
   im.setAttribute('height', String(h));
   im.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -947,7 +947,7 @@ export function mountBoardUnitChipContents(
   const iconOpacity = tired ? String(config.tiredIconOpacity) : '1';
   const showAim = p.showRangedAimOverlay !== false;
 
-  const sc = (HEX_SIZE * 1.1) / 50;
+  const sc = (HEX_SIZE * 1.24) / 50;
   const unitEl = svgEl('path');
   unitEl.setAttribute('class', 'board-unit__body');
   unitEl.setAttribute('d', BOARD_UNIT_SILHOUETTE_D);
@@ -961,10 +961,11 @@ export function mountBoardUnitChipContents(
   unitEl.style.cursor = "url('/icons/pointer.svg') 13 14, pointer";
   unitWrap.appendChild(unitEl);
 
-  const barW = HEX_SIZE * 0.74;
+  //unit health bar
+  const barW = HEX_SIZE * 0.96;
   const barH = HEX_SIZE * 0.1;
   const barX = p.x - barW / 1.83;
-  const barY = p.y + HEX_SIZE * 0.38;
+  const barY = p.y + HEX_SIZE * 0.46;
 
   const barBg = svgEl('rect');
   barBg.setAttribute('class', 'board-unit__hp-bg');
@@ -987,11 +988,12 @@ export function mountBoardUnitChipContents(
   barFill.setAttribute('opacity', opacity);
   unitWrap.appendChild(barFill);
 
-  const iconCx = p.x - HEX_SIZE * 0.03;
-  const iconCy = p.y - HEX_SIZE * 0.12;
-  const bracketHalf = HEX_SIZE * 0.36;
-  const bracketHalfH = HEX_SIZE * 0.4;
-  const bracketLeg = HEX_SIZE * 0.2;
+  //unit brackets
+  const iconCx = p.x - HEX_SIZE * 0.05;
+  const iconCy = p.y - HEX_SIZE * 0.16;
+  const bracketHalf = HEX_SIZE * 0.44;
+  const bracketHalfH = HEX_SIZE * 0.48;
+  const bracketLeg = HEX_SIZE * 0.26;
   const bracketPath = svgEl('path');
   bracketPath.setAttribute('class', 'board-unit__brackets');
   bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketHalfH, bracketLeg));
@@ -2404,6 +2406,7 @@ export function animateMoves(
       bracketPath.setAttribute('stroke', chip.bracketStroke);
       bracketPath.setAttribute('stroke-width', String(chip.bracketStrokeW));
 
+      
       const iconCx = x;
       const iconCy = y - HEX_SIZE * 0.34;
       bracketPath.setAttribute('d', boardUnitBracketsPathD(iconCx, iconCy, bracketHalf, bracketHalfH, bracketLeg));
