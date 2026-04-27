@@ -32,6 +32,10 @@ import { boardPixelForVirtualHex } from './territoryMap';
 
 const MOUNTAIN_HEX_TEXTURES = [mountainHex01, mountainHex02, mountainHex03, mountainHex04, mountainHex05, mountainHex06, mountainHex07] as const;
 
+/** Shield silhouette in 50×64 design space; scaled in JS. Styled via `.board-unit__body` in `style.css`. */
+export const BOARD_UNIT_SILHOUETTE_D =
+  'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
+
 /** BFS path distance: hexes with distance 0, 1, or 2 from any friendly unit are in vision. */
 const FOG_VISION_HEX_DISTANCE = 2;
 
@@ -599,12 +603,22 @@ export async function loadIconDefs(iconPaths: string[]): Promise<void> {
   }));
 }
 
-function inlineIcon(iconSrc: string | undefined, x: number, y: number, size: number, color: string, opacity: string): SVGGElement | null {
+function inlineIcon(
+  iconSrc: string | undefined,
+  x: number,
+  y: number,
+  size: number,
+  color: string,
+  opacity: string,
+  /** Optional class on the root `<g>` (e.g. `board-unit__icon`). */
+  rootClass?: string,
+): SVGGElement | null {
   if (!iconSrc) return null;
   const def = iconDefsCache[iconSrc];
   if (!def) return null;
   const scale = size / def.viewBox;
   const g = svgEl('g');
+  if (rootClass) g.setAttribute('class', rootClass);
   g.setAttribute('transform', `translate(${x - size / 2},${y - size / 2}) scale(${scale})`);
   if (def.mode === 'fill') {
     g.setAttribute('fill', color);
@@ -1912,12 +1926,11 @@ export function renderState(
     unitWrap.setAttribute('data-row', String(dr));
     uParent.appendChild(unitWrap);
 
-    const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
     const sc = (HEX_SIZE * 1.1) / 50;
     const unitEl = svgEl('path');
-    unitEl.setAttribute('d', UNIT_PATH_D);
+    unitEl.setAttribute('class', 'board-unit__body');
+    unitEl.setAttribute('d', BOARD_UNIT_SILHOUETTE_D);
     unitEl.setAttribute('fill', fill);
-    unitEl.setAttribute('stroke', 'none');
     unitEl.setAttribute('opacity', opacity);
     unitEl.setAttribute('data-col', String(dc));
     unitEl.setAttribute('data-row', String(dr));
@@ -1932,18 +1945,19 @@ export function renderState(
     const barY = y + HEX_SIZE * 0.13;
 
     const barBg = svgEl('rect');
+    barBg.setAttribute('class', 'board-unit__hp-bg');
     barBg.setAttribute('x', String(barX)); barBg.setAttribute('y', String(barY));
     barBg.setAttribute('width', String(barW)); barBg.setAttribute('height', String(barH));
-    barBg.setAttribute('fill', '#222'); barBg.setAttribute('rx', '1');
     barBg.setAttribute('pointer-events', 'none');
     barBg.setAttribute('opacity', opacity);
     unitWrap.appendChild(barBg);
 
     const barColor = tired ? c.hpTired : hpRatio > 0.6 ? c.hpHigh : hpRatio > 0.3 ? c.hpMid : c.hpLow;
     const barFill = svgEl('rect');
+    barFill.setAttribute('class', 'board-unit__hp-fill');
     barFill.setAttribute('x', String(barX)); barFill.setAttribute('y', String(barY));
     barFill.setAttribute('width', String(barW * hpRatio)); barFill.setAttribute('height', String(barH));
-    barFill.setAttribute('fill', barColor); barFill.setAttribute('rx', '1');
+    barFill.setAttribute('fill', barColor);
     barFill.setAttribute('pointer-events', 'none');
     barFill.setAttribute('opacity', opacity);
     unitWrap.appendChild(barFill);
@@ -1951,7 +1965,7 @@ export function renderState(
     // Icon (shifted up inside shape)
     const icon = unit.icon ?? unitIcon(unit.unitTypeId);
     const iconColor = isRangedTarget ? '#ffffff' : c.unitIconColor;
-    const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.34, HEX_SIZE * 0.4, iconColor, iconOpacity);
+    const iconEl = inlineIcon(icon, x, y - HEX_SIZE * 0.34, HEX_SIZE * 0.4, iconColor, iconOpacity, 'board-unit__icon');
     if (iconEl) unitWrap.appendChild(iconEl);
 
     if (isRangedTarget) {
@@ -2028,23 +2042,26 @@ export function animateMoves(
     const layer: SVGGElement = spriteRoot ?? animLayer!;
     if (spriteRoot) animLayer!.appendChild(spriteRoot);
 
-    const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
     const animFill = baseColor;
     const unitSc = (HEX_SIZE * 1.1) / 50;
-    const circle = svgEl('path');
-    circle.setAttribute('d', UNIT_PATH_D);
-    circle.setAttribute('fill', animFill);
-    circle.setAttribute('stroke', 'none');
-    circle.setAttribute('pointer-events', 'none');
-    layer.appendChild(circle);
+    const unitWrap = svgEl('g');
+    unitWrap.setAttribute('class', 'board-unit board-unit--moving');
+    layer.appendChild(unitWrap);
+
+    const unitBody = svgEl('path');
+    unitBody.setAttribute('class', 'board-unit__body');
+    unitBody.setAttribute('d', BOARD_UNIT_SILHOUETTE_D);
+    unitBody.setAttribute('fill', animFill);
+    unitBody.setAttribute('pointer-events', 'none');
+    unitWrap.appendChild(unitBody);
 
     const animBarW = HEX_SIZE * 0.58;
     const barH = HEX_SIZE * 0.1;
     const barBg = svgEl('rect');
+    barBg.setAttribute('class', 'board-unit__hp-bg');
     barBg.setAttribute('width', String(animBarW)); barBg.setAttribute('height', String(barH));
-    barBg.setAttribute('fill', '#222'); barBg.setAttribute('rx', '1');
     barBg.setAttribute('pointer-events', 'none');
-    layer.appendChild(barBg);
+    unitWrap.appendChild(barBg);
 
     const live0 = liveStateForHp ? getUnitById(liveStateForHp, anim.unit.id) : null;
     const maxHp0 = live0?.maxHp ?? anim.unit.maxHp;
@@ -2052,19 +2069,20 @@ export function animateMoves(
     const hpRatio0 = maxHp0 > 0 ? Math.min(1, Math.max(0, displayHp0 / maxHp0)) : 0;
     const barColor0 = hpRatio0 > 0.6 ? c.hpHigh : hpRatio0 > 0.3 ? c.hpMid : c.hpLow;
     const barFill = svgEl('rect');
+    barFill.setAttribute('class', 'board-unit__hp-fill');
     barFill.setAttribute('width', String(animBarW * hpRatio0)); barFill.setAttribute('height', String(barH));
-    barFill.setAttribute('fill', barColor0); barFill.setAttribute('rx', '1');
+    barFill.setAttribute('fill', barColor0);
     barFill.setAttribute('pointer-events', 'none');
-    layer.appendChild(barFill);
+    unitWrap.appendChild(barFill);
 
     const iconSrc = anim.unit.icon ?? unitIcon(anim.unit.unitTypeId);
     const iconSize = HEX_SIZE * 0.4;
     // Place icon at (0,0) so its internal scale stays fixed; a wrapper <g> handles translation each frame.
-    const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, c.unitIconColor, '1');
+    const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, c.unitIconColor, '1', 'board-unit__icon');
     const iconWrapper = svgEl('g');
     iconWrapper.setAttribute('pointer-events', 'none');
     if (iconEl) iconWrapper.appendChild(iconEl);
-    layer.appendChild(iconWrapper);
+    unitWrap.appendChild(iconWrapper);
 
     const startTime = performance.now();
 
@@ -2086,7 +2104,7 @@ export function animateMoves(
       if (spriteRoot) {
         spriteRoot.setAttribute('transform', `translate(${x},${y}) scale(-1,-1) translate(${-x},${-y})`);
       }
-      circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
+      unitBody.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
       barBg.setAttribute('x',   String(x - animBarW / 2));
       barBg.setAttribute('y',   String(y + HEX_SIZE * 0.13));
       barFill.setAttribute('x', String(x - animBarW / 2));
@@ -2100,7 +2118,7 @@ export function animateMoves(
         if (spriteRoot) {
           spriteRoot.remove();
         } else {
-          circle.remove(); barBg.remove(); barFill.remove(); iconWrapper.remove();
+          unitWrap.remove();
         }
         completed++;
         if (completed >= animations.length) {
@@ -2187,42 +2205,44 @@ export function animateStrikeAndReturn(
   const maxHp0 = live0?.maxHp ?? unit.maxHp;
   const displayHp0 = live0 ? getBoardVisualHp(live0, performance.now()) : unit.hp;
   const hpRatio0 = maxHp0 > 0 ? Math.min(1, Math.max(0, displayHp0 / maxHp0)) : 0;
-  const UNIT_PATH_D = 'M0 44.1143V0H25H50V44.1143L25 64L0 44.1143Z';
   const unitSc = (HEX_SIZE * 1.1) / 50;
 
-  const circle = svgEl('path');
-  circle.setAttribute('d', UNIT_PATH_D);
-  circle.setAttribute('fill', baseColor);
-  circle.setAttribute('stroke', 'none');
-  circle.setAttribute('pointer-events', 'none');
-  layer.appendChild(circle);
+  const unitWrap = svgEl('g');
+  unitWrap.setAttribute('class', 'board-unit board-unit--moving');
+  layer.appendChild(unitWrap);
+
+  const unitBody = svgEl('path');
+  unitBody.setAttribute('class', 'board-unit__body');
+  unitBody.setAttribute('d', BOARD_UNIT_SILHOUETTE_D);
+  unitBody.setAttribute('fill', baseColor);
+  unitBody.setAttribute('pointer-events', 'none');
+  unitWrap.appendChild(unitBody);
 
   const animBarW = HEX_SIZE * 0.58;
   const barH = HEX_SIZE * 0.1;
   const barBg = svgEl('rect');
+  barBg.setAttribute('class', 'board-unit__hp-bg');
   barBg.setAttribute('width', String(animBarW));
   barBg.setAttribute('height', String(barH));
-  barBg.setAttribute('fill', '#222');
-  barBg.setAttribute('rx', '1');
   barBg.setAttribute('pointer-events', 'none');
-  layer.appendChild(barBg);
+  unitWrap.appendChild(barBg);
 
   const barColor0 = hpRatio0 > 0.6 ? c.hpHigh : hpRatio0 > 0.3 ? c.hpMid : c.hpLow;
   const barFill = svgEl('rect');
+  barFill.setAttribute('class', 'board-unit__hp-fill');
   barFill.setAttribute('width', String(animBarW * hpRatio0));
   barFill.setAttribute('height', String(barH));
   barFill.setAttribute('fill', barColor0);
-  barFill.setAttribute('rx', '1');
   barFill.setAttribute('pointer-events', 'none');
-  layer.appendChild(barFill);
+  unitWrap.appendChild(barFill);
 
   const iconSrc = unit.icon ?? unitIcon(unit.unitTypeId);
   const iconSize = HEX_SIZE * 0.4;
-  const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, c.unitIconColor, '1');
+  const iconEl = inlineIcon(iconSrc, 0, 0, iconSize, c.unitIconColor, '1', 'board-unit__icon');
   const iconWrapper = svgEl('g');
   iconWrapper.setAttribute('pointer-events', 'none');
   if (iconEl) iconWrapper.appendChild(iconEl);
-  layer.appendChild(iconWrapper);
+  unitWrap.appendChild(iconWrapper);
 
   const startTime = performance.now();
 
@@ -2249,7 +2269,7 @@ export function animateStrikeAndReturn(
     if (spriteRoot) {
       spriteRoot.setAttribute('transform', `translate(${x},${y}) scale(-1,-1) translate(${-x},${-y})`);
     }
-    circle.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
+    unitBody.setAttribute('transform', `translate(${x - 25 * unitSc},${y - 32 * unitSc}) scale(${unitSc})`);
     barBg.setAttribute('x', String(x - animBarW / 2));
     barBg.setAttribute('y', String(y + HEX_SIZE * 0.13));
     barFill.setAttribute('x', String(x - animBarW / 2));
@@ -2263,10 +2283,7 @@ export function animateStrikeAndReturn(
       if (spriteRoot) {
         spriteRoot.remove();
       } else {
-        circle.remove();
-        barBg.remove();
-        barFill.remove();
-        iconWrapper.remove();
+        unitWrap.remove();
       }
       animLayer!.innerHTML = '';
       resetAnimLayerStackOrder(svgElement);

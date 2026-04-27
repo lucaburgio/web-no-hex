@@ -531,12 +531,23 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 /* Playable board outer edge — path.board-perimeter-outline in renderer (hex boundary).
-   Edit variables on #board / #recap-board to restyle the dashed stroke. */
+   Unit chip variables: idle units in `#unit-layer` and move/strike clones in `#anim-layer` share the same
+   DOM classes (`board-unit`, `board-unit__body`, …). JS still sets faction `fill` on the body path and
+   tier `fill` on `.board-unit__hp-fill`. */
 #board,
 #recap-board {
   --board-perimeter-stroke: rgba(0, 0, 0, 0.2);
   --board-perimeter-stroke-width: 2px;
   --board-perimeter-dasharray: 4 4;
+
+  --board-unit-body-stroke: transparent;
+  --board-unit-body-stroke-width: 0;
+  --board-unit-body-filter: none;
+
+  --board-unit-hp-bg-fill: #222;
+  --board-unit-hp-track-rx: 1px;
+
+  --board-unit-icon-filter: none;
 }
 
 #board {
@@ -570,12 +581,42 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 /* Chromatic pointer-hover on selectable units (proposal 19 in public/unit-hover-proposals.html).
    Baseline transform/filter on `.board-unit` so transitions always have from/to values after DOM repaints. */
-#board .board-unit {
+#board .board-unit,
+#recap-board .board-unit {
   transform-box: fill-box;
   transform-origin: 50% 50%;
   transition: transform 0.2s ease, filter 0.2s ease;
   transform: scale(1);
   filter: brightness(1);
+}
+
+/* Move / strike sprites: same shell as idle units; motion is driven by JS each frame (no CSS transition). */
+#board .board-unit--moving,
+#recap-board .board-unit--moving {
+  transition: none;
+}
+
+#board .board-unit__body,
+#recap-board .board-unit__body {
+  stroke: var(--board-unit-body-stroke);
+  stroke-width: var(--board-unit-body-stroke-width);
+  filter: var(--board-unit-body-filter);
+}
+
+#board .board-unit__hp-bg,
+#recap-board .board-unit__hp-bg {
+  fill: var(--board-unit-hp-bg-fill);
+  rx: var(--board-unit-hp-track-rx);
+}
+
+#board .board-unit__hp-fill,
+#recap-board .board-unit__hp-fill {
+  rx: var(--board-unit-hp-track-rx);
+}
+
+#board .board-unit__icon,
+#recap-board .board-unit__icon {
+  filter: var(--board-unit-icon-filter);
 }
 
 #board .board-unit--pointer-hover-chromatic {
