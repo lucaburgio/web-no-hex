@@ -584,6 +584,15 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   }
 }
 
+@keyframes move-path-end-dot-border-pulse {
+  from {
+    stroke-width: 0;
+  }
+  to {
+    stroke-width: 5;
+  }
+}
+
 #board polygon.move-path-dest-outline,
 #recap-board polygon.move-path-dest-outline {
   fill: none;
@@ -595,7 +604,10 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #board .move-path-end-dot-outer,
 #recap-board .move-path-end-dot-outer {
   fill: var(--color-yellow-500);
-  stroke: none;
+  stroke: #ffffff;
+  stroke-width: 0;
+  paint-order: stroke fill;
+  animation: move-path-end-dot-border-pulse 0.85s ease-in-out infinite alternate;
 }
 
 #board .move-path-end-dot-inner,
