@@ -125,7 +125,6 @@ import {
 import { initMapEditor, showMapEditor, hideMapEditor } from './mapEditor';
 import { initEditorV2, showEditorV2, hideEditorV2 } from './editorV2';
 import { initSettingsNumberSpinners } from './settingsNumberSpinners';
-import { initGameAreaBoardTexture } from './gameAreaBoardTexture';
 import { playMainMenuEnterAnimation } from './mainMenuEnterAnimation';
 
 document.addEventListener('contextmenu', (e) => e.preventDefault(), { capture: true });
@@ -154,9 +153,6 @@ const WS_URL = relayWebSocketUrl();
 
 const svg        = document.getElementById('board') as unknown as SVGSVGElement;
 const gameAreaEl = document.getElementById('game-area') as HTMLElement | null;
-if (gameAreaEl) {
-  initGameAreaBoardTexture(gameAreaEl, svg as unknown as HTMLElement);
-}
 
 /** Last move-path preview key; redraw only when unit position or hovered destination changes. */
 let movePathPreviewKey: string | null = null;

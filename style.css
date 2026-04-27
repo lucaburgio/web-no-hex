@@ -51,7 +51,7 @@ img {
 :root {
 
   --color-white: #FFF;
-  --color-light: #ECECEC;
+  --color-light: #EFF0F0;
 
   --color-yellow-900: #9F5A15;
   --color-yellow-500: #FFC13A;
@@ -524,20 +524,13 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   position: relative;
   display: flex;
   justify-content: center;
+  background: var(--color-light);
   min-width: max-content;
   flex: 1;
   align-items: center;
   padding: 40px 0 72px;
   /* Distance outside the board bbox over which the line texture fades to transparent (see gameAreaBoardTexture.ts). */
   --game-area-board-texture-fade: min(36vw, 320px);
-}
-
-#game-area-bg-texture {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0;
 }
 
 #board-wrap {
