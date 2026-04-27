@@ -560,6 +560,16 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   display: block;
 }
 
+/* Territory map: movement selection uses same inset border as allied/enemy (ev2-border-line / glow) */
+#board .ev2-territory-fill.ev2-trr-move-highlight-fill,
+#recap-board .ev2-territory-fill.ev2-trr-move-highlight-fill {
+  fill: var(--color-yellow-50);
+}
+#board .ev2-territory-border.ev2-border-move-highlight,
+#recap-board .ev2-territory-border.ev2-border-move-highlight {
+  --ev2-border-color: var(--color-yellow-500);
+}
+
 /* Move path hover preview — proposal 23 in public/move-path-proposals.html (dashed track + chevron train). */
 #board #move-path-line.move-path-preview-track {
   stroke: var(--color-yellow-500);

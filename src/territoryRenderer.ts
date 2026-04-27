@@ -538,6 +538,21 @@ export function renderTerritoryState(
     }
   }
 
+  /** Selected unit territory + valid-move destinations: same inset border treatment as allied/enemy */
+  const moveHighlightTids = new Set<string>();
+  for (const t of mapDef.territories) {
+    if (t.state === 'mountain') continue;
+    const node = territories[t.id];
+    if (!node) continue;
+    const key = node.virtualKey;
+    const isSel = !!(
+      selectedUnitHl &&
+      selectedUnitHl.col === node.virtualCol &&
+      selectedUnitHl.row === node.virtualRow
+    );
+    if (isSel || validMoveKeys.has(key)) moveHighlightTids.add(t.id);
+  }
+
   function ownerState(tid: string): 'neutral' | 'allied' | 'enemy' {
     const node = territories[tid];
     if (!node) return 'neutral';
@@ -559,13 +574,30 @@ export function renderTerritoryState(
     const vizState: 'neutral' | 'allied' | 'enemy' | 'mountain' =
       t.state === 'mountain' ? 'mountain' : ownerState(t.id);
 
+    const isMoveHl = moveHighlightTids.has(t.id);
+
     if (fillPoly) {
-      const cls = `ev2-territory-fill ev2-state-${vizState}`;
-      if (fillPoly.getAttribute('class') !== cls) fillPoly.setAttribute('class', cls);
+      const baseFill = `ev2-territory-fill ev2-state-${vizState}`;
+      const fillCls = isMoveHl ? `${baseFill} ev2-trr-move-highlight-fill` : baseFill;
+      if (fillPoly.getAttribute('class') !== fillCls) fillPoly.setAttribute('class', fillCls);
     }
 
     if (borderGroup) {
-      if (vizState === 'neutral' || vizState === 'mountain') {
+      if (isMoveHl) {
+        if (borderGroup.getAttribute('display') === 'none') borderGroup.removeAttribute('display');
+
+        const borderCls = 'ev2-territory-border ev2-border-move-highlight';
+        if (borderGroup.getAttribute('class') !== borderCls) borderGroup.setAttribute('class', borderCls);
+
+        const suppressEdge = (neighborTid: string | null): boolean =>
+          neighborTid !== null && ownerState(neighborTid) === vizState;
+
+        const borderD = buildInsetBorderPath(t, edgeTerritoryIndex, points, -10, suppressEdge);
+        const glowEl = borderGroup.querySelector('.ev2-border-glow') as SVGElement | null;
+        const lineEl = borderGroup.querySelector('.ev2-border-line') as SVGElement | null;
+        if (glowEl) setAttrIfChanged(glowEl, 'd', borderD);
+        if (lineEl) setAttrIfChanged(lineEl, 'd', borderD);
+      } else if (vizState === 'neutral' || vizState === 'mountain') {
         if (borderGroup.getAttribute('display') !== 'none') borderGroup.setAttribute('display', 'none');
       } else {
         if (borderGroup.getAttribute('display') === 'none') borderGroup.removeAttribute('display');
@@ -600,20 +632,10 @@ export function renderTerritoryState(
     if (!node) continue;
     const key = node.virtualKey;
 
-    const isSelected = !!(
-      selectedUnitHl &&
-      selectedUnitHl.col === node.virtualCol &&
-      selectedUnitHl.row === node.virtualRow
-    );
-    const isValidMove = validMoveKeys.has(key);
     const isProduction = productionPlacementKeys.has(key);
 
     let stroke: string | null = null;
-    let fillHl = 'none';
-    if (isSelected || isValidMove) {
-      stroke = 'var(--color-yellow-500)';
-      fillHl = 'var(--color-yellow-50)';
-    } else if (isProduction) {
+    if (isProduction) {
       stroke = COLOR_PRODUCTION_STROKE;
     }
 
@@ -627,7 +649,7 @@ export function renderTerritoryState(
         highlightLayer.appendChild(pathEl);
       }
       setAttrIfChanged(pathEl, 'd', territoryPathD(t, points));
-      setAttrIfChanged(pathEl, 'fill', fillHl);
+      setAttrIfChanged(pathEl, 'fill', 'none');
       setAttrIfChanged(pathEl, 'stroke', stroke);
       setAttrIfChanged(pathEl, 'stroke-width', String(STROKE_WIDTH_HIGHLIGHT));
       setAttrIfChanged(pathEl, 'stroke-linejoin', 'round');
