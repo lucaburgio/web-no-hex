@@ -594,6 +594,21 @@ function combineAnimCancels(...cancels: (() => void)[]): () => void {
   };
 }
 
+/**
+ * Clears the single in-flight player move/combat VFX tween so another move or ranged attack can start.
+ * Selection / deselect / inspecting another unit does not call this — those actions leave the tween running.
+ */
+function cancelHumanMoveAnimationIfPlaying(): boolean {
+  if (!humanMoveAnimCancel || aiPlaybackInProgress) return false;
+  humanMoveAnimCancel();
+  humanMoveAnimCancel = null;
+  isAnimating = false;
+  if (gameMode === 'vsAI') scheduleSaveGameState();
+  render();
+  checkWinner();
+  return true;
+}
+
 /** Green +N heal badges after end-of-turn cleanup (same timing as damage floats). */
 function playEndTurnHealFloats(
   healFloats: { col: number; row: number; amount: number }[],
@@ -3483,23 +3498,10 @@ svg.addEventListener('click', (e: MouseEvent) => {
   if (!hex) {
     // Empty SVG margin / background (no hex under cursor): clear selection
     if (state.phase === 'movement' && state.selectedUnit !== null) {
-      let didInterruptHumanMove = false;
-      if (humanMoveAnimCancel && !aiPlaybackInProgress) {
-        didInterruptHumanMove = true;
-        humanMoveAnimCancel();
-        humanMoveAnimCancel = null;
-        isAnimating = false;
-        if (gameMode === 'vsAI') scheduleSaveGameState();
-        render();
-        checkWinner();
-      }
-      if (!isAnimating) {
-        clearMovePathPreview();
-        state.selectedUnit = null;
-        render(); updateUI();
-        sendStateUpdate();
-        if (didInterruptHumanMove) maybeAutoEnd();
-      }
+      clearMovePathPreview();
+      state.selectedUnit = null;
+      render(); updateUI();
+      sendStateUpdate();
     } else if (state.phase === 'production' && pendingProductionHex !== null) {
       hideUnitPicker();
       render();
@@ -3508,21 +3510,10 @@ svg.addEventListener('click', (e: MouseEvent) => {
     return;
   }
   const { col, row } = hex;
-  // Snapshot before humanMoveAnimCancel/render: cancel clears the SVG and e.target can detach;
-  // closest(#unit-layer) would then fail and chip checks would wrongly reject the click.
+  // Snapshot before any handler render(): render replaces SVG subtrees and e.target can detach.
   const clickWasOnBoardUnitChip = eventTargetIsOnBoardUnitChip(e);
 
-  let didInterruptHumanMove = false;
-  if (humanMoveAnimCancel && !aiPlaybackInProgress) {
-    didInterruptHumanMove = true;
-    humanMoveAnimCancel();
-    humanMoveAnimCancel = null;
-    isAnimating = false;
-    if (gameMode === 'vsAI') scheduleSaveGameState();
-    render();
-    checkWinner();
-  }
-  // Allow movement-phase clicks while animating so another unit can be selected mid-tween (cancel above).
+  // Movement-phase UI stays usable while a move/combat tween plays; we only cancel when issuing a new move or ranged attack.
   if (isAnimating && state.phase !== 'movement') return;
 
   if (state.phase === 'production' && state.activePlayer === localPlayer) {
@@ -3585,6 +3576,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
 
         if (!validMoves.some(([c, r]) => c === col && r === row)) {
           if (canRanged && clickWasOnBoardUnitChip) {
+            cancelHumanMoveAnimationIfPlaying();
             clearMovePathPreview();
             syncDamageFloatCssDuration();
             const { state: nextState, combatVfx } = playerRangedAttack(state, col, row, localPlayer);
@@ -3650,11 +3642,12 @@ svg.addEventListener('click', (e: MouseEvent) => {
           }
           render(); updateUI();
           sendStateUpdate();
-          if (didInterruptHumanMove) maybeAutoEnd();
           return;
         }
 
         clearMovePathPreview();
+
+        cancelHumanMoveAnimationIfPlaying();
 
         // Snapshot the moving unit before state changes
         const movingUnitId = state.selectedUnit;
@@ -3875,9 +3868,6 @@ svg.addEventListener('click', (e: MouseEvent) => {
     }
   }
 
-  if (didInterruptHumanMove && state.phase === 'movement' && state.activePlayer === localPlayer) {
-    maybeAutoEnd();
-  }
   } finally {
     // Clicks on the map must not reach document.body: the "click outside" handler can treat a
     // spurious or wrap-targeted event as outside #board, clearing selection right after a unit is chosen.
@@ -3925,23 +3915,10 @@ document.body.addEventListener('click', (e: MouseEvent) => {
   if (state.phase !== 'movement' || state.selectedUnit === null) return;
   if (movementHudStackEl.contains(t)) return;
 
-  let didInterruptHumanMove = false;
-  if (humanMoveAnimCancel && !aiPlaybackInProgress) {
-    didInterruptHumanMove = true;
-    humanMoveAnimCancel();
-    humanMoveAnimCancel = null;
-    isAnimating = false;
-    if (gameMode === 'vsAI') scheduleSaveGameState();
-    render();
-    checkWinner();
-  }
-  if (isAnimating) return;
-
   clearMovePathPreview();
   state.selectedUnit = null;
   render(); updateUI();
   sendStateUpdate();
-  if (didInterruptHumanMove) maybeAutoEnd();
 });
 
 // ── End phase button ──────────────────────────────────────────────────────────
