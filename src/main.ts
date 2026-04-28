@@ -2412,6 +2412,7 @@ function buildRulesContent(): string {
       <div class="rules-group-title">Movement</div>
       <ul class="rules-list">
       <li>Each unit may move up to its movement range per turn (see <strong>Units in this match</strong>). Moving onto an empty hex <strong>conquers</strong> it.</li>
+      <li><strong>Polygon scenario maps:</strong> you move between territories that share a <strong>border edge</strong> (same as the map editor&rsquo;s internal adjacency), not merely a corner contact.</li>
       <li>Moving onto an enemy unit triggers <strong>combat</strong>. If you need more than one hex to reach them, you move along the path into the hex adjacent to the enemy first, then combat resolves.</li>
       <li><strong>Artillery:</strong> each turn you either <strong>move</strong> one hex or fire a <strong>ranged attack</strong> at an enemy ${arRanged} (not both). Ranged fire does not use movement into the target&rsquo;s hex.</li>
       <li><strong>Zone of Control (ZoC):</strong> a unit adjacent to an enemy is locked — it may only attack

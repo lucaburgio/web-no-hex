@@ -104,6 +104,60 @@ export interface TerritoryGraphData {
   points: Record<string, { x: number; y: number }>;
 }
 
+function undirectedTerritoryEdgeKey(aId: string, bId: string): string {
+  return aId < bId ? `${aId}|${bId}` : `${bId}|${aId}`;
+}
+
+/**
+ * Adjacency from shared **polygon edges** only: the same undirected edge (two consecutive
+ * vertices on a territory boundary) must appear in both polygons. Sharing two vertices that
+ * are not a common side — e.g. meeting at a corner only, or non-consecutive verts — does not
+ * count. Matches {@link buildEdgeTerritoryIndex} in territoryRenderer.ts and polygonEdgePairs in editorV2.
+ */
+export function buildTerritoryAdjacency(mapDef: TerritoryMapDef): Record<string, string[]> {
+  const adjacency: Record<string, string[]> = {};
+  for (const t of mapDef.territories) {
+    adjacency[t.id] = [];
+  }
+
+  const byId = new Map(mapDef.territories.map(t => [t.id, t]));
+  const edgeKeyToTerritoryIds = new Map<string, string[]>();
+  for (const t of mapDef.territories) {
+    const n = t.pointIds.length;
+    if (n < 2) continue;
+    for (let i = 0; i < n; i++) {
+      const a = t.pointIds[i]!;
+      const b = t.pointIds[(i + 1) % n]!;
+      if (a === b) continue;
+      const key = undirectedTerritoryEdgeKey(a, b);
+      let list = edgeKeyToTerritoryIds.get(key);
+      if (!list) {
+        list = [];
+        edgeKeyToTerritoryIds.set(key, list);
+      }
+      if (!list.includes(t.id)) list.push(t.id);
+    }
+  }
+
+  for (const tids of edgeKeyToTerritoryIds.values()) {
+    if (tids.length < 2) continue;
+    for (let i = 0; i < tids.length; i++) {
+      for (let j = i + 1; j < tids.length; j++) {
+        const idA = tids[i]!;
+        const idB = tids[j]!;
+        const ta = byId.get(idA);
+        const tb = byId.get(idB);
+        if (!ta || !tb) continue;
+        if (ta.state === 'mountain' || tb.state === 'mountain') continue;
+        if (!adjacency[idA]!.includes(idB)) adjacency[idA]!.push(idB);
+        if (!adjacency[idB]!.includes(idA)) adjacency[idB]!.push(idA);
+      }
+    }
+  }
+
+  return adjacency;
+}
+
 /**
  * Build a territory graph from a map definition.
  * - Allied territories → player home row (ROWS-1 = 2)
@@ -157,29 +211,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
   assignTerritories(enemy, 0);
   assignTerritories(others, 1);
 
-  // Build adjacency: territories share a full edge (2+ common point IDs)
-  const adjacency: Record<string, string[]> = {};
-  const tList = mapDef.territories;
-  for (const t of tList) {
-    adjacency[t.id] = [];
-  }
-
-  for (let i = 0; i < tList.length; i++) {
-    for (let j = i + 1; j < tList.length; j++) {
-      const a = tList[i]!;
-      const b = tList[j]!;
-      const aSet = new Set(a.pointIds);
-      const shared = b.pointIds.filter(pid => aSet.has(pid));
-      if (shared.length >= 2) {
-        // They share a full edge — adjacent (even if one is mountain, we record it)
-        // But for movement adjacency we only include passable territories
-        if (a.state !== 'mountain' && b.state !== 'mountain') {
-          adjacency[a.id]!.push(b.id);
-          adjacency[b.id]!.push(a.id);
-        }
-      }
-    }
-  }
+  const adjacency = buildTerritoryAdjacency(mapDef);
 
   const playerHomeTerritoryIds = allied.map(t => t.id);
   const aiHomeTerritoryIds = enemy.map(t => t.id);

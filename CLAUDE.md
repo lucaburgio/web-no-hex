@@ -72,6 +72,7 @@ Row = r, Col = q offset per row parity.
 - No frameworks, no bundler — just `<script type="module">` imports
 - SVG for rendering (scalable, easy hit-testing)
 - AI uses greedy heuristics in `game.ts`: **Domination** — pressure toward the player home row and threats; **Conquest** — prioritize capturing neutral/enemy control points, defending AI-owned CPs when player units are close, and prefer ranged/melee targets on CP hexes; **Breakthrough** — defend CPs in sectors still owned by the **defender**, pressure threats from the **attacker** (roles follow `breakthroughAttackerOwner`).
+- **Polygon territory maps:** Movement and melee adjacency use `effectiveGetNeighbors()` → `customMapGraph.adjacency`. That graph is built by `buildTerritoryAdjacency()` from **shared polygon edges** (the same undirected edge must appear as consecutive vertices on both territory boundaries), aligned with `editorV2` / `buildEdgeTerritoryIndex` in `territoryRenderer.ts`. On load, `applyGameStateBoardDimensions()` rebuilds the graph from embedded `mapDef` so connectivity fixes apply to older saves.
 
 ### SVG layers with CSS animations (avoid flicker)
 `renderState` runs on every board interaction (selection, moves, combat, etc.). **Do not** wipe whole SVG subtrees with `innerHTML = ''` (or mass `remove`/`replace`) if those nodes carry CSS **`animation`** or other continuous motion (e.g. marching **`stroke-dashoffset`**). Replacing the node restarts the animation from 0 and reads as a global flicker.

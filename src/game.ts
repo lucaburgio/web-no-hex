@@ -178,6 +178,10 @@ export function resolveBoardDimensionsForState(state: GameState): { boardCols: n
 export function applyGameStateBoardDimensions(state: GameState): void {
   // For territory map games, restore the graph and use stored dimensions directly.
   if (state.customMapGraph) {
+    if (state.customMapGraph.mapDef) {
+      const graph = buildTerritoryGraph(state.customMapGraph.mapDef);
+      state.customMapGraph = graph;
+    }
     setActiveTerritoryGraph(state.customMapGraph);
     const boardCols = state.boardCols ?? state.customMapGraph.virtualCols;
     const boardRows = state.boardRows ?? state.customMapGraph.virtualRows;
