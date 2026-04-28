@@ -131,7 +131,7 @@ const config: GameConfig = {
       strength: 10,
       icon: 'icons/units/infantry.svg',
       package: 'standard',
-      upgradePointsToLevel: 1,
+      upgradePointsToLevel: 8,
     },
     {
       id: 'tank',

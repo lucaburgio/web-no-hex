@@ -300,12 +300,12 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   const zocPattern = mksvg('pattern');
   zocPattern.id = 'ev2-zoc-pattern';
   zocPattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  zocPattern.setAttribute('width', '90');
-  zocPattern.setAttribute('height', '90');
+  zocPattern.setAttribute('width', '45');
+  zocPattern.setAttribute('height', '45');
   const zocImg = mksvg('image');
   zocImg.setAttribute('href', zocPatternSrc);
-  zocImg.setAttribute('width', '90');
-  zocImg.setAttribute('height', '90');
+  zocImg.setAttribute('width', '45');
+  zocImg.setAttribute('height', '45');
   zocPattern.appendChild(zocImg);
   defs.appendChild(zocPattern);
 
