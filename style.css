@@ -88,8 +88,8 @@ img {
     --color-bg: var(--color-light);
 
     /* ── Player / AI identity colors ────────────────────────────────────────── */
-    --color-player: var(--color-dark);
-    --color-ai:     #9D5555; /* gray-600 845E5E */
+    --color-player: #5DAAF6;
+    --color-ai:     #FE775E; /* gray-600 845E5E */
     /* Movement: unit has no moves left this turn (“tired”) — body + HP bar */
     --color-player-tired: #8F8F8F;
     --color-ai-tired:     #a89696;
