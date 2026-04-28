@@ -7,10 +7,21 @@
 import type { GameState, HexState, Owner, Unit } from './types';
 import type { TerritoryGraphData, TerritoryMapTerritory, TerritoryMapDef } from './territoryMap';
 import { computeRedundantPartitionParentIds } from './territoryMap';
-import { getValidMoves, isValidProductionPlacement, getRangedAttackTargets } from './game';
+import {
+  getValidMoves,
+  isValidProductionPlacement,
+  getRangedAttackTargets,
+  PLAYER,
+  AI,
+  getUnit,
+  isInEnemyZoC,
+  getOpponentHomeGuardBlockedHexes,
+} from './game';
+import { getNeighbors } from './hex';
 import { ensureMovePathPreviewLayer, mountBoardUnitChipContents } from './renderer';
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
 import outsideBorderPatternSrc from '../public/images/misc/outside-border-pattern.png';
+import zocPatternSrc from '../public/images/misc/zoc-pattern.png';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Match `#board` / `renderer.ts` so SVG territory hits use the app pointer art, not the OS cursor. */
@@ -285,6 +296,18 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   mountainImg.setAttribute('height', '45');
   mountainPattern.appendChild(mountainImg);
   defs.appendChild(mountainPattern);
+
+  const zocPattern = mksvg('pattern');
+  zocPattern.id = 'ev2-zoc-pattern';
+  zocPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  zocPattern.setAttribute('width', '90');
+  zocPattern.setAttribute('height', '90');
+  const zocImg = mksvg('image');
+  zocImg.setAttribute('href', zocPatternSrc);
+  zocImg.setAttribute('width', '90');
+  zocImg.setAttribute('height', '90');
+  zocPattern.appendChild(zocImg);
+  defs.appendChild(zocPattern);
 
   const prodEnemyHatch = mksvg('pattern');
   prodEnemyHatch.id = 'ev2-prod-enemy-hatch';
@@ -585,6 +608,22 @@ export function renderTerritoryState(
     if (isSel || validMoveKeys.has(key)) moveHighlightTids.add(t.id);
   }
 
+  const zocEnemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
+  const zocKeys = new Set<string>();
+  if (selectedUnitHl && isInEnemyZoC(state, selectedUnitHl.col, selectedUnitHl.row, zocEnemy)) {
+    for (const [nc, nr] of getNeighbors(selectedUnitHl.col, selectedUnitHl.row, state.cols, state.rows)) {
+      const zKey = `${nc},${nr}`;
+      if (!getUnit(state, nc, nr) && isInEnemyZoC(state, nc, nr, zocEnemy)) {
+        zocKeys.add(zKey);
+      }
+    }
+  }
+  if (selectedUnitHl && state.phase === 'movement' && state.activePlayer === localPlayer) {
+    for (const [c, r] of getOpponentHomeGuardBlockedHexes(state, selectedUnitHl)) {
+      zocKeys.add(`${c},${r}`);
+    }
+  }
+
   function ownerState(tid: string): 'neutral' | 'allied' | 'enemy' {
     const node = territories[tid];
     if (!node) return 'neutral';
@@ -613,9 +652,11 @@ export function renderTerritoryState(
       t.state === 'mountain' ? 'mountain' : ownerState(t.id);
 
     const isMoveHl = moveHighlightTids.has(t.id);
+    const isZocHl =
+      !isMoveHl && t.state !== 'mountain' && virtKey !== '' && zocKeys.has(virtKey);
 
     let prodFillMod = '';
-    if (!isMoveHl && inLocalProd && t.state !== 'mountain') {
+    if (!isMoveHl && !isZocHl && inLocalProd && t.state !== 'mountain') {
       if (isProdSel) prodFillMod = ' ev2-prod-selected';
       else if (productionPlacementKeys.has(virtKey)) prodFillMod = ' ev2-prod-placement';
       else if (vizState === 'allied') prodFillMod = ' ev2-prod-dim-friendly';
@@ -625,7 +666,9 @@ export function renderTerritoryState(
     if (fillPoly) {
       const baseFill = isMoveHl
         ? `ev2-territory-fill ev2-state-${vizState} ev2-fill-move-highlight`
-        : `ev2-territory-fill ev2-state-${vizState}${prodFillMod}`;
+        : isZocHl
+          ? `ev2-territory-fill ev2-state-zoc`
+          : `ev2-territory-fill ev2-state-${vizState}${prodFillMod}`;
       if (fillPoly.getAttribute('class') !== baseFill) fillPoly.setAttribute('class', baseFill);
     }
 
@@ -640,6 +683,23 @@ export function renderTerritoryState(
           neighborTid !== null && ownerState(neighborTid) === vizState;
 
         const borderD = buildInsetBorderPath(t, edgeTerritoryIndex, points, -10, suppressEdge);
+        const glowEl = borderGroup.querySelector('.ev2-border-glow') as SVGElement | null;
+        const lineEl = borderGroup.querySelector('.ev2-border-line') as SVGElement | null;
+        if (glowEl) setAttrIfChanged(glowEl, 'd', borderD);
+        if (lineEl) setAttrIfChanged(lineEl, 'd', borderD);
+      } else if (isZocHl) {
+        if (borderGroup.getAttribute('display') === 'none') borderGroup.removeAttribute('display');
+
+        const borderCls = 'ev2-territory-border ev2-border-zoc';
+        if (borderGroup.getAttribute('class') !== borderCls) borderGroup.setAttribute('class', borderCls);
+
+        const suppressZocEdge = (neighborTid: string | null): boolean => {
+          if (neighborTid === null) return false;
+          const nk = territories[neighborTid]?.virtualKey ?? '';
+          return nk !== '' && zocKeys.has(nk);
+        };
+
+        const borderD = buildInsetBorderPath(t, edgeTerritoryIndex, points, -10, suppressZocEdge);
         const glowEl = borderGroup.querySelector('.ev2-border-glow') as SVGElement | null;
         const lineEl = borderGroup.querySelector('.ev2-border-line') as SVGElement | null;
         if (glowEl) setAttrIfChanged(glowEl, 'd', borderD);

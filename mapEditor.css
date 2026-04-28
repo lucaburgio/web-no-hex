@@ -20,11 +20,13 @@
 .ev2-state-allied   { fill: #eff6ff; }
 .ev2-state-enemy    { fill: #fff1f2; }
 .ev2-state-mountain { fill: url(#ev2-mountain-pattern); }
+.ev2-state-zoc      { fill: url(#ev2-zoc-pattern); }
 .ev2-territory-fill { stroke: none; }
 
 /* Owner border color tokens (inherited by glow + line via var) */
 .ev2-border-allied { --ev2-border-color: #5EB1FF; }
 .ev2-border-enemy  { --ev2-border-color: #FE775E; }
+.ev2-border-zoc    { --ev2-border-color: #D3D2D2; }
 
 /* Border compositing group — opacity lives here, never on individual paths */
 .ev2-territory-border { isolation: isolate; }
