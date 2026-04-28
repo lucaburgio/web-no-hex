@@ -28,7 +28,7 @@ import {
   getConquestControlPointsForMap,
   mirrorStoryMapY,
 } from './storyMapLayouts';
-import { buildTerritoryGraph } from './territoryMap';
+import { boardPixelForVirtualHex, buildTerritoryGraph } from './territoryMap';
 import type { TerritoryGraphData, TerritoryMapDef } from './territoryMap';
 
 function perfEnabled(): boolean {
@@ -113,6 +113,24 @@ function effectiveHexDistance(c1: number, r1: number, c2: number, r2: number): n
     return Infinity;
   }
   return hexDistance(c1, r1, c2, r2, COLS, ROWS);
+}
+
+/**
+ * Artillery range uses integer “hex steps”. On polygon maps, {@link effectiveHexDistance} is graph
+ * BFS only — hop count can be small while territory centroids are far apart. Blend in pixel steps
+ * (straight-line centroid distance / average neighbor spacing) so ranged bands match the map.
+ */
+function rangedCombatHexDistance(c1: number, r1: number, c2: number, r2: number): number {
+  const graphSteps = effectiveHexDistance(c1, r1, c2, r2);
+  const g = _activeTerritoryGraph;
+  const avg = g?.avgAdjacentCentroidPx;
+  if (!g || avg === undefined || avg <= 0) return graphSteps;
+  const p1 = boardPixelForVirtualHex(g, c1, r1);
+  const p2 = boardPixelForVirtualHex(g, c2, r2);
+  if (!p1 || !p2) return graphSteps;
+  const px = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  const pixelSteps = Math.ceil(px / avg);
+  return Math.max(graphSteps, pixelSteps);
 }
 
 const HEX_KEY_RE = /^(\d+),(\d+)$/;
@@ -1227,7 +1245,7 @@ function isRangedCombat(state: GameState, attacker: Unit, defender: Unit): boole
   const ut = unitTypeForUnit(attacker);
   if (!ut.range) return false;
   if (limitArtilleryBlocksRanged(state, attacker)) return false;
-  const d = effectiveHexDistance(attacker.col, attacker.row, defender.col, defender.row);
+  const d = rangedCombatHexDistance(attacker.col, attacker.row, defender.col, defender.row);
   return d >= 2 && d <= ut.range;
 }
 
@@ -1240,7 +1258,7 @@ export function getRangedAttackTargets(state: GameState, unit: Unit): Unit[] {
   const out: Unit[] = [];
   for (const u of state.units) {
     if (u.owner !== enemy) continue;
-    const d = effectiveHexDistance(unit.col, unit.row, u.col, u.row);
+    const d = rangedCombatHexDistance(unit.col, unit.row, u.col, u.row);
     if (d >= 2 && d <= ut.range) out.push(u);
   }
   return out;

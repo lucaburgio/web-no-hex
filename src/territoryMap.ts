@@ -102,6 +102,12 @@ export interface TerritoryGraphData {
   mapDef: TerritoryMapDef;
   /** Map from point id → {x, y} */
   points: Record<string, { x: number; y: number }>;
+  /**
+   * Mean pixel distance between centroids of adjacent territories (shared-border neighbors).
+   * Used with straight-line centroid distance so ranged min/max range tracks map geometry, not
+   * only abstract graph hop count (which can be short on irregular polygon layouts).
+   */
+  avgAdjacentCentroidPx: number;
 }
 
 function undirectedTerritoryEdgeKey(aId: string, bId: string): string {
@@ -156,6 +162,25 @@ export function buildTerritoryAdjacency(mapDef: TerritoryMapDef): Record<string,
   }
 
   return adjacency;
+}
+
+function computeAvgAdjacentCentroidPx(
+  territories: Record<string, TerritoryNode>,
+  adjacency: Record<string, string[]>,
+): number {
+  let sum = 0;
+  let count = 0;
+  for (const id of Object.keys(adjacency)) {
+    for (const nid of adjacency[id] ?? []) {
+      if (id >= nid) continue;
+      const ta = territories[id];
+      const tb = territories[nid];
+      if (!ta || !tb) continue;
+      sum += Math.hypot(tb.centroid.x - ta.centroid.x, tb.centroid.y - ta.centroid.y);
+      count++;
+    }
+  }
+  return count > 0 ? sum / count : 1;
 }
 
 /**
@@ -233,6 +258,8 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
     territoryIds: s.territoryIds,
   }));
 
+  const avgAdjacentCentroidPx = computeAvgAdjacentCentroidPx(territories, adjacency);
+
   return {
     territories,
     keyToId,
@@ -247,6 +274,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
     sectors,
     mapDef,
     points,
+    avgAdjacentCentroidPx,
   };
 }
 
