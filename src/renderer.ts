@@ -14,6 +14,7 @@ import {
   getValidMoves,
   getRangedAttackTargets,
   isInEnemyZoC,
+  getBoardNeighbors,
   getOpponentHomeGuardBlockedHexes,
   getBreakthroughDefenderOwner,
 } from './game';
@@ -1873,8 +1874,8 @@ export function renderState(
   const zocEnemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
   const zocHexes = new Set<string>();
   if (selectedUnit && isInEnemyZoC(state, selectedUnit.col, selectedUnit.row, zocEnemy)) {
-    // Unit is locked in ZoC: highlight empty neighbors it cannot retreat to (also in ZoC)
-    for (const [nc, nr] of getNeighbors(selectedUnit.col, selectedUnit.row, COLS, ROWS)) {
+    // Unit is locked in ZoC: highlight empty board neighbors it cannot retreat to (also in ZoC)
+    for (const [nc, nr] of getBoardNeighbors(selectedUnit.col, selectedUnit.row)) {
       const key = `${nc},${nr}`;
       if (!getUnit(state, nc, nr) && isInEnemyZoC(state, nc, nr, zocEnemy)) {
         zocHexes.add(key);

@@ -789,14 +789,19 @@ export type EndProductionOptions = { skipReason?: 'no-placements' };
 // Returns true if (col,row) is under ZoC from any unit belonging to `enemyOwner`
 export function isInEnemyZoC(state: GameState, col: number, row: number, enemyOwner: Owner): boolean {
   if (!config.zoneOfControl) return false;
-  // Always use geometric hex neighbors (six adjacent cells). Movement on polygon territory maps uses
-  // `effectiveGetNeighbors` (shared borders); ZoC "adjacent" must match the visible grid so long
-  // graph chords do not lock units when the enemy is multiple hex steps away on the board.
-  const neighbors = getNeighbors(col, row, COLS, ROWS);
+  // Must match {@link computeBaseValidMoves}: same neighbor relation as movement.
+  // On polygon maps, virtual (col,row) can be geometric hex-neighbors without sharing a map border —
+  // ZoC must use {@link effectiveGetNeighbors} (territory graph) so lock matches melee adjacency.
+  const neighbors = effectiveGetNeighbors(col, row, COLS, ROWS);
   return neighbors.some(([nc, nr]) => {
     const u = getUnit(state, nc, nr);
     return u && u.owner === enemyOwner;
   });
+}
+
+/** Neighbors for movement, ZoC, and combat adjacency (hex grid or active territory graph). */
+export function getBoardNeighbors(col: number, row: number): [number, number][] {
+  return effectiveGetNeighbors(col, row, COLS, ROWS);
 }
 
 /**

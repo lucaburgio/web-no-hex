@@ -15,9 +15,9 @@ import {
   AI,
   getUnit,
   isInEnemyZoC,
+  getBoardNeighbors,
   getOpponentHomeGuardBlockedHexes,
 } from './game';
-import { getNeighbors } from './hex';
 import { ensureMovePathPreviewLayer, mountBoardUnitChipContents } from './renderer';
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
 import outsideBorderPatternSrc from '../public/images/misc/outside-border-pattern.png';
@@ -611,7 +611,7 @@ export function renderTerritoryState(
   const zocEnemy: Owner = localPlayer === PLAYER ? AI : PLAYER;
   const zocKeys = new Set<string>();
   if (selectedUnitHl && isInEnemyZoC(state, selectedUnitHl.col, selectedUnitHl.row, zocEnemy)) {
-    for (const [nc, nr] of getNeighbors(selectedUnitHl.col, selectedUnitHl.row, state.cols, state.rows)) {
+    for (const [nc, nr] of getBoardNeighbors(selectedUnitHl.col, selectedUnitHl.row)) {
       const zKey = `${nc},${nr}`;
       if (!getUnit(state, nc, nr) && isInEnemyZoC(state, nc, nr, zocEnemy)) {
         zocKeys.add(zKey);

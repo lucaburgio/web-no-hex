@@ -29,6 +29,7 @@ import {
   getBreakthroughDefenderOwner,
   breakthroughActiveFrontlineSectorIndex,
   isInEnemyZoC,
+  getBoardNeighbors,
   isHexBlockedByOpponentHomeGuardOnly,
   playerApplyUnitUpgrade,
   resolvePendingAiUpgradeChoices,
@@ -67,7 +68,6 @@ import {
   invalidateColorsCache,
 } from './renderer';
 import { aiDamageFloatDrawParams } from './combatPlayback';
-import { getNeighbors } from './hex';
 import type { MoveAnimation } from './renderer';
 import config, {
   DEFAULT_TERRITORY_ECONOMY,
@@ -2416,7 +2416,7 @@ function buildRulesContent(): string {
       <li><strong>Artillery:</strong> each turn you either <strong>move</strong> one hex or fire a <strong>ranged attack</strong> at an enemy ${arRanged} (not both). Ranged fire does not use movement into the target&rsquo;s hex.
         On polygon scenario maps, maximum range also respects straight-line distance between territory centers (not only abstract connection hops), so artillery cannot shoot targets that are visually far away because the graph path is short.</li>
       <li><strong>Zone of Control (ZoC):</strong> a unit adjacent to an enemy is locked — it may only attack
-        or retreat to a hex not itself adjacent to any enemy. <strong>Adjacent</strong> means one of the six neighboring hex cells on the board grid (movement on polygon maps may follow different borders). ZoC limits movement and adjacent attacks; it does not block artillery ranged fire at longer range.</li>
+        or retreat to a hex not itself adjacent to any enemy. <strong>Adjacent</strong> for ZoC is the same as for movement: on a standard hex board, the six grid neighbors; on <strong>polygon scenario maps</strong>, territories that share a <strong>border edge</strong> (not merely close virtual indices on the abstract grid). ZoC limits movement and adjacent attacks; it does not block artillery ranged fire at longer range.</li>
       <li><strong>Domination — guarded home row:</strong> with ZoC enabled, you cannot move onto an <strong>empty</strong> hex on the opponent&rsquo;s <strong>home row</strong> if any enemy is adjacent to that hex (this stops fast units from bypassing ZoC with multi-hex moves). You can still move onto that hex to attack an enemy unit sitting on it.</li>
     </ul>
       </div>
@@ -4686,7 +4686,7 @@ svg.addEventListener('mousemove', (e: MouseEvent) => {
 
   // ZoC-blocked hex: unit is locked and this empty neighbor is also in enemy ZoC
   if (!target && isInEnemyZoC(state, attacker.col, attacker.row, enemyOwner)) {
-    const isNeighbor = getNeighbors(attacker.col, attacker.row, COLS, ROWS)
+    const isNeighbor = getBoardNeighbors(attacker.col, attacker.row)
       .some(([nc, nr]) => nc === hex.col && nr === hex.row);
     if (isNeighbor && isInEnemyZoC(state, hex.col, hex.row, enemyOwner)) {
       tooltipEl.innerHTML = `<div class="tt-title tt-zoc">Zone of Control</div>

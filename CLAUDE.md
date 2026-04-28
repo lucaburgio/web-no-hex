@@ -50,7 +50,7 @@ web-strategic/
 ### Movement & Zone of Control
 - Each unit moves up to its **movement** value per turn (see unit types; e.g. infantry 1, tank 2).
 - Moving onto an empty hex conquers it.
-- **Zone of Control (ZoC):** a unit adjacent to an enemy is "locked" — it may only attack an adjacent enemy or retreat to a hex that is itself not adjacent to any enemy. ZoC adjacency follows the six geometric hex neighbors on the board grid (not polygon-only adjacency on territory maps).
+- **Zone of Control (ZoC):** a unit adjacent to an enemy is "locked" — it may only attack an adjacent enemy or retreat to a hex that is itself not adjacent to any enemy. **Adjacent** matches movement: on hex boards, the six grid neighbors; on polygon territory maps, **shared-border** adjacency (same as melee), not merely neighboring indices on the virtual column grid.
 
 ### Combat
 - Damage is resolved **simultaneously**.
