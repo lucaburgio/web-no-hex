@@ -1973,9 +1973,10 @@ export function renderState(
       }
 
       // Draw production placement stroke above #mountain-layer (SVG paint order), not on the base hex polygon.
+      // Selected production hex: solid yellow stroke on the main polygon (no dashed overlay).
       let prodOverlayStroke: string | null = null;
       if (!isSelectedHex && !isZoc && !isValidMove) {
-        if (isProdSelected) prodOverlayStroke = c.hexProdStroke;
+        if (isProdSelected) prodOverlayStroke = null;
         else if (canPlace && !isProductionPlacementHex) prodOverlayStroke = c.hexStroke;
         else if (canPlace && isProductionPlacementHex) prodOverlayStroke = null;
       }
@@ -1999,6 +2000,11 @@ export function renderState(
         poly.removeAttribute('stroke-dasharray');
         poly.removeAttribute('stroke-dashoffset');
       } else if (isSelectedHex || isValidMove) {
+        poly.setAttribute('stroke', stroke);
+        poly.setAttribute('stroke-width', '2.5');
+        poly.removeAttribute('stroke-dasharray');
+        poly.removeAttribute('stroke-dashoffset');
+      } else if (isProdSelected) {
         poly.setAttribute('stroke', stroke);
         poly.setAttribute('stroke-width', '2.5');
         poly.removeAttribute('stroke-dasharray');
@@ -2073,7 +2079,7 @@ export function renderState(
         markerParent.appendChild(diamond);
       }
 
-      if (state.phase === 'production' && canPlace && !isSelectedHex && !isValidMove) {
+      if (state.phase === 'production' && canPlace && !isProdSelected && !isSelectedHex && !isValidMove) {
         const { x, y } = hexToPixel(col, r);
         const iw = HEX_SIZE * 0.4;
         const plusOpacity = '1';

@@ -123,8 +123,8 @@ img {
     --color-hex-prod-candidate-stroke: var(--color-production-territory-border);
     /* Production phase: hover on empty placement hexes (+) — see renderer (hex hit layer passes through) */
     --color-hex-prod-candidate-hover: #bdbdbd;
-    --color-hex-prod-selected: var(--color-yellow-500);
-    --color-hex-prod-stroke:   transparent;
+    --color-hex-prod-selected: var(--color-yellow-50);
+    --color-hex-prod-stroke:   var(--color-yellow-500);
     --color-hex-zoc:           #d58f8f;
     /* Unconquered hexes: transparent so the game-area line texture shows through */
     --color-hex-neutral:       var(--color-light);
@@ -602,6 +602,14 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #board .ev2-territory-border.ev2-prod-placement-border,
 #recap-board .ev2-territory-border.ev2-prod-placement-border {
   --ev2-border-color: var(--color-production-territory-border);
+}
+#board .ev2-territory-fill.ev2-prod-selected,
+#recap-board .ev2-territory-fill.ev2-prod-selected {
+  fill: var(--color-hex-prod-selected) !important;
+}
+#board .ev2-territory-border.ev2-prod-selected-border,
+#recap-board .ev2-territory-border.ev2-prod-selected-border {
+  --ev2-border-color: var(--color-hex-prod-stroke);
 }
 
 /* Move path hover preview: 4px dashed track (marching dashes), optional hex dest ring, end dot. */

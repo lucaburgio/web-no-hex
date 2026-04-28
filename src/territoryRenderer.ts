@@ -533,7 +533,7 @@ export function renderTerritoryState(
   svgElement: SVGSVGElement,
   state: GameState,
   graph: TerritoryGraphData,
-  _productionKey: string | null,
+  productionKey: string | null,
   hiddenUnitIds: Set<number>,
   localPlayer: Owner,
   opts?: RenderTerritoryStateOptions | null,
@@ -607,6 +607,7 @@ export function renderTerritoryState(
 
     const nodeTerr = territories[t.id];
     const virtKey = nodeTerr?.virtualKey ?? '';
+    const isProdSel = productionKey != null && virtKey === productionKey;
 
     const vizState: 'neutral' | 'allied' | 'enemy' | 'mountain' =
       t.state === 'mountain' ? 'mountain' : ownerState(t.id);
@@ -615,7 +616,8 @@ export function renderTerritoryState(
 
     let prodFillMod = '';
     if (!isMoveHl && inLocalProd && t.state !== 'mountain') {
-      if (productionPlacementKeys.has(virtKey)) prodFillMod = ' ev2-prod-placement';
+      if (isProdSel) prodFillMod = ' ev2-prod-selected';
+      else if (productionPlacementKeys.has(virtKey)) prodFillMod = ' ev2-prod-placement';
       else if (vizState === 'allied') prodFillMod = ' ev2-prod-dim-friendly';
       else if (vizState === 'enemy') prodFillMod = ' ev2-prod-dim-enemy';
     }
@@ -649,7 +651,8 @@ export function renderTerritoryState(
 
         let prodBorderMod = '';
         if (!isMoveHl && inLocalProd) {
-          if (productionPlacementKeys.has(virtKey)) prodBorderMod = ' ev2-prod-placement-border';
+          if (isProdSel) prodBorderMod = ' ev2-prod-selected-border';
+          else if (productionPlacementKeys.has(virtKey)) prodBorderMod = ' ev2-prod-placement-border';
           else prodBorderMod = ' ev2-prod-dim-border';
         }
 
@@ -687,7 +690,10 @@ export function renderTerritoryState(
 
     let stroke: string | null = null;
     if (isProduction) {
-      stroke = 'var(--color-production-territory-border)';
+      stroke =
+        productionKey === key
+          ? 'var(--color-yellow-500)'
+          : 'var(--color-production-territory-border)';
     }
 
     if (stroke) {
@@ -715,6 +721,7 @@ export function renderTerritoryState(
       if (t.state === 'mountain') continue;
       const nodePm = territories[t.id];
       if (!nodePm || !productionPlacementKeys.has(nodePm.virtualKey)) continue;
+      if (productionKey != null && nodePm.virtualKey === productionKey) continue;
       const cx = nodePm.centroid.x;
       const cy = nodePm.centroid.y;
       const g = mksvg('g');
