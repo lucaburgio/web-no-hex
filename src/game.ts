@@ -207,6 +207,10 @@ export function applyGameStateBoardDimensions(state: GameState): void {
     state.boardRows = boardRows;
     updateConfig({ boardCols, boardRows });
     syncDimensions();
+    if (state.gameMode === 'breakthrough') {
+      repairTerritoryBreakthroughLayoutFromGraph(state);
+      breakthroughRefreshActiveControlPoint(state);
+    }
     return;
   }
   const { boardCols, boardRows } = resolveBoardDimensionsForState(state);
@@ -614,6 +618,55 @@ function expandBreakthroughSectorHexesForTerritoryMap(
     out[orphanSid]!.push(node.virtualKey);
   }
   return out;
+}
+
+/**
+ * Older saves / migrations set `sectorControlPointHex` to [] when the field was missing, which made
+ * {@link applyBreakthroughEndOfRound} bail out (`!.length` on []). Rebuild CP keys and sector hex
+ * lists from the embedded graph so breakthrough rounds and UI stay functional.
+ */
+function repairTerritoryBreakthroughLayoutFromGraph(state: GameState): void {
+  const graph = state.customMapGraph;
+  if (!graph || state.gameMode !== 'breakthrough') return;
+  const nSec = graph.sectors?.length ?? 0;
+  if (nSec === 0 || !state.sectorOwners?.length || state.sectorOwners.length !== nSec) return;
+
+  const cpTids = new Set(Object.values(graph.controlPoints).map(cp => cp.territoryId));
+  const attackerSectorIdx = graph.sectors.findIndex(sec => !sec.territoryIds.some(tid => cpTids.has(tid)));
+  if (attackerSectorIdx < 0) return;
+
+  const sch = state.sectorControlPointHex;
+  const needsCpRepair = !sch || sch.length !== nSec;
+  if (needsCpRepair) {
+    state.sectorControlPointHex = graph.sectors.map((sec, i) => {
+      if (i === attackerSectorIdx) return '';
+      const cpEntry = Object.values(graph.controlPoints).find(cp => sec.territoryIds.includes(cp.territoryId));
+      if (!cpEntry) return '';
+      const t = graph.territories[cpEntry.territoryId];
+      return t ? t.virtualKey : '';
+    });
+  }
+
+  const sh = state.sectorHexes;
+  if (!sh?.length || sh.length !== nSec) {
+    let sectorHexes = graph.sectors.map(sec =>
+      sec.territoryIds
+        .map(id => graph.territories[id])
+        .filter(t => t && t.state !== 'mountain')
+        .map(t => t!.virtualKey),
+    );
+    sectorHexes = expandBreakthroughSectorHexesForTerritoryMap(graph, sectorHexes, attackerSectorIdx);
+    state.sectorHexes = sectorHexes;
+    state.sectorIndexByHex = {};
+    sectorHexes.forEach((hexes, sid) => {
+      for (const k of hexes) state.sectorIndexByHex[k] = sid;
+    });
+  }
+
+  const occ = state.breakthroughCpOccupation ?? [];
+  if (!state.breakthroughCpOccupation || state.breakthroughCpOccupation.length !== nSec) {
+    state.breakthroughCpOccupation = Array.from({ length: nSec }, (_, i) => occ[i] ?? 0);
+  }
 }
 
 // ── Hex territory ─────────────────────────────────────────────────────────────
@@ -1826,7 +1879,10 @@ function breakthroughAssignCapturedSectorHexes(state: GameState, sectorIndex: nu
 
 /** Breakthrough: after a full round, advance CP occupation; capture sectors after two consecutive rounds. */
 function applyBreakthroughEndOfRound(state: GameState): void {
-  if (state.gameMode !== 'breakthrough' || !state.sectorControlPointHex?.length) return;
+  if (state.gameMode !== 'breakthrough') return;
+  if (!state.sectorOwners?.length) return;
+  // Do not use `!sectorControlPointHex?.length` — migration uses [] when missing, length 0 wrongly skips logic.
+  if (!state.sectorControlPointHex || state.sectorControlPointHex.length !== state.sectorOwners.length) return;
   const att = getBreakthroughAttackerOwner(state);
   const i = breakthroughActiveFrontlineSectorIndex(state);
   if (i !== null) {
