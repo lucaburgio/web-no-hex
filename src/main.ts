@@ -1394,7 +1394,6 @@ const settingsBackBtn    = document.getElementById('settings-back-btn') as HTMLB
 
 // Numeric fields: [elementId, configKey, scale factor (e.g. 100 for % fields)]
 const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
-  ['cfg-controlPointCount',       'controlPointCount',       1],
   ['cfg-conquestPointsPlayer',    'conquestPointsPlayer',    1],
   ['cfg-conquestPointsAi',        'conquestPointsAi',        1],
   ['cfg-breakthroughAttackerStartingPP', 'breakthroughAttackerStartingPP', 1],
@@ -1420,7 +1419,7 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
 
 // Proxy type for key checking only — never instantiated
 declare const _cfgNumProxy: {
-  controlPointCount: number; conquestPointsPlayer: number; conquestPointsAi: number;
+  conquestPointsPlayer: number; conquestPointsAi: number;
   breakthroughAttackerStartingPP: number; breakthroughSectorCount: number; breakthroughEnemySectorStrengthMult: number;
   breakthroughSectorCaptureBonusPP: number;
   startingUnitsPlayer1: number; startingUnitsPlayer2: number; startingUnitsDefender: number; startingUnitsAttacker: number;
@@ -1507,7 +1506,6 @@ function populateSettings(): void {
   lastSettingsGameModeForQuota = null;
   quotaFieldsBeforeBreakthrough = null;
   const vals: Record<string, number> = {
-    controlPointCount: config.controlPointCount,
     conquestPointsPlayer: config.conquestPointsPlayer,
     conquestPointsAi: config.conquestPointsAi,
     breakthroughAttackerStartingPP: config.breakthroughAttackerStartingPP,
@@ -2456,7 +2454,7 @@ function buildRulesContent(): string {
       <p class="rules-prose">The match mode is chosen in <strong>Game settings</strong> before play.</p>
       <ul class="rules-list">
       <li><strong>Domination:</strong> move a unit onto the <strong>opponent&rsquo;s home row</strong>, or <strong>eliminate all enemy units</strong>.</li>
-      <li><strong>Conquest:</strong> marked <strong>control point</strong> hexes appear on the map (default ${config.controlPointCount} in current settings).
+      <li><strong>Conquest:</strong> <strong>control point</strong> hexes are placed on the map in the editor (or embedded map JSON).
         Each side starts with <strong>Conquer Points</strong> (south ${config.conquestPointsPlayer}, north ${config.conquestPointsAi} — configurable).
         After each side finishes its <strong>movement phase</strong>, for every control point you <strong>own</strong>, the opponent loses 1 Conquer Point (multiple points stack).
         Additionally, each time a unit is <strong>killed</strong>, its owner loses 1 Conquer Point.
@@ -2584,7 +2582,6 @@ function broadcastSettingsPreview(): void {
   row('Map', selectText('cfg-customMap') || '[generate]');
 
   if (isConquest) {
-    row('Control points', v('cfg-controlPointCount'));
     row('Conquer pts host', v('cfg-conquestPointsPlayer'));
     row('Your conquer pts', v('cfg-conquestPointsAi'));
   }

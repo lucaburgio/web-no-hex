@@ -425,121 +425,6 @@ export function getBreakthroughTerritoryStartingSlotCounts(mapDef: TerritoryMapD
   };
 }
 
-/** Conquest: place control points with north/south balance and spacing (not clustered). */
-function pickControlPointHexes(cpCandidates: string[], want: number, cols: number, rows: number): string[] {
-  if (want <= 0 || cpCandidates.length === 0) return [];
-  const n = Math.min(want, cpCandidates.length);
-
-  const parseKey = (key: string): { col: number; row: number } => {
-    const [col, row] = key.split(',').map(Number);
-    return { col, row };
-  };
-
-  function shuffleInPlace<T>(arr: T[]): void {
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-  }
-
-  const minDistToPicked = (col: number, row: number, picked: { col: number; row: number }[]): number => {
-    if (picked.length === 0) return Infinity;
-    let m = Infinity;
-    for (const p of picked) {
-      const d = hexDistance(col, row, p.col, p.row, cols, rows);
-      if (d < m) m = d;
-    }
-    return m;
-  };
-
-  const pickGreedySpread = (pool: string[], k: number): string[] => {
-    if (k <= 0 || pool.length === 0) return [];
-    const poolCopy = [...pool];
-    shuffleInPlace(poolCopy);
-    const picked: { col: number; row: number }[] = [];
-    const result: string[] = [];
-    while (result.length < k && poolCopy.length > 0) {
-      let bestIdx = -1;
-      let bestScore = -1;
-      for (let i = 0; i < poolCopy.length; i++) {
-        const { col, row } = parseKey(poolCopy[i]);
-        const md = minDistToPicked(col, row, picked);
-        if (md > bestScore) {
-          bestScore = md;
-          bestIdx = i;
-        }
-      }
-      if (bestIdx < 0) break;
-      const key = poolCopy.splice(bestIdx, 1)[0];
-      const { col, row } = parseKey(key);
-      picked.push({ col, row });
-      result.push(key);
-    }
-    return result;
-  };
-
-  const rMin = 1;
-  const rMax = rows - 2;
-  if (rMax < rMin) {
-    const copy = [...cpCandidates];
-    shuffleInPlace(copy);
-    return copy.slice(0, n);
-  }
-
-  // Single CP: interior vertical band ~45–55% of playable rows (map center).
-  if (n === 1) {
-    const span = rMax - rMin;
-    if (span <= 0) {
-      const copy = [...cpCandidates];
-      shuffleInPlace(copy);
-      return [copy[0]];
-    }
-    const band = cpCandidates.filter(k => {
-      const { row } = parseKey(k);
-      const tr = (row - rMin) / span;
-      return tr >= 0.45 && tr <= 0.55;
-    });
-    if (band.length > 0) {
-      shuffleInPlace(band);
-      return [band[0]];
-    }
-    let bestKey = cpCandidates[0];
-    let bestD = Infinity;
-    for (const key of cpCandidates) {
-      const { row } = parseKey(key);
-      const tr = (row - rMin) / span;
-      const d = Math.abs(tr - 0.5);
-      if (d < bestD) {
-        bestD = d;
-        bestKey = key;
-      }
-    }
-    return [bestKey];
-  }
-
-  // Multiple CPs: split playable rows into north / south halves; assign counts evenly (odd: random extra side).
-  const northMax = rMin + Math.floor((rMax - rMin) / 2);
-  const northPool = cpCandidates.filter(k => parseKey(k).row <= northMax);
-  const southPool = cpCandidates.filter(k => parseKey(k).row > northMax);
-
-  let northGets = Math.ceil(n / 2);
-  let southGets = n - northGets;
-  if (Math.random() < 0.5) [northGets, southGets] = [southGets, northGets];
-
-  const takeNorth = Math.min(northGets, northPool.length);
-  const takeSouth = Math.min(southGets, southPool.length);
-  let chosen = [...pickGreedySpread(northPool, takeNorth), ...pickGreedySpread(southPool, takeSouth)];
-
-  const shortfall = n - chosen.length;
-  if (shortfall > 0) {
-    const chosenSet = new Set(chosen);
-    const rest = cpCandidates.filter(k => !chosenSet.has(k));
-    chosen = chosen.concat(pickGreedySpread(rest, shortfall));
-  }
-
-  return chosen.slice(0, n);
-}
-
 /** Breakthrough: sort south → north, split into `sectorCount` contiguous chunks of ~equal size. */
 function partitionBreakthroughSectors(assignableKeys: string[], sectorCount: number): string[][] {
   const sorted = [...assignableKeys].sort((a, b) => {
@@ -2144,13 +2029,6 @@ export function createInitialState(): GameState {
   const mountainHexes = candidates.slice(0, Math.min(mountainCount, candidates.length));
   const mountainSet = new Set(mountainHexes);
 
-  const cpCandidates: string[] = [];
-  for (let r = 1; r < ROWS - 1; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const key = `${c},${r}`;
-      if (!reservedKeys.has(key) && !mountainSet.has(key)) cpCandidates.push(key);
-    }
-  }
   let sectorHexes: string[][] = [];
   let sectorOwners: Owner[] = [];
   let sectorControlPointHex: string[] = [];
@@ -2207,8 +2085,6 @@ export function createInitialState(): GameState {
         ? [sectorControlPointHex[frontlineIdx]!]
         : [];
     primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
-  } else if (gm === 'conquest' && config.controlPointCount > 0 && cpCandidates.length > 0) {
-    controlPointHexes = pickControlPointHexes(cpCandidates, config.controlPointCount, COLS, ROWS);
   }
 
   if (gm !== 'breakthrough') {
@@ -2443,46 +2319,10 @@ export function createInitialStatePreservingTerrain(previous: GameState): GameSt
   };
 }
 
-/**
- * Conquest: merge authored story control points with {@link config.controlPointCount}
- * and spread placement (extra points picked like {@link pickControlPointHexes}).
- */
-function resolveConquestCpsForPlayableStory(
-  story: StoryDef,
-  cpCandidates: string[],
-  cols: number,
-  rows: number,
-): string[] {
-  const want = config.controlPointCount;
-  if (want <= 0 || cpCandidates.length === 0) return [];
-
+/** Conquest: hex keys from the story map that are valid interior candidates (passable, not unit spawns). */
+function resolveConquestCpsForPlayableStory(story: StoryDef, cpCandidates: string[]): string[] {
   const candSet = new Set(cpCandidates);
-
-  const authoredConquest = getConquestControlPointsForMap(story.map);
-  if (authoredConquest.length > 0) {
-    const fromStory: string[] = [];
-    const seen = new Set<string>();
-    for (const k of authoredConquest) {
-      if (!seen.has(k) && candSet.has(k)) {
-        seen.add(k);
-        fromStory.push(k);
-      }
-    }
-
-    if (fromStory.length >= want) {
-      return pickControlPointHexes(fromStory, want, cols, rows);
-    }
-
-    if (fromStory.length > 0) {
-      const picked = new Set(fromStory);
-      const restPool = cpCandidates.filter(k => !picked.has(k));
-      const need = want - fromStory.length;
-      const extra = need > 0 ? pickControlPointHexes(restPool, need, cols, rows) : [];
-      return [...fromStory, ...extra].slice(0, want);
-    }
-  }
-
-  return pickControlPointHexes(cpCandidates, want, cols, rows);
+  return getConquestControlPointsForMap(story.map).filter(k => candSet.has(k));
 }
 
 /**
@@ -2608,8 +2448,8 @@ export function createInitialStateFromPlayableStory(story: StoryDef): GameState 
         ? [sectorControlPointHex[frontlineIdx]!]
         : [];
     primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
-  } else if (gm === 'conquest' && config.controlPointCount > 0 && cpCandidates.length > 0) {
-    controlPointHexes = resolveConquestCpsForPlayableStory(story, cpCandidates, COLS, ROWS);
+  } else if (gm === 'conquest') {
+    controlPointHexes = resolveConquestCpsForPlayableStory(story, cpCandidates);
   }
 
   if (gm !== 'breakthrough') {

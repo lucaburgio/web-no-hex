@@ -322,8 +322,6 @@ export interface ScenarioDef {
 export interface GameConfig {
   /** Default when starting a new match from settings. */
   gameMode: GameMode;
-  /** Number of control-point hexes placed on the map (Conquest). */
-  controlPointCount: number;
   /** Starting Conquer Points for the southern player (owner 1). */
   conquestPointsPlayer: number;
   /** Starting Conquer Points for the northern player (owner 2). */
