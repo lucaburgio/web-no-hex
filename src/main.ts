@@ -509,9 +509,12 @@ let pendingNextStoryIndex: number | null = null;
 let activeScenarioId: string = SCENARIOS[0]?.id ?? '';
 
 /** Unit package selected in game settings for player 1 (south); persists across opens. */
-let settingsUnitPackage = 'standard';
+let settingsUnitPackage = 'us-ww2';
 /** Unit package selected in game settings for player 2 / AI (north); persists across opens. */
-let settingsUnitPackagePlayer2 = 'standard';
+let settingsUnitPackagePlayer2 = 'de-ww2';
+
+setActiveUnitPackage(settingsUnitPackage);
+setActiveUnitPackagePlayer2(settingsUnitPackagePlayer2);
 
 /** Config values to restore after leaving story mode. */
 const STORY_CONFIG_DEFAULTS = {
@@ -2011,7 +2014,7 @@ for (const [id] of NUM_FIELDS) {
     opt.textContent = pkg;
     pkgEl.appendChild(opt);
   }
-  pkgEl.value = 'standard';
+  pkgEl.value = packages.includes(settingsUnitPackage) ? settingsUnitPackage : (packages[0] ?? 'standard');
   const pkgEl2 = document.getElementById('cfg-unitPackagePlayer2') as HTMLSelectElement;
   for (const pkg of packages) {
     const opt = document.createElement('option');
@@ -2019,7 +2022,7 @@ for (const [id] of NUM_FIELDS) {
     opt.textContent = pkg;
     pkgEl2.appendChild(opt);
   }
-  pkgEl2.value = 'standard';
+  pkgEl2.value = packages.includes(settingsUnitPackagePlayer2) ? settingsUnitPackagePlayer2 : (packages[0] ?? 'standard');
 })();
 (function initRulesPresetSelectOptions(): void {
   const sel = document.getElementById('cfg-rulesPreset') as HTMLSelectElement | null;
