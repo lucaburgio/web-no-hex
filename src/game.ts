@@ -3832,29 +3832,61 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
   syncDimensions();
   unitIdCounter = 0;
 
-  // Place one unit per home territory
+  const mountainHexes = graph.mountainTerritoryIds.map(id => graph.territories[id]!.virtualKey);
+
+  const hexStates: Record<string, HexState> = {};
+
+  /** Map layout: which owner's homes lie in the sector that has no CP (designed attacker side). */
+  let mapInferredAttacker: Owner | undefined;
+  let attackerSectorIdxForBreakthrough = -1;
+  if (gameMode === 'breakthrough') {
+    const cpTids = new Set(Object.values(graph.controlPoints).map(cp => cp.territoryId));
+    attackerSectorIdxForBreakthrough = graph.sectors.findIndex(sec => !sec.territoryIds.some(tid => cpTids.has(tid)));
+    const attackerSector = graph.sectors[attackerSectorIdxForBreakthrough];
+    const aiInAttacker =
+      attackerSector?.territoryIds.some(tid => graph.aiHomeTerritoryIds.includes(tid)) ?? false;
+    mapInferredAttacker = aiInAttacker ? AI : PLAYER;
+  }
+
+  const desiredBreakthroughAttacker: Owner | undefined =
+    gameMode === 'breakthrough' && mapInferredAttacker !== undefined
+      ? config.breakthroughRandomRoles
+        ? (Math.random() < 0.5 ? PLAYER : AI)
+        : config.breakthroughPlayer1Role === 'attacker'
+          ? PLAYER
+          : AI
+      : undefined;
+
+  const swapBreakthroughSpawnSides =
+    gameMode === 'breakthrough' &&
+    desiredBreakthroughAttacker !== undefined &&
+    mapInferredAttacker !== undefined &&
+    desiredBreakthroughAttacker !== mapInferredAttacker;
+
+  // Place one unit per home territory (breakthrough: swap spawn lists if settings assign P1 the opposite role vs map)
+  const playerSpawnTerritoryIds =
+    gameMode === 'breakthrough' && swapBreakthroughSpawnSides
+      ? graph.aiHomeTerritoryIds
+      : graph.playerHomeTerritoryIds;
+  const aiSpawnTerritoryIds =
+    gameMode === 'breakthrough' && swapBreakthroughSpawnSides
+      ? graph.playerHomeTerritoryIds
+      : graph.aiHomeTerritoryIds;
+
   const units: Unit[] = [
-    ...graph.playerHomeTerritoryIds.map(id => {
+    ...playerSpawnTerritoryIds.map(id => {
       const t = graph.territories[id]!;
       return makeUnit(PLAYER, t.virtualCol, t.virtualRow);
     }),
-    ...graph.aiHomeTerritoryIds.map(id => {
+    ...aiSpawnTerritoryIds.map(id => {
       const t = graph.territories[id]!;
       return makeUnit(AI, t.virtualCol, t.virtualRow);
     }),
   ];
 
-  const mountainHexes = graph.mountainTerritoryIds.map(id => graph.territories[id]!.virtualKey);
-
-  const hexStates: Record<string, HexState> = {};
-
   if (gameMode === 'breakthrough') {
-    // Sector without CP = attacker's home sector
-    const cpTids = new Set(Object.values(graph.controlPoints).map(cp => cp.territoryId));
-    const attackerSectorIdx = graph.sectors.findIndex(sec => !sec.territoryIds.some(tid => cpTids.has(tid)));
-    const attackerSector = graph.sectors[attackerSectorIdx];
-    const aiInAttacker = attackerSector?.territoryIds.some(tid => graph.aiHomeTerritoryIds.includes(tid)) ?? false;
-    const attackerOwner: Owner = aiInAttacker ? AI : PLAYER;
+    const attackerSectorIdx = attackerSectorIdxForBreakthrough;
+    const attackerOwner: Owner = desiredBreakthroughAttacker!;
     const defenderOwner: Owner = attackerOwner === AI ? PLAYER : AI;
 
     const sectorOwners: Owner[] = graph.sectors.map((_, i) => i === attackerSectorIdx ? attackerOwner : defenderOwner);
@@ -3900,9 +3932,13 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
         ? [sectorControlPointHex[frontlineIdx]!]
         : [];
 
+    const defHexCount = Object.values(hexStates).filter(h => h.owner === defenderOwner).length;
+    const defBonus = territoryBonusForHexCount(defHexCount);
+    const defBasePP = defenderOwner === AI ? config.productionPointsPerTurnAi : config.productionPointsPerTurn;
+    const defPP = defBasePP + defBonus;
     const pp: Record<Owner, number> = { 1: 0, 2: 0 };
     pp[attackerOwner] = config.breakthroughAttackerStartingPP;
-    pp[defenderOwner] = config.productionPointsPerTurn;
+    pp[defenderOwner] = defPP;
 
     return buildTerritoryState(graph, units, hexStates, mountainHexes, gameMode, {
       controlPointHexes,
