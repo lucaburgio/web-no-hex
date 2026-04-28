@@ -205,6 +205,188 @@ function computeAvgAdjacentCentroidPx(
   return count > 0 ? sum / count : 1;
 }
 
+/** Pixel-area tolerance when checking whether child territories partition a parent polygon. */
+const PARTITION_AREA_EPS = 1;
+
+function shoelaceAbsArea(
+  pointIds: string[],
+  pts: Record<string, { x: number; y: number }>,
+): number {
+  const n = pointIds.length;
+  if (n < 3) return 0;
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    const p = pts[pointIds[i]!];
+    const q = pts[pointIds[(i + 1) % n]!];
+    if (!p || !q) continue;
+    sum += p.x * q.y - q.x * p.y;
+  }
+  return Math.abs(sum / 2);
+}
+
+function vertexCentroid(
+  pointIds: string[],
+  pts: Record<string, { x: number; y: number }>,
+): { x: number; y: number } {
+  let sx = 0;
+  let sy = 0;
+  let c = 0;
+  for (const id of pointIds) {
+    const p = pts[id];
+    if (p) {
+      sx += p.x;
+      sy += p.y;
+      c++;
+    }
+  }
+  return c > 0 ? { x: sx / c, y: sy / c } : { x: 0, y: 0 };
+}
+
+function territoryPolyPoints(
+  pointIds: string[],
+  pts: Record<string, { x: number; y: number }>,
+): Array<{ x: number; y: number }> {
+  const out: Array<{ x: number; y: number }> = [];
+  for (const id of pointIds) {
+    const p = pts[id];
+    if (p) out.push({ x: p.x, y: p.y });
+  }
+  return out;
+}
+
+/** Ray-cast point-in-polygon (SVG y-down coords). */
+function pointInPolygon(px: number, py: number, poly: Array<{ x: number; y: number }>): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i]!.x;
+    const yi = poly[i]!.y;
+    const xj = poly[j]!.x;
+    const yj = poly[j]!.y;
+    const denom = yj - yi;
+    if (Math.abs(denom) < 1e-12) continue;
+    if ((yi > py) === (yj > py)) continue;
+    const xCross = ((xj - xi) * (py - yi)) / denom + xi;
+    if (px < xCross) inside = !inside;
+  }
+  return inside;
+}
+
+const MAX_PARTITION_SUBSET = 22;
+
+function findSubsetSummingToArea(
+  items: Array<{ id: string; area: number }>,
+  target: number,
+  eps: number,
+): string[] | null {
+  const n = items.length;
+  if (n > MAX_PARTITION_SUBSET) return null;
+  let best: string[] | null = null;
+  function dfs(i: number, remaining: number, chosen: string[]): void {
+    if (best) return;
+    if (chosen.length >= 2 && Math.abs(remaining) < eps) {
+      best = [...chosen];
+      return;
+    }
+    if (i === n) return;
+    if (remaining < -eps) return;
+    dfs(i + 1, remaining, chosen);
+    const it = items[i]!;
+    dfs(i + 1, remaining - it.area, [...chosen, it.id]);
+  }
+  dfs(0, target, []);
+  return best;
+}
+
+/**
+ * Removes territories that duplicate an outer boundary after a **split without deleting the
+ * original**: smaller territories lie inside the parent polygon, have the same `state`, and
+ * their areas sum to the parent's area (planar partition). Common when auto-detect or
+ * "save as new" adds faces **t63/t64** but leaves **t50** as the old enclosing ring.
+ *
+ * **Note:** dropping entries changes neutral/mountain **virtual column** indices (see
+ * `assignTerritories` in {@link buildTerritoryGraph}); embedded saves for the same map id may
+ * need a fresh match if the territory list was edited.
+ */
+export function sanitizeTerritoryMapDef(mapDef: TerritoryMapDef): TerritoryMapDef {
+  const pts: Record<string, { x: number; y: number }> = {};
+  for (const p of mapDef.pts) pts[p.id] = { x: p.x, y: p.y };
+
+  const areas = new Map<string, number>();
+  const polys = new Map<string, Array<{ x: number; y: number }>>();
+  for (const t of mapDef.territories) {
+    areas.set(t.id, shoelaceAbsArea(t.pointIds, pts));
+    polys.set(t.id, territoryPolyPoints(t.pointIds, pts));
+  }
+
+  const sortedByAreaDesc = [...mapDef.territories].sort(
+    (a, b) => (areas.get(b.id) ?? 0) - (areas.get(a.id) ?? 0),
+  );
+
+  const toRemove = new Set<string>();
+
+  for (const P of sortedByAreaDesc) {
+    if (toRemove.has(P.id)) continue;
+    const areaP = areas.get(P.id);
+    if (areaP === undefined || areaP < PARTITION_AREA_EPS) continue;
+
+    const polyP = polys.get(P.id);
+    if (!polyP || polyP.length < 3) continue;
+
+    const candidates = mapDef.territories.filter(T => {
+      if (T.id === P.id || toRemove.has(T.id)) return false;
+      if (T.state !== P.state) return false;
+      const aT = areas.get(T.id) ?? 0;
+      if (aT >= areaP - PARTITION_AREA_EPS) return false;
+      const c = vertexCentroid(T.pointIds, pts);
+      return pointInPolygon(c.x, c.y, polyP);
+    });
+
+    if (candidates.length < 2) continue;
+
+    const subset = findSubsetSummingToArea(
+      candidates.map(t => ({ id: t.id, area: areas.get(t.id) ?? 0 })),
+      areaP,
+      PARTITION_AREA_EPS,
+    );
+    if (subset && subset.length >= 2) {
+      toRemove.add(P.id);
+      console.warn(
+        `[sanitizeTerritoryMapDef] Removed redundant territory "${P.id}" (${areaP.toFixed(1)} px²): ` +
+          `interior partition [${subset.join(', ')}] matches combined area. ` +
+          `Delete the parent in the editor when splitting a territory to avoid duplicate rings.`,
+      );
+    }
+  }
+
+  if (toRemove.size === 0) return mapDef;
+
+  const territories = mapDef.territories.filter(t => !toRemove.has(t.id));
+  const controlPoints = mapDef.controlPoints.filter(cp => !toRemove.has(cp.territoryId));
+  const sectors = (mapDef.sectors ?? [])
+    .map(s => ({
+      ...s,
+      territoryIds: s.territoryIds.filter(id => !toRemove.has(id)),
+    }))
+    .filter(s => s.territoryIds.length > 0);
+
+  let adjacencyBlockPairsFiltered = mapDef.adjacencyBlockPairs;
+  if (adjacencyBlockPairsFiltered?.length) {
+    adjacencyBlockPairsFiltered = adjacencyBlockPairsFiltered.filter(
+      ([a, b]) => !toRemove.has(a) && !toRemove.has(b),
+    );
+    if (adjacencyBlockPairsFiltered.length === 0) adjacencyBlockPairsFiltered = undefined;
+  }
+
+  const { adjacencyBlockPairs: _removedAbp, ...mapDefRest } = mapDef;
+  return {
+    ...mapDefRest,
+    territories,
+    controlPoints,
+    sectors,
+    ...(adjacencyBlockPairsFiltered?.length ? { adjacencyBlockPairs: adjacencyBlockPairsFiltered } : {}),
+  };
+}
+
 /**
  * Build a territory graph from a map definition.
  * - Allied territories → player home row (ROWS-1 = 2)
@@ -213,8 +395,9 @@ function computeAvgAdjacentCentroidPx(
  * - Virtual ROWS = 3, COLS = max count of any group (minimum 4)
  */
 export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData {
+  const cleanMapDef = sanitizeTerritoryMapDef(mapDef);
   const points: Record<string, { x: number; y: number }> = {};
-  for (const p of mapDef.pts) {
+  for (const p of cleanMapDef.pts) {
     points[p.id] = { x: p.x, y: p.y };
   }
 
@@ -222,7 +405,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
   const enemy: TerritoryMapTerritory[] = [];
   const others: TerritoryMapTerritory[] = []; // neutral + mountain
 
-  for (const t of mapDef.territories) {
+  for (const t of cleanMapDef.territories) {
     if (t.state === 'allied') allied.push(t);
     else if (t.state === 'enemy') enemy.push(t);
     else others.push(t);
@@ -258,7 +441,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
   assignTerritories(enemy, 0);
   assignTerritories(others, 1);
 
-  const adjacency = buildTerritoryAdjacency(mapDef);
+  const adjacency = buildTerritoryAdjacency(cleanMapDef);
 
   const playerHomeTerritoryIds = allied.map(t => t.id);
   const aiHomeTerritoryIds = enemy.map(t => t.id);
@@ -266,7 +449,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
   const passableTerritoryIds = [...allied, ...enemy, ...others.filter(t => t.state !== 'mountain')].map(t => t.id);
 
   const controlPoints: Record<string, TerritoryControlPoint> = {};
-  for (const cp of mapDef.controlPoints) {
+  for (const cp of cleanMapDef.controlPoints) {
     controlPoints[cp.id] = {
       id: cp.id,
       territoryId: cp.territoryId,
@@ -274,7 +457,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
     };
   }
 
-  const sectors: TerritoryMapSectorData[] = (mapDef.sectors ?? []).map(s => ({
+  const sectors: TerritoryMapSectorData[] = (cleanMapDef.sectors ?? []).map(s => ({
     id: s.id,
     name: s.name,
     territoryIds: s.territoryIds,
@@ -294,7 +477,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
     passableTerritoryIds,
     controlPoints,
     sectors,
-    mapDef,
+    mapDef: cleanMapDef,
     points,
     avgAdjacentCentroidPx,
   };

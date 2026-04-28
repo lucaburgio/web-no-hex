@@ -1769,24 +1769,6 @@
         "state": "neutral"
       },
       {
-        "id": "t50",
-        "pointIds": [
-          "p139",
-          "p138",
-          "p155",
-          "p154",
-          "p153",
-          "p152",
-          "p151",
-          "p150",
-          "p149",
-          "p148",
-          "p141",
-          "p140"
-        ],
-        "state": "neutral"
-      },
-      {
         "id": "t52",
         "pointIds": [
           "p57",
@@ -2138,11 +2120,5 @@
         "align": "center"
       }
     ],
-    "sectors": [],
-    "adjacencyBlockPairs": [
-      [
-        "t50",
-        "t63"
-      ]
-    ]
+    "sectors": []
   }

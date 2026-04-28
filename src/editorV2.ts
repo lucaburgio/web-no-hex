@@ -1,6 +1,7 @@
 // ── Editor V2 — Polygon-based map editor ────────────────────────────────────
 
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
+import { sanitizeTerritoryMapDef, type TerritoryMapDef } from './territoryMap';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -1492,7 +1493,16 @@ function clearAll(): void {
 // ── Export / Import ───────────────────────────────────────────────────────────
 
 function exportState(): void {
-  const data = { version: 2, pts, edges, territories, controlPoints, notes, sectors };
+  const raw: TerritoryMapDef = {
+    version: 2,
+    pts,
+    edges,
+    territories,
+    controlPoints,
+    notes,
+    sectors,
+  };
+  const data = sanitizeTerritoryMapDef(raw);
   const json = JSON.stringify(data, null, 2);
   navigator.clipboard.writeText(json).then(() => {
     const btn = document.getElementById('ev2-export-btn') as HTMLButtonElement;
@@ -1513,12 +1523,23 @@ function importFromJson(json: string): void {
   if (!Array.isArray(data.pts) || !Array.isArray(data.edges) || !Array.isArray(data.territories)) {
     throw new Error('Invalid format: missing pts, edges, or territories arrays.');
   }
-  pts = data.pts as Pt[];
-  edges = data.edges as Edge[];
-  territories = data.territories as Territory[];
-  controlPoints = Array.isArray(data.controlPoints) ? data.controlPoints as ControlPoint[] : [];
-  notes = Array.isArray(data.notes) ? data.notes as Note[] : [];
-  sectors = Array.isArray(data.sectors) ? data.sectors as Sector[] : [];
+  const loaded: TerritoryMapDef = {
+    version: data.version,
+    pts: data.pts,
+    edges: data.edges,
+    territories: data.territories,
+    controlPoints: Array.isArray(data.controlPoints) ? data.controlPoints : [],
+    notes: Array.isArray(data.notes) ? data.notes : [],
+    sectors: Array.isArray(data.sectors) ? data.sectors : [],
+    adjacencyBlockPairs: Array.isArray(data.adjacencyBlockPairs) ? data.adjacencyBlockPairs : undefined,
+  };
+  const sanitized = sanitizeTerritoryMapDef(loaded);
+  pts = sanitized.pts as Pt[];
+  edges = sanitized.edges as Edge[];
+  territories = sanitized.territories as Territory[];
+  controlPoints = sanitized.controlPoints as ControlPoint[];
+  notes = (sanitized.notes ?? []) as Note[];
+  sectors = (sanitized.sectors ?? []) as Sector[];
   currentPath = [];
   hoveredPoint = null;
   selectedEdgeIds = new Set();
