@@ -120,48 +120,7 @@ const config: GameConfig = {
 
   // Available unit types (id must be unique; cost is in production points)
   unitTypes: [
-    {
-      id: 'infantry',
-      unitClass: 'infantry',
-      name: 'Infantry',
-      cost: 20,
-      movement: 1,
-      maxHp: 10,
-      strength: 10,
-      icon: 'icons/units/infantry.svg',
-      package: 'standard',
-      upgradePointsToLevel: 8,
-    },
-    {
-      id: 'tank',
-      unitClass: 'tank',
-      name: 'Tank',
-      cost: 40,
-      movement: 2,
-      maxHp: 14,
-      strength: 11,
-      extraFlanking: 0.05,
-      icon: 'icons/units/tank.svg',
-      package: 'standard',
-      upgradePointsToLevel: 10,
-    },
-    {
-      id: 'artillery',
-      unitClass: 'artillery',
-      name: 'Artillery',
-      cost: 36,
-      movement: 1,
-      maxHp: 9,
-      strength: 8,
-      range: 3,
-      icon: 'icons/units/artillery.svg',
-      package: 'standard',
-      upgradePointsToLevel: 20,
-    },
-
-
-
-
+    
     {
       id: 'infantry',
       unitClass: 'infantry',
