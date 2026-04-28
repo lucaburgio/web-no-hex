@@ -618,7 +618,7 @@ export function renderTerritoryState(
   const validMoveKeys = new Set(validMoves.map(([c, r]) => `${c},${r}`));
 
   const productionPlacementKeys = new Set<string>();
-  if (state.phase === 'production') {
+  if (state.phase === 'production' && state.activePlayer === localPlayer) {
     for (const t of mapDef.territories) {
       const node = territories[t.id];
       if (node && isValidProductionPlacement(state, node.virtualCol, node.virtualRow, localPlayer)) {
