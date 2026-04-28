@@ -426,15 +426,6 @@ const config: GameConfig = {
   // Unit silhouette icon opacity when out of movement (tired); body/HP use theme tired colors
   tiredIconOpacity: 0.5,
 
-  // Fraction of board hexes to randomly set as impassable mountains at game start (0–1)
-  mountainPct: 0.12,
-
-  // Generate a river on new games (random walk from a border hex) before placing mountains
-  enableRivers: true,
-
-  // Max river length = floor(boardCols × this); keeps long snakes off wide boards
-  riverMaxLengthBoardWidthMult: 1.5,
-
   // Color of the movement path preview line shown when hovering a valid move hex (track uses CSS; kept for API parity)
   movePathColor: '#FFC13A',
 

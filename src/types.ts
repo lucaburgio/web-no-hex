@@ -340,7 +340,7 @@ export interface GameConfig {
   /** Breakthrough: ignore {@link breakthroughPlayer1Role} and assign attacker randomly at match start. */
   breakthroughRandomRoles: boolean;
 
-  /** Custom match: use fixed terrain from this story id, or null for procedurally generated map. */
+  /** Custom match: fixed map JSON id under `public/maps/`, or null to use the first list entry at startup. */
   customMatchMapId: string | null;
 
   boardCols: number;
@@ -394,15 +394,6 @@ export interface GameConfig {
   tankSpearheadAttackBonus: number;
   // Duration in ms for the unit move animation (0 = instant)
   unitMoveSpeed: number;
-  // Fraction of board hexes to randomly set as impassable mountains (0–1)
-  mountainPct: number;
-  /** When true, one river is generated on new games before mountains are placed. */
-  enableRivers: boolean;
-  /**
-   * Generated river length cap: at most this many times {@link boardCols} hexes wide
-   * (actual max hex count is floor(boardCols × this value), minimum 1).
-   */
-  riverMaxLengthBoardWidthMult: number;
   // Color of the movement path preview line
   movePathColor: string;
   // Stroke width of the movement path preview line (in pixels)

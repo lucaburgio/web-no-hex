@@ -2335,7 +2335,7 @@ function buildRulesContent(): string {
       <div class="rules-group-title">Overview</div>
       <p class="rules-prose">Turn-based hex strategy on a ${config.boardCols}×${config.boardRows} grid.
          You play from the south (bottom row); the opponent plays from the north (top row).
-         In custom match settings you can pick a <strong>map layout</strong> from maps that define both Conquest and Breakthrough control points in the map editor; otherwise the board is randomly generated.</p>
+         Pick a <strong>map layout</strong> in custom match settings (maps define terrain and mode-specific objectives in the editor).</p>
       </div>
     </section>
 

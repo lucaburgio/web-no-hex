@@ -18,12 +18,10 @@ async function clickIfVisible(page, selector) {
   return false;
 }
 
-async function startNewGameAtSize(page, cols, rows) {
+async function startNewGameAtSize(page, _cols, _rows) {
   await page.click('#menu-new-game-btn');
   await clickIfVisible(page, '#confirm-new-game-btn');
   await page.waitForSelector('#settings-overlay:not(.hidden)', { timeout: 10000 });
-  await page.fill('#cfg-boardCols', String(cols));
-  await page.fill('#cfg-boardRows', String(rows));
   await page.click('#settings-start-btn');
   await page.waitForSelector('#board', { timeout: 10000 });
   await sleep(400);
