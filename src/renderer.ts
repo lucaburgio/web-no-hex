@@ -113,8 +113,15 @@ function hexTerrainFillForOwner(owner: Owner, localPlayer: Owner, c: Colors): st
   return owner === localPlayer ? c.hexPlayer : c.hexAi;
 }
 
-function hexTerrainDimmedFillForOwner(owner: Owner, localPlayer: Owner, c: Colors): string {
-  return owner === localPlayer ? c.hexPlayerDimmed : c.hexAiDimmed;
+function hexTerrainDimmedFillForOwner(
+  owner: Owner,
+  localPlayer: Owner,
+  c: Colors,
+  productionEnemyPatternFill?: string | null,
+): string {
+  if (owner === localPlayer) return c.hexPlayerDimmed;
+  if (productionEnemyPatternFill) return productionEnemyPatternFill;
+  return c.hexAiDimmed;
 }
 
 /** Resolved mountain tint faction (visual-only). */
@@ -255,6 +262,7 @@ function computeMountainTerritoryFillByKey(
   productionFocusHexes: Set<string>,
   unitByHex: Map<string, Unit>,
   mtnCategoryByKey?: Map<string, MountainTerritoryCategory>,
+  productionEnemyPatternFill?: string | null,
 ): Map<string, string> {
   const out = new Map<string, string>();
   const categoryMap = mtnCategoryByKey ?? resolveMountainTerritoryCategoryByKey(state, mountainSet);
@@ -275,7 +283,7 @@ function computeMountainTerritoryFillByKey(
       ownerForTint == null
         ? c.hexNeutral
         : mountainDimmed
-          ? hexTerrainDimmedFillForOwner(ownerForTint, localPlayer, c)
+          ? hexTerrainDimmedFillForOwner(ownerForTint, localPlayer, c, productionEnemyPatternFill)
           : hexTerrainFillForOwner(ownerForTint, localPlayer, c);
     out.set(key, fill);
   }
@@ -688,6 +696,8 @@ interface Colors {
   hexFog: string;
   hexNeutral: string;
   hexStroke: string;
+  /** Solid stroke on empty hexes where infantry may be placed (production phase) */
+  hexProdCandidateStroke: string;
   hexProdStroke: string;
   /** Solid stroke on selected hex and valid-move destination hexes */
   hexMoveHighlightStroke: string;
@@ -700,6 +710,8 @@ interface Colors {
   playerTired: string;
   aiTired: string;
   aiDuringProduction: string;
+  /** Gray shell / icon / HP during local player production phase */
+  unitProductionDisabled: string;
   rangedTarget: string;
   colorDark: string;
   /** Map unit shield card (design ref). */
@@ -759,6 +771,8 @@ function colors(): Colors {
     hexFog:          v('--color-fog'),
     hexNeutral:      v('--color-hex-neutral'),
     hexStroke:       v('--color-hex-stroke'),
+    hexProdCandidateStroke:
+      v('--color-hex-prod-candidate-stroke') || v('--color-production-territory-border'),
     hexProdStroke:   v('--color-hex-prod-stroke'),
     hexMoveHighlightStroke:
       v('--color-hex-move-highlight-stroke') || v('--color-yellow-500'),
@@ -771,6 +785,7 @@ function colors(): Colors {
     playerTired:     v('--color-player-tired'),
     aiTired:         v('--color-ai-tired'),
     aiDuringProduction: v('--color-ai-during-production'),
+    unitProductionDisabled: v('--color-unit-production-disabled') || '#999999',
     rangedTarget:    v('--color-red-700'),
     colorDark:       v('--color-dark'),
 
@@ -861,14 +876,14 @@ function boardUnitIconOpacity(
   productionTiredVisual: boolean,
 ): string {
   if (!state) return '1';
+  if (productionTiredVisual) return '1';
   const liveU = getUnitById(state, unit.id);
   const movesUsed = liveU?.movesUsed ?? unit.movesUsed;
   const movementTired =
     state.phase === 'movement' &&
     state.activePlayer === unit.owner &&
     movesUsed >= unit.movement;
-  const tired = movementTired || productionTiredVisual;
-  return tired ? String(config.tiredIconOpacity) : '1';
+  return movementTired ? String(config.tiredIconOpacity) : '1';
 }
 
 function mapUnitChipStyle(
@@ -878,8 +893,30 @@ function mapUnitChipStyle(
     isFriendly: boolean;
     isRangedTarget: boolean;
     friendlyMovementTired: boolean;
+    productionPhaseUiDisabled?: boolean;
   },
 ): MapUnitChipStyle {
+  if (opts.productionPhaseUiDisabled) {
+    const m = c.unitProductionDisabled;
+    const bodyStroke = opts.isSelected ? c.boardUnitBorderSelected : m;
+    const bodyStrokeW = opts.isSelected ? c.boardUnitBorderSelectedWidth : c.boardUnitBorderWidth;
+    let bracketStroke = opts.isSelected ? c.boardUnitBracketSelected : m;
+    let bracketStrokeW = opts.isSelected ? c.boardUnitBracketSelectedWidth : c.boardUnitBracketWidth;
+    if (opts.isRangedTarget && !opts.isSelected) {
+      bracketStroke = c.rangedTarget;
+      bracketStrokeW = Math.max(bracketStrokeW, 1.6);
+    }
+    return {
+      bodyFill: c.boardUnitCardFill,
+      bodyStroke,
+      bodyStrokeW,
+      bracketStroke,
+      bracketStrokeW,
+      hpFill: m,
+      iconColor: m,
+    };
+  }
+
   const bodyFill = c.boardUnitCardFill;
   const bodyStroke = opts.isSelected ? c.boardUnitBorderSelected : c.boardUnitBorder;
   const bodyStrokeW = opts.isSelected ? c.boardUnitBorderSelectedWidth : c.boardUnitBorderWidth;
@@ -939,6 +976,7 @@ function appendBoardUnitStars(
   starCenterY: number,
   starCount: number,
   starSize: number,
+  starFill: string,
 ): void {
   if (starCount <= 0) return;
   const g = svgEl('g');
@@ -948,7 +986,7 @@ function appendBoardUnitStars(
   const totalW = (starCount - unitStarsTotalWidthCountOffset) * spacing;
   for (let i = 0; i < starCount; i++) {
     const cx = xCenter - totalW / 2 + i * spacing;
-    const starG = inlineIcon('icons/star.svg', cx, starCenterY, starSize, unitStarIconFill, '1');
+    const starG = inlineIcon('icons/star.svg', cx, starCenterY, starSize, starFill, '1');
     if (starG) g.appendChild(starG);
   }
   parent.appendChild(g);
@@ -989,11 +1027,13 @@ export function mountBoardUnitChipContents(
     p.unit.movesUsed >= p.unit.movement;
   const isFriendly = p.unit.owner === p.localPlayer;
   const friendlyMovementTired = movementTired && isFriendly;
+  const productionPhaseUiDisabled = p.productionTiredVisual;
   const chip = mapUnitChipStyle(c, {
     isSelected,
     isFriendly,
     isRangedTarget,
     friendlyMovementTired,
+    productionPhaseUiDisabled,
   });
   const opacity = '1';
   const iconOpacity = boardUnitIconOpacity(p.state, p.unit, p.productionTiredVisual);
@@ -1002,6 +1042,8 @@ export function mountBoardUnitChipContents(
   const sc = (HEX_SIZE * unitTagSizeMultiplier) / 50;
   const unitEl = svgEl('path');
   unitEl.setAttribute('class', 'board-unit__body');
+  if (productionPhaseUiDisabled) unitWrap.classList.add('board-unit--production-phase');
+  else unitWrap.classList.remove('board-unit--production-phase');
   unitEl.setAttribute('d', BOARD_UNIT_SILHOUETTE_D);
   unitEl.setAttribute('fill', chip.bodyFill);
   unitEl.setAttribute('stroke', chip.bodyStroke);
@@ -1075,7 +1117,7 @@ export function mountBoardUnitChipContents(
   const starN = boardUnitUpgradeStarCount(p.unit);
   const starSize = HEX_SIZE * unitStarsOuterMultiplier;
   const starY = p.y - unitStarsAnchorYScMult * sc - starSize * unitStarsBelowAnchorSizeMult;
-  appendBoardUnitStars(unitWrap, p.x, starY, starN, starSize);
+  appendBoardUnitStars(unitWrap, p.x, starY, starN, starSize, chip.iconColor);
 
   if (showAim && isRangedTarget) {
     const aim = inlineIcon('icons/artillery.svg', p.x, p.y - HEX_SIZE * 1, HEX_SIZE * 0.5, c.rangedTarget, opacity);
@@ -1401,6 +1443,30 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   bg.setAttribute('fill', 'transparent');
   svgElement.appendChild(bg);
 
+  const hatchId = `${svgElement.id || 'board'}-hex-prod-enemy-hatch`;
+  const defsHexProd = svgEl('defs');
+  const hatchPat = svgEl('pattern');
+  hatchPat.setAttribute('id', hatchId);
+  hatchPat.setAttribute('patternUnits', 'userSpaceOnUse');
+  hatchPat.setAttribute('width', '10');
+  hatchPat.setAttribute('height', '10');
+  const hatchBg = svgEl('rect');
+  hatchBg.setAttribute('width', '10');
+  hatchBg.setAttribute('height', '10');
+  hatchBg.setAttribute('fill', 'var(--color-production-disabled-enemy-stripe-base)');
+  const hatchFg = svgEl('path');
+  hatchFg.setAttribute(
+    'd',
+    'M0,10 L10,0 M-2.5,2.5 L2.5,-2.5 M7.5,12.5 L12.5,7.5',
+  );
+  hatchFg.setAttribute('stroke', 'var(--color-production-disabled-enemy-stripe-light)');
+  hatchFg.setAttribute('stroke-width', '2.5');
+  hatchFg.setAttribute('fill', 'none');
+  hatchPat.appendChild(hatchBg);
+  hatchPat.appendChild(hatchFg);
+  defsHexProd.appendChild(hatchPat);
+  svgElement.appendChild(defsHexProd);
+
   const boardOrigin = svgEl('g');
   boardOrigin.id = 'board-origin';
   boardOrigin.setAttribute('transform', `translate(${boardMargin},${boardMargin})`);
@@ -1706,6 +1772,11 @@ export function renderState(
     hexStatesDrawOverride != null ? { ...state, hexStates: hexStatesDrawOverride } : state;
 
   const c = colors();
+  const productionPhaseLocal =
+    state.phase === 'production' && state.activePlayer === localPlayer;
+  const productionEnemyPatternFill = productionPhaseLocal
+    ? `url(#${svgElement.id || 'board'}-hex-prod-enemy-hatch)`
+    : null;
   const visionKeys =
     config.fogOfWar && !renderOptions?.skipFogOfWar
       ? buildLocalPlayerVisionKeys(state.units, localPlayer, COLS, ROWS)
@@ -1751,6 +1822,7 @@ export function renderState(
     productionFocusHexes,
     unitByHex,
     mtnTerritoryCategoryByKey,
+    productionEnemyPatternFill,
   );
   if (visionKeys) {
     for (const key of mountainSet) {
@@ -1760,7 +1832,8 @@ export function renderState(
         f === c.hexPlayer ||
         f === c.hexAi ||
         f === c.hexPlayerDimmed ||
-        f === c.hexAiDimmed
+        f === c.hexAiDimmed ||
+        (productionEnemyPatternFill && f === productionEnemyPatternFill)
       ) {
         mountainTerritoryFillByKey.set(key, c.hexFog);
       }
@@ -1849,6 +1922,11 @@ export function renderState(
       const canPlace           = canPlaceHexes.has(key);
       const isProdSelected     = productionHex && col === productionHex.col && r === productionHex.row;
       const isConquered        = !!hexState;
+      const isProductionPlacementHex =
+        state.phase === 'production' &&
+        state.activePlayer === localPlayer &&
+        canPlace &&
+        !isProdSelected;
 
       let fill   = c.hexNeutral;
       let stroke = 'transparent';
@@ -1878,7 +1956,7 @@ export function renderState(
         stroke = c.hexProdStroke;
       } else if (canPlace) {
         fill   = c.hexCanPlace;
-        stroke = c.hexStroke;
+        stroke = isProductionPlacementHex ? c.hexProdCandidateStroke : c.hexStroke;
       } else if (isConquered) {
         if (hexState.owner === localPlayer) {
           fill = c.hexPlayer;
@@ -1894,11 +1972,12 @@ export function renderState(
         fill = c.hexFog;
       }
 
-      // Draw dashed production stroke above #mountain-layer (SVG paint order), not on the base hex polygon.
+      // Draw production placement stroke above #mountain-layer (SVG paint order), not on the base hex polygon.
       let prodOverlayStroke: string | null = null;
       if (!isSelectedHex && !isZoc && !isValidMove) {
         if (isProdSelected) prodOverlayStroke = c.hexProdStroke;
-        else if (canPlace) prodOverlayStroke = c.hexStroke;
+        else if (canPlace && !isProductionPlacementHex) prodOverlayStroke = c.hexStroke;
+        else if (canPlace && isProductionPlacementHex) prodOverlayStroke = null;
       }
       if (prodOverlayStroke) stroke = 'transparent';
 
@@ -1906,9 +1985,13 @@ export function renderState(
       const hexDimmed = productionFocusHexes.size > 0 && isConquered && (!productionFocusHexes.has(key) || hexOccupied) && !isProdSelected;
       if (hexDimmed && hexState && inVision) {
         if (hexState.owner === localPlayer) fill = c.hexPlayerDimmed;
+        else if (productionEnemyPatternFill) fill = productionEnemyPatternFill;
         else fill = c.hexAiDimmed;
       }
-      const opacityDimmed = inVision && hexDimmed && fill !== c.hexPlayerDimmed && fill !== c.hexAiDimmed;
+      const opacityDimmed =
+        inVision &&
+        hexDimmed &&
+        !(state.phase === 'production' && state.activePlayer === localPlayer);
       poly.setAttribute('fill', fill);
       if (stroke === 'transparent') {
         poly.setAttribute('stroke', 'none');
@@ -1920,6 +2003,22 @@ export function renderState(
         poly.setAttribute('stroke-width', '2.5');
         poly.removeAttribute('stroke-dasharray');
         poly.removeAttribute('stroke-dashoffset');
+      } else if (isProductionPlacementHex) {
+        poly.setAttribute('stroke', stroke);
+        poly.setAttribute('stroke-width', '2');
+        poly.removeAttribute('stroke-dasharray');
+        poly.removeAttribute('stroke-dashoffset');
+      } else if (
+        hexDimmed &&
+        hexState &&
+        inVision &&
+        state.phase === 'production' &&
+        state.activePlayer === localPlayer
+      ) {
+        poly.setAttribute('stroke', 'var(--color-production-disabled-border)');
+        poly.setAttribute('stroke-width', '1.5');
+        poly.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);
+        poly.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
       } else {
         poly.setAttribute('stroke', stroke);
         poly.setAttribute('stroke-width', '2.5');
@@ -1946,7 +2045,7 @@ export function renderState(
         overlay.setAttribute('stroke-width', '2.5');
         overlay.setAttribute('stroke-dasharray', `${DASH} ${GAP}`);
         overlay.setAttribute('stroke-dashoffset', String(DASH_OFFSET));
-        overlay.setAttribute('opacity', inVision && hexDimmed ? '0.2' : '1');
+        overlay.setAttribute('opacity', inVision && hexDimmed && !productionPhaseLocal ? '0.2' : '1');
         overlay.setAttribute('pointer-events', 'none');
         prodStrokeLayer.appendChild(overlay);
       }
@@ -1977,14 +2076,20 @@ export function renderState(
       if (state.phase === 'production' && canPlace && !isSelectedHex && !isValidMove) {
         const { x, y } = hexToPixel(col, r);
         const iw = HEX_SIZE * 0.4;
-        const plusOpacity = hexDimmed ? '0.12' : '0.92';
+        const plusOpacity = '1';
         const half = iw / 2;
         const sw = Math.max(1, iw * (2 / 16));
-        const plusStroke = isProdSelected ? c.colorDark : '#ffffff';
+        const plusStroke = c.colorDark;
         const g = svgEl('g');
         g.setAttribute('opacity', plusOpacity);
         g.setAttribute('pointer-events', 'none');
         g.setAttribute('id', `marker-prod-plus-${col}-${r}`);
+        const dot = svgEl('circle');
+        dot.setAttribute('cx', String(x));
+        dot.setAttribute('cy', String(y));
+        dot.setAttribute('r', String(Math.max(1.2, sw * 0.65)));
+        dot.setAttribute('fill', plusStroke);
+        dot.setAttribute('pointer-events', 'none');
         const lineH = svgEl('line');
         lineH.setAttribute('x1', String(x - half));
         lineH.setAttribute('y1', String(y));
@@ -2001,6 +2106,7 @@ export function renderState(
         lineV.setAttribute('stroke', plusStroke);
         lineV.setAttribute('stroke-width', String(sw));
         lineV.setAttribute('stroke-linecap', 'butt');
+        g.appendChild(dot);
         g.appendChild(lineH);
         g.appendChild(lineV);
         markerParent.appendChild(g);
@@ -2379,7 +2485,7 @@ export function renderState(
       dc,
       dr,
       displayHp: displayHpByUnit.get(unit.id) ?? unit.hp,
-      productionTiredVisual: productionFocusHexes.size > 0,
+      productionTiredVisual: productionPhaseLocal,
       rangedTargetKeys,
       localSpectatorInspectUnitId,
     });

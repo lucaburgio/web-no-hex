@@ -96,6 +96,16 @@ img {
     /* Your production (placement focus): opponent units — body + HP bar (theme AI slot) */
     --color-ai-during-production: var(--color-gray-200);
 
+    /* Production phase (WW2 map ref): active placement territory vs dimmed friend/enemy */
+    --color-production-territory-fill: #cccccc;
+    --color-production-territory-border: #333333;
+    --color-production-disabled-friendly-fill: #ffffff;
+    --color-production-disabled-enemy-stripe-base: #ffffff;
+    --color-production-disabled-enemy-stripe-light: #e6e6e6;
+    --color-production-disabled-border: #d9d9d9;
+    --color-unit-production-disabled: #999999;
+    --color-text-primary: #000000;
+
     /* ── Unit states ────────────────────────────────────────────────────────── */
     --color-unit-selected: var(--color-yellow-900);
   
@@ -106,12 +116,13 @@ img {
     --color-hex-move-highlight-stroke: var(--color-yellow-500);
     --color-hex-player:        var(--color-gray-200);
     --color-hex-ai:            #e0c5c5; /* gray-100 C3B3B3 e0c5c5 */
-    /* Production phase: owned territory not in focus (replaces opacity dimming) */
-    --color-hex-player-dimmed: var(--color-gray-200);
-    --color-hex-ai-dimmed:     var(--color-gray-100);
-    --color-hex-can-place:     var(--color-gray-600);
+    /* Production phase: owned territory not in focus (friendly / enemy fills; enemy stripes via SVG pattern in renderer) */
+    --color-hex-player-dimmed: var(--color-production-disabled-friendly-fill);
+    --color-hex-ai-dimmed:     var(--color-production-disabled-enemy-stripe-light);
+    --color-hex-can-place:     var(--color-production-territory-fill);
+    --color-hex-prod-candidate-stroke: var(--color-production-territory-border);
     /* Production phase: hover on empty placement hexes (+) — see renderer (hex hit layer passes through) */
-    --color-hex-prod-candidate-hover: var(--color-gray-700);
+    --color-hex-prod-candidate-hover: #bdbdbd;
     --color-hex-prod-selected: var(--color-yellow-500);
     --color-hex-prod-stroke:   transparent;
     --color-hex-zoc:           #d58f8f;
@@ -571,6 +582,28 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   --ev2-border-color: var(--color-yellow-500);
 }
 
+/* Territory map — local player production phase (fills / borders align with hex-board production tokens) */
+#board .ev2-territory-fill.ev2-prod-placement,
+#recap-board .ev2-territory-fill.ev2-prod-placement {
+  fill: var(--color-production-territory-fill) !important;
+}
+#board .ev2-territory-fill.ev2-prod-dim-friendly,
+#recap-board .ev2-territory-fill.ev2-prod-dim-friendly {
+  fill: var(--color-production-disabled-friendly-fill) !important;
+}
+#board .ev2-territory-fill.ev2-prod-dim-enemy,
+#recap-board .ev2-territory-fill.ev2-prod-dim-enemy {
+  fill: url(#ev2-prod-enemy-hatch) !important;
+}
+#board .ev2-territory-border.ev2-prod-dim-border,
+#recap-board .ev2-territory-border.ev2-prod-dim-border {
+  --ev2-border-color: var(--color-production-disabled-border);
+}
+#board .ev2-territory-border.ev2-prod-placement-border,
+#recap-board .ev2-territory-border.ev2-prod-placement-border {
+  --ev2-border-color: var(--color-production-territory-border);
+}
+
 /* Move path hover preview: 4px dashed track (marching dashes), optional hex dest ring, end dot. */
 #board #move-path-line.move-path-preview-track,
 #recap-board #move-path-line.move-path-preview-track {
@@ -658,6 +691,12 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #board .board-unit__icon,
 #recap-board .board-unit__icon {
   filter: var(--board-unit-icon-filter);
+}
+
+#board .board-unit--production-phase .board-unit__faction,
+#recap-board .board-unit--production-phase .board-unit__faction {
+  filter: grayscale(1);
+  opacity: 0.55;
 }
 
 #board .board-unit--pointer-hover-chromatic {

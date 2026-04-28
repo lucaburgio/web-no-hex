@@ -18,8 +18,7 @@ const TERRITORY_HOVER_CURSOR = "url('/icons/pointer.svg') 13 14, pointer";
 const TERRITORY_MOUNTAIN_CURSOR = "url('/icons/pointer.svg') 13 14, default";
 
 // Game-specific highlight colors (no map-editor equivalent)
-const COLOR_PRODUCTION_STROKE = '#3b82f6';
-const STROKE_WIDTH_HIGHLIGHT  = 3;
+const STROKE_WIDTH_HIGHLIGHT = 2;
 
 interface RendererState {
   graph: TerritoryGraphData;
@@ -287,6 +286,27 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   mountainPattern.appendChild(mountainImg);
   defs.appendChild(mountainPattern);
 
+  const prodEnemyHatch = mksvg('pattern');
+  prodEnemyHatch.id = 'ev2-prod-enemy-hatch';
+  prodEnemyHatch.setAttribute('patternUnits', 'userSpaceOnUse');
+  prodEnemyHatch.setAttribute('width', '10');
+  prodEnemyHatch.setAttribute('height', '10');
+  const peBg = mksvg('rect');
+  peBg.setAttribute('width', '10');
+  peBg.setAttribute('height', '10');
+  peBg.setAttribute('fill', 'var(--color-production-disabled-enemy-stripe-base)');
+  const peFg = mksvg('path');
+  peFg.setAttribute(
+    'd',
+    'M0,10 L10,0 M-2.5,2.5 L2.5,-2.5 M7.5,12.5 L12.5,7.5',
+  );
+  peFg.setAttribute('stroke', 'var(--color-production-disabled-enemy-stripe-light)');
+  peFg.setAttribute('stroke-width', '2.5');
+  peFg.setAttribute('fill', 'none');
+  prodEnemyHatch.appendChild(peBg);
+  prodEnemyHatch.appendChild(peFg);
+  defs.appendChild(prodEnemyHatch);
+
   // Clip paths per territory (same as map editor)
   for (const t of mapDef.territories) {
     const clipPath = mksvg('clipPath');
@@ -305,6 +325,7 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     'ev2-sector-border-layer',
     'ev2-cp-layer',
     'ev2-note-layer',
+    'trr-prod-markers',
     'trr-highlights',
     'trr-units',
   ]) {
@@ -572,6 +593,8 @@ export function renderTerritoryState(
     return hs.owner === localPlayer ? 'allied' : 'enemy';
   }
 
+  const inLocalProd = state.phase === 'production' && state.activePlayer === localPlayer;
+
   // ── ev2-territory-layer ───────────────────────────────────────────────────────
   const territoryLayer = svgElement.querySelector('#ev2-territory-layer')!;
 
@@ -582,15 +605,25 @@ export function renderTerritoryState(
     const fillPoly = group.querySelector('.ev2-territory-fill') as SVGElement | null;
     const borderGroup = group.querySelector('.ev2-territory-border') as SVGGElement | null;
 
+    const nodeTerr = territories[t.id];
+    const virtKey = nodeTerr?.virtualKey ?? '';
+
     const vizState: 'neutral' | 'allied' | 'enemy' | 'mountain' =
       t.state === 'mountain' ? 'mountain' : ownerState(t.id);
 
     const isMoveHl = moveHighlightTids.has(t.id);
 
+    let prodFillMod = '';
+    if (!isMoveHl && inLocalProd && t.state !== 'mountain') {
+      if (productionPlacementKeys.has(virtKey)) prodFillMod = ' ev2-prod-placement';
+      else if (vizState === 'allied') prodFillMod = ' ev2-prod-dim-friendly';
+      else if (vizState === 'enemy') prodFillMod = ' ev2-prod-dim-enemy';
+    }
+
     if (fillPoly) {
       const baseFill = isMoveHl
         ? `ev2-territory-fill ev2-state-${vizState} ev2-fill-move-highlight`
-        : `ev2-territory-fill ev2-state-${vizState}`;
+        : `ev2-territory-fill ev2-state-${vizState}${prodFillMod}`;
       if (fillPoly.getAttribute('class') !== baseFill) fillPoly.setAttribute('class', baseFill);
     }
 
@@ -614,7 +647,13 @@ export function renderTerritoryState(
       } else {
         if (borderGroup.getAttribute('display') === 'none') borderGroup.removeAttribute('display');
 
-        const borderCls = `ev2-territory-border ev2-border-${vizState}`;
+        let prodBorderMod = '';
+        if (!isMoveHl && inLocalProd) {
+          if (productionPlacementKeys.has(virtKey)) prodBorderMod = ' ev2-prod-placement-border';
+          else prodBorderMod = ' ev2-prod-dim-border';
+        }
+
+        const borderCls = `ev2-territory-border ev2-border-${vizState}${prodBorderMod}`;
         if (borderGroup.getAttribute('class') !== borderCls) borderGroup.setAttribute('class', borderCls);
 
         const suppressEdge = (neighborTid: string | null): boolean =>
@@ -648,7 +687,7 @@ export function renderTerritoryState(
 
     let stroke: string | null = null;
     if (isProduction) {
-      stroke = COLOR_PRODUCTION_STROKE;
+      stroke = 'var(--color-production-territory-border)';
     }
 
     if (stroke) {
@@ -668,6 +707,46 @@ export function renderTerritoryState(
     }
   }
   for (const [tid, el] of existingHL) if (!seenHL.has(tid)) el.remove();
+
+  const prodMarkerLayer = svgElement.querySelector('#trr-prod-markers')!;
+  prodMarkerLayer.replaceChildren();
+  if (inLocalProd) {
+    for (const t of mapDef.territories) {
+      if (t.state === 'mountain') continue;
+      const nodePm = territories[t.id];
+      if (!nodePm || !productionPlacementKeys.has(nodePm.virtualKey)) continue;
+      const cx = nodePm.centroid.x;
+      const cy = nodePm.centroid.y;
+      const g = mksvg('g');
+      g.setAttribute('data-territory-id', t.id);
+      g.setAttribute('pointer-events', 'none');
+      const half = 9;
+      const sw = 1.5;
+      const dot = mksvg('circle');
+      dot.setAttribute('cx', String(cx));
+      dot.setAttribute('cy', String(cy));
+      dot.setAttribute('r', '2.5');
+      dot.setAttribute('fill', 'var(--color-dark)');
+      const lh = mksvg('line');
+      lh.setAttribute('x1', String(cx - half));
+      lh.setAttribute('y1', String(cy));
+      lh.setAttribute('x2', String(cx + half));
+      lh.setAttribute('y2', String(cy));
+      lh.setAttribute('stroke', 'var(--color-dark)');
+      lh.setAttribute('stroke-width', String(sw));
+      const lv = mksvg('line');
+      lv.setAttribute('x1', String(cx));
+      lv.setAttribute('y1', String(cy - half));
+      lv.setAttribute('x2', String(cx));
+      lv.setAttribute('y2', String(cy + half));
+      lv.setAttribute('stroke', 'var(--color-dark)');
+      lv.setAttribute('stroke-width', String(sw));
+      g.appendChild(dot);
+      g.appendChild(lh);
+      g.appendChild(lv);
+      prodMarkerLayer.appendChild(g);
+    }
+  }
 
   // ── ev2-cp-layer ──────────────────────────────────────────────────────────────
   const cpLayer = svgElement.querySelector('#ev2-cp-layer')!;
