@@ -342,9 +342,11 @@ function findSubsetSummingToArea(
 /**
  * Territory ids that {@link sanitizeTerritoryMapDef} would strip: an enclosing polygon whose
  * interior is fully tiled by smaller same-`state` faces (same area sum **and** every parent
- * boundary segment appears on some child in that subset). While those shells still exist in
- * the editor, they share every map-boundary edge with a child face, so edge counts for “outer
- * perimeter” must ignore these ids.
+ * boundary segment appears on some child in that subset). Candidates are restricted to faces
+ * whose vertices are all corners of the parent (no centroid-in-parent test: for concave
+ * parents the vertex mean of a child can lie outside the parent polygon). Other candidates
+ * still use centroid-in-parent. This avoids the small-subset cap from unrelated same-state
+ * territories whose centroids fall inside a large concave parent.
  */
 export function computeRedundantPartitionParentIds(mapDef: TerritoryMapDef): Set<string> {
   const pts: Record<string, { x: number; y: number }> = {};
@@ -372,11 +374,16 @@ export function computeRedundantPartitionParentIds(mapDef: TerritoryMapDef): Set
     const polyP = polys.get(P.id);
     if (!polyP || polyP.length < 3) continue;
 
+    /** Vertices of a child face from splitting P use only corners of P (no Steiner points). */
+    const pVertSet = new Set(P.pointIds);
+
     const candidates = mapDef.territories.filter(T => {
       if (T.id === P.id || toRemove.has(T.id)) return false;
       if (T.state !== P.state) return false;
       const aT = areas.get(T.id) ?? 0;
       if (aT >= areaP - PARTITION_AREA_EPS) return false;
+      const vertsOnlyFromP = T.pointIds.every((pid) => pVertSet.has(pid));
+      if (vertsOnlyFromP) return true;
       const c = vertexCentroid(T.pointIds, pts);
       return pointInPolygon(c.x, c.y, polyP);
     });
