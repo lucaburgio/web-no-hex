@@ -3508,6 +3508,9 @@ svg.addEventListener('click', (e: MouseEvent) => {
     return;
   }
   const { col, row } = hex;
+  // Snapshot before humanMoveAnimCancel/render: cancel clears the SVG and e.target can detach;
+  // closest(#unit-layer) would then fail and chip checks would wrongly reject the click.
+  const clickWasOnBoardUnitChip = eventTargetIsOnBoardUnitChip(e);
 
   let didInterruptHumanMove = false;
   if (humanMoveAnimCancel && !aiPlaybackInProgress) {
@@ -3534,7 +3537,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
     if (state.selectedUnit === null) {
       const clickedUnit = getUnit(state, col, row);
       if (clickedUnit && clickedUnit.owner === enemyOwner) {
-        if (eventTargetIsOnBoardUnitChip(e)) {
+        if (clickWasOnBoardUnitChip) {
           // Select enemy unit for inspection (show unit card only, no movement highlights)
           state.selectedUnit = clickedUnit.id;
           render(); updateUI();
@@ -3542,7 +3545,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
         }
         return;
       }
-      if (clickedUnit && clickedUnit.owner === localPlayer && !eventTargetIsOnBoardUnitChip(e)) {
+      if (clickedUnit && clickedUnit.owner === localPlayer && !clickWasOnBoardUnitChip) {
         return;
       }
       state = playerSelectUnit(state, col, row, localPlayer);
@@ -3551,7 +3554,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
     } else {
       const target = getUnit(state, col, row);
       if (target && target.owner === localPlayer) {
-        if (!eventTargetIsOnBoardUnitChip(e)) return;
+        if (!clickWasOnBoardUnitChip) return;
         clearMovePathPreview();
         state = playerSelectUnit(state, col, row, localPlayer);
         render(); updateUI();
@@ -3562,7 +3565,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
         // If inspecting an enemy unit, clicking non-own unit switches inspection or deselects
         if (selUnit.owner === enemyOwner) {
           clearMovePathPreview();
-          if (target && target.owner === enemyOwner && eventTargetIsOnBoardUnitChip(e)) {
+          if (target && target.owner === enemyOwner && clickWasOnBoardUnitChip) {
             state.selectedUnit = target.id;
           } else {
             state.selectedUnit = null;
@@ -3581,7 +3584,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
           getRangedAttackTargets(state, selUnit).some(u => u.id === clickTarget.id);
 
         if (!validMoves.some(([c, r]) => c === col && r === row)) {
-          if (canRanged && eventTargetIsOnBoardUnitChip(e)) {
+          if (canRanged && clickWasOnBoardUnitChip) {
             clearMovePathPreview();
             syncDamageFloatCssDuration();
             const { state: nextState, combatVfx } = playerRangedAttack(state, col, row, localPlayer);
@@ -3640,7 +3643,7 @@ svg.addEventListener('click', (e: MouseEvent) => {
           }
           clearMovePathPreview();
           // If clicking an enemy unit that's not a valid target, switch to inspecting it
-          if (clickTarget && clickTarget.owner === enemyOwner && eventTargetIsOnBoardUnitChip(e)) {
+          if (clickTarget && clickTarget.owner === enemyOwner && clickWasOnBoardUnitChip) {
             state.selectedUnit = clickTarget.id;
           } else {
             state.selectedUnit = null;
