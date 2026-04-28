@@ -3478,6 +3478,8 @@ svg.addEventListener('click', (e: MouseEvent) => {
   }
 
   if (state.activePlayer !== localPlayer) return;
+  // vs-AI: block input between End Movement and the macrotask that starts AI (isAnimating true, no cancel yet).
+  if (aiTurnPendingStart) return;
   if (!hex) {
     // Empty SVG margin / background (no hex under cursor): clear selection
     if (state.phase === 'movement' && state.selectedUnit !== null) {
@@ -3517,7 +3519,8 @@ svg.addEventListener('click', (e: MouseEvent) => {
     render();
     checkWinner();
   }
-  if (isAnimating) return;
+  // Allow movement-phase clicks while animating so another unit can be selected mid-tween (cancel above).
+  if (isAnimating && state.phase !== 'movement') return;
 
   if (state.phase === 'production' && state.activePlayer === localPlayer) {
     if (isValidProductionPlacement(state, col, row, localPlayer)) {
