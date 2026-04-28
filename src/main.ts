@@ -3488,8 +3488,9 @@ svg.addEventListener('click', (e: MouseEvent) => {
   }
 
   if (state.activePlayer !== localPlayer) return;
-  // vs-AI: block input between End Movement and the macrotask that starts AI (isAnimating true, no cancel yet).
-  if (aiTurnPendingStart) return;
+  // vs-AI: block while AI resolves. activePlayer stays PLAYER and phase stays "movement" until
+  // endTurnAfterAi, so isAnimating && phase !== "movement" alone does not guard this window.
+  if (gameMode === 'vsAI' && (aiTurnPendingStart || aiPlaybackInProgress)) return;
   if (!hex) {
     // Empty SVG margin / background (no hex under cursor): clear selection
     if (state.phase === 'movement' && state.selectedUnit !== null) {
