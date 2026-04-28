@@ -37,6 +37,7 @@ import {
   unitTypeForUnit,
   unitShowsBoardPointerHover,
   type EndProductionOptions,
+  getBreakthroughTerritoryStartingSlotCounts,
 } from './game';
 import {
   initTerritoryRenderer,
@@ -86,6 +87,7 @@ import {
 } from './rulesPresets';
 import gsap from 'gsap';
 import type { GameState, Unit, UnitType, CombatForecast, Owner, CombatVfxPayload, GameMode, UnitUpgradeKind, HexState } from './types';
+import type { TerritoryMapDef } from './territoryMap';
 import { saveGameState, loadGameState, hasSaveGame, clearGameState } from './gameStorage';
 import modeImgDomination from '../public/images/modes/domination.png';
 import modeImgConquest from '../public/images/modes/conquest.png';
@@ -1726,12 +1728,14 @@ function applyStartingUnitsInputMaxes(): void {
 
   if (v === 'breakthrough') {
     const hexCap = Math.min(BOARD_HEX_DIM_MAX, Math.max(1, config.boardCols));
-    // Role counts apply to fixed map regions (attacker sector vs other sectors), not to P1/P2 labels.
-    // Polygon maps allow stacking on few home territories — use full dim cap.
-    const roleMax =
-      territories.length > 0 ? BOARD_HEX_DIM_MAX : hexCap;
-    attEl.max = String(roleMax);
-    defEl.max = String(roleMax);
+    if (territories.length > 0 && selectedMap?.def) {
+      const c = getBreakthroughTerritoryStartingSlotCounts(selectedMap.def as TerritoryMapDef);
+      attEl.max = cap(Math.max(1, c.attacker));
+      defEl.max = cap(Math.max(1, c.defender));
+    } else {
+      attEl.max = cap(hexCap);
+      defEl.max = cap(hexCap);
+    }
     p1el.max = String(BOARD_HEX_DIM_MAX);
     p2el.max = String(BOARD_HEX_DIM_MAX);
   } else {

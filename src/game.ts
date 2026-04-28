@@ -379,16 +379,6 @@ function spreadHomeTerritorySlotIndices(n: number, slotCount: number): number[] 
   );
 }
 
-/** Maps each of `n` units to a home slot (0..L-1); same pattern as {@link spreadCols} so extras stack on shared slots when L < n. */
-function spreadHomeTerritorySlotIndicesFull(n: number, slotCount: number): number[] {
-  const L = slotCount;
-  if (L <= 0 || n <= 0) return [];
-  if (n === 1) return [Math.floor(L / 2)];
-  return Array.from({ length: n }, (_, i) =>
-    Math.round((L - 1) * i / (n - 1)),
-  );
-}
-
 function sortTerritoryIdsByVirtualPosition(graph: TerritoryGraphData, ids: string[]): string[] {
   return [...ids].sort((a, b) => {
     const ta = graph.territories[a];
@@ -422,7 +412,7 @@ function computeBreakthroughTerritoryRoleHomes(graph: TerritoryGraphData): {
   };
 }
 
-/** For settings UI: home territory counts per breakthrough role on this polygon map. */
+/** For settings UI: number of home territories per breakthrough role (one unit per territory max). */
 export function getBreakthroughTerritoryStartingSlotCounts(mapDef: TerritoryMapDef): {
   attacker: number;
   defender: number;
@@ -430,8 +420,8 @@ export function getBreakthroughTerritoryStartingSlotCounts(mapDef: TerritoryMapD
   const graph = buildTerritoryGraph(mapDef);
   const { attackerHomeIds, defenderHomeIds } = computeBreakthroughTerritoryRoleHomes(graph);
   return {
-    attacker: Math.max(1, attackerHomeIds.length),
-    defender: Math.max(1, defenderHomeIds.length),
+    attacker: attackerHomeIds.length,
+    defender: defenderHomeIds.length,
   };
 }
 
@@ -4001,11 +3991,11 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
     const attSlots =
       attackerHomeIds.length === 0
         ? []
-        : spreadHomeTerritorySlotIndicesFull(config.startingUnitsAttacker, attackerHomeIds.length);
+        : spreadHomeTerritorySlotIndices(config.startingUnitsAttacker, attackerHomeIds.length);
     const defSlots =
       defenderHomeIds.length === 0
         ? []
-        : spreadHomeTerritorySlotIndicesFull(config.startingUnitsDefender, defenderHomeIds.length);
+        : spreadHomeTerritorySlotIndices(config.startingUnitsDefender, defenderHomeIds.length);
 
     units = [
       ...attSlots.map(si => {
