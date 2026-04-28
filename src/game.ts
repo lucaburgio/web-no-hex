@@ -843,8 +843,64 @@ function isVirtualHexOnTerritory(state: GameState, col: number, row: number): bo
   return g.keyToId[`${col},${row}`] !== undefined;
 }
 
+/** Map sector with no CP — attacker's starting home blob (same index as {@link createInitialStateFromTerritoryMap}). */
+function breakthroughTerritoryAttackerHomeSectorIndex(state: GameState): number | null {
+  const g = state.customMapGraph;
+  if (!g || state.gameMode !== 'breakthrough') return null;
+  const cpTids = new Set(Object.values(g.controlPoints).map(cp => cp.territoryId));
+  const i = g.sectors.findIndex(sec => !sec.territoryIds.some(tid => cpTids.has(tid)));
+  return i >= 0 ? i : null;
+}
+
+/** Breakthrough on a territory map: “home supply” follows sector layout, not the virtual grid's north/south border rows (spawn swap can leave the attacker with no hex on row 0 / ROWS−1). */
+function isBreakthroughTerritoryHomeSupplyVirtualKey(state: GameState, key: string, localPlayer: Owner): boolean {
+  const attHome = breakthroughTerritoryAttackerHomeSectorIndex(state);
+  if (attHome === null || !state.sectorHexes?.length || !state.sectorOwners?.length) return false;
+  const att = getBreakthroughAttackerOwner(state);
+  const def = getBreakthroughDefenderOwner(state);
+  if (localPlayer === att) return (state.sectorHexes[attHome] ?? []).includes(key);
+  if (localPlayer === def) {
+    for (let i = 0; i < state.sectorOwners.length; i++) {
+      if (state.sectorOwners[i] === def && (state.sectorHexes[i] ?? []).includes(key)) return true;
+    }
+  }
+  return false;
+}
+
 /** True if the player controls at least one non-mountain hex on their home row (supply from the border). */
 export function hasHomeProductionAccess(state: GameState, localPlayer: Owner): boolean {
+  if (state.gameMode === 'breakthrough' && state.customMapGraph && state.sectorHexes?.length) {
+    const attHome = breakthroughTerritoryAttackerHomeSectorIndex(state);
+    if (attHome !== null) {
+      const att = getBreakthroughAttackerOwner(state);
+      const def = getBreakthroughDefenderOwner(state);
+      const mountains = state.mountainHexes ?? [];
+      if (localPlayer === att) {
+        for (const key of state.sectorHexes[attHome] ?? []) {
+          if (mountains.includes(key)) continue;
+          const [c, r] = key.split(',').map(Number);
+          if (!isVirtualHexOnTerritory(state, c, r)) continue;
+          const hex = state.hexStates[key];
+          if (hex?.owner === localPlayer) return true;
+        }
+        return false;
+      }
+      if (localPlayer === def) {
+        for (let i = 0; i < state.sectorOwners.length; i++) {
+          if (state.sectorOwners[i] !== def) continue;
+          for (const key of state.sectorHexes[i] ?? []) {
+            if (mountains.includes(key)) continue;
+            const [c, r] = key.split(',').map(Number);
+            if (!isVirtualHexOnTerritory(state, c, r)) continue;
+            const hex = state.hexStates[key];
+            if (hex?.owner === localPlayer) return true;
+          }
+        }
+        return false;
+      }
+    }
+  }
+
   const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
   const mountains = state.mountainHexes ?? [];
   for (let c = 0; c < COLS; c++) {
@@ -867,15 +923,29 @@ export function isValidProductionPlacement(state: GameState, col: number, row: n
   if (!isVirtualHexOnTerritory(state, col, row)) return false;
   if (getUnit(state, col, row)) return false;
   if (!hasHomeProductionAccess(state, localPlayer)) return false;
+  const key = `${col},${row}`;
+
+  if (state.gameMode === 'breakthrough' && state.customMapGraph && state.sectorHexes?.length) {
+    const attHome = breakthroughTerritoryAttackerHomeSectorIndex(state);
+    if (attHome !== null) {
+      if (isBreakthroughTerritoryHomeSupplyVirtualKey(state, key, localPlayer)) {
+        const hex = state.hexStates[key];
+        if (hex) return hex.owner === localPlayer;
+        return false;
+      }
+      const hex = state.hexStates[key];
+      return !!(hex && hex.isProduction && hex.owner === localPlayer);
+    }
+  }
+
   const homeRow = localPlayer === PLAYER ? ROWS - 1 : 0;
   if (row === homeRow) {
-    const key = `${col},${row}`;
     const hex = state.hexStates[key];
     if (hex) return hex.owner === localPlayer;
     // Unseeded empty home border (legacy) — only the native side may build here
     return borderRowNativeOwner(homeRow) === localPlayer;
   }
-  const hex = state.hexStates[`${col},${row}`];
+  const hex = state.hexStates[key];
   return !!(hex && hex.isProduction && hex.owner === localPlayer);
 }
 

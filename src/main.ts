@@ -2392,10 +2392,11 @@ function buildRulesContent(): string {
       <li><strong>Breakthrough:</strong> the <strong>southern attacker</strong> does not receive PP after the match starts (only the configured starting pool). The <strong>northern defender</strong> earns PP each turn as above.</li>
       <li><strong>Territory bonus:</strong> +${config.pointsPerQuota} PP for every ${config.territoryQuota} hexes you own.</li>
       <li>Which units you can build is listed under <strong>Units in this match</strong> (north and south may differ).</li>
-      <li>Valid placement: your <strong>home row</strong> (bottom), or any owned <strong>production hex</strong>.
-        You must control <strong>at least one hex on your home row</strong> to produce anywhere; if the enemy takes
-        every border hex, reconquer one before you can build again. You cannot place on home-row hexes the enemy controls
-        until you retake them.</li>
+      <li>Valid placement: your <strong>home row</strong> (bottom on a standard hex board), or any owned <strong>production hex</strong>.
+        On <strong>polygon Breakthrough</strong> maps, your &ldquo;home&rdquo; for supply and placement is your <strong>starting sector</strong>
+        (the sector without a control point for the attacker, and defender-held sectors for the defender), not only the bottom row of the abstract placement grid.
+        You must control <strong>at least one such home hex</strong> to produce anywhere; if the enemy takes every home-sector hex, reconquer one before you can build again.
+        You cannot place on home-area hexes the enemy controls until you retake them.</li>
       <li><strong>Production hex:</strong> an owned hex stable for <strong>${config.productionTurns} consecutive turns</strong>.
         Stability requires all hexes within distance ${config.productionSafeDistance} to be owned by you
         (impassable <strong>mountain</strong> hexes in that ring count as secure — they are not neutral or enemy territory).
