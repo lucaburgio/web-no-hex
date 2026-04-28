@@ -248,29 +248,6 @@ export interface UnitType {
   upgradePointsToLevel: number;
 }
 
-export interface StoryMapDef {
-  cols: number;
-  rows: number;
-  /** Hex keys "col,row" that are impassable mountains. */
-  mountains: string[];
-  playerStart: Array<{ col: number; unitTypeId?: string }>;
-  aiStart: Array<{ col: number; unitTypeId?: string }>;
-  /**
-   * Hex keys for Conquest control points. When set alongside {@link breakthroughControlPoints},
-   * the map can be offered as a custom-match preset (all modes share terrain).
-   */
-  conquestControlPoints?: string[];
-  /** Hex keys for Breakthrough sector CPs (sectors = length + 1). */
-  breakthroughControlPoints?: string[];
-  /**
-   * Legacy single list used by older stories and the campaign when only one mode was authored.
-   * Prefer {@link conquestControlPoints} / {@link breakthroughControlPoints} for new maps.
-   */
-  controlPoints?: string[];
-  /** River hexes painted on this map. */
-  rivers?: RiverHex[];
-}
-
 export interface StoryDef {
   id: string;
   title: string;
@@ -282,18 +259,35 @@ export interface StoryDef {
   /** Only unit types with this package are available for player 2 / AI (north). Undefined = same as unitPackage. */
   unitPackagePlayer2?: string;
   gameMode: GameMode;
-  map: StoryMapDef;
+  /**
+   * Territory map JSON shipped under `public/maps/` (same id as custom matches: filename without `.json`).
+   */
+  map: string;
   conquestPointsPlayer?: number;
   conquestPointsAi?: number;
   /** Override production points per turn for both sides. */
   productionPointsPerTurn?: number;
   /** Override production points per turn for AI / player 2 only. */
   productionPointsPerTurnAi?: number;
+  /** Domination / Conquest: starting unit count for player 1 (south). */
+  startingUnitsPlayer1?: number;
+  /** Domination / Conquest: starting unit count for player 2 / AI (north). */
+  startingUnitsPlayer2?: number;
+  /** Breakthrough: starting units for the attacker role. */
+  startingUnitsAttacker?: number;
+  /** Breakthrough: starting units for the defender role. */
+  startingUnitsDefender?: number;
   // Breakthrough-specific overrides
   breakthroughSectorCount?: number;
   breakthroughAttackerStartingPP?: number;
   breakthroughPlayer1Role?: 'attacker' | 'defender';
   breakthroughRandomRoles?: boolean;
+  breakthroughEnemySectorStrengthMult?: number;
+  breakthroughSectorCaptureBonusPP?: number;
+  /** When set, overrides global {@link GameConfig.limitArtillery} for this story. */
+  limitArtillery?: boolean;
+  /** When set, overrides global {@link GameConfig.fogOfWar} for this story. */
+  fogOfWar?: boolean;
 }
 
 export interface StoryProgress {

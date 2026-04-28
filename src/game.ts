@@ -22,11 +22,6 @@ import type {
   BattleStatsSide,
   WinReason,
 } from './types';
-import {
-  getBreakthroughControlPointsForMap,
-  getConquestControlPointsForMap,
-  mirrorStoryMapY,
-} from './storyMapLayouts';
 import { boardPixelForVirtualHex, buildTerritoryGraph } from './territoryMap';
 import type { TerritoryGraphData, TerritoryMapDef } from './territoryMap';
 
@@ -1945,188 +1940,28 @@ export function createInitialStatePreservingTerrain(previous: GameState): GameSt
 // ── Story state ───────────────────────────────────────────────────────────────
 
 /**
- * Creates a GameState from a story definition, using its fixed map layout.
- * Call updateConfig + syncDimensions before this so COLS/ROWS are correct.
+ * Creates a GameState from a story using a shipped territory map (`public/maps/<id>.json`).
+ * Call {@link updateConfig} with story overrides and unit packages before this.
  */
-export function createStoryState(story: StoryDef): GameState {
-  unitIdCounter = 0;
-
-  let breakthroughAttackerOwner: Owner | undefined;
+export function createStoryState(story: StoryDef, mapDef: TerritoryMapDef): GameState {
+  const base = createInitialStateFromTerritoryMap(mapDef, story.gameMode);
   if (story.gameMode === 'breakthrough') {
-    const randomRoles = story.breakthroughRandomRoles ?? config.breakthroughRandomRoles;
-    const player1Role = story.breakthroughPlayer1Role ?? config.breakthroughPlayer1Role;
-    breakthroughAttackerOwner = randomRoles
-      ? (Math.random() < 0.5 ? PLAYER : AI)
-      : player1Role === 'attacker' ? PLAYER : AI;
+    return {
+      ...base,
+      log: ['Story mission started — Breakthrough. Your turn — Production phase.'],
+    };
   }
-
-  const mirrorSpawns = story.gameMode === 'breakthrough' && breakthroughAttackerOwner === AI;
-  const startCol = (c: number) => (mirrorSpawns ? COLS - 1 - c : c);
-
-  const units: Unit[] = [];
-  for (const pos of story.map.playerStart) {
-    units.push(makeUnit(PLAYER, startCol(pos.col), ROWS - 1, pos.unitTypeId ?? 'infantry'));
-  }
-  for (const pos of story.map.aiStart) {
-    units.push(makeUnit(AI, startCol(pos.col), 0, pos.unitTypeId ?? 'infantry'));
-  }
-
-  let hexStates: Record<string, HexState> = {};
-  for (const u of units) {
-    hexStates[`${u.col},${u.row}`] = { owner: u.owner, stableFor: 0, isProduction: false };
-  }
-
-  let mapForTerrain = story.map;
-  if (story.gameMode === 'breakthrough' && breakthroughAttackerOwner === AI) {
-    mapForTerrain = mirrorStoryMapY(story.map, COLS, ROWS);
-  }
-
-  const mountainHexes = [...mapForTerrain.mountains];
-  const mountainSet = new Set(mountainHexes);
-  let controlPointHexes =
-    story.gameMode === 'conquest' ? [...getConquestControlPointsForMap(story.map)] : [];
-
-  let sectorHexes: string[][] = [];
-  let sectorOwners: Owner[] = [];
-  let sectorControlPointHex: string[] = [];
-  let breakthroughCpOccupation: number[] = [];
-  let sectorIndexByHex: Record<string, number> = {};
-
-  if (story.gameMode === 'breakthrough') {
-    const att = breakthroughAttackerOwner!;
-
-    // Build all assignable (non-mountain) hexes
-    const assignable: string[] = [];
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const key = `${c},${r}`;
-        if (!mountainSet.has(key)) assignable.push(key);
-      }
-    }
-
-    // Sector count: explicit override > derived from map CPs+1 > config default
-    const storyMapCps = getBreakthroughControlPointsForMap(mapForTerrain);
-    const wantSectors = story.breakthroughSectorCount
-      ?? (storyMapCps.length > 0 ? storyMapCps.length + 1 : config.breakthroughSectorCount);
-    const nSectors = Math.max(2, Math.min(wantSectors, assignable.length));
-
-    sectorHexes = partitionBreakthroughSectors(assignable, nSectors);
-    const nSec = sectorHexes.length;
-
-    sectorOwners = sectorHexes.map((_, i) =>
-      att === PLAYER ? (i === 0 ? PLAYER : AI) : i === nSec - 1 ? AI : PLAYER,
-    );
-
-    sectorIndexByHex = {};
-    sectorHexes.forEach((keys, sid) => {
-      for (const k of keys) sectorIndexByHex[k] = sid;
-    });
-
-    // All hexes owned by their sector's owner
-    hexStates = {};
-    for (let s = 0; s < sectorHexes.length; s++) {
-      const owner = sectorOwners[s]!;
-      for (const k of sectorHexes[s]!) {
-        hexStates[k] = { owner, stableFor: 0, isProduction: false };
-      }
-    }
-
-    // Assign CPs: use story's pre-defined positions if they fall within the sector, else centroid
-    const storyCpSet = new Set(storyMapCps);
-    sectorControlPointHex = sectorHexes.map(keys => {
-      const storyCP = keys.find(k => storyCpSet.has(k));
-      return storyCP ?? pickBreakthroughSectorControlPoint(keys, COLS, ROWS);
-    });
-
-    breakthroughCpOccupation = Array(nSec).fill(0);
-
-    // Attacker's home sector has no CP marker
-    const homeIdx = att === PLAYER ? 0 : nSec - 1;
-    sectorControlPointHex[homeIdx] = '';
-
-    // Expose only the frontline CP
-    const frontlineIdx = att === PLAYER
-      ? sectorOwners.findIndex(o => o !== att)
-      : (() => {
-          for (let i = sectorOwners.length - 1; i >= 0; i--) {
-            if (sectorOwners[i] !== att) return i;
-          }
-          return -1;
-        })();
-    controlPointHexes =
-      frontlineIdx >= 0 && sectorControlPointHex[frontlineIdx]
-        ? [sectorControlPointHex[frontlineIdx]!]
-        : [];
-
-    primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
-  }
-
-  if (story.gameMode !== 'breakthrough') {
-    seedEmptyHomeRowHexStates(hexStates, mountainHexes);
-  }
-
-  const conquestPoints =
-    story.gameMode === 'conquest'
-      ? ({
-          [PLAYER]: story.conquestPointsPlayer ?? config.conquestPointsPlayer,
-          [AI]: story.conquestPointsAi ?? config.conquestPointsAi,
-        } as Record<Owner, number>)
-      : null;
-
-  let ppPlayer: number;
-  let ppAi: number;
-  if (story.gameMode === 'breakthrough' && breakthroughAttackerOwner !== undefined) {
-    const att = breakthroughAttackerOwner;
-    const def: Owner = att === PLAYER ? AI : PLAYER;
-    const defHexCount = Object.values(hexStates).filter(h => h.owner === def).length;
-    const defBonus = territoryBonusForHexCount(defHexCount);
-    const attPP = story.breakthroughAttackerStartingPP ?? config.breakthroughAttackerStartingPP;
-    const defBasePP = def === AI
-      ? (story.productionPointsPerTurnAi ?? config.productionPointsPerTurnAi)
-      : (story.productionPointsPerTurn ?? config.productionPointsPerTurn);
-    const defPP = defBasePP + defBonus;
-    ppPlayer = att === PLAYER ? attPP : defPP;
-    ppAi = att === AI ? attPP : defPP;
-  } else {
-    const ppTurnPlayer = story.productionPointsPerTurn ?? config.productionPointsPerTurn;
-    const ppTurnAi = story.productionPointsPerTurnAi ?? config.productionPointsPerTurnAi;
-    const playerHexCount = Object.values(hexStates).filter(h => h.owner === PLAYER).length;
-    const aiHexCount = Object.values(hexStates).filter(h => h.owner === AI).length;
-    ppPlayer = ppTurnPlayer + territoryBonusForHexCount(playerHexCount);
-    ppAi = ppTurnAi + territoryBonusForHexCount(aiHexCount);
-  }
-
-  const logMsg = story.gameMode === 'breakthrough'
-    ? 'Story mission started — Breakthrough. Your turn — Production phase.'
-    : 'Story mission started. Your turn — Production phase.';
-
+  const ppTurnPlayer = story.productionPointsPerTurn ?? config.productionPointsPerTurn;
+  const ppTurnAi = story.productionPointsPerTurnAi ?? config.productionPointsPerTurnAi;
+  const playerHexCount = Object.values(base.hexStates).filter(h => h.owner === PLAYER).length;
+  const aiHexCount = Object.values(base.hexStates).filter(h => h.owner === AI).length;
   return {
-    units,
-    hexStates,
-    mountainHexes,
-    riverHexes: mapForTerrain.rivers ?? [],
-    boardCols: COLS,
-    boardRows: ROWS,
-    gameMode: story.gameMode,
-    controlPointHexes,
-    conquestPoints,
-    sectorHexes,
-    sectorOwners,
-    sectorControlPointHex,
-    breakthroughCpOccupation,
-    sectorIndexByHex,
-    ...(story.gameMode === 'breakthrough' && breakthroughAttackerOwner !== undefined
-      ? { breakthroughAttackerOwner }
-      : {}),
-    turn: 1,
-    phase: 'production',
-    activePlayer: PLAYER,
-    selectedUnit: null,
-    productionPoints: { [PLAYER]: ppPlayer, [AI]: ppAi } as Record<Owner, number>,
-    log: [logMsg],
-    winner: null,
-    battleStats: initBattleStatsFromUnits(units),
-    ...snapshotActiveUnitPackagesForSave(),
+    ...base,
+    productionPoints: {
+      [PLAYER]: ppTurnPlayer + territoryBonusForHexCount(playerHexCount),
+      [AI]: ppTurnAi + territoryBonusForHexCount(aiHexCount),
+    },
+    log: ['Story mission started. Your turn — Production phase.'],
   };
 }
 

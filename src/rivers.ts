@@ -645,7 +645,7 @@ function partitionKeyComponents(keys: Set<string>, cols: number, rows: number): 
 }
 
 /**
- * Map editor / copy export: painted `"col,row"` keys → {@link RiverHex} rows like `stories.ts` `map.rivers`.
+ * Map editor / copy export: painted `"col,row"` keys → {@link RiverHex} rows (same shape as river metadata embedded in territory map JSON).
  * Linear chains and simple cycles get proper entry/exit/segment keys; T-junctions or branches fall back
  * to a generic segment per hex.
  *

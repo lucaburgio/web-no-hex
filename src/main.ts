@@ -44,11 +44,6 @@ import {
   renderTerritoryState,
   getTerritoryFromEvent,
 } from './territoryRenderer';
-const _TERRITORY_MAP_MODULES = import.meta.glob('../public/maps/*.json', { eager: true, import: 'default' }) as Record<string, unknown>;
-const TERRITORY_MAPS_LIST: Array<{ id: string; def: unknown }> = Object.entries(_TERRITORY_MAP_MODULES).map(([path, def]) => ({
-  id: path.replace('../public/maps/', '').replace('.json', ''),
-  def,
-}));
 import {
   initRenderer,
   loadIconDefs,
@@ -67,6 +62,27 @@ import {
   playRangedArtilleryHexBarrageVfx,
   invalidateColorsCache,
 } from './renderer';
+import { buildTerritoryGraph } from './territoryMap';
+const _TERRITORY_MAP_MODULES = import.meta.glob('../public/maps/*.json', { eager: true, import: 'default' }) as Record<string, unknown>;
+const TERRITORY_MAPS_LIST: Array<{ id: string; def: unknown }> = Object.entries(_TERRITORY_MAP_MODULES).map(([path, def]) => ({
+  id: path.replace('../public/maps/', '').replace('.json', ''),
+  def,
+}));
+const storyMapVirtualGridLabelCache = new Map<string, string>();
+
+function getStoryVirtualGridLabel(mapId: string): string {
+  let cached = storyMapVirtualGridLabelCache.get(mapId);
+  if (cached) return cached;
+  const entry = TERRITORY_MAPS_LIST.find(m => m.id === mapId);
+  if (!entry?.def) {
+    storyMapVirtualGridLabelCache.set(mapId, mapId);
+    return mapId;
+  }
+  const graph = buildTerritoryGraph(entry.def as TerritoryMapDef);
+  cached = `${graph.virtualCols}×${graph.virtualRows}`;
+  storyMapVirtualGridLabelCache.set(mapId, cached);
+  return cached;
+}
 import { aiDamageFloatDrawParams } from './combatPlayback';
 import type { MoveAnimation } from './renderer';
 import config, {
@@ -453,6 +469,7 @@ let settingsUnitPackagePlayer2 = 'standard';
 const STORY_CONFIG_DEFAULTS = {
   boardCols: config.boardCols,
   boardRows: config.boardRows,
+  gameMode: config.gameMode,
   productionPointsPerTurn: config.productionPointsPerTurn,
   productionPointsPerTurnAi: config.productionPointsPerTurnAi,
   conquestPointsPlayer: config.conquestPointsPlayer,
@@ -461,7 +478,15 @@ const STORY_CONFIG_DEFAULTS = {
   breakthroughSectorCount: config.breakthroughSectorCount,
   breakthroughPlayer1Role: config.breakthroughPlayer1Role,
   breakthroughRandomRoles: config.breakthroughRandomRoles,
+  breakthroughEnemySectorStrengthMult: config.breakthroughEnemySectorStrengthMult,
+  breakthroughSectorCaptureBonusPP: config.breakthroughSectorCaptureBonusPP,
   customMatchMapId: null as string | null,
+  startingUnitsPlayer1: config.startingUnitsPlayer1,
+  startingUnitsPlayer2: config.startingUnitsPlayer2,
+  startingUnitsAttacker: config.startingUnitsAttacker,
+  startingUnitsDefender: config.startingUnitsDefender,
+  limitArtillery: config.limitArtillery,
+  fogOfWar: config.fogOfWar,
 };
 let storyConfigSnapshot: typeof STORY_CONFIG_DEFAULTS | null = null;
 
@@ -1120,7 +1145,7 @@ function buildStoriesList(scenarioId: string): void {
     } else {
       statusLabel = 'READY';
     }
-    const mapSize = `${story.map.cols}x${story.map.rows}`;
+    const mapSize = getStoryVirtualGridLabel(story.map);
     statusEl.textContent = `${modeLabel} - ${mapSize} - ${statusLabel}`;
     info.appendChild(statusEl);
 
@@ -1187,10 +1212,17 @@ function handleStoryWin(): void {
 
 function startStory(storyIndex: number, savedState?: GameState): void {
   const story = STORIES[storyIndex]!;
+  const mapEntry = TERRITORY_MAPS_LIST.find(m => m.id === story.map);
+  if (!mapEntry?.def) {
+    console.error(`startStory: missing territory map "${story.map}" (expected public/maps/${story.map}.json).`);
+    return;
+  }
+  const mapDef = mapEntry.def as TerritoryMapDef;
 
   storyConfigSnapshot = {
     boardCols: config.boardCols,
     boardRows: config.boardRows,
+    gameMode: config.gameMode,
     productionPointsPerTurn: config.productionPointsPerTurn,
     productionPointsPerTurnAi: config.productionPointsPerTurnAi,
     conquestPointsPlayer: config.conquestPointsPlayer,
@@ -1199,13 +1231,20 @@ function startStory(storyIndex: number, savedState?: GameState): void {
     breakthroughSectorCount: config.breakthroughSectorCount,
     breakthroughPlayer1Role: config.breakthroughPlayer1Role,
     breakthroughRandomRoles: config.breakthroughRandomRoles,
+    breakthroughEnemySectorStrengthMult: config.breakthroughEnemySectorStrengthMult,
+    breakthroughSectorCaptureBonusPP: config.breakthroughSectorCaptureBonusPP,
     customMatchMapId: config.customMatchMapId,
+    startingUnitsPlayer1: config.startingUnitsPlayer1,
+    startingUnitsPlayer2: config.startingUnitsPlayer2,
+    startingUnitsAttacker: config.startingUnitsAttacker,
+    startingUnitsDefender: config.startingUnitsDefender,
+    limitArtillery: config.limitArtillery,
+    fogOfWar: config.fogOfWar,
   };
 
   updateConfig({
     customMatchMapId: null,
-    boardCols: story.map.cols,
-    boardRows: story.map.rows,
+    gameMode: story.gameMode,
     ...(story.productionPointsPerTurn !== undefined ? { productionPointsPerTurn: story.productionPointsPerTurn } : {}),
     ...(story.productionPointsPerTurnAi !== undefined ? { productionPointsPerTurnAi: story.productionPointsPerTurnAi } : {}),
     ...(story.conquestPointsPlayer !== undefined ? { conquestPointsPlayer: story.conquestPointsPlayer } : {}),
@@ -1214,6 +1253,18 @@ function startStory(storyIndex: number, savedState?: GameState): void {
     ...(story.breakthroughSectorCount !== undefined ? { breakthroughSectorCount: story.breakthroughSectorCount } : {}),
     ...(story.breakthroughPlayer1Role !== undefined ? { breakthroughPlayer1Role: story.breakthroughPlayer1Role } : {}),
     ...(story.breakthroughRandomRoles !== undefined ? { breakthroughRandomRoles: story.breakthroughRandomRoles } : {}),
+    ...(story.startingUnitsPlayer1 !== undefined ? { startingUnitsPlayer1: story.startingUnitsPlayer1 } : {}),
+    ...(story.startingUnitsPlayer2 !== undefined ? { startingUnitsPlayer2: story.startingUnitsPlayer2 } : {}),
+    ...(story.startingUnitsAttacker !== undefined ? { startingUnitsAttacker: story.startingUnitsAttacker } : {}),
+    ...(story.startingUnitsDefender !== undefined ? { startingUnitsDefender: story.startingUnitsDefender } : {}),
+    ...(story.breakthroughEnemySectorStrengthMult !== undefined
+      ? { breakthroughEnemySectorStrengthMult: story.breakthroughEnemySectorStrengthMult }
+      : {}),
+    ...(story.breakthroughSectorCaptureBonusPP !== undefined
+      ? { breakthroughSectorCaptureBonusPP: story.breakthroughSectorCaptureBonusPP }
+      : {}),
+    ...(story.limitArtillery !== undefined ? { limitArtillery: story.limitArtillery } : {}),
+    ...(story.fogOfWar !== undefined ? { fogOfWar: story.fogOfWar } : {}),
   });
   syncDimensions();
   setActiveUnitPackage(story.unitPackage ?? null);
@@ -1231,7 +1282,7 @@ function startStory(storyIndex: number, savedState?: GameState): void {
 
   let initialState: GameState;
   if (!savedState) {
-    initialState = createStoryState(story);
+    initialState = createStoryState(story, mapDef);
   } else if (savedState.unitPackage == null) {
     const p1 = story.unitPackage ?? 'standard';
     const p2 = story.unitPackagePlayer2 ?? p1;
