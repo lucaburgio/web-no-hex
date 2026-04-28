@@ -74,6 +74,7 @@ import config, {
   setActiveUnitPackage,
   setActiveUnitPackagePlayer2,
   getAvailableUnitTypes,
+  BOARD_HEX_DIM_MAX,
 } from './gameconfig';
 import {
   RULES_PRESETS,
@@ -1704,8 +1705,14 @@ function applyStartingUnitsInputMaxes(): void {
   const selectedMap = getSelectedTerritoryMapForSettings();
   const mapDef = selectedMap?.def as { territories?: Array<{ state: string }> } | undefined;
   const territories = mapDef?.territories ?? [];
-  const south = Math.max(1, territories.filter(t => t.state === 'allied').length);
-  const north = Math.max(1, territories.filter(t => t.state === 'enemy').length);
+  let south = Math.max(1, territories.filter(t => t.state === 'allied').length);
+  let north = Math.max(1, territories.filter(t => t.state === 'enemy').length);
+  // Procedural hex board ([generate] map): no territory list — cap by board width (home row has at most one unit per column).
+  if (territories.length === 0) {
+    const hexCap = Math.min(BOARD_HEX_DIM_MAX, Math.max(1, config.boardCols));
+    south = hexCap;
+    north = hexCap;
+  }
 
   const p1el = document.getElementById('cfg-startingUnitsPlayer1') as HTMLInputElement | null;
   const p2el = document.getElementById('cfg-startingUnitsPlayer2') as HTMLInputElement | null;
@@ -1871,9 +1878,7 @@ function collectSettings(): Parameters<typeof updateConfig>[0] {
   if (out.gameMode === 'breakthrough') {
     out.territoryQuota = 0;
     out.pointsPerQuota = 0;
-  }
-  if (out.gameMode === 'breakthrough') {
-    // Ignore Player 1/2 starting-unit fields in Breakthrough mode.
+    // Keep P1/P2 counts from stored config; startingUnitsDefender / startingUnitsAttacker already collected from the form via NUM_FIELDS above.
     out.startingUnitsPlayer1 = config.startingUnitsPlayer1;
     out.startingUnitsPlayer2 = config.startingUnitsPlayer2;
   } else {

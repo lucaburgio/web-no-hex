@@ -3941,12 +3941,14 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
   }
 
   const desiredBreakthroughAttacker: Owner | undefined =
-    gameMode === 'breakthrough' && mapInferredAttacker !== undefined
-      ? config.breakthroughRandomRoles
-        ? (Math.random() < 0.5 ? PLAYER : AI)
-        : config.breakthroughPlayer1Role === 'attacker'
-          ? PLAYER
-          : AI
+    gameMode === 'breakthrough'
+      ? (
+          config.breakthroughRandomRoles
+            ? (Math.random() < 0.5 ? PLAYER : AI)
+            : config.breakthroughPlayer1Role === 'attacker'
+              ? PLAYER
+              : AI
+        )
       : undefined;
 
   const swapBreakthroughSpawnSides =
@@ -3967,8 +3969,8 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
 
   let playerStartingUnits = config.startingUnitsPlayer1;
   let aiStartingUnits = config.startingUnitsPlayer2;
-  if (gameMode === 'breakthrough' && desiredBreakthroughAttacker !== undefined) {
-    const att = desiredBreakthroughAttacker;
+  if (gameMode === 'breakthrough') {
+    const att = desiredBreakthroughAttacker!;
     playerStartingUnits = att === PLAYER ? config.startingUnitsAttacker : config.startingUnitsDefender;
     aiStartingUnits = att === AI ? config.startingUnitsAttacker : config.startingUnitsDefender;
   }
