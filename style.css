@@ -560,7 +560,12 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   display: block;
 }
 
-/* Territory map: valid-move / selection inset border (fill stays owner state). */
+/* Territory map: valid-move / current-hex fills match hex movement (yellow-50); inset border unchanged. */
+#board .ev2-territory-fill.ev2-fill-move-highlight,
+#recap-board .ev2-territory-fill.ev2-fill-move-highlight {
+  fill: var(--color-hex-valid-move);
+}
+
 #board .ev2-territory-border.ev2-border-move-highlight,
 #recap-board .ev2-territory-border.ev2-border-move-highlight {
   --ev2-border-color: var(--color-yellow-500);

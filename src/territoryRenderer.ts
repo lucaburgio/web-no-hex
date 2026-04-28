@@ -582,7 +582,9 @@ export function renderTerritoryState(
     const isMoveHl = moveHighlightTids.has(t.id);
 
     if (fillPoly) {
-      const baseFill = `ev2-territory-fill ev2-state-${vizState}`;
+      const baseFill = isMoveHl
+        ? `ev2-territory-fill ev2-state-${vizState} ev2-fill-move-highlight`
+        : `ev2-territory-fill ev2-state-${vizState}`;
       if (fillPoly.getAttribute('class') !== baseFill) fillPoly.setAttribute('class', baseFill);
     }
 
