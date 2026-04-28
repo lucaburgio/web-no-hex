@@ -133,31 +133,6 @@ function rangedCombatHexDistance(c1: number, r1: number, c2: number, r2: number)
   return Math.max(graphSteps, pixelSteps);
 }
 
-/** MP cost for one graph step (adjacent virtual cells). Territory maps scale by centroid separation vs avg neighbor spacing so long borders cost more than one infantry move. */
-function movementEdgeWeight(fromCol: number, fromRow: number, toCol: number, toRow: number): number {
-  const nbrs = effectiveGetNeighbors(fromCol, fromRow, COLS, ROWS);
-  if (!nbrs.some(([c, r]) => c === toCol && r === toRow)) return Infinity;
-  if (!_activeTerritoryGraph) return 1;
-  const g = _activeTerritoryGraph;
-  const avg = g.avgAdjacentCentroidPx;
-  if (!(avg > 0)) return 1;
-  const p1 = boardPixelForVirtualHex(g, fromCol, fromRow);
-  const p2 = boardPixelForVirtualHex(g, toCol, toRow);
-  if (!p1 || !p2) return 1;
-  const px = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-  return Math.max(1, Math.ceil(px / avg));
-}
-
-function totalPathMovementCost(path: [number, number][]): number {
-  let sum = 0;
-  for (let i = 1; i < path.length; i++) {
-    const [c1, r1] = path[i - 1]!;
-    const [c2, r2] = path[i]!;
-    sum += movementEdgeWeight(c1, r1, c2, r2);
-  }
-  return sum;
-}
-
 const HEX_KEY_RE = /^(\d+),(\d+)$/;
 
 function considerHexKey(key: string, acc: { maxC: number; maxR: number }): void {
@@ -868,7 +843,6 @@ function computeBaseValidMoves(state: GameState, unit: Unit): [number, number][]
 
   if (inZoC) {
     return effectiveGetNeighbors(unit.col, unit.row, COLS, ROWS).filter(([c, r]) => {
-      if (movementEdgeWeight(unit.col, unit.row, c, r) > remainingMoves) return false;
       if (mountains.has(`${c},${r}`)) return false;
       const occupant = getUnit(state, c, r);
       if (occupant && occupant.owner === unit.owner) return false;
@@ -878,53 +852,27 @@ function computeBaseValidMoves(state: GameState, unit: Unit): [number, number][]
     });
   }
 
-  // Dijkstra up to remaining MP budget; enemy hexes are valid destinations but block further passage
-  const startKey = `${unit.col},${unit.row}`;
-  const dist = new Map<string, number>();
-  dist.set(startKey, 0);
-  const visited = new Set<string>();
+  // BFS up to remaining movement steps; enemy hexes are valid destinations but block further passage
+  const visited = new Set<string>([`${unit.col},${unit.row}`]);
   const reachable = new Set<string>();
+  let frontier: [number, number][] = [[unit.col, unit.row]];
 
-  while (true) {
-    let bestK: string | null = null;
-    let bestD = Infinity;
-    for (const [k, d] of dist) {
-      if (visited.has(k)) continue;
-      if (d < bestD) {
-        bestD = d;
-        bestK = k;
+  for (let step = 0; step < remainingMoves; step++) {
+    const nextFrontier: [number, number][] = [];
+    for (const [c, r] of frontier) {
+      for (const [nc, nr] of effectiveGetNeighbors(c, r, COLS, ROWS)) {
+        const key = `${nc},${nr}`;
+        if (visited.has(key)) continue;
+        if (mountains.has(key)) continue; // impassable
+        visited.add(key);
+        const occupant = getUnit(state, nc, nr);
+        if (occupant && occupant.owner === unit.owner) continue; // blocked by own unit
+        reachable.add(key);
+        if (!occupant) nextFrontier.push([nc, nr]); // empty: can continue through
+        // enemy: valid destination (attack) but can't pass through
       }
     }
-    if (bestK === null || bestD === Infinity) break;
-    if (bestD > remainingMoves) break;
-    visited.add(bestK);
-    const [c, r] = bestK.split(',').map(Number);
-
-    if (bestK !== startKey) {
-      const occ = getUnit(state, c, r);
-      if (!occ || occ.owner === enemy) reachable.add(bestK);
-    }
-
-    const occHere = getUnit(state, c, r);
-    if (bestK !== startKey && occHere && occHere.owner === enemy) continue;
-
-    for (const [nc, nr] of effectiveGetNeighbors(c, r, COLS, ROWS)) {
-      const nk = `${nc},${nr}`;
-      if (mountains.has(nk)) continue;
-      const occ = getUnit(state, nc, nr);
-      if (occ && occ.owner === unit.owner) continue;
-      const w = movementEdgeWeight(c, r, nc, nr);
-      const nd = bestD + w;
-      if (nd > remainingMoves) continue;
-      if (occ && occ.owner === enemy) {
-        reachable.add(nk);
-        const prev = dist.get(nk);
-        if (prev === undefined || nd < prev) dist.set(nk, nd);
-        continue;
-      }
-      const prev = dist.get(nk);
-      if (prev === undefined || nd < prev) dist.set(nk, nd);
-    }
+    frontier = nextFrontier;
   }
 
   return [...reachable].map(key => {
@@ -947,63 +895,47 @@ export function getOpponentHomeGuardBlockedHexes(state: GameState, unit: Unit): 
   );
 }
 
-// Shortest path by MP cost from unit's position to (toCol,toRow), respecting movement rules
-// (no mountains, no friendly units, enemy hex is only passable as the destination).
-// On polygon maps edge weights scale with centroid separation (long borders cost more MP).
+// BFS path from unit's position to (toCol,toRow), respecting movement rules (no mountains,
+// no friendly units, enemy units are valid destinations but block further passage).
 // Returns the full path including the start hex, or [] if unreachable.
 export function getMovePath(state: GameState, unit: Unit, toCol: number, toRow: number): [number, number][] {
   if (unit.col === toCol && unit.row === toRow) return [[toCol, toRow]];
   const mountains = new Set(state.mountainHexes ?? []);
   const enemy: Owner = unit.owner === PLAYER ? AI : PLAYER;
+
+  const predecessors = new Map<string, string | null>();
   const start = `${unit.col},${unit.row}`;
   const targetKey = `${toCol},${toRow}`;
-  const dist = new Map<string, number>();
-  const pred = new Map<string, string | null>();
-  dist.set(start, 0);
-  pred.set(start, null);
-  const visited = new Set<string>();
+  predecessors.set(start, null);
+  let frontier: [number, number][] = [[unit.col, unit.row]];
+  let found = false;
 
-  while (true) {
-    let bestK: string | null = null;
-    let bestD = Infinity;
-    for (const [k, d] of dist) {
-      if (visited.has(k)) continue;
-      if (d < bestD) {
-        bestD = d;
-        bestK = k;
+  outer: while (frontier.length > 0) {
+    const next: [number, number][] = [];
+    for (const [c, r] of frontier) {
+      for (const [nc, nr] of effectiveGetNeighbors(c, r, COLS, ROWS)) {
+        const key = `${nc},${nr}`;
+        if (predecessors.has(key)) continue;
+        if (mountains.has(key)) continue;
+        const occupant = getUnit(state, nc, nr);
+        if (occupant && occupant.owner === unit.owner) continue; // blocked by own unit
+        predecessors.set(key, `${c},${r}`);
+        if (key === targetKey) { found = true; break outer; }
+        if (!occupant) next.push([nc, nr]); // only traverse through empty hexes
+        // enemy occupant: valid destination but can't pass through — already recorded above
       }
     }
-    if (bestK === null || bestD === Infinity) return [];
-    if (bestK === targetKey) break;
-    visited.add(bestK);
-    const [c, r] = bestK.split(',').map(Number);
-    const occHere = getUnit(state, c, r);
-    if (bestK !== start && occHere && occHere.owner === enemy) continue;
-
-    for (const [nc, nr] of effectiveGetNeighbors(c, r, COLS, ROWS)) {
-      const nk = `${nc},${nr}`;
-      if (mountains.has(nk)) continue;
-      const occupant = getUnit(state, nc, nr);
-      if (occupant && occupant.owner === unit.owner) continue;
-      if (occupant && occupant.owner === enemy && nk !== targetKey) continue;
-      const w = movementEdgeWeight(c, r, nc, nr);
-      const nd = bestD + w;
-      const prev = dist.get(nk);
-      if (prev === undefined || nd < prev) {
-        dist.set(nk, nd);
-        pred.set(nk, bestK);
-      }
-    }
+    frontier = next;
   }
 
-  if (!dist.has(targetKey)) return [];
+  if (!found) return [];
 
   const path: [number, number][] = [];
   let cur: string | null = targetKey;
   while (cur !== null) {
-    const [cc, rr] = cur.split(',').map(Number);
-    path.unshift([cc, rr]);
-    cur = pred.get(cur) ?? null;
+    const [c, r] = cur.split(',').map(Number);
+    path.unshift([c, r]);
+    cur = predecessors.get(cur) ?? null;
   }
   return path;
 }
@@ -1023,55 +955,41 @@ function advanceAlongPathBeforeCombat(
   }
 }
 
-/** Shortest-path MP cost from (fromCol,fromRow) to (toCol,toRow), ignoring units/ZoC (mountains only). Hex boards: unit edge weights. Territory maps: weighted edges by centroid separation. */
+// BFS distance from (fromCol,fromRow) to (toCol,toRow), ignoring units/ZoC.
+// Used to count how many movement points a move actually costs (one per graph/hop step).
 export function bfsDistance(state: GameState, fromCol: number, fromRow: number, toCol: number, toRow: number): number {
   const mk = getMountainKey(state);
-  const gavg = _activeTerritoryGraph?.avgAdjacentCentroidPx ?? 'hex';
   const a = `${fromCol},${fromRow}`;
   const b = `${toCol},${toRow}`;
   const pair = a < b ? `${a}|${b}` : `${b}|${a}`;
-  const cacheKey = `${mk}|${gavg}|${pair}`;
+  const cacheKey = `${mk}|${pair}`;
   const cached = bfsDistanceCache.get(cacheKey);
   if (cached !== undefined) return cached;
   const mountains = new Set(state.mountainHexes ?? []);
-  const start = `${fromCol},${fromRow}`;
-  const goal = `${toCol},${toRow}`;
-  const dist = new Map<string, number>();
-  dist.set(start, 0);
-  const visited = new Set<string>();
-
-  while (true) {
-    let bestK: string | null = null;
-    let bestD = Infinity;
-    for (const [k, d] of dist) {
-      if (visited.has(k)) continue;
-      if (d < bestD) {
-        bestD = d;
-        bestK = k;
+  const visited = new Set<string>([`${fromCol},${fromRow}`]);
+  let frontier: [number, number][] = [[fromCol, fromRow]];
+  let dist = 0;
+  while (frontier.length > 0) {
+    const next: [number, number][] = [];
+    for (const [c, r] of frontier) {
+      if (c === toCol && r === toRow) {
+        bfsDistanceCache.set(cacheKey, dist);
+        maybeTrimPathCaches();
+        return dist;
+      }
+      for (const [nc, nr] of effectiveGetNeighbors(c, r, COLS, ROWS)) {
+        const key = `${nc},${nr}`;
+        if (visited.has(key) || mountains.has(key)) continue;
+        visited.add(key);
+        next.push([nc, nr]);
       }
     }
-    if (bestK === null || bestD === Infinity) {
-      bfsDistanceCache.set(cacheKey, Infinity);
-      maybeTrimPathCaches();
-      return Infinity;
-    }
-    if (bestK === goal) {
-      bfsDistanceCache.set(cacheKey, bestD);
-      maybeTrimPathCaches();
-      return bestD;
-    }
-    visited.add(bestK);
-    const [c, r] = bestK.split(',').map(Number);
-    for (const [nc, nr] of effectiveGetNeighbors(c, r, COLS, ROWS)) {
-      const nk = `${nc},${nr}`;
-      if (mountains.has(nk)) continue;
-      const w = movementEdgeWeight(c, r, nc, nr);
-      if (!Number.isFinite(w)) continue;
-      const nd = bestD + w;
-      const prev = dist.get(nk);
-      if (prev === undefined || nd < prev) dist.set(nk, nd);
-    }
+    dist++;
+    frontier = next;
   }
+  bfsDistanceCache.set(cacheKey, Infinity);
+  maybeTrimPathCaches();
+  return Infinity;
 }
 
 /** Minimum BFS steps through passable hexes (mountains only) to any cell on the opponent's home row. */
@@ -1568,7 +1486,7 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
   const ranged = isRangedCombat(state, attacker, defender);
   const path = getMovePath(state, attacker, defender.col, defender.row);
   const approachSteps =
-    path.length > 0 ? totalPathMovementCost(path) : bfsDistance(state, attacker.col, attacker.row, defender.col, defender.row);
+    path.length > 0 ? path.length - 1 : bfsDistance(state, attacker.col, attacker.row, defender.col, defender.row);
   const attackerForFlank: Unit =
     ranged
       ? attacker
@@ -3078,7 +2996,7 @@ export function playerMoveUnit(
   }
 
   const path = getMovePath(state, unit, col, row);
-  const stepsCost = path.length > 0 ? totalPathMovementCost(path) : bfsDistance(state, unit.col, unit.row, col, row);
+  const stepsCost = path.length > 0 ? path.length - 1 : bfsDistance(state, unit.col, unit.row, col, row);
   const movesBefore = unit.movesUsed;
   unit.movesUsed += stepsCost;
   state.selectedUnit = null;
@@ -3501,7 +3419,7 @@ export function aiMovement(state: GameState): {
           if (!best || s > best.score) best = { kind: 'attack', col: nc, row: nr, score: s };
         } else {
           const path = getMovePath(state, unit, nc, nr);
-          const stepsCost = path.length > 0 ? totalPathMovementCost(path) : 0;
+          const stepsCost = path.length > 0 ? path.length - 1 : 0;
           const s = scoreEmptyMove(
             state,
             unit,
@@ -3526,7 +3444,7 @@ export function aiMovement(state: GameState): {
         const target = getUnit(state, best.col, best.row);
         if (!target || target.owner !== PLAYER) break;
         const path = getMovePath(state, unit, best.col, best.row);
-        const stepsCost = path.length > 0 ? totalPathMovementCost(path) : bfsDistance(state, unit.col, unit.row, best.col, best.row);
+        const stepsCost = path.length > 0 ? path.length - 1 : bfsDistance(state, unit.col, unit.row, best.col, best.row);
         const movesBefore = unit.movesUsed;
         const spearhead = tankSpearheadFromApproach(unit, stepsCost, movesBefore);
         unit.movesUsed = unit.movement;
@@ -3614,7 +3532,7 @@ export function aiMovement(state: GameState): {
       }
 
       const path = getMovePath(state, unit, best.col, best.row);
-      const stepsCost = path.length > 0 ? totalPathMovementCost(path) : 0;
+      const stepsCost = path.length > 0 ? path.length - 1 : 0;
       if (unit.movesUsed + stepsCost > unit.movement) break;
       const fromCol = unit.col;
       const fromRow = unit.row;
