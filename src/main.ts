@@ -4421,31 +4421,23 @@ function updateUI(): void {
         const sid = state.sectorIndexByHex?.[`${u.col},${u.row}`];
         return sid !== undefined && state.sectorOwners![sid] === attOwner;
       });
-      const allSectorsAttacker =
-        state.sectorOwners!.length > 0 && state.sectorOwners!.every(o => o === attOwner);
       let toastText: string;
       let toastVariant: 'gray' | 'yellow' | 'red';
-      if (allSectorsAttacker) {
-        toastText = youAreAttacker
-          ? 'All sectors are yours — victory is incoming.'
-          : 'All sectors have fallen.';
-        toastVariant = 'gray';
-      } else if (!youAreAttacker && defUnitsOnAttackerSector) {
-        toastText =
-          'You are in attacker-held territory. Your units fight at reduced strength until they leave.';
+      if (!youAreAttacker && defUnitsOnAttackerSector) {
+        toastText = "You lost the sector. Your units have a combat malus if they do not retreat";
         toastVariant = 'red';
-      } else if (cpOccupation > 0 && activeSid !== null) {
+      } else if (cpOccupation > 0) {
         if (youAreAttacker) {
-          toastText = 'Hold the control point one more round to secure this sector.';
+          toastText = "We're taking the sector, keep your unit to hold it";
         } else {
           const turns = 2 - cpOccupation;
-          toastText = `They will capture this sector in ${turns} round${turns !== 1 ? 's' : ''} unless you dislodge them.`;
+          toastText = `They're taking the sector, remove their units before ${turns} turn${turns !== 1 ? 's' : ''}`;
         }
         toastVariant = 'yellow';
       } else {
         toastText = youAreAttacker
-          ? 'Capture the active control point and hold it for two full rounds to take each sector.'
-          : 'Defend the active control point — the attacker must hold it two full rounds to capture the sector.';
+          ? "You're the attacker. Conquer the control point to own the sector."
+          : "You're the defender. Hold the control point to keep the sector.";
         toastVariant = 'gray';
       }
       breakthroughToastEl.textContent = toastText;
