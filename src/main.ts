@@ -62,27 +62,11 @@ import {
   playRangedArtilleryHexBarrageVfx,
   invalidateColorsCache,
 } from './renderer';
-import { buildTerritoryGraph } from './territoryMap';
 const _TERRITORY_MAP_MODULES = import.meta.glob('../public/maps/*.json', { eager: true, import: 'default' }) as Record<string, unknown>;
 const TERRITORY_MAPS_LIST: Array<{ id: string; def: unknown }> = Object.entries(_TERRITORY_MAP_MODULES).map(([path, def]) => ({
   id: path.replace('../public/maps/', '').replace('.json', ''),
   def,
 }));
-const storyMapVirtualGridLabelCache = new Map<string, string>();
-
-function getStoryVirtualGridLabel(mapId: string): string {
-  let cached = storyMapVirtualGridLabelCache.get(mapId);
-  if (cached) return cached;
-  const entry = TERRITORY_MAPS_LIST.find(m => m.id === mapId);
-  if (!entry?.def) {
-    storyMapVirtualGridLabelCache.set(mapId, mapId);
-    return mapId;
-  }
-  const graph = buildTerritoryGraph(entry.def as TerritoryMapDef);
-  cached = `${graph.virtualCols}×${graph.virtualRows}`;
-  storyMapVirtualGridLabelCache.set(mapId, cached);
-  return cached;
-}
 import { aiDamageFloatDrawParams } from './combatPlayback';
 import type { MoveAnimation } from './renderer';
 import config, {
@@ -1204,8 +1188,7 @@ function buildStoriesList(scenarioId: string): void {
     } else {
       statusLabel = 'READY';
     }
-    const mapSize = getStoryVirtualGridLabel(story.map);
-    statusEl.textContent = `${modeLabel} - ${mapSize} - ${statusLabel}`;
+    statusEl.textContent = `${modeLabel} - ${statusLabel}`;
     info.appendChild(statusEl);
 
     card.appendChild(info);
