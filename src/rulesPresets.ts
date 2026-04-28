@@ -6,9 +6,6 @@ export const RULES_PRESET_CUSTOM = 'custom' as const;
 
 export type RulesPresetValues = Pick<
   GameConfig,
-  | 'mountainPct'
-  | 'enableRivers'
-  | 'riverMaxLengthBoardWidthMult'
   | 'productionPointsPerTurn'
   | 'productionPointsPerTurnAi'
   | 'territoryQuota'
@@ -39,9 +36,6 @@ const FRAC_EPS = 1e-5;
 
 function rulesValuesMatchConfig(cfg: GameConfig, p: RulesPresetValues): boolean {
   return (
-    Math.abs(cfg.mountainPct - p.mountainPct) < FRAC_EPS &&
-    cfg.enableRivers === p.enableRivers &&
-    Math.abs(cfg.riverMaxLengthBoardWidthMult - p.riverMaxLengthBoardWidthMult) < FRAC_EPS &&
     cfg.productionPointsPerTurn === p.productionPointsPerTurn &&
     cfg.productionPointsPerTurnAi === p.productionPointsPerTurnAi &&
     cfg.territoryQuota === p.territoryQuota &&
@@ -68,9 +62,6 @@ export const RULES_PRESETS: RulesPreset[] = [
     label: 'Standard',
     description:
       'The standard ruleset of the game. A good earning base for Production points, but earnings by territory are limited. Battles are challenging till the end.',
-    mountainPct: 0.12,
-    enableRivers: true,
-    riverMaxLengthBoardWidthMult: 1.5,
     productionPointsPerTurn: 20,
     productionPointsPerTurnAi: 20,
     territoryQuota: DEFAULT_TERRITORY_ECONOMY.territoryQuota,
@@ -94,9 +85,6 @@ export const RULES_PRESETS: RulesPreset[] = [
     label: 'Blitz',
     description:
       'Low earning base, but each hex contributes to the production points earnings. Owning territory is crucial and even a small progress through enemy lines could quickly end the battle.',
-    mountainPct: 0.12,
-    enableRivers: true,
-    riverMaxLengthBoardWidthMult: 1.5,
     productionPointsPerTurn: 6,
     productionPointsPerTurnAi: 6,
     territoryQuota: 1,

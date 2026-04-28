@@ -1413,8 +1413,6 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
   ['cfg-flankingBonus',           'flankingBonus',           100],
   ['cfg-maxFlankingUnits',        'maxFlankingUnits',        1],
   ['cfg-healOwnTerritory',        'healOwnTerritory',        1],
-  ['cfg-mountainPct',             'mountainPct',             100],
-  ['cfg-riverMaxLengthBoardWidthMult', 'riverMaxLengthBoardWidthMult', 100],
 ];
 
 // Proxy type for key checking only — never instantiated
@@ -1429,23 +1427,17 @@ declare const _cfgNumProxy: {
   productionTurns: number; productionSafeDistance: number;
   flankingBonus: number; maxFlankingUnits: number;
   healOwnTerritory: number;
-  mountainPct: number;
-  riverMaxLengthBoardWidthMult: number;
-  // enableRivers is a toggle, handled separately via TOGGLE_FIELDS
 };
 
 const TOGGLE_FIELDS: Array<
-  [string, 'zoneOfControl' | 'limitArtillery' | 'enableRivers' | 'fogOfWar']
+  [string, 'zoneOfControl' | 'limitArtillery' | 'fogOfWar']
 > = [
   ['cfg-zoneOfControl',      'zoneOfControl'],
   ['cfg-limitArtillery',     'limitArtillery'],
-  ['cfg-enableRivers',       'enableRivers'],
   ['cfg-fogOfWar',           'fogOfWar'],
 ];
 
 const RULES_PRESET_NUM_FIELDS: Array<[string, keyof RulesPresetValues, number]> = [
-  ['cfg-mountainPct', 'mountainPct', 100],
-  ['cfg-riverMaxLengthBoardWidthMult', 'riverMaxLengthBoardWidthMult', 100],
   ['cfg-productionPointsPerTurn', 'productionPointsPerTurn', 1],
   ['cfg-productionPointsPerTurnAi', 'productionPointsPerTurnAi', 1],
   ['cfg-territoryQuota', 'territoryQuota', 1],
@@ -1461,9 +1453,8 @@ const RULES_PRESET_NUM_FIELDS: Array<[string, keyof RulesPresetValues, number]> 
 ];
 
 const RULES_PRESET_TOGGLES: Array<
-  [string, 'zoneOfControl' | 'limitArtillery' | 'enableRivers' | 'fogOfWar']
+  [string, 'zoneOfControl' | 'limitArtillery' | 'fogOfWar']
 > = [
-  ['cfg-enableRivers', 'enableRivers'],
   ['cfg-zoneOfControl', 'zoneOfControl'],
   ['cfg-limitArtillery', 'limitArtillery'],
   ['cfg-fogOfWar', 'fogOfWar'],
@@ -1522,8 +1513,6 @@ function populateSettings(): void {
     productionTurns: config.productionTurns, productionSafeDistance: config.productionSafeDistance,
     flankingBonus: config.flankingBonus, maxFlankingUnits: config.maxFlankingUnits,
     healOwnTerritory: config.healOwnTerritory,
-    mountainPct: config.mountainPct,
-    riverMaxLengthBoardWidthMult: config.riverMaxLengthBoardWidthMult,
   };
   for (const [id, key, scale] of NUM_FIELDS) {
     const el = document.getElementById(id) as HTMLInputElement;
@@ -2605,11 +2594,6 @@ function broadcastSettingsPreview(): void {
   }
 
   if (showRulesDetail) {
-    sec('TERRAIN');
-    row('Mountain hexes (%)', v('cfg-mountainPct'));
-    row('Rivers', tog('cfg-enableRivers'));
-    row('Max river length (%)', v('cfg-riverMaxLengthBoardWidthMult'));
-
     sec('ECONOMY');
     row('PP per turn (host)', v('cfg-productionPointsPerTurn'));
     row('PP per turn (you)', v('cfg-productionPointsPerTurnAi'));
