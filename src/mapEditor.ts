@@ -80,6 +80,21 @@ function newCpId(): string { return `cp${++_cpCounter}`; }
 function newNoteId(): string { return `note${++_noteCounter}`; }
 function newSectorId(): string { return `sec${++_sectorCounter}`; }
 
+/** Space should insert a character, not start space+drag pan. */
+function eventTargetAcceptsSpaceForTyping(t: EventTarget | null): boolean {
+  if (!t || !(t instanceof Element)) return false;
+  const host = t.closest<HTMLElement>('input, textarea, select, [contenteditable="true"]');
+  if (!host) return false;
+  if (host instanceof HTMLTextAreaElement) return true;
+  if (host.getAttribute('contenteditable') === 'true') return true;
+  if (host instanceof HTMLInputElement) {
+    const noTextEntry = new Set(['button', 'checkbox', 'color', 'file', 'image', 'radio', 'reset', 'submit']);
+    return !noTextEntry.has(host.type);
+  }
+  if (host instanceof HTMLSelectElement) return true;
+  return false;
+}
+
 // ── DOM refs (set in initMapEditor) ────────────────────────────────────────────
 
 let overlayEl: HTMLElement;
@@ -1830,6 +1845,7 @@ export function initMapEditor(onBack: () => void): void {
   window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (overlayEl.classList.contains('hidden')) return;
     if (e.key === ' ' && !spaceDown) {
+      if (eventTargetAcceptsSpaceForTyping(e.target)) return;
       spaceDown = true;
       if (!isPanning) svgEl.style.cursor = 'grab';
       e.preventDefault();
@@ -1855,6 +1871,7 @@ export function initMapEditor(onBack: () => void): void {
   window.addEventListener('keyup', (e: KeyboardEvent) => {
     if (overlayEl.classList.contains('hidden')) return;
     if (e.key === ' ') {
+      if (eventTargetAcceptsSpaceForTyping(e.target)) return;
       spaceDown = false;
       if (!isPanning) {
         svgEl.style.cursor = mode === 'edit' && isRemovingDot ? 'cell'
