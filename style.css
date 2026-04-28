@@ -599,17 +599,16 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #recap-board .ev2-territory-border.ev2-prod-dim-border {
   --ev2-border-color: var(--color-production-disabled-border);
 }
+/* Valid / selected production hexes: hide inset border (fill + perimeter highlight + plus remain). */
 #board .ev2-territory-border.ev2-prod-placement-border,
-#recap-board .ev2-territory-border.ev2-prod-placement-border {
-  --ev2-border-color: var(--color-production-territory-border);
+#recap-board .ev2-territory-border.ev2-prod-placement-border,
+#board .ev2-territory-border.ev2-prod-selected-border,
+#recap-board .ev2-territory-border.ev2-prod-selected-border {
+  display: none;
 }
 #board .ev2-territory-fill.ev2-prod-selected,
 #recap-board .ev2-territory-fill.ev2-prod-selected {
   fill: var(--color-hex-prod-selected) !important;
-}
-#board .ev2-territory-border.ev2-prod-selected-border,
-#recap-board .ev2-territory-border.ev2-prod-selected-border {
-  --ev2-border-color: var(--color-hex-prod-stroke);
 }
 
 /* Move path hover preview: 4px dashed track (marching dashes), optional hex dest ring, end dot. */
