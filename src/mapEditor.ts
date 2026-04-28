@@ -2063,8 +2063,12 @@ export function initMapEditor(onBack: () => void): void {
 
   // Notes list — text / maxWidth input (live update)
   document.getElementById('ev2-notes-list')?.addEventListener('input', (e) => {
-    const input = e.target as HTMLInputElement;
-    if (!input.dataset.noteId) return;
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement) || !input.dataset.noteId) return;
+    // `<select>` can emit `input` in some browsers; only text + max-width fields update note text.
+    if (!input.classList.contains('ev2-note-text-input') && !input.classList.contains('ev2-note-maxwidth-input')) {
+      return;
+    }
     const note = notes.find(n => n.id === input.dataset.noteId);
     if (!note) return;
     if (input.classList.contains('ev2-note-maxwidth-input')) {
