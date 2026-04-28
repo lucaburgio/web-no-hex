@@ -2503,7 +2503,7 @@ function buildRulesContent(): string {
         Reaching the opponent&rsquo;s home row alone does <strong>not</strong> end the match.
         If both sides hit 0 Conquer Points in the same tick, the side with more <strong>owned hexes</strong> wins; if hex counts are also equal, the <strong>northern</strong> player wins the tie. Both sides totally eliminated from the map at once → northern player wins.</li>
       <li><strong>Breakthrough:</strong> the map is split into <strong>${config.breakthroughSectorCount}</strong> sectors (configurable, south to north). In <strong>Game settings</strong> you can set whether <strong>player 1</strong> (south / host) is <strong>attacker</strong> or <strong>defender</strong>, or enable <strong>random role</strong> to pick at match start. The <strong>attacker</strong> starts with <strong>${config.breakthroughAttackerStartingPP} PP</strong> and earns <strong>no further PP</strong>; the <strong>defender</strong> earns the usual per-turn PP plus territory bonus.
-        The attacker&rsquo;s <strong>home sector</strong> (south if player 1 is attacker, north if player 1 is defender) has no control point. Only the <strong>frontline defender sector on the attacker-facing border</strong> shows a control point at a time. To capture that sector, the attacker must keep a unit on its control point for <strong>two full rounds</strong> (checked after both sides move). When a sector is captured, the marker is removed, <strong>every hex in that sector</strong> becomes attacker territory, and the next defender-border sector&rsquo;s control point appears. The attacker also gains <strong>+${config.breakthroughSectorCaptureBonusPP} PP</strong> (configurable; 0 to disable).
+        The attacker&rsquo;s <strong>home sector</strong> (south if player 1 is attacker, north if player 1 is defender) has no control point. Only the <strong>frontline defender sector on the attacker-facing border</strong> shows its control point(s) at a time. To capture that sector, the attacker must keep at least one unit on <strong>each</strong> of that sector&rsquo;s control points <strong>at the same time</strong> for <strong>two full rounds</strong> (checked after both sides move); the occupation counter only advances while every CP in the sector is held. When a sector is captured, those markers are removed, <strong>every hex in that sector</strong> becomes attacker territory, and the next defender-border sector&rsquo;s control point(s) appear. The attacker also gains <strong>+${config.breakthroughSectorCaptureBonusPP} PP</strong> (configurable; 0 to disable).
         After that, the defender <strong>cannot regain those hexes</strong> — they may still fight and move there, but hex ownership stays with the attacker. The sector itself also <strong>never</strong> flips back politically.
         <strong>Defender units</strong> in a sector already captured by the attacker fight at <strong>${Math.round(config.breakthroughEnemySectorStrengthMult * 100)}%</strong> strength (configurable).
         <strong>Attacker wins</strong> by holding every sector; <strong>defender wins</strong> if the attacker has no units left.</li>
@@ -4429,6 +4429,9 @@ function updateUI(): void {
       const youAreAttacker = localPlayer === attOwner;
       const activeSid = breakthroughActiveFrontlineSectorIndex(state);
       const cpOccupation = activeSid !== null ? (state.breakthroughCpOccupation?.[activeSid] ?? 0) : 0;
+      const nFrontCps =
+        activeSid !== null ? (state.sectorControlPointHex?.[activeSid]?.length ?? 0) : 0;
+      const multiCp = nFrontCps > 1;
       const defUnitsOnAttackerSector = state.units.some(u => {
         if (u.owner !== defOwner) return false;
         const sid = state.sectorIndexByHex?.[`${u.col},${u.row}`];
@@ -4441,16 +4444,24 @@ function updateUI(): void {
         toastVariant = 'red';
       } else if (cpOccupation > 0) {
         if (youAreAttacker) {
-          toastText = "We're taking the sector, keep your unit to hold it";
+          toastText = multiCp
+            ? "We're taking the sector — keep a unit on every control point"
+            : "We're taking the sector, keep your unit to hold it";
         } else {
           const turns = 2 - cpOccupation;
-          toastText = `They're taking the sector, remove their units before ${turns} turn${turns !== 1 ? 's' : ''}`;
+          toastText = multiCp
+            ? `They're taking the sector — clear every control point before ${turns} turn${turns !== 1 ? 's' : ''}`
+            : `They're taking the sector, remove their units before ${turns} turn${turns !== 1 ? 's' : ''}`;
         }
         toastVariant = 'yellow';
       } else {
         toastText = youAreAttacker
-          ? "You're the attacker. Conquer the control point to own the sector."
-          : "You're the defender. Hold the control point to keep the sector.";
+          ? multiCp
+            ? "You're the attacker. Hold every control point in this sector at once to capture it."
+            : "You're the attacker. Conquer the control point to own the sector."
+          : multiCp
+            ? "You're the defender. Don't let them hold all control points in this sector."
+            : "You're the defender. Hold the control point to keep the sector.";
         toastVariant = 'gray';
       }
       breakthroughToastEl.textContent = toastText;

@@ -850,7 +850,7 @@ export function renderTerritoryState(
 
   const activeCpHexes = new Set([
     ...state.controlPointHexes,
-    ...state.sectorControlPointHex.filter(k => k),
+    ...state.sectorControlPointHex.flat(),
   ]);
 
   for (const cp of Object.values(graph.controlPoints)) {

@@ -118,8 +118,8 @@ export interface GameState {
   sectorHexes: string[][];
   /** Breakthrough: who politically controls each sector (irreversible from AI → Player). */
   sectorOwners: Owner[];
-  /** Breakthrough: one control point hex per sector (same order as sectorHexes). */
-  sectorControlPointHex: string[];
+  /** Breakthrough: control point hex keys per sector (same order as sectorHexes); empty = no CPs (e.g. attacker home). */
+  sectorControlPointHex: string[][];
   /** Breakthrough: full-round occupation counts toward capturing that sector’s CP. */
   breakthroughCpOccupation: number[];
   /** Breakthrough: O(1) `col,row` → sector index. */

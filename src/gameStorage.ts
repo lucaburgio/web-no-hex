@@ -1,5 +1,5 @@
 import config from './gameconfig';
-import { normalizeBattleStats } from './game';
+import { migrateSectorControlPointHexLoaded, normalizeBattleStats } from './game';
 import type { GameState } from './types';
 
 const STORAGE_KEY = 'web-strategic-save';
@@ -30,6 +30,9 @@ export function loadGameState(): GameState | null {
     if (!state.sectorHexes) state.sectorHexes = [];
     if (!state.sectorOwners) state.sectorOwners = [];
     if (!state.sectorControlPointHex) state.sectorControlPointHex = [];
+    if (state.gameMode === 'breakthrough' && state.sectorOwners.length > 0) {
+      migrateSectorControlPointHexLoaded(state);
+    }
     if (!state.breakthroughCpOccupation) state.breakthroughCpOccupation = [];
     if (!state.sectorIndexByHex) state.sectorIndexByHex = {};
     if (state.gameMode === 'breakthrough' && state.sectorOwners.length === 0) {

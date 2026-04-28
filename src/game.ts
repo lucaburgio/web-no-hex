@@ -152,8 +152,12 @@ export function inferBoardDimensionsFromState(state: GameState): { boardCols: nu
     if (rh.row > acc.maxR) acc.maxR = rh.row;
   }
   for (const k of state.controlPointHexes) considerHexKey(k, acc);
-  for (const k of state.sectorControlPointHex) {
-    if (k) considerHexKey(k, acc);
+  for (const entry of state.sectorControlPointHex ?? []) {
+    if (typeof entry === 'string') {
+      if (entry) considerHexKey(entry, acc);
+    } else if (Array.isArray(entry)) {
+      for (const k of entry) considerHexKey(k, acc);
+    }
   }
   for (const group of state.sectorHexes) {
     for (const k of group) considerHexKey(k, acc);
@@ -163,6 +167,38 @@ export function inferBoardDimensionsFromState(state: GameState): { boardCols: nu
     return { boardCols: config.boardCols, boardRows: config.boardRows };
   }
   return { boardCols: acc.maxC + 1, boardRows: acc.maxR + 1 };
+}
+
+/**
+ * Migrate legacy saves where `sectorControlPointHex` was `string[]` (one hex or '' per sector)
+ * to `string[][]` (all CP hex keys per sector; empty = none).
+ */
+export function migrateSectorControlPointHexLoaded(state: GameState): void {
+  const nSec = state.sectorOwners?.length ?? 0;
+  const raw = state.sectorControlPointHex as unknown;
+  if (nSec === 0) {
+    state.sectorControlPointHex = [];
+    return;
+  }
+  if (!Array.isArray(raw) || raw.length === 0) {
+    state.sectorControlPointHex = Array.from({ length: nSec }, () => []);
+    return;
+  }
+  const first = raw[0];
+  const isLegacy = !Array.isArray(first);
+  let rows: string[][];
+  if (isLegacy) {
+    rows = (raw as string[]).map(cell => (typeof cell === 'string' && cell ? [cell] : []));
+  } else {
+    rows = (raw as unknown[]).map(row =>
+      Array.isArray(row)
+        ? row.filter((k): k is string => typeof k === 'string' && k.length > 0)
+        : [],
+    );
+  }
+  while (rows.length < nSec) rows.push([]);
+  if (rows.length > nSec) rows = rows.slice(0, nSec);
+  state.sectorControlPointHex = rows;
 }
 
 function isValidBoardDim(n: number): boolean {
@@ -188,6 +224,9 @@ export function resolveBoardDimensionsForState(state: GameState): { boardCols: n
 
 /** Align global `config`, `COLS`/`ROWS`, and optional fields on `state` with the match map size. */
 export function applyGameStateBoardDimensions(state: GameState): void {
+  if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
+    migrateSectorControlPointHexLoaded(state);
+  }
   // For territory map games, restore the graph and use stored dimensions directly.
   if (state.customMapGraph) {
     if (state.customMapGraph.mapDef) {
@@ -461,20 +500,18 @@ export function breakthroughActiveFrontlineSectorIndex(state: GameState): number
   return null;
 }
 
-/** Breakthrough: only show the current frontline control point. */
+/** Breakthrough: only the current frontline sector’s control point(s) are active for markers and capture checks. */
 function breakthroughRefreshActiveControlPoint(state: GameState): void {
   if (state.gameMode !== 'breakthrough') return;
-  const cp = breakthroughFrontlineCpKey(state);
-  state.controlPointHexes = cp ? [cp] : [];
+  state.controlPointHexes = breakthroughFrontlineCpKeys(state);
 }
 
-/** Active frontline sector CP key, or null if none (e.g. all sectors captured). */
-function breakthroughFrontlineCpKey(state: GameState): string | null {
-  if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return null;
+/** Active frontline sector CP hex keys (may be multiple per sector); empty if none or all sectors captured. */
+function breakthroughFrontlineCpKeys(state: GameState): string[] {
+  if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return [];
   const sid = breakthroughActiveFrontlineSectorIndex(state);
-  if (sid === null) return null;
-  const cp = state.sectorControlPointHex[sid];
-  return cp || null;
+  if (sid === null) return [];
+  return [...(state.sectorControlPointHex[sid] ?? [])];
 }
 
 /**
@@ -544,11 +581,15 @@ function repairTerritoryBreakthroughLayoutFromGraph(state: GameState): void {
   const needsCpRepair = !sch || sch.length !== nSec;
   if (needsCpRepair) {
     state.sectorControlPointHex = graph.sectors.map((sec, i) => {
-      if (i === attackerSectorIdx) return '';
-      const cpEntry = Object.values(graph.controlPoints).find(cp => sec.territoryIds.includes(cp.territoryId));
-      if (!cpEntry) return '';
-      const t = graph.territories[cpEntry.territoryId];
-      return t ? t.virtualKey : '';
+      if (i === attackerSectorIdx) return [];
+      const keys: string[] = [];
+      for (const cp of Object.values(graph.controlPoints)) {
+        if (!sec.territoryIds.includes(cp.territoryId)) continue;
+        const t = graph.territories[cp.territoryId];
+        if (t) keys.push(t.virtualKey);
+      }
+      keys.sort();
+      return keys;
     });
   }
 
@@ -1164,8 +1205,7 @@ function aiBreakthroughUnitPriority(
   let best = 999;
   const sid = breakthroughActiveFrontlineSectorIndex(state);
   if (sid !== null && state.sectorOwners[sid] === def) {
-    const cp = state.sectorControlPointHex[sid];
-    if (cp) {
+    for (const cp of state.sectorControlPointHex[sid] ?? []) {
       const [cc, cr] = cp.split(',').map(Number);
       const dist = bfsDistance(state, u.col, u.row, cc, cr);
       const pd = minPlayerBfsToHexFn(cc, cr);
@@ -1825,12 +1865,13 @@ function applyConquestDrainAfterMovement(state: GameState): void {
   checkVictory(state);
 }
 
-/** Breakthrough: remove the sector control point marker from play once the sector is captured. */
+/** Breakthrough: remove all sector control point markers from play once the sector is captured. */
 function breakthroughRemoveSectorControlPoint(state: GameState, sectorIndex: number): void {
-  const cp = state.sectorControlPointHex[sectorIndex];
-  if (!cp) return;
-  state.controlPointHexes = state.controlPointHexes.filter(k => k !== cp);
-  state.sectorControlPointHex[sectorIndex] = '';
+  const cps = state.sectorControlPointHex[sectorIndex];
+  if (!cps?.length) return;
+  const remove = new Set(cps);
+  state.controlPointHexes = state.controlPointHexes.filter(k => !remove.has(k));
+  state.sectorControlPointHex[sectorIndex] = [];
 }
 
 /** Breakthrough: when a sector is captured, every playable hex in it becomes attacker territory. */
@@ -1861,10 +1902,13 @@ function applyBreakthroughEndOfRound(state: GameState): void {
   const att = getBreakthroughAttackerOwner(state);
   const i = breakthroughActiveFrontlineSectorIndex(state);
   if (i !== null) {
-    const cp = state.sectorControlPointHex[i];
-    if (cp) {
-      const attackerOnCp = state.units.some(u => u.owner === att && `${u.col},${u.row}` === cp);
-      if (attackerOnCp) {
+    const cps = state.sectorControlPointHex[i] ?? [];
+    if (cps.length) {
+      const attKeys = new Set(
+        state.units.filter(u => u.owner === att).map(u => `${u.col},${u.row}`),
+      );
+      const allHeld = cps.every(k => attKeys.has(k));
+      if (allHeld) {
         state.breakthroughCpOccupation[i] = (state.breakthroughCpOccupation[i] ?? 0) + 1;
         if (state.breakthroughCpOccupation[i] >= 2) {
           state.sectorOwners[i] = att;
@@ -1875,11 +1919,12 @@ function applyBreakthroughEndOfRound(state: GameState): void {
           if (bonus > 0) {
             state.productionPoints[att] += bonus;
           }
+          const cpWord = cps.length > 1 ? 'control points' : 'control point';
           log(
             state,
             bonus > 0
-              ? `Breakthrough: sector ${i + 1} captured — attacker territory locked; control point cleared. +${bonus} PP.`
-              : `Breakthrough: sector ${i + 1} captured — attacker territory locked; control point cleared.`,
+              ? `Breakthrough: sector ${i + 1} captured — attacker territory locked; ${cpWord} cleared. +${bonus} PP.`
+              : `Breakthrough: sector ${i + 1} captured — attacker territory locked; ${cpWord} cleared.`,
           );
         }
       } else {
@@ -3013,7 +3058,7 @@ function buildTerritoryState(
     sectorOwners: Owner[];
     sectorHexes: string[][];
     sectorIndexByHex: Record<string, number>;
-    sectorControlPointHex: string[];
+    sectorControlPointHex: string[][];
     breakthroughCpOccupation: number[];
     breakthroughAttackerOwner: Owner | undefined;
     productionPoints: Record<Owner, number>;
@@ -3148,13 +3193,17 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
       for (const k of sectorHexes[s]!) hexStates[k] = { owner, stableFor: 0, isProduction: false };
     }
 
-    // Sector CPs from JSON (attacker sector has none)
+    // Sector CPs from JSON (attacker sector has none; a sector may list multiple CP territories)
     const sectorControlPointHex = graph.sectors.map((sec, i) => {
-      if (i === attackerSectorIdx) return '';
-      const cpEntry = Object.values(graph.controlPoints).find(cp => sec.territoryIds.includes(cp.territoryId));
-      if (!cpEntry) return '';
-      const t = graph.territories[cpEntry.territoryId];
-      return t ? t.virtualKey : '';
+      if (i === attackerSectorIdx) return [];
+      const keys: string[] = [];
+      for (const cp of Object.values(graph.controlPoints)) {
+        if (!sec.territoryIds.includes(cp.territoryId)) continue;
+        const t = graph.territories[cp.territoryId];
+        if (t) keys.push(t.virtualKey);
+      }
+      keys.sort();
+      return keys;
     });
 
     primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
@@ -3169,10 +3218,8 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
             }
             return -1;
           })();
-    const controlPointHexes =
-      frontlineIdx >= 0 && sectorControlPointHex[frontlineIdx]
-        ? [sectorControlPointHex[frontlineIdx]!]
-        : [];
+    const frontCps = frontlineIdx >= 0 ? sectorControlPointHex[frontlineIdx] ?? [] : [];
+    const controlPointHexes = frontCps.length ? [...frontCps] : [];
 
     const defHexCount = Object.values(hexStates).filter(h => h.owner === defenderOwner).length;
     const defBonus = territoryBonusForHexCount(defHexCount);
