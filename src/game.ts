@@ -379,6 +379,16 @@ function spreadHomeTerritorySlotIndices(n: number, slotCount: number): number[] 
   );
 }
 
+/** Maps each of `n` units to a home slot (0..L-1); same pattern as {@link spreadCols} so extras stack on shared slots when L < n. */
+function spreadHomeTerritorySlotIndicesFull(n: number, slotCount: number): number[] {
+  const L = slotCount;
+  if (L <= 0 || n <= 0) return [];
+  if (n === 1) return [Math.floor(L / 2)];
+  return Array.from({ length: n }, (_, i) =>
+    Math.round((L - 1) * i / (n - 1)),
+  );
+}
+
 function sortTerritoryIdsByVirtualPosition(graph: TerritoryGraphData, ids: string[]): string[] {
   return [...ids].sort((a, b) => {
     const ta = graph.territories[a];
@@ -387,6 +397,42 @@ function sortTerritoryIdsByVirtualPosition(graph: TerritoryGraphData, ids: strin
     if (ta.virtualRow !== tb.virtualRow) return ta.virtualRow - tb.virtualRow;
     return ta.virtualCol - tb.virtualCol;
   });
+}
+
+/**
+ * Breakthrough: attacker starts in the sector that has no control point; defender homes are
+ * home territories (allied or enemy) in all other sectors. Settings `startingUnitsAttacker` /
+ * `startingUnitsDefender` apply to those map regions; owners follow the configured role.
+ */
+function computeBreakthroughTerritoryRoleHomes(graph: TerritoryGraphData): {
+  attackerHomeIds: string[];
+  defenderHomeIds: string[];
+} {
+  const cpTids = new Set(Object.values(graph.controlPoints).map(cp => cp.territoryId));
+  let attackerSectorIdx = graph.sectors.findIndex(sec => !sec.territoryIds.some(tid => cpTids.has(tid)));
+  if (attackerSectorIdx < 0) attackerSectorIdx = 0;
+  const sector = graph.sectors[attackerSectorIdx];
+  const attackerSectorTids = new Set(sector?.territoryIds ?? []);
+  const allHome = [...new Set([...graph.playerHomeTerritoryIds, ...graph.aiHomeTerritoryIds])];
+  const ah = allHome.filter(id => attackerSectorTids.has(id));
+  const dh = allHome.filter(id => !attackerSectorTids.has(id));
+  return {
+    attackerHomeIds: sortTerritoryIdsByVirtualPosition(graph, ah),
+    defenderHomeIds: sortTerritoryIdsByVirtualPosition(graph, dh),
+  };
+}
+
+/** For settings UI: home territory counts per breakthrough role on this polygon map. */
+export function getBreakthroughTerritoryStartingSlotCounts(mapDef: TerritoryMapDef): {
+  attacker: number;
+  defender: number;
+} {
+  const graph = buildTerritoryGraph(mapDef);
+  const { attackerHomeIds, defenderHomeIds } = computeBreakthroughTerritoryRoleHomes(graph);
+  return {
+    attacker: Math.max(1, attackerHomeIds.length),
+    defender: Math.max(1, defenderHomeIds.length),
+  };
 }
 
 /** Conquest: place control points with north/south balance and spacing (not clustered). */
@@ -3928,16 +3974,11 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
 
   const hexStates: Record<string, HexState> = {};
 
-  /** Map layout: which owner's homes lie in the sector that has no CP (designed attacker side). */
-  let mapInferredAttacker: Owner | undefined;
+  /** Sector index with no CP (attacker home sector). */
   let attackerSectorIdxForBreakthrough = -1;
   if (gameMode === 'breakthrough') {
     const cpTids = new Set(Object.values(graph.controlPoints).map(cp => cp.territoryId));
     attackerSectorIdxForBreakthrough = graph.sectors.findIndex(sec => !sec.territoryIds.some(tid => cpTids.has(tid)));
-    const attackerSector = graph.sectors[attackerSectorIdxForBreakthrough];
-    const aiInAttacker =
-      attackerSector?.territoryIds.some(tid => graph.aiHomeTerritoryIds.includes(tid)) ?? false;
-    mapInferredAttacker = aiInAttacker ? AI : PLAYER;
   }
 
   const desiredBreakthroughAttacker: Owner | undefined =
@@ -3951,50 +3992,54 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
         )
       : undefined;
 
-  const swapBreakthroughSpawnSides =
-    gameMode === 'breakthrough' &&
-    desiredBreakthroughAttacker !== undefined &&
-    mapInferredAttacker !== undefined &&
-    desiredBreakthroughAttacker !== mapInferredAttacker;
+  let units: Unit[];
+  if (gameMode === 'breakthrough' && desiredBreakthroughAttacker !== undefined) {
+    const attackerOwner = desiredBreakthroughAttacker;
+    const defenderOwner = attackerOwner === PLAYER ? AI : PLAYER;
+    const { attackerHomeIds, defenderHomeIds } = computeBreakthroughTerritoryRoleHomes(graph);
 
-  // Breakthrough: swap spawn lists if settings assign P1 the opposite role vs map
-  const playerSpawnTerritoryIds =
-    gameMode === 'breakthrough' && swapBreakthroughSpawnSides
-      ? graph.aiHomeTerritoryIds
-      : graph.playerHomeTerritoryIds;
-  const aiSpawnTerritoryIds =
-    gameMode === 'breakthrough' && swapBreakthroughSpawnSides
-      ? graph.playerHomeTerritoryIds
-      : graph.aiHomeTerritoryIds;
+    const attSlots =
+      attackerHomeIds.length === 0
+        ? []
+        : spreadHomeTerritorySlotIndicesFull(config.startingUnitsAttacker, attackerHomeIds.length);
+    const defSlots =
+      defenderHomeIds.length === 0
+        ? []
+        : spreadHomeTerritorySlotIndicesFull(config.startingUnitsDefender, defenderHomeIds.length);
 
-  let playerStartingUnits = config.startingUnitsPlayer1;
-  let aiStartingUnits = config.startingUnitsPlayer2;
-  if (gameMode === 'breakthrough') {
-    const att = desiredBreakthroughAttacker!;
-    playerStartingUnits = att === PLAYER ? config.startingUnitsAttacker : config.startingUnitsDefender;
-    aiStartingUnits = att === AI ? config.startingUnitsAttacker : config.startingUnitsDefender;
+    units = [
+      ...attSlots.map(si => {
+        const id = attackerHomeIds[si]!;
+        const t = graph.territories[id]!;
+        return makeUnit(attackerOwner, t.virtualCol, t.virtualRow);
+      }),
+      ...defSlots.map(si => {
+        const id = defenderHomeIds[si]!;
+        const t = graph.territories[id]!;
+        return makeUnit(defenderOwner, t.virtualCol, t.virtualRow);
+      }),
+    ];
+  } else {
+    const sortedPlayerTids = sortTerritoryIdsByVirtualPosition(graph, graph.playerHomeTerritoryIds);
+    const sortedAiTids = sortTerritoryIdsByVirtualPosition(graph, graph.aiHomeTerritoryIds);
+    const playerSlotIndices = spreadHomeTerritorySlotIndices(config.startingUnitsPlayer1, sortedPlayerTids.length);
+    const aiSlotIndices = spreadHomeTerritorySlotIndices(config.startingUnitsPlayer2, sortedAiTids.length);
+    units = [
+      ...playerSlotIndices.map(slotIdx => {
+        const id = sortedPlayerTids[slotIdx]!;
+        const t = graph.territories[id]!;
+        return makeUnit(PLAYER, t.virtualCol, t.virtualRow);
+      }),
+      ...aiSlotIndices.map(slotIdx => {
+        const id = sortedAiTids[slotIdx]!;
+        const t = graph.territories[id]!;
+        return makeUnit(AI, t.virtualCol, t.virtualRow);
+      }),
+    ];
   }
 
-  const sortedPlayerTids = sortTerritoryIdsByVirtualPosition(graph, playerSpawnTerritoryIds);
-  const sortedAiTids = sortTerritoryIdsByVirtualPosition(graph, aiSpawnTerritoryIds);
-  const playerSlotIndices = spreadHomeTerritorySlotIndices(playerStartingUnits, sortedPlayerTids.length);
-  const aiSlotIndices = spreadHomeTerritorySlotIndices(aiStartingUnits, sortedAiTids.length);
-
-  const units: Unit[] = [
-    ...playerSlotIndices.map(slotIdx => {
-      const id = sortedPlayerTids[slotIdx]!;
-      const t = graph.territories[id]!;
-      return makeUnit(PLAYER, t.virtualCol, t.virtualRow);
-    }),
-    ...aiSlotIndices.map(slotIdx => {
-      const id = sortedAiTids[slotIdx]!;
-      const t = graph.territories[id]!;
-      return makeUnit(AI, t.virtualCol, t.virtualRow);
-    }),
-  ];
-
   if (gameMode === 'breakthrough') {
-    const attackerSectorIdx = attackerSectorIdxForBreakthrough;
+    const attackerSectorIdx = attackerSectorIdxForBreakthrough >= 0 ? attackerSectorIdxForBreakthrough : 0;
     const attackerOwner: Owner = desiredBreakthroughAttacker!;
     const defenderOwner: Owner = attackerOwner === AI ? PLAYER : AI;
 

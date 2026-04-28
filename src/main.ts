@@ -1725,27 +1725,15 @@ function applyStartingUnitsInputMaxes(): void {
   const v = gameModeEl.value as GameMode;
 
   if (v === 'breakthrough') {
-    const randEl = document.getElementById('cfg-breakthroughRandomRoles') as HTMLInputElement | null;
-    const roleEl = document.getElementById('cfg-breakthroughPlayer1Role') as HTMLSelectElement | null;
-    const random = randEl?.checked ?? false;
-    const p1Attacks = (roleEl?.value ?? 'attacker') === 'attacker';
-    let maxDef: number;
-    let maxAtt: number;
-    if (random) {
-      const m = Math.min(south, north);
-      maxDef = m;
-      maxAtt = m;
-    } else if (p1Attacks) {
-      maxDef = north;
-      maxAtt = south;
-    } else {
-      maxDef = south;
-      maxAtt = north;
-    }
-    defEl.max = cap(maxDef);
-    attEl.max = cap(maxAtt);
-    p1el.max = cap(Math.min(south, north));
-    p2el.max = cap(Math.min(south, north));
+    const hexCap = Math.min(BOARD_HEX_DIM_MAX, Math.max(1, config.boardCols));
+    // Role counts apply to fixed map regions (attacker sector vs other sectors), not to P1/P2 labels.
+    // Polygon maps allow stacking on few home territories — use full dim cap.
+    const roleMax =
+      territories.length > 0 ? BOARD_HEX_DIM_MAX : hexCap;
+    attEl.max = String(roleMax);
+    defEl.max = String(roleMax);
+    p1el.max = String(BOARD_HEX_DIM_MAX);
+    p2el.max = String(BOARD_HEX_DIM_MAX);
   } else {
     p1el.max = cap(south);
     p2el.max = cap(north);
