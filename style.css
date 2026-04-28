@@ -548,8 +548,8 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
    * the fixed header and above the fixed footer; margin vars add scroll slack (set Y > 0 for
    * more vertical pan room beyond that baseline).
    */
-  --game-area-map-scroll-margin-x: 120px;
-  --game-area-map-scroll-margin-y: 0px;
+  --game-area-map-scroll-margin-x: 420px;
+  --game-area-map-scroll-margin-y: 420px;
   padding: calc(40px + var(--game-area-map-scroll-margin-y))
     var(--game-area-map-scroll-margin-x)
     calc(72px + var(--game-area-map-scroll-margin-y));
