@@ -1,7 +1,7 @@
-/* ── Editor V2 ─────────────────────────────────────────────────────────────── */
+/* ── Map editor (polygon territories) ─────────────────────────────────────── */
 
 /* Canvas area */
-#editor-v2-overlay {
+#map-editor-overlay {
   position: fixed; inset: 0; display: flex; z-index: 200;
   background: #f5f5f3;
 }

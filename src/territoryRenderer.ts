@@ -1,7 +1,7 @@
 /**
  * Territory-based SVG renderer for polygon maps.
- * Uses the exact same CSS classes and SVG elements as editorV2 for a 1:1 visual match.
- * Requires editorV2.css (loaded via index.html).
+ * Uses the exact same CSS classes and SVG elements as the map editor for a 1:1 visual match.
+ * Requires mapEditor.css (loaded via index.html).
  */
 
 import type { GameState, HexState, Owner, Unit } from './types';
@@ -16,7 +16,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const TERRITORY_HOVER_CURSOR = "url('/icons/pointer.svg') 13 14, pointer";
 const TERRITORY_MOUNTAIN_CURSOR = "url('/icons/pointer.svg') 13 14, default";
 
-// Game-specific highlight colors (no editorV2 equivalent)
+// Game-specific highlight colors (no map-editor equivalent)
 const COLOR_PRODUCTION_STROKE = '#3b82f6';
 const STROKE_WIDTH_HIGHLIGHT  = 3;
 
@@ -92,7 +92,7 @@ function buildEdgeTerritoryIndex(mapDef: TerritoryMapDef): Map<string, string[]>
 /**
  * Build the outer perimeter SVG path — edges touching exactly one territory.
  * The resulting path is stroked with the outer-border pattern at 144px width,
- * matching editorV2's perimeter rendering.
+ * matching the map editor's perimeter rendering.
  */
 function buildOuterBorderPath(
   mapDef: TerritoryMapDef,
@@ -157,7 +157,7 @@ function buildOuterBorderPath(
 }
 
 /**
- * Build the inset border path for a territory, ported directly from editorV2's
+ * Build the inset border path for a territory, ported directly from the map editor's
  * buildInsetBorderPath. Edges shared with same-owner neighbors are suppressed.
  */
 function buildInsetBorderPath(
@@ -255,7 +255,7 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
 
   const edgeTerritoryIndex = buildEdgeTerritoryIndex(mapDef);
 
-  // ── Defs — same pattern IDs as editorV2 so CSS fill references resolve ──────
+  // ── Defs — same pattern IDs as map editor so CSS fill references resolve ──────
   const defs = mksvg('defs');
   svgEl.appendChild(defs);
 
@@ -283,7 +283,7 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   mountainPattern.appendChild(mountainImg);
   defs.appendChild(mountainPattern);
 
-  // Clip paths per territory (same as editorV2)
+  // Clip paths per territory (same as map editor)
   for (const t of mapDef.territories) {
     const clipPath = mksvg('clipPath');
     clipPath.id = `ev2-clip-${t.id}`;
@@ -293,7 +293,7 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     defs.appendChild(clipPath);
   }
 
-  // ── Layers — same IDs as editorV2 ────────────────────────────────────────────
+  // ── Layers — same IDs as map editor ────────────────────────────────────────────
   for (const id of [
     'ev2-outer-border-layer',
     'ev2-territory-layer',

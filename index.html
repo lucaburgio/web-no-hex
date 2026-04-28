@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Web Strategic</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="editorV2.css" />
+  <link rel="stylesheet" href="mapEditor.css" />
   <script>
     (function () {
       const theme = new URLSearchParams(location.search).get('theme');
@@ -90,7 +90,6 @@
       <button id="menu-host-btn" class="menu-btn">HOST GAME</button>
       <button id="menu-join-btn" class="menu-btn">JOIN GAME</button>
       <button id="menu-map-editor-btn" class="menu-btn">MAP EDITOR</button>
-      <button id="menu-editor-v2-btn" class="menu-btn">EDITOR V2</button>
       <p class="menu-version-text">v0.1 — BETA</p>
     </div>
   </div>
@@ -142,106 +141,14 @@
     </div>
   </div>
 
-  <!-- Map Editor overlay -->
+  <!-- Map editor overlay -->
   <div id="map-editor-overlay" class="hidden">
-    <div id="map-editor-canvas-area">
-      <div id="map-editor-canvas-scroll">
-        <svg id="map-editor-board"></svg>
-      </div>
-      <div id="map-editor-toolbar"></div>
-    </div>
-    <div id="map-editor-right">
-      <div id="map-editor-right-body">
-        <div id="map-editor-title">MAP<br>EDITOR</div>
-
-        <div class="settings-group">
-          <div class="settings-group-title">MAP SIZE</div>
-          <div class="settings-row">
-            <label class="settings-label" for="me-cols">Width</label>
-            <input class="settings-input" type="number" id="me-cols" min="4" max="48" value="8" />
-          </div>
-          <div class="settings-row">
-            <label class="settings-label" for="me-rows">Height</label>
-            <input class="settings-input" type="number" id="me-rows" min="4" max="48" value="8" />
-          </div>
-        </div>
-
-        <div class="settings-group">
-          <div class="settings-group-title">SCENARIO</div>
-          <div class="settings-row">
-            <label class="settings-label" for="me-scenario">Scenario</label>
-            <select class="settings-input settings-select" id="me-scenario">
-              <option value="">None</option>
-            </select>
-          </div>
-          <div class="settings-row">
-            <button type="button" class="button-secondary settings-input" id="me-generate-river-btn" disabled>
-              Generate river (from painted hexes)
-            </button>
-          </div>
-        </div>
-
-        <div class="settings-group">
-          <div class="settings-group-title">EDIT LAYER</div>
-          <div class="settings-row">
-            <label class="settings-label" for="me-game-mode">Terrain / modes</label>
-            <select class="settings-input settings-select" id="me-game-mode">
-              <option value="domination">Domination (terrain &amp; rivers)</option>
-              <option value="conquest">Conquest (control points)</option>
-              <option value="breakthrough">Breakthrough (sectors &amp; CPs)</option>
-            </select>
-          </div>
-          <div class="settings-note neutral" role="note">
-            Switch layers to paint mountains, rivers, conquest CPs, and breakthrough CPs separately. Rivers paint like mountains (NORMAL clears). Custom match presets require both conquest and breakthrough CPs.
-          </div>
-        </div>
-
-        <div class="settings-group">
-          <div class="settings-group-title">UNIT PACKAGE</div>
-          <div class="settings-row">
-            <label class="settings-label" for="me-unit-package">Player 1 (Host)</label>
-            <select class="settings-input settings-select" id="me-unit-package">
-              <option value="">None</option>
-            </select>
-          </div>
-          <div class="settings-row">
-            <label class="settings-label" for="me-unit-package-player2">Player 2 (AI/Guest)</label>
-            <select class="settings-input settings-select" id="me-unit-package-player2">
-              <option value="">Same as Player 1</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div id="map-editor-actions">
-        <button id="me-export-btn" type="button" class="button-primary">COPY MAP CODE</button>
-        <button id="me-load-btn" type="button" class="button-secondary">LOAD MAP</button>
-        <button id="me-back-btn" type="button" class="button-secondary">BACK</button>
-      </div>
-    </div>
-
-    <!-- Load Map modal -->
-    <div id="me-load-modal-overlay" class="hidden">
-      <div id="me-load-modal">
-        <p class="me-load-hint">Paste a story map definition:</p>
-        <textarea id="me-load-textarea" spellcheck="false" placeholder="{ id: 'my-map', map: { cols: 8, rows: 8, mountains: [], conquestControlPoints: ['3,3'], breakthroughControlPoints: ['3,3','4,4'], playerStart: [], aiStart: [] } }"></textarea>
-        <div id="me-load-error" class="hidden"></div>
-        <div class="me-load-actions">
-          <button id="me-load-confirm-btn" type="button" class="button-primary">LOAD</button>
-          <button id="me-load-cancel-btn" type="button" class="button-secondary">CANCEL</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Map Editor v2 overlay -->
-  <div id="editor-v2-overlay" class="hidden">
     <div id="ev2-canvas-area">
       <svg id="ev2-svg" xmlns="http://www.w3.org/2000/svg"></svg>
     </div>
     <div id="ev2-sidebar">
       <div id="ev2-header">
-        <div id="ev2-title">EDITOR<br>V2</div>
+        <div id="ev2-title">MAP<br>EDITOR</div>
       </div>
       <div id="ev2-mode-switcher" class="ev2-mode-switcher">
         <button id="ev2-btn-edit" class="ev2-mode-btn active">EDIT</button>

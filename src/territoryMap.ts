@@ -124,7 +124,7 @@ function undirectedTerritoryEdgeKey(aId: string, bId: string): string {
  * Adjacency from shared **polygon edges** only: the same undirected edge (two consecutive
  * vertices on a territory boundary) must appear in both polygons. Sharing two vertices that
  * are not a common side — e.g. meeting at a corner only, or non-consecutive verts — does not
- * count. Matches {@link buildEdgeTerritoryIndex} in territoryRenderer.ts and polygonEdgePairs in editorV2.
+ * count. Matches {@link buildEdgeTerritoryIndex} in territoryRenderer.ts and polygonEdgePairs in mapEditor.
  */
 export function buildTerritoryAdjacency(mapDef: TerritoryMapDef): Record<string, string[]> {
   const adjacency: Record<string, string[]> = {};

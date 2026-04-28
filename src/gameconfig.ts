@@ -1,6 +1,6 @@
 import type { GameConfig, GameMode, UnitType } from './types';
 
-/** Allowed range for board width/height (hex count). Keep in sync with `#cfg-boardCols` / `#cfg-boardRows` and map editor `#me-cols` / `#me-rows` in index.html. */
+/** Allowed range for board width/height (hex count). Keep in sync with `#cfg-boardCols` / `#cfg-boardRows` in index.html. */
 export const BOARD_HEX_DIM_MIN = 4;
 export const BOARD_HEX_DIM_MAX = 48;
 

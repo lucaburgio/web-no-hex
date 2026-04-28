@@ -1,1143 +1,2082 @@
-import config, { BOARD_HEX_DIM_MAX, BOARD_HEX_DIM_MIN } from './gameconfig';
-import { hexPoints } from './hex';
-import { SCENARIOS } from './scenarios';
-import { riverHexesFromPaintedKeys, riverSegmentUrl } from './rivers';
-import type { RiverHex } from './types';
+// ── Map editor — Polygon-based territory maps ───────────────────────────────
 
-const EDITOR_HEX_SIZE = 34;
+import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
+import { sanitizeTerritoryMapDef, type TerritoryMapDef } from './territoryMap';
 
-/** Defaults for new map editor sessions and resets when loading raw map JSON (no story wrapper). */
-const DEFAULT_MAP_EDITOR_SCENARIO = 'tutorial';
-const DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1 = 'standard';
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
-// ── Sector helpers (breakthrough mode) ───────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-/** Max height (rows) of the attacker starting sector in the map editor overlay. */
-const BREAKTHROUGH_ATTACKER_SECTOR_MAX_ROWS = 3;
+type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain';
+type TerritoryTool = TerritoryState | 'controlpoint';
 
-const SECTOR_COLORS: [number, number, number][] = [
-  [60,  100, 220],
-  [220, 150,  30],
-  [ 40, 170,  80],
-  [190,  60,  90],
-  [130,  50, 210],
-  [ 30, 160, 160],
-];
+interface Pt { id: string; x: number; y: number }
+interface Edge { id: string; a: string; b: string }
+interface Territory { id: string; pointIds: string[]; state: TerritoryState }
+interface ControlPoint { id: string; territoryId: string; name: string }
+interface Note { id: string; x: number; y: number; text: string; align: 'left' | 'center' | 'right'; maxWidth?: number }
+interface Sector { id: string; name: string; territoryIds: string[] }
 
-function sectorTint(idx: number): string {
-  const [r, g, b] = SECTOR_COLORS[idx % SECTOR_COLORS.length];
-  return `rgba(${r},${g},${b},0.09)`;
-}
+// ── Module-level state ────────────────────────────────────────────────────────
 
-function sectorLabelColor(idx: number): string {
-  const [r, g, b] = SECTOR_COLORS[idx % SECTOR_COLORS.length];
-  return `rgba(${r},${g},${b},0.65)`;
-}
+let pts: Pt[] = [];
+let edges: Edge[] = [];
+let territories: Territory[] = [];
+let controlPoints: ControlPoint[] = [];
+let notes: Note[] = [];
+let sectors: Sector[] = [];
+let currentPath: string[] = [];      // point IDs in-progress
+let mode: 'edit' | 'borders' | 'territory' | 'sectors' | 'view' = 'edit';
+let isRemovingDot = false;           // remove-dot sub-mode within edit
+let isNoteTool = false;              // note placement sub-mode within edit
+let territoryTool: TerritoryTool = 'allied';
+let selectedEdgeIds = new Set<string>();
+let selectedTerritoryId: string | null = null;
+let selectedSectorTerritoryIds = new Set<string>();
+let editingSectorId: string | null = null;
+let bordersError: string | null = null;
+let hoveredPoint: string | null = null;
+let cursorPos: { x: number; y: number } = { x: 0, y: 0 };
+let dragPointId: string | null = null;  // point being dragged
+let dragNoteId: string | null = null;   // note being dragged
+let hasDragged = false;                 // true if mouse moved during drag
 
-/**
- * Breakthrough editor: control-point rows sorted north → south (increasing r).
- * Sectors partition by row from fixed CP positions (nearest CP in row); sector 0 is south (attacker).
- */
-function breakthroughCpRowsNorthToSouth(cpKeys: Iterable<string>): number[] {
-  const rows = [...cpKeys].map(k => Number(k.split(',')[1])).filter(Number.isFinite);
-  return [...new Set(rows)].sort((a, b) => a - b);
-}
+// Pan / zoom state
+let panX = 0;
+let panY = 0;
+let zoom = 1;
+let isPanning = false;
+let hasPanned = false;
+let spaceDown = false;
+let panStartClientX = 0;
+let panStartClientY = 0;
+let panStartPanX = 0;
+let panStartPanY = 0;
 
-/**
- * Game sector index for a hex row: 0 = attacker strip at the map bottom (south of CPs), at most
- * {@link BREAKTHROUGH_ATTACKER_SECTOR_MAX_ROWS} rows; extra rows south of the southernmost CP count
- * as sector 1 (southmost defender). Other defender rows use nearest CP by row (1D Voronoi).
- * Tie: northern CP wins when two rows are equidistant.
- */
-function breakthroughEditorGameSectorForRow(
-  row: number,
-  cpRowsNorthToSouth: number[],
-  mapRows: number,
-): number {
-  const r = cpRowsNorthToSouth;
-  const K = r.length;
-  if (K === 0) return 0;
-  const southCp = r[K - 1]!;
-  const candLow = southCp + 1;
-  const candHigh = mapRows - 1;
+let _ptCounter = 0;
+let _edgeCounter = 0;
+let _territoryCounter = 0;
+let _cpCounter = 0;
+let _noteCounter = 0;
+let _sectorCounter = 0;
 
-  if (candLow <= candHigh) {
-    const h = candHigh - candLow + 1;
-    const nAtk = Math.min(BREAKTHROUGH_ATTACKER_SECTOR_MAX_ROWS, h);
-    const atkLo = candHigh - nAtk + 1;
-    if (row >= atkLo && row <= candHigh) return 0;
-    if (row >= candLow && row < atkLo) return 1;
-  }
+function newPtId(): string  { return `p${++_ptCounter}`; }
+function newEdgeId(): string { return `e${++_edgeCounter}`; }
+function newTerritoryId(): string { return `t${++_territoryCounter}`; }
+function newCpId(): string { return `cp${++_cpCounter}`; }
+function newNoteId(): string { return `note${++_noteCounter}`; }
+function newSectorId(): string { return `sec${++_sectorCounter}`; }
 
-  let bestJ = 0;
-  let bestD = Infinity;
-  for (let j = 0; j < K; j++) {
-    const d = Math.abs(row - r[j]!);
-    if (d < bestD || (d === bestD && j < bestJ)) {
-      bestD = d;
-      bestJ = j;
-    }
-  }
-  return K - bestJ;
-}
+// ── DOM refs (set in initMapEditor) ────────────────────────────────────────────
 
-/** Row extents per sector from {@link breakthroughEditorGameSectorForRow} (labels / overlay). */
-function breakthroughSectorRowExtentsVoronoi(cpRowsNorthToSouth: number[], mapRows: number): { lo: number; hi: number }[] {
-  const K = cpRowsNorthToSouth.length;
-  const numSectors = K + 1;
-  const ext = Array.from({ length: numSectors }, () => ({ lo: mapRows, hi: -1 }));
-  for (let row = 0; row < mapRows; row++) {
-    const s = breakthroughEditorGameSectorForRow(row, cpRowsNorthToSouth, mapRows);
-    const e = ext[s]!;
-    e.lo = Math.min(e.lo, row);
-    e.hi = Math.max(e.hi, row);
-  }
-  return ext;
-}
-
-const ATTACKER_START_SECTOR_LABEL = 'Attacker starting sector';
-
-function breakthroughSectorCanvasLabel(gameSector: number): string {
-  return gameSector === 0 ? ATTACKER_START_SECTOR_LABEL : `S${gameSector + 1}`;
-}
-
-/**
- * Horizontal guide lines: mid-Y between consecutive CP rows; defender vs attacker line at the north
- * edge of the (capped) attacker strip, or immediately south of the southernmost CP when the strip
- * is at most {@link BREAKTHROUGH_ATTACKER_SECTOR_MAX_ROWS} rows tall.
- */
-function breakthroughSectorBoundaryYs(cpRowsNorthToSouth: number[], mapRows: number, rowToY: (row: number) => number): number[] {
-  const r = cpRowsNorthToSouth;
-  const K = r.length;
-  const ys: number[] = [];
-  for (let j = 0; j < K - 1; j++) {
-    ys.push((rowToY(r[j]!) + rowToY(r[j + 1]!)) / 2);
-  }
-  if (K === 0) return ys;
-  const southCp = r[K - 1]!;
-  const candLow = southCp + 1;
-  const candHigh = mapRows - 1;
-  if (candLow <= candHigh) {
-    const h = candHigh - candLow + 1;
-    const nAtk = Math.min(BREAKTHROUGH_ATTACKER_SECTOR_MAX_ROWS, h);
-    const atkLo = candHigh - nAtk + 1;
-    if (h <= BREAKTHROUGH_ATTACKER_SECTOR_MAX_ROWS) {
-      ys.push((rowToY(southCp) + rowToY(southCp + 1)) / 2);
-    } else {
-      ys.push((rowToY(atkLo - 1) + rowToY(atkLo)) / 2);
-    }
-  }
-  return ys;
-}
-
-function dedupeBreakthroughCpOnePerRow(set: Set<string>): void {
-  const seen = new Set<number>();
-  for (const k of [...set]) {
-    const r = Number(k.split(',')[1]);
-    if (!Number.isFinite(r) || seen.has(r)) set.delete(k);
-    else seen.add(r);
-  }
-}
-
-let placementHintTimeoutId = 0;
-function showPlacementHint(clientX: number, clientY: number, message: string): void {
-  tooltipEl.textContent = message;
-  tooltipEl.style.left = `${clientX + 12}px`;
-  tooltipEl.style.top = `${clientY - 28}px`;
-  tooltipEl.classList.add('me-unit-tooltip-visible');
-  window.clearTimeout(placementHintTimeoutId);
-  placementHintTimeoutId = window.setTimeout(() => {
-    tooltipEl.classList.remove('me-unit-tooltip-visible');
-  }, 2600);
-}
-
-type EditorGameMode = 'domination' | 'conquest' | 'breakthrough';
-type EditorTool = string; // 'normal' | 'mountain' | 'controlPoint' | 'player:TYPE' | 'ai:TYPE'
-
-interface EditorState {
-  cols: number;
-  rows: number;
-  /** StoryDef `id`; preserved when loading a full story object and emitted on copy. */
-  id: string;
-  title: string;
-  description: string;
-  gameMode: EditorGameMode;
-  scenario: string;
-  unitPackage: string;
-  unitPackagePlayer2: string;
-  mountains: Set<string>;
-  /** Conquest-mode objective hexes (separate from breakthrough CPs). */
-  conquestControlPoints: Set<string>;
-  breakthroughControlPoints: Set<string>;
-  playerStart: Map<number, string>; // col -> unitTypeId
-  aiStart: Map<number, string>;     // col -> unitTypeId
-  /** Painted river terrain (`"col,row"` keys), like {@link EditorState.mountains}. */
-  riverHexKeys: Set<string>;
-  /**
-   * Last {@link riverHexesFromPaintedKeys} result from “Generate river” (random segment picks).
-   * Cleared when painted river hexes no longer match {@link riverPreviewKeysSig}.
-   */
-  riverPreviewHexes: RiverHex[] | null;
-  /** Sorted `riverHexKeys` signature when {@link riverPreviewHexes} was produced. */
-  riverPreviewKeysSig: string | null;
-  activeTool: EditorTool;
-}
-
-function mkState(): EditorState {
-  return {
-    cols: 8, rows: 8,
-    id: 'my-map',
-    title: 'My Map',
-    description: 'Description.',
-    gameMode: 'domination',
-    scenario: DEFAULT_MAP_EDITOR_SCENARIO,
-    unitPackage: DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1,
-    unitPackagePlayer2: '',
-    mountains: new Set(),
-    conquestControlPoints: new Set(),
-    breakthroughControlPoints: new Set(),
-    playerStart: new Map(),
-    aiStart: new Map(),
-    riverHexKeys: new Set(),
-    riverPreviewHexes: null,
-    riverPreviewKeysSig: null,
-    activeTool: 'normal',
-  };
-}
-
-let edState = mkState();
-let onBackCb: () => void = () => {};
-
-// DOM refs (set in initMapEditor)
-let overlayEl: HTMLDivElement;
-let canvasScrollEl: HTMLDivElement;
+let overlayEl: HTMLElement;
 let svgEl: SVGSVGElement;
-let tooltipEl: HTMLDivElement;
-let colsInput: HTMLInputElement;
-let rowsInput: HTMLInputElement;
-let gameModeSelect: HTMLSelectElement;
-let scenarioSelect: HTMLSelectElement;
-let unitPackageSelect: HTMLSelectElement;
-let unitPackagePlayer2Select: HTMLSelectElement;
-let toolbarEl: HTMLDivElement;
-let exportBtn: HTMLButtonElement;
-let generateRiverBtn: HTMLButtonElement;
-let loadModalOverlay: HTMLDivElement;
-let loadTextarea: HTMLTextAreaElement;
-let loadErrorEl: HTMLDivElement;
+let canvasAreaEl: HTMLElement;
+let btnEdit: HTMLButtonElement;
+let btnTerritory: HTMLButtonElement;
+let btnView: HTMLButtonElement;
+let btnBorders: HTMLButtonElement;
+let removeDotBtn: HTMLButtonElement;
+let noteToolBtn: HTMLButtonElement;
+let panelEdit: HTMLElement;
+let panelBorders: HTMLElement;
+let panelTerritory: HTMLElement;
+let btnSectors: HTMLButtonElement;
+let panelSectors: HTMLElement;
 
-export function initMapEditor(onBack: () => void): void {
-  onBackCb = onBack;
+// ── Geometry helpers ──────────────────────────────────────────────────────────
 
-  overlayEl        = document.getElementById('map-editor-overlay') as HTMLDivElement;
-  canvasScrollEl   = document.getElementById('map-editor-canvas-scroll') as HTMLDivElement;
-  svgEl            = document.getElementById('map-editor-board') as unknown as SVGSVGElement;
-
-  // Tooltip element for unit hover
-  tooltipEl = document.getElementById('me-unit-tooltip') as HTMLDivElement;
-  if (!tooltipEl) {
-    tooltipEl = document.createElement('div');
-    tooltipEl.id = 'me-unit-tooltip';
-    tooltipEl.className = 'me-unit-tooltip';
-    document.body.appendChild(tooltipEl);
-  }
-  colsInput        = document.getElementById('me-cols') as HTMLInputElement;
-  rowsInput        = document.getElementById('me-rows') as HTMLInputElement;
-  gameModeSelect   = document.getElementById('me-game-mode') as HTMLSelectElement;
-  scenarioSelect   = document.getElementById('me-scenario') as HTMLSelectElement;
-  unitPackageSelect        = document.getElementById('me-unit-package') as HTMLSelectElement;
-  unitPackagePlayer2Select = document.getElementById('me-unit-package-player2') as HTMLSelectElement;
-  toolbarEl        = document.getElementById('map-editor-toolbar') as HTMLDivElement;
-  exportBtn        = document.getElementById('me-export-btn') as HTMLButtonElement;
-  generateRiverBtn = document.getElementById('me-generate-river-btn') as HTMLButtonElement;
-
-  // Populate scenario select
-  SCENARIOS.forEach(s => {
-    const opt = document.createElement('option');
-    opt.value = s.id;
-    opt.textContent = s.title;
-    scenarioSelect.appendChild(opt);
-  });
-
-  scenarioSelect.addEventListener('change', () => {
-    edState.scenario = scenarioSelect.value;
-  });
-
-  // Populate unit package selects
-  const pkgs = [...new Set(
-    config.unitTypes.map(u => u.package).filter((p): p is string => Boolean(p))
-  )];
-  pkgs.forEach(pkg => {
-    const opt = document.createElement('option');
-    opt.value = pkg;
-    opt.textContent = pkg;
-    unitPackageSelect.appendChild(opt);
-    const opt2 = document.createElement('option');
-    opt2.value = pkg;
-    opt2.textContent = pkg;
-    unitPackagePlayer2Select.appendChild(opt2);
-  });
-
-  function clampDimensionInput(el: HTMLInputElement): number {
-    const raw = parseFloat(el.value);
-    const min = el.min === '' ? -Infinity : Number(el.min);
-    const max = el.max === '' ? Infinity : Number(el.max);
-    const fallback = Number.isFinite(min) ? min : BOARD_HEX_DIM_MIN;
-    const parsed = Number.isFinite(raw) ? raw : fallback;
-    const clamped = Math.max(min, Math.min(max, parsed));
-    if (String(clamped) !== el.value) el.value = String(clamped);
-    return clamped;
-  }
-
-  /** While typing, only cap above max (same as custom match numeric fields); min commits on blur. */
-  function onMapDimensionInput(which: 'cols' | 'rows'): void {
-    const el = which === 'cols' ? colsInput : rowsInput;
-    if (el.max !== '') {
-      const v = parseFloat(el.value);
-      const max = Number(el.max);
-      if (Number.isFinite(v) && Number.isFinite(max) && v > max) {
-        el.value = String(max);
-      }
-    }
-    const t = el.value.trim();
-    if (t === '') return;
-    const raw = parseInt(t, 10);
-    if (!Number.isFinite(raw)) return;
-    if (raw < BOARD_HEX_DIM_MIN) return;
-    const clamped = Math.max(BOARD_HEX_DIM_MIN, Math.min(BOARD_HEX_DIM_MAX, raw));
-    if (which === 'cols') edState.cols = clamped;
-    else edState.rows = clamped;
-    cleanOOB();
-    renderBoard();
-    scheduleCenterMapEditorCanvas();
-  }
-
-  function commitMapDimension(which: 'cols' | 'rows'): void {
-    const el = which === 'cols' ? colsInput : rowsInput;
-    const w = clampDimensionInput(el);
-    if (which === 'cols') edState.cols = w;
-    else edState.rows = w;
-    cleanOOB();
-    renderBoard();
-    scheduleCenterMapEditorCanvas();
-  }
-
-  colsInput.addEventListener('input', () => { onMapDimensionInput('cols'); });
-  colsInput.addEventListener('blur', () => { commitMapDimension('cols'); });
-  colsInput.addEventListener('change', () => { commitMapDimension('cols'); });
-
-  rowsInput.addEventListener('input', () => { onMapDimensionInput('rows'); });
-  rowsInput.addEventListener('blur', () => { commitMapDimension('rows'); });
-  rowsInput.addEventListener('change', () => { commitMapDimension('rows'); });
-
-  gameModeSelect.addEventListener('change', () => {
-    edState.gameMode = gameModeSelect.value as EditorGameMode;
-    if (edState.gameMode === 'domination' && edState.activeTool === 'controlPoint') {
-      edState.activeTool = 'normal';
-    }
-    refreshToolbar();
-    renderBoard();
-    scheduleCenterMapEditorCanvas();
-  });
-
-  unitPackageSelect.addEventListener('change', () => {
-    edState.unitPackage = unitPackageSelect.value;
-    edState.playerStart.clear();
-    if (edState.activeTool.startsWith('player:')) edState.activeTool = 'normal';
-    refreshToolbar();
-    renderBoard();
-  });
-
-  unitPackagePlayer2Select.addEventListener('change', () => {
-    edState.unitPackagePlayer2 = unitPackagePlayer2Select.value;
-    edState.aiStart.clear();
-    if (edState.activeTool.startsWith('ai:')) edState.activeTool = 'normal';
-    refreshToolbar();
-    renderBoard();
-  });
-
-  loadModalOverlay = document.getElementById('me-load-modal-overlay') as HTMLDivElement;
-  loadTextarea     = document.getElementById('me-load-textarea') as HTMLTextAreaElement;
-  loadErrorEl      = document.getElementById('me-load-error') as HTMLDivElement;
-
-  document.getElementById('me-back-btn')!.addEventListener('click', () => onBackCb());
-  document.getElementById('me-load-btn')!.addEventListener('click', () => {
-    loadTextarea.value = '';
-    loadErrorEl.classList.add('hidden');
-    loadErrorEl.textContent = '';
-    loadModalOverlay.classList.remove('hidden');
-    loadTextarea.focus();
-  });
-  document.getElementById('me-load-cancel-btn')!.addEventListener('click', () => {
-    loadModalOverlay.classList.add('hidden');
-  });
-  document.getElementById('me-load-confirm-btn')!.addEventListener('click', () => {
-    const err = applyLoadedCode(loadTextarea.value);
-    if (err) {
-      loadErrorEl.textContent = err;
-      loadErrorEl.classList.remove('hidden');
-    } else {
-      loadModalOverlay.classList.add('hidden');
-    }
-  });
-  exportBtn.addEventListener('click', exportToClipboard);
-
-  generateRiverBtn.addEventListener('click', () => {
-    const { cols, rows, riverHexKeys } = edState;
-    if (riverHexKeys.size === 0) return;
-    const seed = (Math.random() * 0xFFFFFFFF) >>> 0;
-    edState.riverPreviewHexes = riverHexesFromPaintedKeys(riverHexKeys, cols, rows, seed);
-    edState.riverPreviewKeysSig = riverKeysSignature(riverHexKeys);
-    renderBoard();
-  });
-
-  // SVG drag-paint interaction
-  let painting = false;
-  svgEl.addEventListener('mousedown', (e) => { painting = true; applyTool(e); });
-  svgEl.addEventListener('mousemove', (e) => {
-    if (painting) applyTool(e);
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const g = el?.closest('[data-unit-name]') as SVGGElement | null;
-    if (g && svgEl.contains(g)) {
-      tooltipEl.textContent = g.dataset.unitName!;
-      tooltipEl.style.left = `${e.clientX + 12}px`;
-      tooltipEl.style.top  = `${e.clientY - 28}px`;
-      tooltipEl.classList.add('me-unit-tooltip-visible');
-    } else {
-      tooltipEl.classList.remove('me-unit-tooltip-visible');
-    }
-  });
-  svgEl.addEventListener('mouseleave', () => {
-    tooltipEl.classList.remove('me-unit-tooltip-visible');
-  });
-  window.addEventListener('mouseup', () => { painting = false; });
-
-  window.addEventListener('resize', () => {
-    if (!overlayEl.classList.contains('hidden')) scheduleCenterMapEditorCanvas();
-  });
-}
-
-/** Keeps custom settings dropdown labels in sync after programmatic value changes. */
-function syncMapEditorSelectWidgets(): void {
-  for (const el of [scenarioSelect, gameModeSelect, unitPackageSelect, unitPackagePlayer2Select]) {
-    el.dispatchEvent(new Event('settings-select-sync'));
-  }
-}
-
-// ── State management ──────────────────────────────────────────────────────────
-
-function cleanOOB(): void {
-  const { cols, rows } = edState;
-  for (const k of [...edState.mountains]) {
-    const [c, r] = k.split(',').map(Number);
-    if (c >= cols || r >= rows) edState.mountains.delete(k);
-  }
-  for (const k of [...edState.conquestControlPoints]) {
-    const [c, r] = k.split(',').map(Number);
-    if (c >= cols || r >= rows) edState.conquestControlPoints.delete(k);
-  }
-  for (const k of [...edState.breakthroughControlPoints]) {
-    const [c, r] = k.split(',').map(Number);
-    if (c >= cols || r >= rows) edState.breakthroughControlPoints.delete(k);
-  }
-  dedupeBreakthroughCpOnePerRow(edState.breakthroughControlPoints);
-  edState.riverHexKeys = new Set(
-    [...edState.riverHexKeys].filter(k => {
-      const [c, r] = k.split(',').map(Number);
-      return c >= 0 && r >= 0 && c < cols && r < rows;
-    }),
-  );
-  for (const c of [...edState.playerStart.keys()]) if (c >= cols) edState.playerStart.delete(c);
-  for (const c of [...edState.aiStart.keys()]) if (c >= cols) edState.aiStart.delete(c);
-}
-
-// ── Toolbar ───────────────────────────────────────────────────────────────────
-
-function refreshToolbar(): void {
-  toolbarEl.innerHTML = '';
-
-  const { outer: tg, btns: tgBtns } = mkGroup('TERRAIN');
-  tgBtns.appendChild(mkToolBtn('normal', 'NORMAL'));
-  tgBtns.appendChild(mkToolBtn('mountain', 'MOUNTAIN'));
-  tgBtns.appendChild(mkToolBtn('river', 'RIVER'));
-  if (edState.gameMode === 'conquest' || edState.gameMode === 'breakthrough') {
-    tgBtns.appendChild(mkToolBtn('controlPoint', 'CTRL PT'));
-  }
-  toolbarEl.appendChild(tg);
-
-  const pkg1 = edState.unitPackage;
-  if (pkg1) {
-    const units1 = config.unitTypes.filter(u => u.package === pkg1);
-    if (units1.length > 0) {
-      const { outer: pg, btns: pgBtns } = mkGroup('PLAYER START');
-      units1.forEach(ut => pgBtns.appendChild(mkToolBtn(`player:${ut.id}`, ut.name, ut.icon)));
-      toolbarEl.appendChild(pg);
-    }
-  }
-
-  const pkg2 = edState.unitPackagePlayer2 || edState.unitPackage;
-  if (pkg2) {
-    const units2 = config.unitTypes.filter(u => u.package === pkg2);
-    if (units2.length > 0) {
-      const { outer: ag, btns: agBtns } = mkGroup('AI START');
-      units2.forEach(ut => agBtns.appendChild(mkToolBtn(`ai:${ut.id}`, ut.name, ut.icon)));
-      toolbarEl.appendChild(ag);
-    }
-  }
-
-  updateActive();
-}
-
-function mkGroup(label: string): { outer: HTMLDivElement; btns: HTMLDivElement } {
-  const outer = document.createElement('div');
-  outer.className = 'me-tool-group';
-  const lbl = document.createElement('div');
-  lbl.className = 'me-tool-group-label';
-  lbl.textContent = label;
-  outer.appendChild(lbl);
-  const btns = document.createElement('div');
-  btns.className = 'me-tool-group-btns';
-  outer.appendChild(btns);
-  return { outer, btns };
-}
-
-function mkToolBtn(tool: string, label: string, icon?: string): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.className = 'me-tool-btn';
-  btn.dataset.tool = tool;
-
-  if (icon) {
-    const img = document.createElement('img');
-    img.src = icon;
-    img.className = 'me-tool-btn-icon';
-    img.alt = '';
-    btn.appendChild(img);
-  }
-
-  const span = document.createElement('span');
-  span.textContent = label;
-  btn.appendChild(span);
-
-  btn.addEventListener('click', () => {
-    edState.activeTool = tool;
-    updateActive();
-    renderBoard();
-  });
-
-  return btn;
-}
-
-function updateActive(): void {
-  toolbarEl.querySelectorAll<HTMLButtonElement>('.me-tool-btn').forEach(btn => {
-    btn.classList.toggle('me-tool-active', btn.dataset.tool === edState.activeTool);
-  });
-}
-
-function riverKeysSignature(keys: Set<string>): string {
-  return [...keys].sort().join('|');
-}
-
-/** Clipped river art on the editor board (matches in-game river rendering at {@link EDITOR_HEX_SIZE}). */
-function appendRiverPreviewLayer(hexes: RiverHex[]): void {
-  const s = EDITOR_HEX_SIZE;
-  const clipPrefix = 'me-riv-clip';
-  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-  for (const rh of hexes) {
-    const { x, y } = hexToPixelLocal(rh.col, rh.row);
-    const clip = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
-    clip.setAttribute('id', `${clipPrefix}-${rh.col}-${rh.row}`);
-    clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
-    const clipPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-    clipPoly.setAttribute('points', hexPoints(x, y, s));
-    clip.appendChild(clipPoly);
-    defs.appendChild(clip);
-  }
-  svgEl.appendChild(defs);
-
-  const iw = s * Math.sqrt(3);
-  const ih = s * 2;
-  const layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  layer.setAttribute('pointer-events', 'none');
-  for (const rh of hexes) {
-    const url = riverSegmentUrl(rh.segment);
-    if (!url) continue;
-    const { x, y } = hexToPixelLocal(rh.col, rh.row);
-    const clipped = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    clipped.setAttribute('clip-path', `url(#${clipPrefix}-${rh.col}-${rh.row})`);
-    const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-    img.setAttribute('href', url);
-    img.setAttribute('x', String(x - iw / 2));
-    img.setAttribute('y', String(y - ih / 2));
-    img.setAttribute('width', String(iw));
-    img.setAttribute('height', String(ih));
-    img.setAttribute('pointer-events', 'none');
-    clipped.appendChild(img);
-    layer.appendChild(clipped);
-  }
-  svgEl.appendChild(layer);
-}
-
-// ── Canvas rendering ──────────────────────────────────────────────────────────
-
-function hexToPixelLocal(col: number, row: number): { x: number; y: number } {
-  const s = EDITOR_HEX_SIZE;
+function svgCoords(e: MouseEvent): { x: number; y: number } {
+  const rect = svgEl.getBoundingClientRect();
   return {
-    x: s * Math.sqrt(3) * (col + (Math.abs(row) % 2 === 1 ? 0.5 : 0)),
-    y: s * 1.5 * row,
+    x: (e.clientX - rect.left) / zoom + panX,
+    y: (e.clientY - rect.top) / zoom + panY,
   };
 }
 
-/** Scroll so the board is centered when it overflows the canvas area (after layout). */
-function centerMapEditorCanvasScroll(): void {
-  if (!canvasScrollEl || overlayEl.classList.contains('hidden')) return;
-  const { scrollWidth, clientWidth, scrollHeight, clientHeight } = canvasScrollEl;
-  const maxX = Math.max(0, scrollWidth - clientWidth);
-  const maxY = Math.max(0, scrollHeight - clientHeight);
-  canvasScrollEl.scrollLeft = maxX / 2;
-  canvasScrollEl.scrollTop = maxY / 2;
+function dist(ax: number, ay: number, bx: number, by: number): number {
+  const dx = ax - bx, dy = ay - by;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
-function scheduleCenterMapEditorCanvas(): void {
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => centerMapEditorCanvasScroll());
-  });
-}
-
-function renderBoard(): void {
-  const keySig = riverKeysSignature(edState.riverHexKeys);
-  if (
-    edState.riverPreviewHexes !== null
-    && edState.riverPreviewKeysSig !== keySig
-  ) {
-    edState.riverPreviewHexes = null;
-    edState.riverPreviewKeysSig = null;
-  }
-
-  const { cols, rows } = edState;
-  const s = EDITOR_HEX_SIZE;
-  const hexW = s * Math.sqrt(3);
-  const margin = s * 0.8;
-  const totalW = cols * hexW + hexW * 0.5;
-  const totalH = (rows - 1) * s * 1.5 + s * 2;
-
-  // Sector overlay — only in Breakthrough edit layer when BT CPs exist
-  const showSectors = edState.gameMode === 'breakthrough' && edState.breakthroughControlPoints.size > 0;
-  const numSectors  = showSectors ? edState.breakthroughControlPoints.size + 1 : 0;
-  const btCpRowsNorthToSouth = showSectors ? breakthroughCpRowsNorthToSouth(edState.breakthroughControlPoints) : [];
-  const btSectorSpans = showSectors ? breakthroughSectorRowExtentsVoronoi(btCpRowsNorthToSouth, rows) : [];
-
-  // Extra left margin to accommodate sector labels
-  const leftMargin = showSectors ? s * 2.8 : margin;
-
-  svgEl.setAttribute('width', String(Math.ceil(totalW + leftMargin + margin)));
-  svgEl.setAttribute('height', String(Math.ceil(totalH + 2 * margin)));
-  svgEl.setAttribute('viewBox', `${-leftMargin} ${-margin} ${totalW + leftMargin + margin} ${totalH + 2 * margin}`);
-  svgEl.innerHTML = '';
-
-  const hlRiver = edState.activeTool === 'river';
-  const hlPlayer = edState.activeTool.startsWith('player:');
-  const hlAi = edState.activeTool.startsWith('ai:');
-
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const key = `${col},${row}`;
-      const { x, y } = hexToPixelLocal(col, row);
-
-      const isMtn       = edState.mountains.has(key);
-      const isCP =
-        (edState.gameMode === 'conquest' && edState.conquestControlPoints.has(key))
-        || (edState.gameMode === 'breakthrough' && edState.breakthroughControlPoints.has(key));
-      const isPS        = row === rows - 1 && edState.playerStart.has(col);
-      const isAS        = row === 0 && edState.aiStart.has(col);
-      const isPlayerRow = row === rows - 1;
-      const isAiRow     = row === 0;
-
-      const isRiver = edState.riverHexKeys.has(key);
-
-      let fill = 'var(--color-hex-neutral)';
-      if      (isMtn) fill = '#7a6e6b';
-      else if (isRiver) fill = 'rgba(55, 130, 220, 0.92)';
-      else if (isCP)  fill = '#c9b87a';
-      else if (isPS)  fill = 'var(--color-hex-player)';
-      else if (isAS)  fill = 'var(--color-hex-ai)';
-
-      let stroke = 'var(--color-hex-stroke)';
-      let strokeW = '1';
-      if      (hlPlayer && isPlayerRow) { stroke = 'var(--color-unit-selected)'; strokeW = '2.5'; }
-      else if (hlAi && isAiRow)         { stroke = 'var(--color-ai)';            strokeW = '2.5'; }
-      else if (hlRiver && isRiver)      { stroke = 'rgba(40, 90, 160, 0.95)';    strokeW = '2.5'; }
-      else if (isPlayerRow)             { stroke = 'rgba(0,0,0,0.35)';           strokeW = '1.5'; }
-      else if (isAiRow)                 { stroke = 'rgba(100,100,100,0.45)';     strokeW = '1.5'; }
-
-      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      g.dataset.col = String(col);
-      g.dataset.row = String(row);
-      g.style.cursor = 'pointer';
-
-      const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-      poly.setAttribute('points', hexPoints(x, y, s));
-      poly.setAttribute('fill', fill);
-      poly.setAttribute('stroke', stroke);
-      poly.setAttribute('stroke-width', strokeW);
-      g.appendChild(poly);
-
-      // Sector tint overlay (drawn on top of base fill, below labels)
-      if (showSectors) {
-        const sector = breakthroughEditorGameSectorForRow(row, btCpRowsNorthToSouth, rows);
-        const tint = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        tint.setAttribute('points', hexPoints(x, y, s));
-        tint.setAttribute('fill', sectorTint(sector));
-        tint.style.pointerEvents = 'none';
-        g.appendChild(tint);
-      }
-
-      if (isMtn) {
-        addTxt(g, x, y, '▲', s * 0.42, '#fff');
-      }
-
-      if (isCP) {
-        const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        ring.setAttribute('cx', String(x));
-        ring.setAttribute('cy', String(y));
-        ring.setAttribute('r', String(s * 0.27));
-        ring.setAttribute('fill', 'none');
-        ring.setAttribute('stroke', 'rgba(0,0,0,0.55)');
-        ring.setAttribute('stroke-width', '2');
-        ring.style.pointerEvents = 'none';
-        g.appendChild(ring);
-      }
-
-      if (isPS) {
-        const uid = edState.playerStart.get(col)!;
-        const ut = config.unitTypes.find(u => u.id === uid && u.package === edState.unitPackage);
-        if (ut?.icon) {
-          addUnitIcon(g, x, y, ut.icon, ut.name, s);
-        } else {
-          addTxt(g, x, y, (ut?.name ?? uid).slice(0, 3).toUpperCase(), s * 0.32, 'var(--color-dark)');
-        }
-        g.dataset.unitName = ut?.name ?? uid;
-      } else if (isPlayerRow && !isMtn) {
-        addTxt(g, x, y, 'P', s * 0.28, 'rgba(0,0,0,0.18)');
-      }
-
-      if (isAS) {
-        const uid = edState.aiStart.get(col)!;
-        const pkg2 = edState.unitPackagePlayer2 || edState.unitPackage;
-        const ut = config.unitTypes.find(u => u.id === uid && u.package === pkg2);
-        if (ut?.icon) {
-          addUnitIcon(g, x, y, ut.icon, ut.name, s);
-        } else {
-          addTxt(g, x, y, (ut?.name ?? uid).slice(0, 3).toUpperCase(), s * 0.32, 'var(--color-dark)');
-        }
-        g.dataset.unitName = ut?.name ?? uid;
-      } else if (isAiRow && !isMtn) {
-        addTxt(g, x, y, 'A', s * 0.28, 'rgba(0,0,0,0.18)');
-      }
-
-      svgEl.appendChild(g);
+function findSnapPoint(x: number, y: number): Pt | null {
+  const SNAP_RADIUS = 14;
+  let best: Pt | null = null;
+  let bestDist = Infinity;
+  for (const p of pts) {
+    const d = dist(p.x, p.y, x, y);
+    if (d < SNAP_RADIUS && d < bestDist) {
+      bestDist = d;
+      best = p;
     }
   }
-
-  if (showSectors) {
-    renderSectorOverlay(rows, cols, btCpRowsNorthToSouth, btSectorSpans, numSectors, s, leftMargin);
-  }
-
-  if (edState.riverPreviewHexes !== null && edState.riverPreviewHexes.length > 0) {
-    appendRiverPreviewLayer(edState.riverPreviewHexes);
-  }
-
-  generateRiverBtn.disabled = edState.riverHexKeys.size === 0;
+  return best;
 }
 
-function renderSectorOverlay(
-  rows: number, cols: number,
-  cpRowsNorthToSouth: number[],
-  sectorSpans: { lo: number; hi: number }[],
-  numSectors: number,
-  hexSize: number, leftMargin: number,
-): void {
-  const hexW = hexSize * Math.sqrt(3);
-  const rowY = (r: number) => hexToPixelLocal(0, r).y;
+function findSnapNote(x: number, y: number): Note | null {
+  const SNAP_RADIUS = 14;
+  let best: Note | null = null;
+  let bestDist = Infinity;
+  for (const n of notes) {
+    const d = dist(n.x, n.y, x, y);
+    if (d < SNAP_RADIUS && d < bestDist) {
+      bestDist = d;
+      best = n;
+    }
+  }
+  return best;
+}
 
-  // Dashed boundary lines between Voronoi bands (mid between CP rows, then defender/attacker)
-  for (const lineY of breakthroughSectorBoundaryYs(cpRowsNorthToSouth, rows, rowY)) {
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', String(-hexW * 0.5));
-    line.setAttribute('y1', String(lineY));
-    line.setAttribute('x2', String(cols * hexW + hexW * 0.5));
-    line.setAttribute('y2', String(lineY));
-    line.setAttribute('stroke', 'rgba(0,0,0,0.22)');
-    line.setAttribute('stroke-width', '1.5');
-    line.setAttribute('stroke-dasharray', '5 4');
-    line.style.pointerEvents = 'none';
-    svgEl.appendChild(line);
+/**
+ * d3.polygonContains — ray parity over edges (d3-polygon, proven on dense meshes).
+ * Uses same (x,y) space as the SVG polygon vertices.
+ */
+function pointInPolygon(x: number, y: number, polygon: Array<{ x: number; y: number }>): boolean {
+  const n = polygon.length;
+  if (n < 3) return false;
+  const p0 = polygon[n - 1]!;
+  let x0 = p0.x, y0 = p0.y;
+  let x1, y1;
+  let inside = false;
+  for (let i = 0; i < n; i++) {
+    const p = polygon[i]!;
+    x1 = p.x; y1 = p.y;
+    if ((y1 > y) !== (y0 > y) && x < ((x0 - x1) * (y - y1)) / (y0 - y1) + x1) inside = !inside;
+    x0 = x1; y0 = y1;
+  }
+  return inside;
+}
+
+function hasEdge(aId: string, bId: string): boolean {
+  return edges.some(
+    (e) => (e.a === aId && e.b === bId) || (e.a === bId && e.b === aId)
+  );
+}
+
+function addEdge(aId: string, bId: string): void {
+  if (!hasEdge(aId, bId)) {
+    edges.push({ id: newEdgeId(), a: aId, b: bId });
+  }
+}
+
+// ── Auto-detect territories from planar graph ────────────────────────────────
+
+/**
+ * Finds all enclosed faces in the drawn planar graph using a DCEL half-edge
+ * traversal and saves them as new territories (skipping duplicates and the
+ * outer/infinite face).
+ *
+ * For each undirected edge {a,b} we create two directed half-edges: (a→b) and
+ * (b→a).  For half-edge h = (u→v) the "next" half-edge in the face is the one
+ * that leaves v making the most clockwise turn — i.e. the outgoing edge from v
+ * that comes just *before* the twin (v→u) in the CCW-sorted list around v.
+ * Traversing these "next" pointers traces every face.  Faces with positive
+ * signed area (in SVG coords where y increases downward) are interior faces;
+ * the outer (infinite) face has negative area and is discarded.
+ */
+function autoDetectTerritories(): { added: number; skipped: number } {
+  if (edges.length < 3) return { added: 0, skipped: 0 };
+
+  // Flat arrays keyed by half-edge index (edge i → HE 2i and 2i+1)
+  const totalHE = edges.length * 2;
+  const heFrom:    string[]  = new Array(totalHE);
+  const heTo:      string[]  = new Array(totalHE);
+  const heTwin:    number[]  = new Array(totalHE);
+  const heNext:    number[]  = new Array(totalHE);
+  const heVisited: boolean[] = new Array(totalHE).fill(false);
+
+  for (let i = 0; i < edges.length; i++) {
+    const e = edges[i]!;
+    const idx = i * 2;
+    heFrom[idx]     = e.a; heTo[idx]     = e.b; heTwin[idx]     = idx + 1;
+    heFrom[idx + 1] = e.b; heTo[idx + 1] = e.a; heTwin[idx + 1] = idx;
   }
 
-  // Sector labels in the expanded left margin (north → south on screen: game sector K … 0)
-  for (let gameSector = numSectors - 1; gameSector >= 0; gameSector--) {
-    const span = sectorSpans[gameSector]!;
-    if (span.lo > span.hi) continue;
-    const midY = (rowY(span.lo) + rowY(span.hi)) / 2;
-    const labelX = -(leftMargin * 0.55);
-    const labelText = breakthroughSectorCanvasLabel(gameSector);
-    const fs = labelText === ATTACKER_START_SECTOR_LABEL ? hexSize * 0.2 : hexSize * 0.3;
+  // Outgoing half-edge lists per vertex, sorted CCW by angle
+  const outgoing = new Map<string, number[]>();
+  for (let i = 0; i < totalHE; i++) {
+    const from = heFrom[i]!;
+    let list = outgoing.get(from);
+    if (!list) { list = []; outgoing.set(from, list); }
+    list.push(i);
+  }
+  for (const indices of outgoing.values()) {
+    indices.sort((a, b) => {
+      const pfa = ptById(heFrom[a]!)!; const pta = ptById(heTo[a]!)!;
+      const pfb = ptById(heFrom[b]!)!; const ptb = ptById(heTo[b]!)!;
+      return Math.atan2(pta.y - pfa.y, pta.x - pfa.x) -
+             Math.atan2(ptb.y - pfb.y, ptb.x - pfb.x);
+    });
+  }
 
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    label.setAttribute('x', String(labelX));
-    label.setAttribute('y', String(midY));
-    label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('dominant-baseline', 'central');
-    label.setAttribute('fill', sectorLabelColor(gameSector));
-    label.setAttribute('font-size', String(fs));
-    label.setAttribute('font-family', 'Disket Mono, monospace');
-    label.setAttribute('font-weight', 'bold');
-    if (labelText === ATTACKER_START_SECTOR_LABEL) {
-      const t1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-      t1.setAttribute('x', String(labelX));
-      t1.setAttribute('dy', '-0.55em');
-      t1.textContent = 'Attacker starting';
-      const t2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-      t2.setAttribute('x', String(labelX));
-      t2.setAttribute('dy', '1.1em');
-      t2.textContent = 'sector';
-      label.appendChild(t1);
-      label.appendChild(t2);
+  // next(h) = outgoing[h.to][ (pos_of_twin - 1 + n) % n ]
+  // This picks the most clockwise turn from the twin's direction around the vertex.
+  for (let i = 0; i < totalHE; i++) {
+    const toVtx  = heTo[i]!;
+    const outList = outgoing.get(toVtx)!;
+    const pos = outList.indexOf(heTwin[i]!);
+    heNext[i] = outList[(pos - 1 + outList.length) % outList.length]!;
+  }
+
+  // Traverse faces
+  let added = 0;
+  let skipped = 0;
+
+  for (let start = 0; start < totalHE; start++) {
+    if (heVisited[start]) continue;
+
+    const face: string[] = [];
+    let cur = start;
+    while (!heVisited[cur]) {
+      heVisited[cur] = true;
+      face.push(heFrom[cur]!);
+      cur = heNext[cur]!;
+    }
+
+    if (face.length < 3) continue;
+
+    // Signed area via shoelace — positive in SVG coords (y-down) = CW winding = interior face
+    let area = 0;
+    for (let j = 0; j < face.length; j++) {
+      const pj = ptById(face[j]!)!;
+      const pk = ptById(face[(j + 1) % face.length]!)!;
+      area += pj.x * pk.y - pk.x * pj.y;
+    }
+    if (area <= 0) continue; // outer / infinite face
+
+    if (territories.some((t) => samePointSetAsTerritory(t, face))) {
+      skipped++;
+      continue;
+    }
+
+    territories.push({ id: newTerritoryId(), pointIds: face, state: 'neutral' });
+    added++;
+  }
+
+  render();
+  return { added, skipped };
+}
+
+// ── Close loop from selected border edges (Borders mode) ────────────────────
+
+function samePointSetAsTerritory(t: Territory, pointIds: string[]): boolean {
+  if (t.pointIds.length !== pointIds.length) return false;
+  const a = new Set(t.pointIds);
+  const b = new Set(pointIds);
+  if (a.size !== b.size) return false;
+  for (const id of a) {
+    if (!b.has(id)) return false;
+  }
+  return true;
+}
+
+/**
+ * Selected edges must form one simple cycle: 2 edges per point, |E| = |V|, connected.
+ * Returns pointIds in order around the loop (not repeating the first at the end).
+ */
+function cycleFromSelectedEdges(selected: Set<string>): { ok: true; pointIds: string[] } | { ok: false; error: string } {
+  const el = edges.filter((e) => selected.has(e.id));
+  if (el.length < 3) return { ok: false, error: 'Select at least 3 edges.' };
+
+  const deg = new Map<string, number>();
+  for (const e of el) {
+    deg.set(e.a, (deg.get(e.a) || 0) + 1);
+    deg.set(e.b, (deg.get(e.b) || 0) + 1);
+  }
+  for (const c of deg.values()) {
+    if (c !== 2) {
+      return { ok: false, error: 'Each point must be touched by exactly two selected edges (one closed loop).' };
+    }
+  }
+  if (el.length !== deg.size) {
+    return { ok: false, error: 'Selection must be a single closed loop (same number of edges and corners).' };
+  }
+
+  const e0 = el[0]!;
+  const pointIds: string[] = [e0.a];
+  let at = e0.b;
+  const used = new Set<string>([e0.id]);
+
+  while (used.size < el.length) {
+    const e = el.find((ed) => !used.has(ed.id) && (ed.a === at || ed.b === at));
+    if (!e) return { ok: false, error: 'Selected edges are not one connected loop.' };
+    const other = e.a === at ? e.b : e.a;
+    used.add(e.id);
+    if (used.size < el.length) {
+      if (other === pointIds[0]) {
+        return { ok: false, error: 'Loop closes before every edge is used—select only one closed ring.' };
+      }
+      pointIds.push(other);
+      at = other;
     } else {
-      label.textContent = labelText;
-    }
-    label.style.pointerEvents = 'none';
-    svgEl.appendChild(label);
-  }
-}
-
-function addUnitIcon(
-  g: SVGGElement, x: number, y: number,
-  icon: string, _name: string, hexSize: number,
-): void {
-  const size = hexSize * 0.72;
-  const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-  img.setAttribute('href', icon);
-  img.setAttribute('x', String(x - size / 2));
-  img.setAttribute('y', String(y - size / 2));
-  img.setAttribute('width', String(size));
-  img.setAttribute('height', String(size));
-  img.setAttribute('pointer-events', 'none');
-  g.appendChild(img);
-}
-
-function addTxt(
-  g: SVGGElement, x: number, y: number,
-  content: string, fontSize: number, fill: string
-): void {
-  const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  t.setAttribute('x', String(x));
-  t.setAttribute('y', String(y));
-  t.setAttribute('text-anchor', 'middle');
-  t.setAttribute('dominant-baseline', 'central');
-  t.setAttribute('fill', fill);
-  t.setAttribute('font-size', String(fontSize));
-  t.setAttribute('font-family', 'Disket Mono, monospace');
-  t.setAttribute('font-weight', 'bold');
-  t.textContent = content;
-  t.style.pointerEvents = 'none';
-  t.style.userSelect = 'none';
-  g.appendChild(t);
-}
-
-// ── Tool application ──────────────────────────────────────────────────────────
-
-function applyTool(e: MouseEvent): void {
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  const g = el?.closest('[data-col]') as SVGGElement | null;
-  if (!g || !svgEl.contains(g)) return;
-
-  const col = parseInt(g.dataset.col!, 10);
-  const row = parseInt(g.dataset.row!, 10);
-  const key = `${col},${row}`;
-  const { rows, activeTool } = edState;
-
-  if (activeTool === 'normal') {
-    edState.mountains.delete(key);
-    edState.conquestControlPoints.delete(key);
-    edState.breakthroughControlPoints.delete(key);
-    edState.riverHexKeys.delete(key);
-    if (row === rows - 1) edState.playerStart.delete(col);
-    if (row === 0) edState.aiStart.delete(col);
-  } else if (activeTool === 'mountain') {
-    edState.mountains.add(key);
-    edState.riverHexKeys.delete(key);
-    edState.conquestControlPoints.delete(key);
-    edState.breakthroughControlPoints.delete(key);
-    if (row === rows - 1) edState.playerStart.delete(col);
-    if (row === 0) edState.aiStart.delete(col);
-  } else if (activeTool === 'river') {
-    if (edState.mountains.has(key)) return;
-    edState.riverHexKeys.add(key);
-    edState.conquestControlPoints.delete(key);
-    edState.breakthroughControlPoints.delete(key);
-    if (row === rows - 1) edState.playerStart.delete(col);
-    if (row === 0) edState.aiStart.delete(col);
-  } else if (activeTool === 'controlPoint') {
-    if (edState.gameMode === 'conquest') {
-      edState.conquestControlPoints.add(key);
-    } else if (edState.gameMode === 'breakthrough') {
-      const rowTaken = [...edState.breakthroughControlPoints].some(
-        other => other !== key && Number(other.split(',')[1]) === row,
-      );
-      if (rowTaken) {
-        showPlacementHint(
-          e.clientX,
-          e.clientY,
-          'Only one breakthrough control point per row — sectors are horizontal bands.',
-        );
-        return;
-      }
-      edState.breakthroughControlPoints.add(key);
-    }
-    edState.mountains.delete(key);
-    edState.riverHexKeys.delete(key);
-  } else if (activeTool.startsWith('player:')) {
-    if (row !== rows - 1) return;
-    edState.playerStart.set(col, activeTool.slice('player:'.length));
-    edState.mountains.delete(key);
-    edState.riverHexKeys.delete(key);
-    edState.conquestControlPoints.delete(key);
-    edState.breakthroughControlPoints.delete(key);
-  } else if (activeTool.startsWith('ai:')) {
-    if (row !== 0) return;
-    edState.aiStart.set(col, activeTool.slice('ai:'.length));
-    edState.mountains.delete(key);
-    edState.riverHexKeys.delete(key);
-    edState.conquestControlPoints.delete(key);
-    edState.breakthroughControlPoints.delete(key);
-  }
-
-  renderBoard();
-}
-
-// ── Load ──────────────────────────────────────────────────────────────────────
-
-/** Parse pasted code and populate editor state. Returns an error string or null on success. */
-function applyLoadedCode(raw: string): string | null {
-  const code = raw.trim().replace(/,\s*$/, ''); // strip trailing comma
-  if (!code) return 'Nothing to load.';
-
-  let parsed: Record<string, unknown>;
-  try {
-    // eslint-disable-next-line no-new-func
-    parsed = new Function('return (' + code + ')')() as Record<string, unknown>;
-  } catch (err) {
-    return 'Parse error: ' + (err as Error).message;
-  }
-
-  if (!parsed || typeof parsed !== 'object') return 'Not a valid object.';
-
-  // Full story: `{ id, map: { … } }`. Bare map: only `StoryMapDef` keys (no wrapper).
-  const isWrapped = Boolean(parsed.map && typeof parsed.map === 'object');
-  const mapDef = (isWrapped ? parsed.map : parsed) as Record<string, unknown>;
-
-  const cols = Number(mapDef.cols);
-  const rows = Number(mapDef.rows);
-  if (!Number.isInteger(cols) || cols < BOARD_HEX_DIM_MIN || cols > BOARD_HEX_DIM_MAX) {
-    return `Invalid cols (must be ${BOARD_HEX_DIM_MIN}–${BOARD_HEX_DIM_MAX}).`;
-  }
-  if (!Number.isInteger(rows) || rows < BOARD_HEX_DIM_MIN || rows > BOARD_HEX_DIM_MAX) {
-    return `Invalid rows (must be ${BOARD_HEX_DIM_MIN}–${BOARD_HEX_DIM_MAX}).`;
-  }
-
-  const mountains = new Set<string>(
-    Array.isArray(mapDef.mountains) ? mapDef.mountains.map(String) : []
-  );
-  let conquestControlPoints = new Set<string>(
-    Array.isArray(mapDef.conquestControlPoints) ? mapDef.conquestControlPoints.map(String) : []
-  );
-  let breakthroughControlPoints = new Set<string>(
-    Array.isArray(mapDef.breakthroughControlPoints) ? mapDef.breakthroughControlPoints.map(String) : []
-  );
-  const legacyCp = Array.isArray(mapDef.controlPoints) ? mapDef.controlPoints.map(String) : [];
-  if (conquestControlPoints.size === 0 && breakthroughControlPoints.size === 0 && legacyCp.length > 0) {
-    const gm = (isWrapped && typeof parsed.gameMode === 'string' ? parsed.gameMode : 'domination') as EditorGameMode;
-    if (gm === 'conquest') conquestControlPoints = new Set(legacyCp);
-    else if (gm === 'breakthrough') breakthroughControlPoints = new Set(legacyCp);
-  }
-
-  const playerStart = new Map<number, string>();
-  if (Array.isArray(mapDef.playerStart)) {
-    for (const pos of mapDef.playerStart as Array<{ col?: unknown; unitTypeId?: unknown }>) {
-      if (pos && typeof pos.col === 'number') {
-        playerStart.set(pos.col, typeof pos.unitTypeId === 'string' ? pos.unitTypeId : 'infantry');
+      if (other !== pointIds[0]) {
+        return { ok: false, error: 'The last edge does not return to the start of the loop.' };
       }
     }
   }
-  const aiStart = new Map<number, string>();
-  if (Array.isArray(mapDef.aiStart)) {
-    for (const pos of mapDef.aiStart as Array<{ col?: unknown; unitTypeId?: unknown }>) {
-      if (pos && typeof pos.col === 'number') {
-        aiStart.set(pos.col, typeof pos.unitTypeId === 'string' ? pos.unitTypeId : 'infantry');
-      }
+  return { ok: true, pointIds };
+}
+
+function findEdgeIdAtEvent(e: MouseEvent): string | null {
+  const stack = document.elementsFromPoint(e.clientX, e.clientY);
+  for (const item of stack) {
+    if (!(item instanceof Element) || !svgEl.contains(item)) continue;
+    if (item.localName === 'line' && item.classList.contains('ev2-edge-hit')) {
+      const id = item.getAttribute('data-ev2-edge-id');
+      if (id) return id;
     }
   }
-
-  const riverHexKeys = new Set<string>();
-  if (Array.isArray(mapDef.rivers)) {
-    for (const rh of mapDef.rivers as Array<Record<string, unknown>>) {
-      if (typeof rh.col === 'number' && typeof rh.row === 'number') {
-        riverHexKeys.add(`${rh.col},${rh.row}`);
-      }
-    }
-  }
-
-  // Commit to state
-  edState.cols = cols;
-  edState.rows = rows;
-  edState.mountains = mountains;
-  edState.conquestControlPoints = conquestControlPoints;
-  edState.breakthroughControlPoints = breakthroughControlPoints;
-  dedupeBreakthroughCpOnePerRow(edState.breakthroughControlPoints);
-  edState.playerStart = playerStart;
-  edState.aiStart = aiStart;
-  edState.riverHexKeys = riverHexKeys;
-
-  if (isWrapped) {
-    edState.id = typeof parsed.id === 'string' ? parsed.id : 'my-map';
-    edState.title = typeof parsed.title === 'string' ? parsed.title : 'My Map';
-    edState.description = typeof parsed.description === 'string' ? parsed.description : 'Description.';
-    edState.gameMode = (typeof parsed.gameMode === 'string' ? parsed.gameMode : 'domination') as EditorGameMode;
-    gameModeSelect.value = edState.gameMode;
-    edState.scenario = typeof parsed.scenario === 'string' ? parsed.scenario : DEFAULT_MAP_EDITOR_SCENARIO;
-    scenarioSelect.value = edState.scenario;
-    edState.unitPackage = typeof parsed.unitPackage === 'string' ? parsed.unitPackage : DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1;
-    unitPackageSelect.value = edState.unitPackage;
-    edState.unitPackagePlayer2 = typeof parsed.unitPackagePlayer2 === 'string' ? parsed.unitPackagePlayer2 : '';
-    unitPackagePlayer2Select.value = edState.unitPackagePlayer2;
-  } else {
-    edState.id = 'my-map';
-    edState.title = 'My Map';
-    edState.description = 'Description.';
-    edState.gameMode = 'domination';
-    gameModeSelect.value = 'domination';
-    edState.scenario = DEFAULT_MAP_EDITOR_SCENARIO;
-    scenarioSelect.value = DEFAULT_MAP_EDITOR_SCENARIO;
-    edState.unitPackage = DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1;
-    unitPackageSelect.value = DEFAULT_MAP_EDITOR_UNIT_PACKAGE_P1;
-    edState.unitPackagePlayer2 = '';
-    unitPackagePlayer2Select.value = '';
-  }
-
-  colsInput.value = String(cols);
-  rowsInput.value = String(rows);
-
-  edState.activeTool = 'normal';
-  refreshToolbar();
-  renderBoard();
-  syncMapEditorSelectWidgets();
-  scheduleCenterMapEditorCanvas();
   return null;
 }
 
-// ── Export ────────────────────────────────────────────────────────────────────
-
-/** Escape for single-quoted JS string literals in generated map code. */
-function escapeJsStringLiteral(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+function setBordersError(msg: string | null): void {
+  bordersError = msg;
+  const el = document.getElementById('ev2-borders-error');
+  if (!el) return;
+  if (msg) {
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  } else {
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
 }
 
-function exportToClipboard(): void {
-  const {
-    cols, rows, id, title, description, scenario, mountains,
-    conquestControlPoints, breakthroughControlPoints,
-    playerStart, aiStart, unitPackage, unitPackagePlayer2, riverHexKeys,
-    riverPreviewHexes, riverPreviewKeysSig,
-  } = edState;
-  const expSig = riverKeysSignature(riverHexKeys);
-  const rivers =
-    riverPreviewHexes !== null && riverPreviewKeysSig === expSig
-      ? riverPreviewHexes
-      : riverHexesFromPaintedKeys(riverHexKeys, cols, rows);
-  const i = '  ';
-  const q = escapeJsStringLiteral;
-
-  const mStr = [...mountains].sort().map(m => `'${m}'`).join(', ');
-
-  const pStr = [...playerStart.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([col, uid]) =>
-      uid === 'infantry' ? `{ col: ${col} }` : `{ col: ${col}, unitTypeId: '${uid}' }`
-    ).join(', ');
-
-  const aStr = [...aiStart.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([col, uid]) =>
-      uid === 'infantry' ? `{ col: ${col} }` : `{ col: ${col}, unitTypeId: '${uid}' }`
-    ).join(', ');
-
-  const cqStr = [...conquestControlPoints].sort().map(c => `'${c}'`).join(', ');
-  const btStr = [...breakthroughControlPoints].sort().map(c => `'${c}'`).join(', ');
-
-  let code = `{\n`;
-  code += `${i}id: '${q(id)}',\n`;
-  code += `${i}title: '${q(title)}',\n`;
-  code += `${i}description: '${q(description)}',\n`;
-  if (scenario) code += `${i}scenario: '${q(scenario)}',\n`;
-  if (unitPackage) code += `${i}unitPackage: '${q(unitPackage)}',\n`;
-  if (unitPackagePlayer2 && unitPackagePlayer2 !== unitPackage) {
-    code += `${i}unitPackagePlayer2: '${q(unitPackagePlayer2)}',\n`;
+function renderTerritoryList(): void {
+  const ul = document.getElementById('ev2-territory-list') as HTMLUListElement | null;
+  if (!ul) return;
+  ul.replaceChildren();
+  for (const t of territories) {
+    const li = document.createElement('li');
+    const top = document.createElement('div');
+    top.style.display = 'flex';
+    top.style.alignItems = 'center';
+    top.style.gap = '6px';
+    const selBtn = document.createElement('button');
+    selBtn.type = 'button';
+    selBtn.className = 'ev2-territory-list-select' + (t.id === selectedTerritoryId ? ' active' : '');
+    selBtn.textContent = t.id;
+    selBtn.dataset.territoryId = t.id;
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'ev2-danger';
+    delBtn.textContent = '×';
+    delBtn.title = 'Delete';
+    delBtn.style.flex = '0 0 28px';
+    delBtn.dataset.territoryDelete = t.id;
+    top.appendChild(selBtn);
+    top.appendChild(delBtn);
+    li.appendChild(top);
+    ul.appendChild(li);
   }
-  code += `${i}gameMode: 'domination',\n`;
-  code += `${i}map: {\n`;
-  code += `${i}${i}cols: ${cols},\n`;
-  code += `${i}${i}rows: ${rows},\n`;
-  code += `${i}${i}mountains: [${mStr}],\n`;
-  code += `${i}${i}playerStart: [${pStr}],\n`;
-  code += `${i}${i}aiStart: [${aStr}],\n`;
-  if (conquestControlPoints.size > 0) {
-    code += `${i}${i}conquestControlPoints: [${cqStr}],\n`;
-  }
-  if (breakthroughControlPoints.size > 0) {
-    code += `${i}${i}breakthroughControlPoints: [${btStr}],\n`;
-  }
-  if (rivers.length > 0) {
-    const rvStr = rivers
-      .map(rh => `{ col: ${rh.col}, row: ${rh.row}, segment: '${rh.segment}', entrySide: '${rh.entrySide}', exitSide: '${rh.exitSide}' }`)
-      .join(`,\n${i}${i}  `);
-    code += `${i}${i}rivers: [\n${i}${i}  ${rvStr},\n${i}${i}],\n`;
-  }
-  code += `${i}},\n`;
-  code += `${i}productionPointsPerTurn: 20,\n`;
-  code += `}`;
+}
 
-  const flash = () => {
-    const orig = exportBtn.textContent;
-    exportBtn.textContent = 'COPIED!';
-    setTimeout(() => { exportBtn.textContent = orig; }, 1500);
-  };
+function renderCpList(): void {
+  const ul = document.getElementById('ev2-cp-list') as HTMLUListElement | null;
+  if (!ul) return;
 
-  navigator.clipboard.writeText(code).then(flash).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = code;
-    Object.assign(ta.style, { position: 'fixed', opacity: '0', top: '0', left: '0' });
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); flash(); } catch { /* ignore */ }
-    document.body.removeChild(ta);
+  // Remove items for deleted CPs
+  const cpIds = new Set(controlPoints.map(cp => cp.id));
+  for (const li of [...ul.children] as HTMLElement[]) {
+    if (li.dataset.cpId && !cpIds.has(li.dataset.cpId)) li.remove();
+  }
+
+  // Add items for new CPs (skip existing)
+  const existing = new Set([...ul.querySelectorAll<HTMLElement>('li[data-cp-id]')].map(li => li.dataset.cpId!));
+  for (const cp of controlPoints) {
+    if (existing.has(cp.id)) continue;
+    const li = document.createElement('li');
+    li.dataset.cpId = cp.id;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = cp.name;
+    input.className = 'ev2-cp-name-input';
+    input.dataset.cpId = cp.id;
+    input.placeholder = 'Name…';
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'ev2-cp-del-btn';
+    delBtn.textContent = '×';
+    delBtn.title = 'Delete';
+    delBtn.dataset.cpDelete = cp.id;
+
+    li.appendChild(input);
+    li.appendChild(delBtn);
+    ul.appendChild(li);
+  }
+}
+
+function renderNoteList(): void {
+  const ul = document.getElementById('ev2-notes-list') as HTMLUListElement | null;
+  if (!ul) return;
+
+  const noteIds = new Set(notes.map(n => n.id));
+  for (const li of [...ul.children] as HTMLElement[]) {
+    if (li.dataset.noteId && !noteIds.has(li.dataset.noteId)) li.remove();
+  }
+
+  const existing = new Set([...ul.querySelectorAll<HTMLElement>('li[data-note-id]')].map(li => li.dataset.noteId!));
+  for (const note of notes) {
+    if (existing.has(note.id)) {
+      // Update text input value if it differs (e.g. after import)
+      const input = ul.querySelector<HTMLInputElement>(`li[data-note-id="${note.id}"] .ev2-note-text-input`);
+      if (input && input.value !== note.text) input.value = note.text;
+      // Update active align button
+      ul.querySelectorAll<HTMLElement>(`li[data-note-id="${note.id}"] .ev2-note-align-btn`).forEach(b => {
+        b.classList.toggle('active', b.dataset.align === note.align);
+      });
+      // Update max-width input
+      const mwInput = ul.querySelector<HTMLInputElement>(`li[data-note-id="${note.id}"] .ev2-note-maxwidth-input`);
+      if (mwInput) {
+        const v = note.maxWidth ? String(note.maxWidth) : '';
+        if (mwInput.value !== v) mwInput.value = v;
+      }
+      continue;
+    }
+
+    const li = document.createElement('li');
+    li.dataset.noteId = note.id;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = note.text;
+    input.className = 'ev2-note-text-input';
+    input.dataset.noteId = note.id;
+    input.placeholder = 'Note text…';
+
+    const controls = document.createElement('div');
+    controls.className = 'ev2-note-list-controls';
+
+    for (const align of ['left', 'center', 'right'] as const) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ev2-note-align-btn' + (note.align === align ? ' active' : '');
+      btn.dataset.align = align;
+      btn.dataset.noteId = note.id;
+      btn.textContent = align === 'left' ? 'L' : align === 'center' ? 'C' : 'R';
+      btn.title = align.charAt(0).toUpperCase() + align.slice(1);
+      controls.appendChild(btn);
+    }
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'ev2-note-del-btn';
+    delBtn.textContent = '×';
+    delBtn.title = 'Delete';
+    delBtn.dataset.noteDelete = note.id;
+
+    controls.appendChild(delBtn);
+
+    const mwRow = document.createElement('div');
+    mwRow.className = 'ev2-note-maxwidth-row';
+    const mwLabel = document.createElement('label');
+    mwLabel.className = 'ev2-note-maxwidth-label';
+    mwLabel.textContent = 'max-w';
+    const mwInput = document.createElement('input');
+    mwInput.type = 'number';
+    mwInput.min = '10';
+    mwInput.step = '10';
+    mwInput.value = note.maxWidth ? String(note.maxWidth) : '';
+    mwInput.className = 'ev2-note-maxwidth-input';
+    mwInput.dataset.noteId = note.id;
+    mwInput.placeholder = '—';
+    mwRow.appendChild(mwLabel);
+    mwRow.appendChild(mwInput);
+
+    li.appendChild(input);
+    li.appendChild(controls);
+    li.appendChild(mwRow);
+    ul.appendChild(li);
+  }
+}
+
+function renderSectorList(): void {
+  const ul = document.getElementById('ev2-sector-list') as HTMLUListElement | null;
+  if (!ul) return;
+  ul.replaceChildren();
+  for (const s of sectors) {
+    const li = document.createElement('li');
+    li.dataset.sectorId = s.id;
+    li.className = 'ev2-sector-item';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = s.name;
+    nameInput.className = 'ev2-cp-name-input';
+    nameInput.dataset.sectorId = s.id;
+    nameInput.placeholder = 'Sector name…';
+
+    const countBadge = document.createElement('span');
+    countBadge.className = 'ev2-sector-count-badge';
+    countBadge.textContent = `${s.territoryIds.length}`;
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'ev2-sector-edit-btn';
+    editBtn.textContent = 'EDIT';
+    editBtn.dataset.sectorEdit = s.id;
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'ev2-cp-del-btn';
+    delBtn.textContent = '×';
+    delBtn.title = 'Delete sector';
+    delBtn.dataset.sectorDelete = s.id;
+
+    li.appendChild(nameInput);
+    li.appendChild(countBadge);
+    li.appendChild(editBtn);
+    li.appendChild(delBtn);
+    ul.appendChild(li);
+  }
+
+  // Update selection count display
+  const selEl = document.getElementById('ev2-sectors-selection');
+  if (selEl) {
+    const n = selectedSectorTerritoryIds.size;
+    selEl.textContent = `${n} territor${n === 1 ? 'y' : 'ies'} selected`;
+  }
+
+  // Update cancel button visibility
+  const cancelBtn = document.getElementById('ev2-sectors-cancel-btn') as HTMLButtonElement | null;
+  if (cancelBtn) cancelBtn.classList.toggle('hidden', !editingSectorId);
+}
+
+function updateBordersPanel(): void {
+  const n = selectedEdgeIds.size;
+  const countEl = document.getElementById('ev2-borders-selection');
+  if (countEl) countEl.textContent = `${n} edge${n === 1 ? '' : 's'} selected`;
+  const rep = document.getElementById('ev2-borders-replace-btn') as HTMLButtonElement | null;
+  if (rep) rep.disabled = !selectedTerritoryId;
+  setBordersError(bordersError);
+  renderTerritoryList();
+  renderCpList();
+  renderNoteList();
+  renderSectorList();
+}
+
+function territoryCentroid(t: Territory): { x: number; y: number } {
+  const tPts = territoryPoints(t);
+  const x = tPts.reduce((s, p) => s + p.x, 0) / tPts.length;
+  const y = tPts.reduce((s, p) => s + p.y, 0) / tPts.length;
+  return { x, y };
+}
+
+function saveTerritoryFromSelection(replace: boolean): void {
+  const r = cycleFromSelectedEdges(selectedEdgeIds);
+  if (!r.ok) {
+    setBordersError(r.error);
+    return;
+  }
+  if (replace) {
+    if (!selectedTerritoryId) {
+      setBordersError('Select a territory in the list first.');
+      return;
+    }
+    const t = territories.find((x) => x.id === selectedTerritoryId);
+    if (!t) {
+      setBordersError('Selected territory not found.');
+      return;
+    }
+    t.pointIds = r.pointIds;
+    setBordersError(null);
+    selectedEdgeIds = new Set();
+  } else {
+    if (territories.some((t) => samePointSetAsTerritory(t, r.pointIds))) {
+      setBordersError('A territory with this exact border already exists.');
+      return;
+    }
+    territories.push({ id: newTerritoryId(), pointIds: r.pointIds, state: 'neutral' });
+    setBordersError(null);
+    selectedEdgeIds = new Set();
+  }
+  render();
+}
+
+function handleBordersClick(e: MouseEvent): void {
+  const edgeId = findEdgeIdAtEvent(e);
+  if (!edgeId) return;
+  if (selectedEdgeIds.has(edgeId)) selectedEdgeIds.delete(edgeId);
+  else selectedEdgeIds.add(edgeId);
+  setBordersError(null);
+  render();
+}
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+
+function updateViewBox(): void {
+  const w = canvasAreaEl.clientWidth;
+  const h = canvasAreaEl.clientHeight;
+  svgEl.setAttribute('viewBox', `${panX} ${panY} ${w / zoom} ${h / zoom}`);
+}
+
+function resizeSvg(): void {
+  const w = canvasAreaEl.clientWidth;
+  const h = canvasAreaEl.clientHeight;
+  svgEl.setAttribute('width', String(w));
+  svgEl.setAttribute('height', String(h));
+  updateViewBox();
+}
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
+
+function ptById(id: string): Pt | undefined {
+  return pts.find((p) => p.id === id);
+}
+
+function territoryPoints(t: Territory): Array<{ x: number; y: number }> {
+  return t.pointIds.map((id) => {
+    const p = ptById(id);
+    return p ? { x: p.x, y: p.y } : { x: 0, y: 0 };
   });
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+function territoryPointsAttr(t: Territory): string {
+  return territoryPoints(t)
+    .map((p) => `${p.x},${p.y}`)
+    .join(' ');
+}
+
+
+/**
+ * Builds an SVG path string for the territory border at `inset` pixels inward
+ * from the polygon boundary. Adjacent non-suppressed offset edges are joined with
+ * a miter (line intersection); if the miter is too extreme (concave vertex), a
+ * bevel (two points) is used instead. Suppressed edges create natural gaps.
+ */
+function buildInsetBorderPath(
+  t: Territory,
+  edgeIndex: Map<string, Territory[]>,
+  inset: number,
+): string {
+  const tPts = territoryPoints(t);
+  const n = tPts.length;
+  if (n < 3) return '';
+
+  // Signed area (SVG y-down): positive = CW → right normal is inward
+  let area = 0;
+  for (let i = 0; i < n; i++) {
+    const a = tPts[i]!, b = tPts[(i + 1) % n]!;
+    area += a.x * b.y - b.x * a.y;
+  }
+  const cw = area > 0 ? 1 : -1;
+
+  const edgePairs = polygonEdgePairs(t);
+  const suppressed = edgePairs.map(([a, b]) => shouldSuppressBorderOnEdge(t, [a, b], edgeIndex));
+
+  // Offset each edge inward by `inset` pixels
+  type OE = { ax: number; ay: number; bx: number; by: number };
+  const off: OE[] = edgePairs.map(([aId, bId]) => {
+    const pa = ptById(aId)!, pb = ptById(bId)!;
+    const dx = pb.x - pa.x, dy = pb.y - pa.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.5) return { ax: pa.x, ay: pa.y, bx: pb.x, by: pb.y };
+    const nx = cw * dy / len, ny = cw * -dx / len;
+    return { ax: pa.x + nx * inset, ay: pa.y + ny * inset,
+             bx: pb.x + nx * inset, by: pb.y + ny * inset };
+  });
+
+  // Miter join: intersection of the two infinite offset lines.
+  // Returns null when parallel or when the parameter is outside a reasonable range
+  // (extreme concave miter) — caller falls back to bevel.
+  function miterJoin(i: number, j: number): { x: number; y: number } | null {
+    const o1 = off[i]!, o2 = off[j]!;
+    const dx1 = o1.bx - o1.ax, dy1 = o1.by - o1.ay;
+    const dx2 = o2.bx - o2.ax, dy2 = o2.by - o2.ay;
+    const denom = dx1 * dy2 - dy1 * dx2;
+    if (Math.abs(denom) < 0.001) return null;
+    const param = ((o2.ax - o1.ax) * dy2 - (o2.ay - o1.ay) * dx2) / denom;
+    if (param < -2 || param > 3) return null; // too extreme → bevel
+    return { x: o1.ax + param * dx1, y: o1.ay + param * dy1 };
+  }
+
+  // All edges non-suppressed → single closed polygon
+  if (suppressed.every(s => !s)) {
+    const pts: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const jp = miterJoin(i, j);
+      if (jp) {
+        pts.push(jp);
+      } else {
+        pts.push({ x: off[i]!.bx, y: off[i]!.by });
+        pts.push({ x: off[j]!.ax, y: off[j]!.ay });
+      }
+    }
+    return 'M ' + pts.map(p => `${p.x},${p.y}`).join(' L ') + ' Z';
+  }
+
+  // Mixed suppression → open sub-paths, one per run of non-suppressed edges
+  let pathD = '';
+  for (let start = 0; start < n; start++) {
+    if (suppressed[start] || !suppressed[(start - 1 + n) % n]) continue; // only run starts
+
+    const pts: Array<{ x: number; y: number }> = [];
+    pts.push({ x: off[start]!.ax, y: off[start]!.ay }); // open start (no join)
+
+    let i = start;
+    while (true) {
+      const next = (i + 1) % n;
+      if (suppressed[next] || next === start) {
+        pts.push({ x: off[i]!.bx, y: off[i]!.by }); // open end
+        break;
+      }
+      const jp = miterJoin(i, next);
+      if (jp) {
+        pts.push(jp);
+      } else {
+        pts.push({ x: off[i]!.bx, y: off[i]!.by });
+        pts.push({ x: off[next]!.ax, y: off[next]!.ay });
+      }
+      i = next;
+    }
+
+    if (pts.length >= 2) pathD += 'M ' + pts.map(p => `${p.x},${p.y}`).join(' L ') + ' ';
+  }
+  return pathD;
+}
+
+// ── Shared-border helpers ─────────────────────────────────────────────────────
+
+/** Returns ordered edge pairs [(p0,p1),(p1,p2),...,(pn,p0)] for a territory polygon. */
+function polygonEdgePairs(t: Territory): Array<[string, string]> {
+  return t.pointIds.map((id, i) => [id, t.pointIds[(i + 1) % t.pointIds.length]] as [string, string]);
+}
+
+function undirectedEdgeKey(aId: string, bId: string): string {
+  return aId < bId ? `${aId}\0${bId}` : `${bId}\0${aId}`;
+}
+
+/** For each undirected map edge, which distinct territories use that segment (deduped by id). */
+function buildEdgeTerritoryIndex(): Map<string, Territory[]> {
+  const byId = new Map(territories.map((t) => [t.id, t] as [string, Territory]));
+  const idSets = new Map<string, Set<string>>();
+  for (const t of territories) {
+    for (const [aId, bId] of polygonEdgePairs(t)) {
+      if (aId === bId) continue;
+      const k = undirectedEdgeKey(aId, bId);
+      let set = idSets.get(k);
+      if (!set) {
+        set = new Set();
+        idSets.set(k, set);
+      }
+      set.add(t.id);
+    }
+  }
+  const out = new Map<string, Territory[]>();
+  for (const [k, set] of idSets) {
+    out.set(
+      k,
+      [...set].map((id) => byId.get(id)).filter((x): x is Territory => x !== undefined),
+    );
+  }
+  return out;
+}
+
+/**
+ * The other territory that shares the undirected edge, if any (planar: usually one).
+ */
+function neighborFromEdgeIndex(
+  t: Territory,
+  edge: [string, string],
+  index: Map<string, Territory[]>,
+): Territory | null {
+  const k = undirectedEdgeKey(edge[0]!, edge[1]!);
+  const list = index.get(k);
+  if (!list) return null;
+  return list.find((o) => o.id !== t.id) ?? null;
+}
+
+/** True if this side of the edge should not draw a stroke (shared with same-state neighbor). */
+function shouldSuppressBorderOnEdge(
+  t: Territory,
+  edge: [string, string],
+  edgeIndex: Map<string, Territory[]>,
+): boolean {
+  if (t.state === 'neutral') return false;
+  const neighbor = neighborFromEdgeIndex(t, edge, edgeIndex);
+  if (!neighbor) return false;
+  return neighbor.state === t.state;
+}
+
+function render(): void {
+  // Ensure defs element exists and is first
+  let defsEl = svgEl.querySelector('defs') as SVGDefsElement | null;
+  if (!defsEl) {
+    defsEl = document.createElementNS(SVG_NS, 'defs') as SVGDefsElement;
+    svgEl.prepend(defsEl);
+  }
+  // Rebuild defs clip paths and outer-border pattern
+  defsEl.innerHTML = '';
+
+  for (const t of territories) {
+    const clipPath = document.createElementNS(SVG_NS, 'clipPath');
+    clipPath.setAttribute('id', `ev2-clip-${t.id}`);
+    const clipPoly = document.createElementNS(SVG_NS, 'polygon');
+    clipPoly.setAttribute('points', territoryPointsAttr(t));
+    clipPath.appendChild(clipPoly);
+    defsEl.appendChild(clipPath);
+  }
+
+  // Pattern for outer border
+  const outerPattern = document.createElementNS(SVG_NS, 'pattern');
+  outerPattern.setAttribute('id', 'ev2-outer-border-pattern');
+  outerPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  outerPattern.setAttribute('width', '48');
+  outerPattern.setAttribute('height', '48');
+  const outerPatternImg = document.createElementNS(SVG_NS, 'image');
+  outerPatternImg.setAttribute('href', 'images/misc/outside-border-pattern.png');
+  outerPatternImg.setAttribute('width', '48');
+  outerPatternImg.setAttribute('height', '48');
+  outerPattern.appendChild(outerPatternImg);
+  defsEl.appendChild(outerPattern);
+
+  // Pattern for mountain territory fill
+  const mountainPattern = document.createElementNS(SVG_NS, 'pattern');
+  mountainPattern.setAttribute('id', 'ev2-mountain-pattern');
+  mountainPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  mountainPattern.setAttribute('width', '45');
+  mountainPattern.setAttribute('height', '45');
+  const mountainPatternImgEl = document.createElementNS(SVG_NS, 'image');
+  mountainPatternImgEl.setAttribute('href', mountainPatternSrc);
+  mountainPatternImgEl.setAttribute('width', '45');
+  mountainPatternImgEl.setAttribute('height', '45');
+  mountainPattern.appendChild(mountainPatternImgEl);
+  defsEl.appendChild(mountainPattern);
+
+  // ── Territory layer ──────────────────────────────────────────────────────
+  const territoryLayer = svgEl.querySelector('#ev2-territory-layer') as SVGGElement;
+  territoryLayer.innerHTML = '';
+  territoryLayer.style.pointerEvents = mode === 'territory' ? 'auto' : 'none';
+
+  const edgeIndex = buildEdgeTerritoryIndex();
+
+  // ── Outer border layer ───────────────────────────────────────────────────
+  // Build a unified perimeter path from all outer edges (touching only 1 territory).
+  // Stroke it 144px wide (half inside, half outside) — the territory layer covers
+  // the inner half, leaving 72px of pattern border visible around the map.
+  const outerBorderLayer = svgEl.querySelector('#ev2-outer-border-layer') as SVGGElement;
+  outerBorderLayer.innerHTML = '';
+  outerBorderLayer.setAttribute('pointer-events', 'none');
+
+  if (territories.length > 0) {
+    // Collect outer edge segments as [pa, pb] pairs
+    const outerSegments: Array<[Pt, Pt]> = [];
+    for (const edge of edges) {
+      const terrs = edgeIndex.get(undirectedEdgeKey(edge.a, edge.b));
+      if (!terrs || terrs.length !== 1) continue;
+      const pa = ptById(edge.a);
+      const pb = ptById(edge.b);
+      if (pa && pb) outerSegments.push([pa, pb]);
+    }
+
+    // Chain segments into continuous polylines
+    if (outerSegments.length > 0) {
+      // Build adjacency: point id → connected point ids in outer perimeter
+      const adj = new Map<string, string[]>();
+      for (const [pa, pb] of outerSegments) {
+        if (!adj.has(pa.id)) adj.set(pa.id, []);
+        if (!adj.has(pb.id)) adj.set(pb.id, []);
+        adj.get(pa.id)!.push(pb.id);
+        adj.get(pb.id)!.push(pa.id);
+      }
+
+      const visited = new Set<string>();
+      const chains: Array<{ pts: Pt[]; closed: boolean }> = [];
+
+      for (const [startPt] of outerSegments) {
+        if (visited.has(startPt.id)) continue;
+        const chain: Pt[] = [startPt];
+        visited.add(startPt.id);
+        let cur = startPt;
+        let prevId: string | null = null;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const neighbors = adj.get(cur.id) ?? [];
+          const next = neighbors.find(id => id !== prevId && !visited.has(id));
+          if (next === undefined) break;
+          visited.add(next);
+          prevId = cur.id;
+          cur = ptById(next)!;
+          chain.push(cur);
+        }
+        // Detect closed loop: last point connects back to first
+        const lastNeighbors = adj.get(chain[chain.length - 1]!.id) ?? [];
+        const closed = lastNeighbors.includes(chain[0]!.id);
+        chains.push({ pts: chain, closed });
+      }
+
+      // Build SVG path from all chains
+      let d = '';
+      for (const { pts: cpts, closed } of chains) {
+        if (cpts.length < 2) continue;
+        d += `M ${cpts[0]!.x},${cpts[0]!.y}`;
+        for (let i = 1; i < cpts.length; i++) d += ` L ${cpts[i]!.x},${cpts[i]!.y}`;
+        if (closed) d += ' Z';
+      }
+
+      if (d) {
+        const perimPath = document.createElementNS(SVG_NS, 'path');
+        perimPath.setAttribute('d', d);
+        perimPath.setAttribute('fill', 'none');
+        perimPath.setAttribute('stroke', 'url(#ev2-outer-border-pattern)');
+        perimPath.setAttribute('stroke-width', '144');
+        perimPath.setAttribute('stroke-linecap', 'butt');
+        perimPath.setAttribute('stroke-linejoin', 'round');
+        outerBorderLayer.appendChild(perimPath);
+      }
+    }
+  }
+
+  for (const t of territories) {
+    const pts_str = territoryPointsAttr(t);
+
+    const group = document.createElementNS(SVG_NS, 'g');
+    group.setAttribute('data-ev2-territory-id', t.id);
+    if (mode === 'borders' && selectedTerritoryId === t.id) {
+      group.classList.add('ev2-territory-selected');
+    }
+    if (mode === 'sectors' && selectedSectorTerritoryIds.has(t.id)) {
+      group.classList.add('ev2-territory-sector-selected');
+    }
+
+    // Filled polygon
+    const fill = document.createElementNS(SVG_NS, 'polygon');
+    fill.setAttribute('class', `ev2-territory-fill ev2-state-${t.state}`);
+    fill.setAttribute('points', pts_str);
+    group.appendChild(fill);
+
+    // Inset border rendered as a compositing group so opacity never compounds at
+    // sub-path endpoints. The glow layer uses butt caps (no end-cap blobs);
+    // the main line uses round caps for clean termination.
+    if (t.state !== 'neutral' && t.state !== 'mountain') {
+      const borderPathD = buildInsetBorderPath(t, edgeIndex, -10);
+      if (borderPathD) {
+        const borderGroup = document.createElementNS(SVG_NS, 'g');
+        borderGroup.setAttribute('class', `ev2-territory-border ev2-border-${t.state}`);
+        borderGroup.setAttribute('pointer-events', 'none');
+
+        const glowEl = document.createElementNS(SVG_NS, 'path');
+        glowEl.setAttribute('d', borderPathD);
+        glowEl.setAttribute('class', 'ev2-border-glow');
+        borderGroup.appendChild(glowEl);
+
+        const lineEl = document.createElementNS(SVG_NS, 'path');
+        lineEl.setAttribute('d', borderPathD);
+        lineEl.setAttribute('class', 'ev2-border-line');
+        borderGroup.appendChild(lineEl);
+
+        group.appendChild(borderGroup);
+      }
+    }
+
+    territoryLayer.appendChild(group);
+  }
+
+  // ── Control point layer ──────────────────────────────────────────────────
+  const cpLayer = svgEl.querySelector('#ev2-cp-layer') as SVGGElement;
+  cpLayer.innerHTML = '';
+  cpLayer.setAttribute('pointer-events', 'none');
+  for (const cp of controlPoints) {
+    const t = territories.find((x) => x.id === cp.territoryId);
+    if (!t) continue;
+    const c = territoryCentroid(t);
+
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('data-cp-id', cp.id);
+
+    // Placeholder rect — sized after text is in DOM
+    const bg = document.createElementNS(SVG_NS, 'rect');
+    bg.setAttribute('class', 'ev2-cp-label-bg');
+    bg.setAttribute('rx', '0');
+    g.appendChild(bg);
+
+    const label = document.createElementNS(SVG_NS, 'text');
+    label.setAttribute('class', 'ev2-cp-label');
+    label.setAttribute('x', String(c.x));
+    label.setAttribute('y', String(c.y - 14));
+    label.textContent = cp.name;
+    g.appendChild(label);
+
+    const dot = document.createElementNS(SVG_NS, 'circle');
+    dot.setAttribute('class', 'ev2-cp-dot');
+    dot.setAttribute('cx', String(c.x));
+    dot.setAttribute('cy', String(c.y));
+    dot.setAttribute('r', '4');
+    g.appendChild(dot);
+
+    cpLayer.appendChild(g);
+
+    // Size the background rect to the rendered text bounds + padding
+    try {
+      const pad = 4;
+      const bb = label.getBBox();
+      bg.setAttribute('x', String(bb.x - pad));
+      bg.setAttribute('y', String(bb.y - pad));
+      bg.setAttribute('width', String(bb.width + pad * 2));
+      bg.setAttribute('height', String(bb.height + pad * 2));
+    } catch (_) { /* getBBox unavailable when SVG is hidden */ }
+  }
+
+  // ── Note layer ───────────────────────────────────────────────────────────
+  const noteLayer = svgEl.querySelector('#ev2-note-layer') as SVGGElement;
+  noteLayer.innerHTML = '';
+  noteLayer.setAttribute('pointer-events', 'none');
+  for (const note of notes) {
+    const anchorMap = { left: 'start', center: 'middle', right: 'end' } as const;
+    const anchor = anchorMap[note.align];
+
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('data-note-id', note.id);
+
+    if (note.maxWidth) {
+      const mw = note.maxWidth;
+      const foX = note.align === 'center' ? note.x - mw / 2
+                : note.align === 'right'  ? note.x - mw
+                : note.x;
+      const fo = document.createElementNS(SVG_NS, 'foreignObject');
+      fo.setAttribute('x', String(foX));
+      fo.setAttribute('y', String(note.y - 20));
+      fo.setAttribute('width', String(mw));
+      fo.setAttribute('height', '2000');
+      const div = document.createElementNS('http://www.w3.org/1999/xhtml', 'div') as HTMLElement;
+      div.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+      div.className = 'ev2-note-fo-text';
+      div.textContent = note.text || ' ';
+      fo.appendChild(div);
+      g.appendChild(fo);
+    } else {
+      const textEl = document.createElementNS(SVG_NS, 'text');
+      textEl.setAttribute('class', 'ev2-note-text');
+      textEl.setAttribute('x', String(note.x));
+      textEl.setAttribute('y', String(note.y - 8));
+      textEl.setAttribute('text-anchor', anchor);
+      textEl.textContent = note.text || ' ';
+      g.appendChild(textEl);
+    }
+
+    if (mode !== 'view') {
+      const handle = document.createElementNS(SVG_NS, 'circle');
+      handle.setAttribute('class', 'ev2-note-handle');
+      handle.setAttribute('cx', String(note.x));
+      handle.setAttribute('cy', String(note.y));
+      handle.setAttribute('r', '5');
+      g.appendChild(handle);
+    }
+
+    noteLayer.appendChild(g);
+  }
+
+  // ── Edge layer ───────────────────────────────────────────────────────────
+  const edgeLayer = svgEl.querySelector('#ev2-edge-layer') as SVGGElement;
+  edgeLayer.innerHTML = '';
+
+  // All glow lines go into one compositing group so their opacity is applied
+  // once to the full composite — overlapping strokes at vertices stay uniform.
+  const glowGroup = document.createElementNS(SVG_NS, 'g');
+  glowGroup.setAttribute('class', 'ev2-edge-glow-group');
+  glowGroup.setAttribute('pointer-events', 'none');
+  edgeLayer.appendChild(glowGroup);
+
+  for (const edge of edges) {
+    const pa = ptById(edge.a);
+    const pb = ptById(edge.b);
+    if (!pa || !pb) continue;
+
+    const glow = document.createElementNS(SVG_NS, 'line');
+    glow.setAttribute('class', 'ev2-edge-glow');
+    glow.setAttribute('x1', String(pa.x));
+    glow.setAttribute('y1', String(pa.y));
+    glow.setAttribute('x2', String(pb.x));
+    glow.setAttribute('y2', String(pb.y));
+    glowGroup.appendChild(glow);
+
+    if (mode === 'borders') {
+      const hit = document.createElementNS(SVG_NS, 'line');
+      hit.setAttribute('class', 'ev2-edge-hit');
+      hit.setAttribute('data-ev2-edge-id', edge.id);
+      hit.setAttribute('x1', String(pa.x));
+      hit.setAttribute('y1', String(pa.y));
+      hit.setAttribute('x2', String(pb.x));
+      hit.setAttribute('y2', String(pb.y));
+      hit.setAttribute('stroke', 'rgba(0,0,0,0.01)');
+      hit.setAttribute('stroke-width', '22');
+      hit.setAttribute('stroke-linecap', 'round');
+      hit.setAttribute('pointer-events', 'stroke');
+      edgeLayer.appendChild(hit);
+    }
+
+    const line = document.createElementNS(SVG_NS, 'line');
+    const edgeTerritories = edgeIndex.get(undirectedEdgeKey(edge.a, edge.b));
+    const isOuterEdge = edgeTerritories !== undefined && edgeTerritories.length === 1;
+    let cls = isOuterEdge ? 'ev2-edge ev2-edge-outer' : 'ev2-edge';
+    if (mode === 'borders' && selectedEdgeIds.has(edge.id)) cls += ' ev2-edge-selected';
+    line.setAttribute('class', cls);
+    if (mode === 'borders') line.setAttribute('data-ev2-edge-id', edge.id);
+    line.setAttribute('x1', String(pa.x));
+    line.setAttribute('y1', String(pa.y));
+    line.setAttribute('x2', String(pb.x));
+    line.setAttribute('y2', String(pb.y));
+    line.setAttribute('pointer-events', 'none');
+    edgeLayer.appendChild(line);
+  }
+
+  // ── Sector border layer ──────────────────────────────────────────────────
+  const sectorBorderLayer = svgEl.querySelector('#ev2-sector-border-layer') as SVGGElement;
+  sectorBorderLayer.innerHTML = '';
+  sectorBorderLayer.setAttribute('pointer-events', 'none');
+
+  if (sectors.length > 0) {
+    const territoryToSector = new Map<string, string>();
+    for (const s of sectors) {
+      for (const tid of s.territoryIds) {
+        territoryToSector.set(tid, s.id);
+      }
+    }
+    for (const edge of edges) {
+      const k = undirectedEdgeKey(edge.a, edge.b);
+      const terrs = edgeIndex.get(k);
+      if (!terrs || terrs.length !== 2) continue;
+      const sA = territoryToSector.get(terrs[0]!.id);
+      const sB = territoryToSector.get(terrs[1]!.id);
+      if (!sA || !sB || sA === sB) continue;
+      const pa = ptById(edge.a);
+      const pb = ptById(edge.b);
+      if (!pa || !pb) continue;
+      const line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('class', 'ev2-sector-border');
+      line.setAttribute('x1', String(pa.x));
+      line.setAttribute('y1', String(pa.y));
+      line.setAttribute('x2', String(pb.x));
+      line.setAttribute('y2', String(pb.y));
+      sectorBorderLayer.appendChild(line);
+    }
+  }
+
+  // ── Point layer ──────────────────────────────────────────────────────────
+  const pointLayer = svgEl.querySelector('#ev2-point-layer') as SVGGElement;
+  pointLayer.innerHTML = '';
+  pointLayer.style.pointerEvents = mode === 'territory' || mode === 'borders' ? 'none' : 'auto';
+  edgeLayer.style.pointerEvents = mode === 'territory' ? 'none' : 'auto';
+
+  if (mode !== 'view') {
+    const firstPathPointId = currentPath.length > 0 ? currentPath[0] : null;
+
+    for (const p of pts) {
+      const circle = document.createElementNS(SVG_NS, 'circle');
+      const isHovered = p.id === hoveredPoint;
+      const isCloseable = p.id === firstPathPointId && currentPath.length >= 3;
+      const isDeleteTarget = isRemovingDot && isHovered;
+
+      let cls = 'ev2-point';
+      if (isDeleteTarget)      cls += ' ev2-point-delete';
+      else if (isCloseable)    cls += ' ev2-point-closeable';
+      else if (isHovered)      cls += ' ev2-point-hover';
+
+      circle.setAttribute('class', cls);
+      circle.setAttribute('cx', String(p.x));
+      circle.setAttribute('cy', String(p.y));
+      circle.setAttribute('r', isHovered || isCloseable ? '7' : '5');
+      pointLayer.appendChild(circle);
+    }
+  }
+
+  // ── Preview layer ────────────────────────────────────────────────────────
+  const previewLayer = svgEl.querySelector('#ev2-preview-layer') as SVGGElement;
+  previewLayer.innerHTML = '';
+
+  updateBordersPanel();
+
+  if (mode === 'edit' && currentPath.length > 0) {
+    const lastId = currentPath[currentPath.length - 1];
+    const lastPt = ptById(lastId);
+    if (lastPt) {
+      const snapPt = findSnapPoint(cursorPos.x, cursorPos.y);
+      const tx = snapPt ? snapPt.x : cursorPos.x;
+      const ty = snapPt ? snapPt.y : cursorPos.y;
+
+      const previewLine = document.createElementNS(SVG_NS, 'line');
+      previewLine.setAttribute('class', 'ev2-preview-line');
+      previewLine.setAttribute('x1', String(lastPt.x));
+      previewLine.setAttribute('y1', String(lastPt.y));
+      previewLine.setAttribute('x2', String(tx));
+      previewLine.setAttribute('y2', String(ty));
+      previewLayer.appendChild(previewLine);
+    }
+  }
+}
+
+// ── Mode switching ────────────────────────────────────────────────────────────
+
+function setMode(newMode: 'edit' | 'borders' | 'territory' | 'sectors' | 'view'): void {
+  if (newMode !== 'sectors') {
+    selectedSectorTerritoryIds = new Set();
+    editingSectorId = null;
+  }
+  mode = newMode;
+  isRemovingDot = false;
+  isNoteTool = false;
+  currentPath = [];
+
+  btnEdit.classList.toggle('active', mode === 'edit');
+  btnBorders.classList.toggle('active', mode === 'borders');
+  btnTerritory.classList.toggle('active', mode === 'territory');
+  btnSectors.classList.toggle('active', mode === 'sectors');
+  btnView.classList.toggle('active', mode === 'view');
+
+  panelEdit.classList.toggle('hidden', mode !== 'edit');
+  panelBorders.classList.toggle('hidden', mode !== 'borders');
+  panelTerritory.classList.toggle('hidden', mode !== 'territory');
+  panelSectors.classList.toggle('hidden', mode !== 'sectors');
+
+  // Reset sub-tool button visuals
+  if (removeDotBtn) removeDotBtn.classList.remove('active');
+  if (noteToolBtn) noteToolBtn.classList.remove('active');
+
+  if (mode === 'edit') svgEl.style.cursor = 'crosshair';
+  else svgEl.style.cursor = 'default';
+
+  render();
+}
+
+// ── Remove point ──────────────────────────────────────────────────────────────
+
+function removePoint(ptId: string): void {
+  // Drop all territories that used this point (polygon is now invalid)
+  territories = territories.filter((t) => !t.pointIds.includes(ptId));
+  // Drop all edges touching this point
+  edges = edges.filter((e) => e.a !== ptId && e.b !== ptId);
+  // Drop the point itself
+  pts = pts.filter((p) => p.id !== ptId);
+  // Clean up current path
+  currentPath = currentPath.filter((id) => id !== ptId);
+}
+
+// ── Edit mode click handling ──────────────────────────────────────────────────
+
+function handleEditClick(e: MouseEvent): void {
+  const { x, y } = svgCoords(e);
+
+  // Remove-dot sub-mode: click a point to destroy it
+  if (isRemovingDot) {
+    const snap = findSnapPoint(x, y);
+    if (snap) { removePoint(snap.id); render(); }
+    return;
+  }
+
+  const snap = findSnapPoint(x, y);
+
+  if (snap) {
+    const snapId = snap.id;
+
+    if (currentPath.length > 0) {
+      const lastId = currentPath[currentPath.length - 1];
+
+      if (snapId !== lastId) {
+        addEdge(lastId, snapId);
+
+        if (currentPath.includes(snapId)) {
+          // Snapped to a point already in the path (first or intermediate) → close/end
+          currentPath = [];
+        } else {
+          currentPath.push(snapId);
+        }
+      }
+      // If snap === last point, ignore (no-op)
+    } else {
+      // Start a new path from this existing point
+      currentPath.push(snapId);
+    }
+  } else {
+    // Place a new point
+    const newPt: Pt = { id: newPtId(), x, y };
+    pts.push(newPt);
+    if (currentPath.length > 0) {
+      const lastId = currentPath[currentPath.length - 1];
+      addEdge(lastId, newPt.id);
+    }
+    currentPath.push(newPt.id);
+  }
+
+  render();
+}
+
+function handleNoteClick(e: MouseEvent): void {
+  const { x, y } = svgCoords(e);
+  notes.push({ id: newNoteId(), x, y, text: 'Note', align: 'center' });
+  render();
+}
+
+// ── Territory mode click handling ─────────────────────────────────────────────
+
+function applyTerritoryTool(t: Territory): void {
+  if (territoryTool === 'controlpoint') {
+    const existing = controlPoints.find((cp) => cp.territoryId === t.id);
+    if (existing) {
+      controlPoints = controlPoints.filter((cp) => cp.id !== existing.id);
+    } else {
+      controlPoints.push({ id: newCpId(), territoryId: t.id, name: t.id.toUpperCase() });
+    }
+  } else {
+    t.state = t.state === territoryTool ? 'neutral' : territoryTool;
+  }
+  render();
+}
+
+/**
+ * Nudges in SVG user space: ray tests on long edges and pixel-thin hit targets
+ * often sit exactly on a boundary; wiggle the probe until exactly one (or a clear) face wins.
+ */
+/** Large nudges would push out of very small 4-vertex (and similar) cells; try tiny first. */
+const PIP_NUDGE_PAIRS: Array<{ dx: number; dy: number }> = (() => {
+  const a = 0.01, b = 0.1, c = 0.5, d = 1.5, e = 3;
+  return [
+    { dx: 0, dy: 0 },
+    { dx: a, dy: 0 }, { dx: -a, dy: 0 }, { dx: 0, dy: a }, { dx: 0, dy: -a },
+    { dx: b, dy: 0 }, { dx: -b, dy: 0 }, { dx: 0, dy: b }, { dx: 0, dy: -b },
+    { dx: c, dy: 0 }, { dx: -c, dy: 0 }, { dx: 0, dy: c }, { dx: 0, dy: -c },
+    { dx: d, dy: 0 }, { dx: -d, dy: 0 }, { dx: 0, dy: d }, { dx: 0, dy: -d },
+    { dx: d, dy: d }, { dx: -d, dy: -d }, { dx: d, dy: -d }, { dx: -d, dy: d },
+    { dx: e, dy: 0 }, { dx: -e, dy: 0 },
+  ];
+})();
+
+/**
+ * Picks a single territory from SVG coords. With overlapping / self-intersecting
+ * loops, many territories can be “inside” for one (x,y); the smallest-area rule
+ * does not match paint order or the browser’s own hit test, so we use the same
+ * rule as the painter: last in `territories` is drawn on top and wins the click.
+ */
+function pickTerritoryAt(svgX: number, svgY: number): Territory | null {
+  for (const { dx, dy } of PIP_NUDGE_PAIRS) {
+    const x = svgX + dx;
+    const y = svgY + dy;
+    const inside: Territory[] = [];
+    for (const t of territories) {
+      if (pointInPolygon(x, y, territoryPoints(t))) inside.push(t);
+    }
+    if (inside.length === 0) continue;
+
+    if (inside.length === 1) return inside[0]!;
+
+    let best = inside[0]!;
+    let bestIdx = territories.indexOf(best);
+    for (let i = 1; i < inside.length; i++) {
+      const cand = inside[i]!;
+      const idx = territories.indexOf(cand);
+      if (idx > bestIdx) {
+        best = cand;
+        bestIdx = idx;
+      }
+    }
+    return best;
+  }
+  return null;
+}
+
+/**
+ * Topmost *filled* territory polygon (not border strokes) — matches what the user sees.
+ * Ignores thick inner border lines, which can sit over another face’s fill.
+ */
+function territoryIdFromTopFillPolygonAt(e: MouseEvent): string | null {
+  const stack = document.elementsFromPoint(e.clientX, e.clientY);
+  for (const item of stack) {
+    if (!(item instanceof Element) || !svgEl.contains(item)) continue;
+    if (item.localName !== 'polygon' || !item.classList.contains('ev2-territory-fill')) continue;
+    const g = item.parentElement;
+    if (g && g.hasAttribute('data-ev2-territory-id')) {
+      return g.getAttribute('data-ev2-territory-id')!;
+    }
+  }
+  return null;
+}
+
+function handleTerritoryClick(e: MouseEvent): void {
+  const fromFill = territoryIdFromTopFillPolygonAt(e);
+  if (fromFill) {
+    const t = territories.find((x) => x.id === fromFill);
+    if (t) { applyTerritoryTool(t); return; }
+  }
+  const { x, y } = svgCoords(e);
+  const t = pickTerritoryAt(x, y);
+  if (t) applyTerritoryTool(t);
+}
+
+// ── Sectors mode ──────────────────────────────────────────────────────────────
+
+function handleSectorsClick(e: MouseEvent): void {
+  const fromFill = territoryIdFromTopFillPolygonAt(e);
+  let t: Territory | null = null;
+  if (fromFill) {
+    t = territories.find((x) => x.id === fromFill) ?? null;
+  }
+  if (!t) {
+    const { x, y } = svgCoords(e);
+    t = pickTerritoryAt(x, y);
+  }
+  if (!t) return;
+  if (selectedSectorTerritoryIds.has(t.id)) {
+    selectedSectorTerritoryIds.delete(t.id);
+  } else {
+    selectedSectorTerritoryIds.add(t.id);
+  }
+  render();
+}
+
+function saveSector(): void {
+  const ids = [...selectedSectorTerritoryIds];
+  if (ids.length === 0) return;
+  if (editingSectorId) {
+    const existing = sectors.find((s) => s.id === editingSectorId);
+    if (existing) existing.territoryIds = ids;
+    editingSectorId = null;
+  } else {
+    sectors.push({ id: newSectorId(), name: `Sector ${sectors.length + 1}`, territoryIds: ids });
+  }
+  selectedSectorTerritoryIds = new Set();
+  render();
+}
+
+// ── Undo ──────────────────────────────────────────────────────────────────────
+
+function undo(): void {
+  if (currentPath.length === 0) return;
+
+  const removedId = currentPath.pop()!;
+
+  // Remove the edge connecting the previous point to the removed point
+  if (currentPath.length > 0) {
+    const prevId = currentPath[currentPath.length - 1];
+    const edgeIdx = edges.findIndex(
+      (e) => (e.a === prevId && e.b === removedId) || (e.a === removedId && e.b === prevId)
+    );
+    if (edgeIdx !== -1) edges.splice(edgeIdx, 1);
+  }
+
+  // Remove the point if it's not referenced by any remaining edge or territory
+  const isUsed =
+    edges.some((e) => e.a === removedId || e.b === removedId) ||
+    territories.some((t) => t.pointIds.includes(removedId));
+
+  if (!isUsed) {
+    pts = pts.filter((p) => p.id !== removedId);
+  }
+
+  render();
+}
+
+// ── Clear ─────────────────────────────────────────────────────────────────────
+
+function clearAll(): void {
+  pts = [];
+  edges = [];
+  territories = [];
+  controlPoints = [];
+  notes = [];
+  sectors = [];
+  currentPath = [];
+  hoveredPoint = null;
+  _ptCounter = 0;
+  _edgeCounter = 0;
+  _territoryCounter = 0;
+  _cpCounter = 0;
+  _noteCounter = 0;
+  _sectorCounter = 0;
+  selectedEdgeIds = new Set();
+  selectedTerritoryId = null;
+  bordersError = null;
+  render();
+}
+
+// ── Export / Import ───────────────────────────────────────────────────────────
+
+function exportState(): void {
+  const raw: TerritoryMapDef = {
+    version: 2,
+    pts,
+    edges,
+    territories,
+    controlPoints,
+    notes,
+    sectors,
+  };
+  const data = sanitizeTerritoryMapDef(raw);
+  const json = JSON.stringify(data, null, 2);
+  navigator.clipboard.writeText(json).then(() => {
+    const btn = document.getElementById('ev2-export-btn') as HTMLButtonElement;
+    const original = btn.textContent!;
+    btn.textContent = 'COPIED!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  }).catch(() => {
+    // Fallback: show in the import modal textarea (read-only)
+    const textarea = document.getElementById('ev2-import-textarea') as HTMLTextAreaElement;
+    textarea.value = json;
+    textarea.readOnly = true;
+    showImportModal();
+  });
+}
+
+function importFromJson(json: string): void {
+  const data = JSON.parse(json);
+  if (!Array.isArray(data.pts) || !Array.isArray(data.edges) || !Array.isArray(data.territories)) {
+    throw new Error('Invalid format: missing pts, edges, or territories arrays.');
+  }
+  const loaded: TerritoryMapDef = {
+    version: data.version,
+    pts: data.pts,
+    edges: data.edges,
+    territories: data.territories,
+    controlPoints: Array.isArray(data.controlPoints) ? data.controlPoints : [],
+    notes: Array.isArray(data.notes) ? data.notes : [],
+    sectors: Array.isArray(data.sectors) ? data.sectors : [],
+    adjacencyBlockPairs: Array.isArray(data.adjacencyBlockPairs) ? data.adjacencyBlockPairs : undefined,
+  };
+  const sanitized = sanitizeTerritoryMapDef(loaded);
+  pts = sanitized.pts as Pt[];
+  edges = sanitized.edges as Edge[];
+  territories = sanitized.territories as Territory[];
+  controlPoints = sanitized.controlPoints as ControlPoint[];
+  notes = (sanitized.notes ?? []) as Note[];
+  sectors = (sanitized.sectors ?? []) as Sector[];
+  currentPath = [];
+  hoveredPoint = null;
+  selectedEdgeIds = new Set();
+  selectedTerritoryId = null;
+  selectedSectorTerritoryIds = new Set();
+  editingSectorId = null;
+  bordersError = null;
+
+  // Restore counters from max IDs so new IDs don't collide
+  const maxNum = (arr: Array<{ id: string }>, prefix: string) =>
+    arr.reduce((m, x) => Math.max(m, parseInt(x.id.slice(prefix.length)) || 0), 0);
+  _ptCounter        = maxNum(pts, 'p');
+  _edgeCounter      = maxNum(edges, 'e');
+  _territoryCounter = maxNum(territories, 't');
+  _cpCounter        = maxNum(controlPoints, 'cp');
+  _noteCounter      = maxNum(notes, 'note');
+  _sectorCounter    = maxNum(sectors, 'sec');
+}
+
+function showImportModal(): void {
+  const modal = document.getElementById('ev2-import-modal') as HTMLElement;
+  const textarea = document.getElementById('ev2-import-textarea') as HTMLTextAreaElement;
+  modal.classList.remove('hidden');
+  textarea.readOnly = false;
+  textarea.focus();
+}
+
+function hideImportModal(): void {
+  const modal = document.getElementById('ev2-import-modal') as HTMLElement;
+  modal.classList.add('hidden');
+  const errorEl = document.getElementById('ev2-import-error') as HTMLElement;
+  errorEl.textContent = '';
+  errorEl.classList.add('hidden');
+}
+
+// ── Exported API ──────────────────────────────────────────────────────────────
+
+let _initialized = false;
+let _onBack: (() => void) | null = null;
+
+export function initMapEditor(onBack: () => void): void {
+  _onBack = onBack;
+
+  if (_initialized) return;
+  _initialized = true;
+
+  (document.getElementById('ev2-swatch-mountain-img') as HTMLImageElement | null)?.setAttribute('src', mountainPatternSrc);
+
+  overlayEl      = document.getElementById('map-editor-overlay') as HTMLElement;
+  svgEl          = document.getElementById('ev2-svg') as unknown as SVGSVGElement;
+  canvasAreaEl   = document.getElementById('ev2-canvas-area') as HTMLElement;
+  btnEdit        = document.getElementById('ev2-btn-edit') as HTMLButtonElement;
+  btnBorders     = document.getElementById('ev2-btn-borders') as HTMLButtonElement;
+  btnTerritory   = document.getElementById('ev2-btn-territory') as HTMLButtonElement;
+  btnView        = document.getElementById('ev2-btn-view') as HTMLButtonElement;
+  removeDotBtn   = document.getElementById('ev2-remove-dot-btn') as HTMLButtonElement;
+  noteToolBtn    = document.getElementById('ev2-note-tool-btn') as HTMLButtonElement;
+  panelEdit      = document.getElementById('ev2-panel-edit') as HTMLElement;
+  panelBorders   = document.getElementById('ev2-panel-borders') as HTMLElement;
+  panelTerritory = document.getElementById('ev2-panel-territory') as HTMLElement;
+  btnSectors     = document.getElementById('ev2-btn-sectors') as HTMLButtonElement;
+  panelSectors   = document.getElementById('ev2-panel-sectors') as HTMLElement;
+
+  // Create SVG layers
+  for (const id of ['ev2-outer-border-layer', 'ev2-territory-layer', 'ev2-edge-layer', 'ev2-sector-border-layer', 'ev2-cp-layer', 'ev2-note-layer', 'ev2-point-layer', 'ev2-preview-layer']) {
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('id', id);
+    svgEl.appendChild(g);
+  }
+
+  // SVG mouse events
+  svgEl.addEventListener('mousedown', (e: MouseEvent) => {
+    if (overlayEl.classList.contains('hidden')) return;
+    // Middle-click or space+left-click → pan
+    if (e.button === 1 || (e.button === 0 && spaceDown)) {
+      isPanning = true;
+      panStartClientX = e.clientX;
+      panStartClientY = e.clientY;
+      panStartPanX = panX;
+      panStartPanY = panY;
+      svgEl.style.cursor = 'grabbing';
+      e.preventDefault();
+      return;
+    }
+    if (mode === 'view' || mode === 'borders' || mode === 'sectors') return;
+    if (isRemovingDot) return;                  // remove-dot uses click, not drag
+    const { x, y } = svgCoords(e);
+    const snapNote = findSnapNote(x, y);
+    if (snapNote) {
+      dragNoteId = snapNote.id;
+      hasDragged = false;
+      e.preventDefault();
+      return;
+    }
+    const snap = findSnapPoint(x, y);
+    if (snap) {
+      dragPointId = snap.id;
+      hasDragged = false;
+      e.preventDefault();                       // prevent text selection while dragging
+    }
+  });
+
+  svgEl.addEventListener('mousemove', (e: MouseEvent) => {
+    if (overlayEl.classList.contains('hidden')) return;
+
+    if (isPanning) {
+      const dx = e.clientX - panStartClientX;
+      const dy = e.clientY - panStartClientY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasPanned = true;
+      panX = panStartPanX - dx / zoom;
+      panY = panStartPanY - dy / zoom;
+      updateViewBox();
+      render();
+      return;
+    }
+
+    const { x, y } = svgCoords(e);
+    cursorPos = { x, y };
+
+    if (dragNoteId) {
+      const note = notes.find(n => n.id === dragNoteId);
+      if (note) { note.x = x; note.y = y; hasDragged = true; }
+      svgEl.style.cursor = 'grabbing';
+      render();
+      return;
+    }
+
+    if (dragPointId) {
+      const pt = pts.find((p) => p.id === dragPointId);
+      if (pt) { pt.x = x; pt.y = y; hasDragged = true; }
+      svgEl.style.cursor = 'grabbing';
+      render();
+      return;
+    }
+
+    if (mode === 'borders') {
+      hoveredPoint = null;
+      svgEl.style.cursor = 'default';
+      render();
+      return;
+    }
+
+    const snap = findSnapPoint(x, y);
+    hoveredPoint = snap ? snap.id : null;
+    const snapNote = !snap ? findSnapNote(x, y) : null;
+    if ((snap || snapNote) && mode !== 'view') svgEl.style.cursor = 'grab';
+    else svgEl.style.cursor = mode === 'edit' && isRemovingDot ? 'cell'
+                             : mode === 'edit' ? 'crosshair'
+                             : 'default';
+    render();
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (isPanning) {
+      isPanning = false;
+      svgEl.style.cursor = spaceDown ? 'grab'
+                         : mode === 'edit' && isRemovingDot ? 'cell'
+                         : mode === 'edit' ? 'crosshair'
+                         : 'default';
+    }
+    if (dragNoteId) {
+      dragNoteId = null;
+      svgEl.style.cursor = mode === 'edit' && isRemovingDot ? 'cell'
+                         : mode === 'edit' ? 'crosshair'
+                         : 'default';
+    }
+    if (dragPointId) {
+      dragPointId = null;
+      svgEl.style.cursor = mode === 'edit' && isRemovingDot ? 'cell'
+                         : mode === 'edit' ? 'crosshair'
+                         : 'default';
+    }
+  });
+
+  svgEl.addEventListener('click', (e: MouseEvent) => {
+    if (overlayEl.classList.contains('hidden')) return;
+    if (hasPanned) { hasPanned = false; return; }     // was a pan, not a tap
+    if (hasDragged) { hasDragged = false; return; }  // was a drag, not a tap
+    if (mode === 'edit') {
+      if (isNoteTool) handleNoteClick(e);
+      else handleEditClick(e);
+    } else if (mode === 'borders') {
+      handleBordersClick(e);
+    } else if (mode === 'territory') {
+      handleTerritoryClick(e);
+    } else if (mode === 'sectors') {
+      handleSectorsClick(e);
+    }
+  });
+
+  // Keyboard
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (overlayEl.classList.contains('hidden')) return;
+    if (e.key === ' ' && !spaceDown) {
+      spaceDown = true;
+      if (!isPanning) svgEl.style.cursor = 'grab';
+      e.preventDefault();
+    }
+    if (e.key === 'Escape') {
+      if (mode === 'borders') {
+        selectedEdgeIds = new Set();
+        bordersError = null;
+        render();
+      } else {
+        currentPath = [];
+        render();
+      }
+    }
+    // Reset view: Home or 0
+    if (e.key === 'Home' || (e.key === '0' && !e.ctrlKey && !e.metaKey)) {
+      panX = 0; panY = 0; zoom = 1;
+      updateViewBox();
+      render();
+    }
+  });
+
+  window.addEventListener('keyup', (e: KeyboardEvent) => {
+    if (overlayEl.classList.contains('hidden')) return;
+    if (e.key === ' ') {
+      spaceDown = false;
+      if (!isPanning) {
+        svgEl.style.cursor = mode === 'edit' && isRemovingDot ? 'cell'
+                           : mode === 'edit' ? 'crosshair'
+                           : 'default';
+      }
+    }
+  });
+
+  // Wheel pan
+  svgEl.addEventListener('wheel', (e: WheelEvent) => {
+    if (overlayEl.classList.contains('hidden')) return;
+    e.preventDefault();
+    panX += e.deltaX / zoom;
+    panY += e.deltaY / zoom;
+    updateViewBox();
+    render();
+  }, { passive: false });
+
+  // Mode buttons
+  btnEdit.addEventListener('click', () => setMode('edit'));
+  btnBorders.addEventListener('click', () => setMode('borders'));
+  btnTerritory.addEventListener('click', () => setMode('territory'));
+  btnSectors.addEventListener('click', () => setMode('sectors'));
+  btnView.addEventListener('click', () => setMode('view'));
+
+  // Sectors panel
+  (document.getElementById('ev2-sectors-save-btn') as HTMLButtonElement)
+    .addEventListener('click', () => saveSector());
+  (document.getElementById('ev2-sectors-clear-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      selectedSectorTerritoryIds = new Set();
+      editingSectorId = null;
+      render();
+    });
+  (document.getElementById('ev2-sectors-cancel-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      editingSectorId = null;
+      selectedSectorTerritoryIds = new Set();
+      render();
+    });
+  document.getElementById('ev2-sector-list')?.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+    if (!b) return;
+    if (b.dataset.sectorDelete) {
+      sectors = sectors.filter((s) => s.id !== b.dataset.sectorDelete);
+      if (editingSectorId === b.dataset.sectorDelete) {
+        editingSectorId = null;
+        selectedSectorTerritoryIds = new Set();
+      }
+      render();
+      return;
+    }
+    if (b.dataset.sectorEdit) {
+      const s = sectors.find((x) => x.id === b.dataset.sectorEdit);
+      if (s) {
+        editingSectorId = s.id;
+        selectedSectorTerritoryIds = new Set(s.territoryIds);
+        render();
+      }
+    }
+  });
+  document.getElementById('ev2-sector-list')?.addEventListener('input', (e) => {
+    const input = e.target as HTMLInputElement;
+    if (!input.dataset.sectorId) return;
+    const s = sectors.find((x) => x.id === input.dataset.sectorId);
+    if (s) s.name = input.value;
+  });
+
+  (document.getElementById('ev2-borders-autodetect-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      const { added, skipped } = autoDetectTerritories();
+      if (added === 0 && skipped === 0) {
+        setBordersError('No closed regions found. Draw a connected graph with enclosed areas first.');
+      } else if (added === 0) {
+        setBordersError(`All ${skipped} detected region${skipped === 1 ? '' : 's'} already exist as territories.`);
+      } else {
+        setBordersError(null);
+        const msg = `Added ${added} territory${added === 1 ? '' : 'ies'}` +
+                    (skipped ? ` (${skipped} already existed).` : '.');
+        // Show a transient success message by briefly setting a non-error notice
+        const el = document.getElementById('ev2-borders-error')!;
+        el.textContent = msg;
+        el.classList.remove('hidden');
+        el.style.color = '#16a34a';
+        setTimeout(() => {
+          el.style.color = '';
+          el.classList.add('hidden');
+          el.textContent = '';
+        }, 2500);
+      }
+    });
+
+  (document.getElementById('ev2-borders-clear-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      selectedEdgeIds = new Set();
+      bordersError = null;
+      render();
+    });
+  (document.getElementById('ev2-borders-save-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      saveTerritoryFromSelection(false);
+    });
+  (document.getElementById('ev2-borders-replace-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      saveTerritoryFromSelection(true);
+    });
+  document.getElementById('ev2-territory-list')?.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+    if (!b) return;
+    e.preventDefault();
+    if (b.dataset.territoryDelete) {
+      const id = b.dataset.territoryDelete;
+      territories = territories.filter((t) => t.id !== id);
+      if (selectedTerritoryId === id) selectedTerritoryId = null;
+      bordersError = null;
+      render();
+      return;
+    }
+    if (b.dataset.territoryId) {
+      selectedTerritoryId = b.dataset.territoryId;
+      bordersError = null;
+      render();
+    }
+  });
+
+  // Territory tool selector
+  document.getElementById('ev2-territory-tool-selector')?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('[data-tool]') as HTMLElement | null;
+    if (!btn) return;
+    const tool = btn.dataset.tool as TerritoryTool;
+    territoryTool = tool;
+    document.querySelectorAll('#ev2-territory-tool-selector .ev2-tool-btn').forEach((b) => {
+      b.classList.toggle('active', (b as HTMLElement).dataset.tool === tool);
+    });
+  });
+
+  // CP list — delete button
+  document.getElementById('ev2-cp-list')?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('[data-cp-delete]') as HTMLElement | null;
+    if (!btn) return;
+    const id = btn.dataset.cpDelete!;
+    controlPoints = controlPoints.filter((cp) => cp.id !== id);
+    render();
+  });
+
+  // CP list — name input (live update, update SVG label without full re-render)
+  document.getElementById('ev2-cp-list')?.addEventListener('input', (e) => {
+    const input = (e.target as HTMLElement) as HTMLInputElement;
+    if (!input.dataset.cpId) return;
+    const cp = controlPoints.find((c) => c.id === input.dataset.cpId);
+    if (!cp) return;
+    cp.name = input.value;
+    const label = svgEl.querySelector<SVGTextElement>(`[data-cp-id="${cp.id}"] text`);
+    if (label) label.textContent = cp.name;
+  });
+
+  // Remove-dot toggle (within edit mode)
+  removeDotBtn.addEventListener('click', () => {
+    isRemovingDot = !isRemovingDot;
+    if (isRemovingDot) { isNoteTool = false; noteToolBtn.classList.remove('active'); }
+    removeDotBtn.classList.toggle('active', isRemovingDot);
+    svgEl.style.cursor = isRemovingDot ? 'cell' : 'crosshair';
+    render();
+  });
+
+  // Note tool toggle (within edit mode)
+  noteToolBtn.addEventListener('click', () => {
+    isNoteTool = !isNoteTool;
+    if (isNoteTool) { isRemovingDot = false; removeDotBtn.classList.remove('active'); }
+    noteToolBtn.classList.toggle('active', isNoteTool);
+    svgEl.style.cursor = 'crosshair';
+    render();
+  });
+
+  // Notes list — delete button
+  document.getElementById('ev2-notes-list')?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('[data-note-delete]') as HTMLElement | null;
+    if (btn) {
+      const id = btn.dataset.noteDelete!;
+      notes = notes.filter(n => n.id !== id);
+      render();
+      return;
+    }
+    const alignBtn = (e.target as HTMLElement).closest('[data-align]') as HTMLElement | null;
+    if (alignBtn && alignBtn.dataset.noteId) {
+      const note = notes.find(n => n.id === alignBtn.dataset.noteId);
+      if (note) {
+        note.align = alignBtn.dataset.align as Note['align'];
+        render();
+      }
+    }
+  });
+
+  // Notes list — text / maxWidth input (live update)
+  document.getElementById('ev2-notes-list')?.addEventListener('input', (e) => {
+    const input = e.target as HTMLInputElement;
+    if (!input.dataset.noteId) return;
+    const note = notes.find(n => n.id === input.dataset.noteId);
+    if (!note) return;
+    if (input.classList.contains('ev2-note-maxwidth-input')) {
+      const v = parseInt(input.value, 10);
+      note.maxWidth = !input.value || isNaN(v) || v <= 0 ? undefined : v;
+      render();
+    } else {
+      note.text = input.value;
+      // Quick DOM update without full render
+      const textEl = svgEl.querySelector<SVGTextElement>(`[data-note-id="${note.id}"] text`);
+      if (textEl) { textEl.textContent = note.text || ' '; return; }
+      const foDiv = svgEl.querySelector<HTMLElement>(`[data-note-id="${note.id}"] div`);
+      if (foDiv) foDiv.textContent = note.text || ' ';
+    }
+  });
+
+  const undoBtn = document.getElementById('ev2-undo-btn') as HTMLButtonElement;
+  undoBtn.addEventListener('click', () => undo());
+
+  const clearBtn = document.getElementById('ev2-clear-btn') as HTMLButtonElement;
+  clearBtn.addEventListener('click', () => clearAll());
+
+  const backBtn = document.getElementById('ev2-back-btn') as HTMLButtonElement;
+  backBtn.addEventListener('click', () => {
+    hideMapEditor();
+    _onBack?.();
+  });
+
+  // Export / Import
+  (document.getElementById('ev2-export-btn') as HTMLButtonElement)
+    .addEventListener('click', () => exportState());
+
+  (document.getElementById('ev2-import-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      const textarea = document.getElementById('ev2-import-textarea') as HTMLTextAreaElement;
+      textarea.value = '';
+      textarea.readOnly = false;
+      showImportModal();
+    });
+
+  (document.getElementById('ev2-import-confirm-btn') as HTMLButtonElement)
+    .addEventListener('click', () => {
+      const textarea = document.getElementById('ev2-import-textarea') as HTMLTextAreaElement;
+      const errorEl  = document.getElementById('ev2-import-error') as HTMLElement;
+      try {
+        importFromJson(textarea.value.trim());
+        hideImportModal();
+        render();
+      } catch (err) {
+        errorEl.textContent = err instanceof Error ? err.message : 'Failed to parse JSON.';
+        errorEl.classList.remove('hidden');
+      }
+    });
+
+  (document.getElementById('ev2-import-cancel-btn') as HTMLButtonElement)
+    .addEventListener('click', () => hideImportModal());
+
+  // Resize observer
+  const ro = new ResizeObserver(() => {
+    if (!overlayEl.classList.contains('hidden')) {
+      resizeSvg();
+      render();
+    }
+  });
+  ro.observe(canvasAreaEl);
+}
 
 export function showMapEditor(): void {
-  edState = mkState();
-  colsInput.value = '8';
-  rowsInput.value = '8';
-  gameModeSelect.value = 'domination';
-  scenarioSelect.value = edState.scenario;
-  unitPackageSelect.value = edState.unitPackage;
-  unitPackagePlayer2Select.value = edState.unitPackagePlayer2;
-  refreshToolbar();
-  renderBoard();
-  syncMapEditorSelectWidgets();
   overlayEl.classList.remove('hidden');
-  scheduleCenterMapEditorCanvas();
+
+  // Reset state
+  pts = [];
+  edges = [];
+  territories = [];
+  controlPoints = [];
+  notes = [];
+  sectors = [];
+  currentPath = [];
+  hoveredPoint = null;
+  cursorPos = { x: 0, y: 0 };
+  _ptCounter = 0;
+  _edgeCounter = 0;
+  _territoryCounter = 0;
+  _cpCounter = 0;
+  _noteCounter = 0;
+  _sectorCounter = 0;
+  isNoteTool = false;
+  dragNoteId = null;
+  territoryTool = 'allied';
+  panX = 0; panY = 0; zoom = 1;
+  isPanning = false; hasPanned = false; spaceDown = false;
+  selectedEdgeIds = new Set();
+  selectedTerritoryId = null;
+  selectedSectorTerritoryIds = new Set();
+  editingSectorId = null;
+  bordersError = null;
+
+  // Reset mode to edit
+  mode = 'edit';
+  isRemovingDot = false;
+  btnEdit.classList.add('active');
+  btnBorders.classList.remove('active');
+  btnTerritory.classList.remove('active');
+  btnSectors.classList.remove('active');
+  btnView.classList.remove('active');
+  removeDotBtn.classList.remove('active');
+  noteToolBtn.classList.remove('active');
+  panelEdit.classList.remove('hidden');
+  panelBorders.classList.add('hidden');
+  panelTerritory.classList.add('hidden');
+  panelSectors.classList.add('hidden');
+  svgEl.style.cursor = 'crosshair';
+
+  // Reset territory tool selector to 'allied'
+  document.querySelectorAll('#ev2-territory-tool-selector .ev2-tool-btn').forEach((b) => {
+    b.classList.toggle('active', (b as HTMLElement).dataset.tool === 'allied');
+  });
+
+  resizeSvg();
+  render();
 }
 
 export function hideMapEditor(): void {
