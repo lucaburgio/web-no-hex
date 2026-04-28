@@ -298,16 +298,12 @@ function findSubsetSummingToArea(
 }
 
 /**
- * Removes territories that duplicate an outer boundary after a **split without deleting the
- * original**: smaller territories lie inside the parent polygon, have the same `state`, and
- * their areas sum to the parent's area (planar partition). Common when auto-detect or
- * "save as new" adds faces **t63/t64** but leaves **t50** as the old enclosing ring.
- *
- * **Note:** dropping entries changes neutral/mountain **virtual column** indices (see
- * `assignTerritories` in {@link buildTerritoryGraph}); embedded saves for the same map id may
- * need a fresh match if the territory list was edited.
+ * Territory ids that {@link sanitizeTerritoryMapDef} would strip: an enclosing polygon whose
+ * interior is fully tiled by smaller same-`state` faces (same area sum). While those shells
+ * still exist in the editor, they share every map-boundary edge with a child face, so edge
+ * counts for “outer perimeter” must ignore these ids.
  */
-export function sanitizeTerritoryMapDef(mapDef: TerritoryMapDef): TerritoryMapDef {
+export function computeRedundantPartitionParentIds(mapDef: TerritoryMapDef): Set<string> {
   const pts: Record<string, { x: number; y: number }> = {};
   for (const p of mapDef.pts) pts[p.id] = { x: p.x, y: p.y };
 
@@ -350,15 +346,32 @@ export function sanitizeTerritoryMapDef(mapDef: TerritoryMapDef): TerritoryMapDe
     );
     if (subset && subset.length >= 2) {
       toRemove.add(P.id);
-      console.warn(
-        `[sanitizeTerritoryMapDef] Removed redundant territory "${P.id}" (${areaP.toFixed(1)} px²): ` +
-          `interior partition [${subset.join(', ')}] matches combined area. ` +
-          `Delete the parent in the editor when splitting a territory to avoid duplicate rings.`,
-      );
     }
   }
 
+  return toRemove;
+}
+
+/**
+ * Removes territories that duplicate an outer boundary after a **split without deleting the
+ * original**: smaller territories lie inside the parent polygon, have the same `state`, and
+ * their areas sum to the parent's area (planar partition). Common when auto-detect or
+ * "save as new" adds faces **t63/t64** but leaves **t50** as the old enclosing ring.
+ *
+ * **Note:** dropping entries changes neutral/mountain **virtual column** indices (see
+ * `assignTerritories` in {@link buildTerritoryGraph}); embedded saves for the same map id may
+ * need a fresh match if the territory list was edited.
+ */
+export function sanitizeTerritoryMapDef(mapDef: TerritoryMapDef): TerritoryMapDef {
+  const toRemove = computeRedundantPartitionParentIds(mapDef);
+
   if (toRemove.size === 0) return mapDef;
+
+  for (const id of toRemove) {
+    console.warn(
+      `[sanitizeTerritoryMapDef] Removed redundant territory "${id}" (obsolete enclosing ring after interior partition).`,
+    );
+  }
 
   const territories = mapDef.territories.filter(t => !toRemove.has(t.id));
   const controlPoints = mapDef.controlPoints.filter(cp => !toRemove.has(cp.territoryId));

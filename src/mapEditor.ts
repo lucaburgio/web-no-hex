@@ -1,7 +1,11 @@
 // ── Map editor — Polygon-based territory maps ───────────────────────────────
 
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
-import { sanitizeTerritoryMapDef, type TerritoryMapDef } from './territoryMap';
+import {
+  computeRedundantPartitionParentIds,
+  sanitizeTerritoryMapDef,
+  type TerritoryMapDef,
+} from './territoryMap';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -174,8 +178,8 @@ function addEdge(aId: string, bId: string): void {
  * signed area (in SVG coords where y increases downward) are interior faces;
  * the outer (infinite) face has negative area and is discarded.
  */
-function autoDetectTerritories(): { added: number; skipped: number } {
-  if (edges.length < 3) return { added: 0, skipped: 0 };
+function autoDetectTerritories(): { added: number; skipped: number; mergedParents: number } {
+  if (edges.length < 3) return { added: 0, skipped: 0, mergedParents: 0 };
 
   // Flat arrays keyed by half-edge index (edge i → HE 2i and 2i+1)
   const totalHE = edges.length * 2;
@@ -253,8 +257,9 @@ function autoDetectTerritories(): { added: number; skipped: number } {
     added++;
   }
 
+  const mergedParents = applySanitizeToEditorState();
   render();
-  return { added, skipped };
+  return { added, skipped, mergedParents };
 }
 
 // ── Close loop from selected border edges (Borders mode) ────────────────────
@@ -592,6 +597,7 @@ function saveTerritoryFromSelection(replace: boolean): void {
     setBordersError(null);
     selectedEdgeIds = new Set();
   }
+  applySanitizeToEditorState();
   render();
 }
 
@@ -852,6 +858,15 @@ function render(): void {
   territoryLayer.style.pointerEvents = mode === 'territory' ? 'auto' : 'none';
 
   const edgeIndex = buildEdgeTerritoryIndex();
+  const redundantPartitionParentIds = computeRedundantPartitionParentIds({
+    version: 2,
+    pts,
+    edges,
+    territories,
+    controlPoints,
+    notes,
+    sectors,
+  });
 
   // ── Outer border layer ───────────────────────────────────────────────────
   // Build a unified perimeter path from all outer edges (touching only 1 territory).
@@ -866,7 +881,9 @@ function render(): void {
     const outerSegments: Array<[Pt, Pt]> = [];
     for (const edge of edges) {
       const terrs = edgeIndex.get(undirectedEdgeKey(edge.a, edge.b));
-      if (!terrs || terrs.length !== 1) continue;
+      const effectiveTerrs =
+        terrs?.filter((t) => !redundantPartitionParentIds.has(t.id)) ?? [];
+      if (effectiveTerrs.length !== 1) continue;
       const pa = ptById(edge.a);
       const pb = ptById(edge.b);
       if (pa && pb) outerSegments.push([pa, pb]);
@@ -1492,6 +1509,34 @@ function clearAll(): void {
 
 // ── Export / Import ───────────────────────────────────────────────────────────
 
+/**
+ * Drops obsolete enclosing territories (same rule as export) so the live list matches
+ * gameplay geometry after subdividing a region.
+ */
+function applySanitizeToEditorState(): number {
+  const raw: TerritoryMapDef = {
+    version: 2,
+    pts,
+    edges,
+    territories,
+    controlPoints,
+    notes,
+    sectors,
+  };
+  const next = sanitizeTerritoryMapDef(raw);
+  const beforeIds = new Set(territories.map((t) => t.id));
+  const afterIds = new Set(next.territories.map((t) => t.id));
+  const removed = [...beforeIds].filter((id) => !afterIds.has(id));
+  if (removed.length === 0) return 0;
+  territories = next.territories as Territory[];
+  controlPoints = next.controlPoints as ControlPoint[];
+  sectors = (next.sectors ?? []) as Sector[];
+  if (selectedTerritoryId && removed.includes(selectedTerritoryId)) {
+    selectedTerritoryId = null;
+  }
+  return removed.length;
+}
+
 function exportState(): void {
   const raw: TerritoryMapDef = {
     version: 2,
@@ -1830,15 +1875,21 @@ export function initMapEditor(onBack: () => void): void {
 
   (document.getElementById('ev2-borders-autodetect-btn') as HTMLButtonElement)
     .addEventListener('click', () => {
-      const { added, skipped } = autoDetectTerritories();
+      const { added, skipped, mergedParents } = autoDetectTerritories();
       if (added === 0 && skipped === 0) {
         setBordersError('No closed regions found. Draw a connected graph with enclosed areas first.');
       } else if (added === 0) {
         setBordersError(`All ${skipped} detected region${skipped === 1 ? '' : 's'} already exist as territories.`);
       } else {
         setBordersError(null);
-        const msg = `Added ${added} territory${added === 1 ? '' : 'ies'}` +
-                    (skipped ? ` (${skipped} already existed).` : '.');
+        const mergeNote =
+          mergedParents > 0
+            ? ` Removed ${mergedParents} duplicate enclosing ${mergedParents === 1 ? 'territory' : 'territories'}.`
+            : '';
+        const msg =
+          `Added ${added} territory${added === 1 ? '' : 'ies'}` +
+          (skipped ? ` (${skipped} already existed).` : '.') +
+          mergeNote;
         // Show a transient success message by briefly setting a non-error notice
         const el = document.getElementById('ev2-borders-error')!;
         el.textContent = msg;

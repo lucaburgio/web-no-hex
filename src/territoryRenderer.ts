@@ -6,6 +6,7 @@
 
 import type { GameState, HexState, Owner, Unit } from './types';
 import type { TerritoryGraphData, TerritoryMapTerritory, TerritoryMapDef } from './territoryMap';
+import { computeRedundantPartitionParentIds } from './territoryMap';
 import { getValidMoves, isValidProductionPlacement, getRangedAttackTargets } from './game';
 import { ensureMovePathPreviewLayer, mountBoardUnitChipContents } from './renderer';
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
@@ -99,6 +100,7 @@ function buildOuterBorderPath(
   points: Record<string, { x: number; y: number }>,
   edgeTerritoryIndex: Map<string, string[]>,
 ): string {
+  const redundantPartitionParentIds = computeRedundantPartitionParentIds(mapDef);
   // Collect outer edge point-id keys
   const allKeys = new Set<string>();
   for (const t of mapDef.territories) {
@@ -109,7 +111,8 @@ function buildOuterBorderPath(
   const outerKeys: string[] = [];
   for (const key of allKeys) {
     const tids = edgeTerritoryIndex.get(key);
-    if (tids && tids.length === 1) outerKeys.push(key);
+    const effective = tids?.filter((tid) => !redundantPartitionParentIds.has(tid)) ?? [];
+    if (effective.length === 1) outerKeys.push(key);
   }
   if (outerKeys.length === 0) return '';
 
@@ -254,6 +257,7 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   svgEl.style.overflow = 'visible';
 
   const edgeTerritoryIndex = buildEdgeTerritoryIndex(mapDef);
+  const redundantPartitionParentIds = computeRedundantPartitionParentIds(mapDef);
 
   // ── Defs — same pattern IDs as map editor so CSS fill references resolve ──────
   const defs = mksvg('defs');
@@ -384,7 +388,9 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     glow.setAttribute('x2', String(pb.x)); glow.setAttribute('y2', String(pb.y));
     glowGroup.appendChild(glow);
 
-    const isOuter = (edgeTerritoryIndex.get(undirectedEdgeKey(edge.a, edge.b))?.length ?? 0) === 1;
+    const tids = edgeTerritoryIndex.get(undirectedEdgeKey(edge.a, edge.b));
+    const effective = tids?.filter((tid) => !redundantPartitionParentIds.has(tid)) ?? [];
+    const isOuter = effective.length === 1;
     const line = mksvg('line');
     line.setAttribute('class', isOuter ? 'ev2-edge ev2-edge-outer' : 'ev2-edge');
     line.setAttribute('x1', String(pa.x)); line.setAttribute('y1', String(pa.y));
