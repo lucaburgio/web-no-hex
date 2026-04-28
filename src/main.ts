@@ -212,6 +212,29 @@ function installGameAreaWheelScroll(): void {
 }
 installGameAreaWheelScroll();
 
+/**
+ * After the board SVG gets its width/height, scroll the page so the map is centered in the
+ * viewport. Padding on #game-area can skew default (0,0) scroll; this keeps the load view stable.
+ */
+function centerBoardInViewport(): void {
+  const wrap = boardWrapEl;
+  const root = document.scrollingElement ?? document.documentElement;
+  if (!wrap) return;
+  const run = (): void => {
+    const r = wrap.getBoundingClientRect();
+    if (r.width <= 0 && r.height <= 0) return;
+    const boardCx = r.left + r.width / 2;
+    const boardCy = r.top + r.height / 2;
+    const viewCx = window.innerWidth / 2;
+    const viewCy = window.innerHeight / 2;
+    root.scrollLeft += boardCx - viewCx;
+    root.scrollTop += boardCy - viewCy;
+  };
+  requestAnimationFrame(() => {
+    requestAnimationFrame(run);
+  });
+}
+
 /** Last move-path preview key; redraw only when unit position or hovered destination changes. */
 let movePathPreviewKey: string | null = null;
 let aiTurnPerfStartMs: number | null = null;
@@ -2979,6 +3002,7 @@ function startGame(initialState: GameState): void {
   updateUI();
   checkWinner();
   maybeAutoEnd();
+  centerBoardInViewport();
 }
 
 function updateHeaderModeLabel(s: GameState): void {
