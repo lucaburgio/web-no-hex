@@ -58,7 +58,6 @@ img {
   --color-yellow-100: #EDE1C7;
   --color-yellow-50: #FFFBF3;
 
-  --color-gray-700: #595959;
   --color-gray-600: #797979;
   --color-gray-500: #9E9E9E;
   --color-gray-400: #B0B0B0;
@@ -67,10 +66,7 @@ img {
   --color-gray-150: #d3d3d3;
   --color-gray-100: #DCDCDC;
   
-  --color-beige-600: #9a908c;
   --color-beige-500: #b2a8a5;
-  --color-beige-400: #c4bab7;
-  --color-beige-300: #d3cbc9;
   --color-dark: #000;
   --color-red-900: #932C2C;
   --color-red-700: #BD4E4E;
@@ -104,7 +100,8 @@ img {
     --color-production-disabled-enemy-stripe-light: #e6e6e6;
     --color-production-disabled-border: #d9d9d9;
     --color-unit-production-disabled: #999999;
-    --color-text-primary: #000000;
+    /* Territory map: trr-highlights stroke for the actively selected placement territory (hex board uses --color-hex-prod-stroke on the ring). */
+    --color-production-territory-selected-stroke: var(--color-hex-prod-stroke);
 
     /* ── Unit states ────────────────────────────────────────────────────────── */
     --color-unit-selected: var(--color-yellow-900);
@@ -123,7 +120,7 @@ img {
     --color-hex-prod-candidate-stroke: var(--color-production-territory-border);
     /* Production phase: hover on empty placement hexes (+) — see renderer (hex hit layer passes through) */
     --color-hex-prod-candidate-hover: #bdbdbd;
-    --color-hex-prod-selected: var(--color-yellow-50);
+    --color-hex-prod-selected: #B8B8B8;
     --color-hex-prod-stroke:   var(--color-yellow-500);
     --color-hex-zoc:           #d58f8f;
     /* Unconquered hexes: transparent so the game-area line texture shows through */

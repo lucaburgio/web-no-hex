@@ -789,7 +789,7 @@ export function renderTerritoryState(
     if (isProduction) {
       stroke =
         productionKey === key
-          ? 'var(--color-yellow-500)'
+          ? 'var(--color-production-territory-selected-stroke)'
           : 'var(--color-production-territory-border)';
     }
 
