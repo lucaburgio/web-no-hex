@@ -851,6 +851,10 @@ function shouldSuppressBorderOnEdge(
 }
 
 function render(): void {
+  // Keep territory list in sync with sanitize rules every frame so redundant enclosing
+  // rings never linger (which would zero-out outer-edge territory counts and hide the map border).
+  applySanitizeToEditorState();
+
   // Ensure defs element exists and is first
   let defsEl = svgEl.querySelector('defs') as SVGDefsElement | null;
   if (!defsEl) {

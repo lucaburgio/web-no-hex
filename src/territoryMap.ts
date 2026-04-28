@@ -278,6 +278,43 @@ function pointInPolygon(px: number, py: number, poly: Array<{ x: number; y: numb
 
 const MAX_PARTITION_SUBSET = 22;
 
+/** Undirected edge keys for a closed territory ring (consecutive point pairs). */
+function territoryUndirectedEdgeKeys(t: TerritoryMapTerritory): Set<string> {
+  const keys = new Set<string>();
+  const n = t.pointIds.length;
+  if (n < 2) return keys;
+  for (let i = 0; i < n; i++) {
+    const a = t.pointIds[i]!;
+    const b = t.pointIds[(i + 1) % n]!;
+    if (a === b) continue;
+    keys.add(undirectedTerritoryEdgeKey(a, b));
+  }
+  return keys;
+}
+
+/**
+ * True if every boundary segment of `parent` appears on at least one territory in `subsetIds`.
+ * Guards against false “partition” matches from area-sum coincidence alone.
+ */
+function partitionSubsetCoversParentEdges(
+  parent: TerritoryMapTerritory,
+  subsetIds: string[],
+  byId: Map<string, TerritoryMapTerritory>,
+): boolean {
+  const parentKeys = territoryUndirectedEdgeKeys(parent);
+  if (parentKeys.size === 0) return false;
+  const union = new Set<string>();
+  for (const id of subsetIds) {
+    const t = byId.get(id);
+    if (!t) return false;
+    for (const k of territoryUndirectedEdgeKeys(t)) union.add(k);
+  }
+  for (const k of parentKeys) {
+    if (!union.has(k)) return false;
+  }
+  return true;
+}
+
 function findSubsetSummingToArea(
   items: Array<{ id: string; area: number }>,
   target: number,
@@ -304,9 +341,10 @@ function findSubsetSummingToArea(
 
 /**
  * Territory ids that {@link sanitizeTerritoryMapDef} would strip: an enclosing polygon whose
- * interior is fully tiled by smaller same-`state` faces (same area sum). While those shells
- * still exist in the editor, they share every map-boundary edge with a child face, so edge
- * counts for “outer perimeter” must ignore these ids.
+ * interior is fully tiled by smaller same-`state` faces (same area sum **and** every parent
+ * boundary segment appears on some child in that subset). While those shells still exist in
+ * the editor, they share every map-boundary edge with a child face, so edge counts for “outer
+ * perimeter” must ignore these ids.
  */
 export function computeRedundantPartitionParentIds(mapDef: TerritoryMapDef): Set<string> {
   const pts: Record<string, { x: number; y: number }> = {};
@@ -324,6 +362,7 @@ export function computeRedundantPartitionParentIds(mapDef: TerritoryMapDef): Set
   );
 
   const toRemove = new Set<string>();
+  const byId = new Map(mapDef.territories.map(t => [t.id, t] as [string, TerritoryMapTerritory]));
 
   for (const P of sortedByAreaDesc) {
     if (toRemove.has(P.id)) continue;
@@ -349,7 +388,11 @@ export function computeRedundantPartitionParentIds(mapDef: TerritoryMapDef): Set
       areaP,
       PARTITION_AREA_EPS,
     );
-    if (subset && subset.length >= 2) {
+    if (
+      subset &&
+      subset.length >= 2 &&
+      partitionSubsetCoversParentEdges(P, subset, byId)
+    ) {
       toRemove.add(P.id);
     }
   }
@@ -359,50 +402,58 @@ export function computeRedundantPartitionParentIds(mapDef: TerritoryMapDef): Set
 
 /**
  * Removes territories that duplicate an outer boundary after a **split without deleting the
- * original**: smaller territories lie inside the parent polygon, have the same `state`, and
- * their areas sum to the parent's area (planar partition). Common when auto-detect or
- * "save as new" adds faces **t63/t64** but leaves **t50** as the old enclosing ring.
+ * original**: smaller territories lie inside the parent polygon, have the same `state`, their
+ * areas sum to the parent's area, and **every edge of the parent boundary appears on at least
+ * one** of those faces (planar partition). Common when auto-detect or "save as new" adds faces
+ * **t63/t64** but leaves **t50** as the old enclosing ring. Runs multiple passes so nested
+ * obsolete shells are removed in one call.
  *
  * **Note:** dropping entries changes neutral/mountain **virtual column** indices (see
  * `assignTerritories` in {@link buildTerritoryGraph}); embedded saves for the same map id may
  * need a fresh match if the territory list was edited.
  */
 export function sanitizeTerritoryMapDef(mapDef: TerritoryMapDef): TerritoryMapDef {
-  const toRemove = computeRedundantPartitionParentIds(mapDef);
+  const MAX_SANITIZE_PASSES = 48;
+  let cur: TerritoryMapDef = mapDef;
 
-  if (toRemove.size === 0) return mapDef;
+  for (let pass = 0; pass < MAX_SANITIZE_PASSES; pass++) {
+    const toRemove = computeRedundantPartitionParentIds(cur);
+    if (toRemove.size === 0) return cur;
 
-  for (const id of toRemove) {
-    console.warn(
-      `[sanitizeTerritoryMapDef] Removed redundant territory "${id}" (obsolete enclosing ring after interior partition).`,
-    );
+    for (const id of toRemove) {
+      console.warn(
+        `[sanitizeTerritoryMapDef] Removed redundant territory "${id}" (obsolete enclosing ring after interior partition).`,
+      );
+    }
+
+    const territories = cur.territories.filter(t => !toRemove.has(t.id));
+    const controlPoints = cur.controlPoints.filter(cp => !toRemove.has(cp.territoryId));
+    const sectors = (cur.sectors ?? [])
+      .map(s => ({
+        ...s,
+        territoryIds: s.territoryIds.filter(id => !toRemove.has(id)),
+      }))
+      .filter(s => s.territoryIds.length > 0);
+
+    let adjacencyBlockPairsFiltered = cur.adjacencyBlockPairs;
+    if (adjacencyBlockPairsFiltered?.length) {
+      adjacencyBlockPairsFiltered = adjacencyBlockPairsFiltered.filter(
+        ([a, b]) => !toRemove.has(a) && !toRemove.has(b),
+      );
+      if (adjacencyBlockPairsFiltered.length === 0) adjacencyBlockPairsFiltered = undefined;
+    }
+
+    const { adjacencyBlockPairs: _removedAbp, ...mapDefRest } = cur;
+    cur = {
+      ...mapDefRest,
+      territories,
+      controlPoints,
+      sectors,
+      ...(adjacencyBlockPairsFiltered?.length ? { adjacencyBlockPairs: adjacencyBlockPairsFiltered } : {}),
+    };
   }
 
-  const territories = mapDef.territories.filter(t => !toRemove.has(t.id));
-  const controlPoints = mapDef.controlPoints.filter(cp => !toRemove.has(cp.territoryId));
-  const sectors = (mapDef.sectors ?? [])
-    .map(s => ({
-      ...s,
-      territoryIds: s.territoryIds.filter(id => !toRemove.has(id)),
-    }))
-    .filter(s => s.territoryIds.length > 0);
-
-  let adjacencyBlockPairsFiltered = mapDef.adjacencyBlockPairs;
-  if (adjacencyBlockPairsFiltered?.length) {
-    adjacencyBlockPairsFiltered = adjacencyBlockPairsFiltered.filter(
-      ([a, b]) => !toRemove.has(a) && !toRemove.has(b),
-    );
-    if (adjacencyBlockPairsFiltered.length === 0) adjacencyBlockPairsFiltered = undefined;
-  }
-
-  const { adjacencyBlockPairs: _removedAbp, ...mapDefRest } = mapDef;
-  return {
-    ...mapDefRest,
-    territories,
-    controlPoints,
-    sectors,
-    ...(adjacencyBlockPairsFiltered?.length ? { adjacencyBlockPairs: adjacencyBlockPairsFiltered } : {}),
-  };
+  return cur;
 }
 
 /**
