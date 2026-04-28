@@ -18,7 +18,7 @@ import {
   getBoardNeighbors,
   getOpponentHomeGuardBlockedHexes,
 } from './game';
-import { ensureMovePathPreviewLayer, mountBoardUnitChipContents } from './renderer';
+import { ensureMovePathPreviewLayer, inlineIcon, mountBoardUnitChipContents } from './renderer';
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
 import outsideBorderPatternSrc from '../public/images/misc/outside-border-pattern.png';
 import zocPatternSrc from '../public/images/misc/zoc-pattern.png';
@@ -30,6 +30,9 @@ const TERRITORY_MOUNTAIN_CURSOR = "url('/icons/pointer.svg') 13 14, default";
 
 // Game-specific highlight colors (no map-editor equivalent)
 const STROKE_WIDTH_HIGHLIGHT = 2;
+/** Territory production marker: `public/icons/plus.svg` (preloaded in main via loadIconDefs). */
+const PROD_PLACEMENT_ICON_SRC = 'icons/plus.svg';
+const PROD_PLACEMENT_ICON_PX = 18;
 
 interface RendererState {
   graph: TerritoryGraphData;
@@ -816,35 +819,23 @@ export function renderTerritoryState(
       const nodePm = territories[t.id];
       if (!nodePm || !productionPlacementKeys.has(nodePm.virtualKey)) continue;
       if (productionKey != null && nodePm.virtualKey === productionKey) continue;
+      // Polygon centroid from buildTerritoryGraph (vertex average); matches unit/CP placement.
       const cx = nodePm.centroid.x;
       const cy = nodePm.centroid.y;
       const g = mksvg('g');
       g.setAttribute('data-territory-id', t.id);
       g.setAttribute('pointer-events', 'none');
-      const half = 9;
-      const sw = 1.5;
-      const dot = mksvg('circle');
-      dot.setAttribute('cx', String(cx));
-      dot.setAttribute('cy', String(cy));
-      dot.setAttribute('r', '2.5');
-      dot.setAttribute('fill', 'var(--color-dark)');
-      const lh = mksvg('line');
-      lh.setAttribute('x1', String(cx - half));
-      lh.setAttribute('y1', String(cy));
-      lh.setAttribute('x2', String(cx + half));
-      lh.setAttribute('y2', String(cy));
-      lh.setAttribute('stroke', 'var(--color-dark)');
-      lh.setAttribute('stroke-width', String(sw));
-      const lv = mksvg('line');
-      lv.setAttribute('x1', String(cx));
-      lv.setAttribute('y1', String(cy - half));
-      lv.setAttribute('x2', String(cx));
-      lv.setAttribute('y2', String(cy + half));
-      lv.setAttribute('stroke', 'var(--color-dark)');
-      lv.setAttribute('stroke-width', String(sw));
-      g.appendChild(dot);
-      g.appendChild(lh);
-      g.appendChild(lv);
+      const plus = inlineIcon(
+        PROD_PLACEMENT_ICON_SRC,
+        cx,
+        cy,
+        PROD_PLACEMENT_ICON_PX,
+        'var(--color-dark)',
+        '1',
+        'trr-prod-marker',
+      );
+      if (!plus) continue;
+      g.appendChild(plus);
       prodMarkerLayer.appendChild(g);
     }
   }

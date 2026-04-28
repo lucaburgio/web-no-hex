@@ -636,7 +636,7 @@ export async function loadIconDefs(iconPaths: string[]): Promise<void> {
   }));
 }
 
-function inlineIcon(
+export function inlineIcon(
   iconSrc: string | undefined,
   x: number,
   y: number,
