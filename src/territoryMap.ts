@@ -49,6 +49,12 @@ export interface TerritoryMapDef {
   controlPoints: TerritoryMapControlPoint[];
   notes?: TerritoryMapNote[];
   sectors?: TerritoryMapSector[];
+  /**
+   * Optional pairs of territory IDs that must **not** be graph-adjacent even when their
+   * polygons share edges (e.g. overlapping strip fragments). Removes both directions from
+   * the adjacency built from shared polygon edges.
+   */
+  adjacencyBlockPairs?: Array<[string, string]>;
 }
 
 /** A territory node in the processed graph */
@@ -161,7 +167,23 @@ export function buildTerritoryAdjacency(mapDef: TerritoryMapDef): Record<string,
     }
   }
 
+  applyAdjacencyBlockPairs(adjacency, mapDef.adjacencyBlockPairs);
+
   return adjacency;
+}
+
+function applyAdjacencyBlockPairs(
+  adjacency: Record<string, string[]>,
+  pairs: Array<[string, string]> | undefined,
+): void {
+  if (!pairs?.length) return;
+  for (const [a, b] of pairs) {
+    const la = adjacency[a];
+    const lb = adjacency[b];
+    if (!la || !lb) continue;
+    adjacency[a] = la.filter(id => id !== b);
+    adjacency[b] = lb.filter(id => id !== a);
+  }
 }
 
 function computeAvgAdjacentCentroidPx(

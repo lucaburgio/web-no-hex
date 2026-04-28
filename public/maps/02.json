@@ -2138,5 +2138,11 @@
         "align": "center"
       }
     ],
-    "sectors": []
+    "sectors": [],
+    "adjacencyBlockPairs": [
+      [
+        "t50",
+        "t63"
+      ]
+    ]
   }
