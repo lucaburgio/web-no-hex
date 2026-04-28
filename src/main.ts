@@ -176,6 +176,42 @@ const svg        = document.getElementById('board') as unknown as SVGSVGElement;
 const gameAreaEl = document.getElementById('game-area') as HTMLElement | null;
 const boardWrapEl = document.getElementById('board-wrap') as HTMLElement | null;
 
+/**
+ * Map editor pans with both wheel deltas at once (`panX += deltaX`, `panY += deltaY`).
+ * Native page scroll on `body` often follows only one axis per gesture; mirror editor behavior here.
+ */
+function installGameAreaWheelScroll(): void {
+  if (!gameAreaEl) return;
+  gameAreaEl.addEventListener(
+    'wheel',
+    (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return;
+      let dx = e.deltaX;
+      let dy = e.deltaY;
+      if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+        const linePx = 16;
+        dx *= linePx;
+        dy *= linePx;
+      } else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+        const root = document.scrollingElement ?? document.documentElement;
+        dx *= root.clientWidth;
+        dy *= root.clientHeight;
+      }
+      if (e.shiftKey && dx === 0 && dy !== 0) {
+        dx = dy;
+        dy = 0;
+      }
+      if (dx === 0 && dy === 0) return;
+      const root = document.scrollingElement ?? document.documentElement;
+      e.preventDefault();
+      root.scrollLeft += dx;
+      root.scrollTop += dy;
+    },
+    { passive: false },
+  );
+}
+installGameAreaWheelScroll();
+
 /** Last move-path preview key; redraw only when unit position or hovered destination changes. */
 let movePathPreviewKey: string | null = null;
 let aiTurnPerfStartMs: number | null = null;
