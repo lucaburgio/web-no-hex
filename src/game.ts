@@ -367,6 +367,28 @@ function spreadOnPassableRow(n: number, passableColumnsSorted: number[]): number
   );
 }
 
+/** Which home-territory slots receive starting units (same spread as {@link spreadOnPassableRow}). */
+function spreadHomeTerritorySlotIndices(n: number, slotCount: number): number[] {
+  const L = slotCount;
+  if (L === 0 || n <= 0) return [];
+  const slots = Array.from({ length: L }, (_, i) => i);
+  const m = Math.min(n, L);
+  if (m === 1) return [slots[Math.floor(L / 2)]!];
+  return Array.from({ length: m }, (_, i) =>
+    slots[Math.round((L - 1) * i / (m - 1))]!,
+  );
+}
+
+function sortTerritoryIdsByVirtualPosition(graph: TerritoryGraphData, ids: string[]): string[] {
+  return [...ids].sort((a, b) => {
+    const ta = graph.territories[a];
+    const tb = graph.territories[b];
+    if (!ta || !tb) return 0;
+    if (ta.virtualRow !== tb.virtualRow) return ta.virtualRow - tb.virtualRow;
+    return ta.virtualCol - tb.virtualCol;
+  });
+}
+
 /** Conquest: place control points with north/south balance and spacing (not clustered). */
 function pickControlPointHexes(cpCandidates: string[], want: number, cols: number, rows: number): string[] {
   if (want <= 0 || cpCandidates.length === 0) return [];
@@ -3933,7 +3955,7 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
     mapInferredAttacker !== undefined &&
     desiredBreakthroughAttacker !== mapInferredAttacker;
 
-  // Place one unit per home territory (breakthrough: swap spawn lists if settings assign P1 the opposite role vs map)
+  // Breakthrough: swap spawn lists if settings assign P1 the opposite role vs map
   const playerSpawnTerritoryIds =
     gameMode === 'breakthrough' && swapBreakthroughSpawnSides
       ? graph.aiHomeTerritoryIds
@@ -3943,12 +3965,27 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
       ? graph.playerHomeTerritoryIds
       : graph.aiHomeTerritoryIds;
 
+  let playerStartingUnits = config.startingUnitsPlayer1;
+  let aiStartingUnits = config.startingUnitsPlayer2;
+  if (gameMode === 'breakthrough' && desiredBreakthroughAttacker !== undefined) {
+    const att = desiredBreakthroughAttacker;
+    playerStartingUnits = att === PLAYER ? config.startingUnitsAttacker : config.startingUnitsDefender;
+    aiStartingUnits = att === AI ? config.startingUnitsAttacker : config.startingUnitsDefender;
+  }
+
+  const sortedPlayerTids = sortTerritoryIdsByVirtualPosition(graph, playerSpawnTerritoryIds);
+  const sortedAiTids = sortTerritoryIdsByVirtualPosition(graph, aiSpawnTerritoryIds);
+  const playerSlotIndices = spreadHomeTerritorySlotIndices(playerStartingUnits, sortedPlayerTids.length);
+  const aiSlotIndices = spreadHomeTerritorySlotIndices(aiStartingUnits, sortedAiTids.length);
+
   const units: Unit[] = [
-    ...playerSpawnTerritoryIds.map(id => {
+    ...playerSlotIndices.map(slotIdx => {
+      const id = sortedPlayerTids[slotIdx]!;
       const t = graph.territories[id]!;
       return makeUnit(PLAYER, t.virtualCol, t.virtualRow);
     }),
-    ...aiSpawnTerritoryIds.map(id => {
+    ...aiSlotIndices.map(slotIdx => {
+      const id = sortedAiTids[slotIdx]!;
       const t = graph.territories[id]!;
       return makeUnit(AI, t.virtualCol, t.virtualRow);
     }),

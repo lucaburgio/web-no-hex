@@ -43,7 +43,6 @@ import {
   renderTerritoryState,
   getTerritoryFromEvent,
 } from './territoryRenderer';
-import tutorialMapDef from '../public/maps/tutorial.json';
 const _TERRITORY_MAP_MODULES = import.meta.glob('../public/maps/*.json', { eager: true, import: 'default' }) as Record<string, unknown>;
 const TERRITORY_MAPS_LIST: Array<{ id: string; def: unknown }> = Object.entries(_TERRITORY_MAP_MODULES).map(([path, def]) => ({
   id: path.replace('../public/maps/', '').replace('.json', ''),
@@ -469,7 +468,7 @@ function createInitialStateForMenu(): GameState {
   const mapEntry = mapId
     ? TERRITORY_MAPS_LIST.find(m => m.id === mapId)
     : TERRITORY_MAPS_LIST[0];
-  const mapDef = mapEntry?.def ?? tutorialMapDef;
+  const mapDef = mapEntry?.def ?? TERRITORY_MAPS_LIST[0]?.def;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return createInitialStateFromTerritoryMap(mapDef as any, config.gameMode);
 }
@@ -2143,22 +2142,6 @@ settingsBackBtn.addEventListener('click', () => {
   hideSettings();
   showMainMenu();
 });
-
-// ── Tutorial map buttons ───────────────────────────────────────────────────────
-
-function startTutorialMap(mode: GameMode): void {
-  hideSettings();
-  hideMainMenu();
-  gameMode = 'vsAI';
-  localPlayer = PLAYER;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const initialState = createInitialStateFromTerritoryMap(tutorialMapDef as any, mode);
-  startGame(initialState);
-}
-
-document.getElementById('tutorial-domination-btn')?.addEventListener('click', () => startTutorialMap('domination'));
-document.getElementById('tutorial-conquest-btn')?.addEventListener('click', () => startTutorialMap('conquest'));
-document.getElementById('tutorial-breakthrough-btn')?.addEventListener('click', () => startTutorialMap('breakthrough'));
 
 // Broadcast settings changes to P2 in real-time when hosting a multiplayer game
 settingsOverlayEl.addEventListener('change', broadcastSettingsPreview);
