@@ -542,7 +542,17 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   min-width: max-content;
   flex: 1;
   align-items: center;
-  padding: 40px 0 72px;
+  /*
+   * Extra space inside the scrollable page around the map so you can pan past the map edges
+   * before hitting the body scroll limit. Base top/bottom (40px / 72px) keeps clearance under
+   * the fixed header and above the fixed footer; margin vars add scroll slack (set Y > 0 for
+   * more vertical pan room beyond that baseline).
+   */
+  --game-area-map-scroll-margin-x: 120px;
+  --game-area-map-scroll-margin-y: 0px;
+  padding: calc(40px + var(--game-area-map-scroll-margin-y))
+    var(--game-area-map-scroll-margin-x)
+    calc(72px + var(--game-area-map-scroll-margin-y));
   /* Distance outside the board bbox over which the line texture fades to transparent (see gameAreaBoardTexture.ts). */
   --game-area-board-texture-fade: min(36vw, 320px);
 }
