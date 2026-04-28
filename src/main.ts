@@ -4407,41 +4407,56 @@ function updateUI(): void {
 
   // Breakthrough toast
   if (isBreakthrough) {
-    const attOwner = getBreakthroughAttackerOwner(state);
-    const defOwner = getBreakthroughDefenderOwner(state);
-    const youAreAttacker = localPlayer === attOwner;
-    const activeSid = breakthroughActiveFrontlineSectorIndex(state);
-    const cpOccupation = activeSid !== null ? (state.breakthroughCpOccupation?.[activeSid] ?? 0) : 0;
-    const defUnitsOnAttackerSector = state.units.some(u => {
-      if (u.owner !== defOwner) return false;
-      const sid = state.sectorIndexByHex?.[`${u.col},${u.row}`];
-      return sid !== undefined && state.sectorOwners![sid] === attOwner;
-    });
-    let toastText: string;
-    let toastVariant: 'gray' | 'yellow' | 'red';
-    if (!youAreAttacker && defUnitsOnAttackerSector) {
-      toastText = "You lost the sector. Your units have a combat malus if they do not retreat";
-      toastVariant = 'red';
-    } else if (cpOccupation > 0) {
-      if (youAreAttacker) {
-        toastText = "We're taking the sector, keep your unit to hold it";
-      } else {
-        const turns = 2 - cpOccupation;
-        toastText = `They're taking the sector, remove their units before ${turns} turn${turns !== 1 ? 's' : ''}`;
-      }
-      toastVariant = 'yellow';
-    } else {
-      toastText = youAreAttacker ? "You're the attacker. Conquer the control point to own the sector." : "You're the defender. Hold the control point to keep the sector.";
-      toastVariant = 'gray';
-    }
-    breakthroughToastEl.textContent = toastText;
-    breakthroughToastEl.className = `toast-${toastVariant}`;
-    if (toastVariant === 'yellow') {
-      breakthroughScreenFrameEl.className = 'breakthrough-screen-frame frame-yellow';
-    } else if (toastVariant === 'red') {
-      breakthroughScreenFrameEl.className = 'breakthrough-screen-frame frame-red';
-    } else {
+    if (state.winner) {
+      breakthroughToastEl.className = 'hidden';
       breakthroughScreenFrameEl.className = 'hidden';
+    } else {
+      const attOwner = getBreakthroughAttackerOwner(state);
+      const defOwner = getBreakthroughDefenderOwner(state);
+      const youAreAttacker = localPlayer === attOwner;
+      const activeSid = breakthroughActiveFrontlineSectorIndex(state);
+      const cpOccupation = activeSid !== null ? (state.breakthroughCpOccupation?.[activeSid] ?? 0) : 0;
+      const defUnitsOnAttackerSector = state.units.some(u => {
+        if (u.owner !== defOwner) return false;
+        const sid = state.sectorIndexByHex?.[`${u.col},${u.row}`];
+        return sid !== undefined && state.sectorOwners![sid] === attOwner;
+      });
+      const allSectorsAttacker =
+        state.sectorOwners!.length > 0 && state.sectorOwners!.every(o => o === attOwner);
+      let toastText: string;
+      let toastVariant: 'gray' | 'yellow' | 'red';
+      if (allSectorsAttacker) {
+        toastText = youAreAttacker
+          ? 'All sectors are yours — victory is incoming.'
+          : 'All sectors have fallen.';
+        toastVariant = 'gray';
+      } else if (!youAreAttacker && defUnitsOnAttackerSector) {
+        toastText =
+          'You are in attacker-held territory. Your units fight at reduced strength until they leave.';
+        toastVariant = 'red';
+      } else if (cpOccupation > 0 && activeSid !== null) {
+        if (youAreAttacker) {
+          toastText = 'Hold the control point one more round to secure this sector.';
+        } else {
+          const turns = 2 - cpOccupation;
+          toastText = `They will capture this sector in ${turns} round${turns !== 1 ? 's' : ''} unless you dislodge them.`;
+        }
+        toastVariant = 'yellow';
+      } else {
+        toastText = youAreAttacker
+          ? 'Capture the active control point and hold it for two full rounds to take each sector.'
+          : 'Defend the active control point — the attacker must hold it two full rounds to capture the sector.';
+        toastVariant = 'gray';
+      }
+      breakthroughToastEl.textContent = toastText;
+      breakthroughToastEl.className = `toast-${toastVariant}`;
+      if (toastVariant === 'yellow') {
+        breakthroughScreenFrameEl.className = 'breakthrough-screen-frame frame-yellow';
+      } else if (toastVariant === 'red') {
+        breakthroughScreenFrameEl.className = 'breakthrough-screen-frame frame-red';
+      } else {
+        breakthroughScreenFrameEl.className = 'hidden';
+      }
     }
   } else {
     breakthroughToastEl.className = 'hidden';

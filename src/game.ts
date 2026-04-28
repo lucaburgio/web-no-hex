@@ -555,13 +555,65 @@ export function breakthroughActiveFrontlineSectorIndex(state: GameState): number
 /** Breakthrough: only show the current frontline control point. */
 function breakthroughRefreshActiveControlPoint(state: GameState): void {
   if (state.gameMode !== 'breakthrough') return;
-  const sid = breakthroughActiveFrontlineSectorIndex(state);
-  if (sid === null) {
-    state.controlPointHexes = [];
-    return;
-  }
-  const cp = state.sectorControlPointHex[sid];
+  const cp = breakthroughFrontlineCpKey(state);
   state.controlPointHexes = cp ? [cp] : [];
+}
+
+/** Active frontline sector CP key, or null if none (e.g. all sectors captured). */
+function breakthroughFrontlineCpKey(state: GameState): string | null {
+  if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return null;
+  const sid = breakthroughActiveFrontlineSectorIndex(state);
+  if (sid === null) return null;
+  const cp = state.sectorControlPointHex[sid];
+  return cp || null;
+}
+
+/**
+ * Map editors often omit neutral/interior territories from sector lists; those tiles would be missing
+ * from {@link GameState.sectorIndexByHex}, breaking breakthrough malus, CP progression, and capture ownership.
+ * Assign every passable territory to a sector via multi-source BFS along adjacency (deterministic first wave),
+ * then assign any disconnected leftovers to the first defender sector.
+ */
+function expandBreakthroughSectorHexesForTerritoryMap(
+  graph: TerritoryGraphData,
+  sectorHexes: string[][],
+  attackerSectorIdx: number,
+): string[][] {
+  const nSec = graph.sectors.length;
+  if (nSec === 0) return sectorHexes.map(s => [...s]);
+  const out = sectorHexes.map(s => [...s]);
+  const tidToSectorIdx = new Map<string, number>();
+  for (let s = 0; s < nSec; s++) {
+    for (const tid of graph.sectors[s]!.territoryIds) {
+      const node = graph.territories[tid];
+      if (!node || node.state === 'mountain') continue;
+      tidToSectorIdx.set(tid, s);
+    }
+  }
+  const visited = new Set(tidToSectorIdx.keys());
+  const queue: { tid: string; sid: number }[] = [...tidToSectorIdx.entries()].map(([tid, sid]) => ({ tid, sid }));
+  while (queue.length) {
+    const { tid, sid } = queue.shift()!;
+    for (const nb of graph.adjacency[tid] ?? []) {
+      if (visited.has(nb)) continue;
+      const nbNode = graph.territories[nb];
+      if (!nbNode || nbNode.state === 'mountain') continue;
+      visited.add(nb);
+      tidToSectorIdx.set(nb, sid);
+      out[sid]!.push(nbNode.virtualKey);
+      queue.push({ tid: nb, sid });
+    }
+  }
+  const fallbackSid = graph.sectors.findIndex((_, i) => i !== attackerSectorIdx);
+  const orphanSid = fallbackSid >= 0 ? fallbackSid : 0;
+  for (const tid of graph.passableTerritoryIds) {
+    if (tidToSectorIdx.has(tid)) continue;
+    const node = graph.territories[tid];
+    if (!node || node.state === 'mountain') continue;
+    tidToSectorIdx.set(tid, orphanSid);
+    out[orphanSid]!.push(node.virtualKey);
+  }
+  return out;
 }
 
 // ── Hex territory ─────────────────────────────────────────────────────────────
@@ -3750,12 +3802,13 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
     const defenderOwner: Owner = attackerOwner === AI ? PLAYER : AI;
 
     const sectorOwners: Owner[] = graph.sectors.map((_, i) => i === attackerSectorIdx ? attackerOwner : defenderOwner);
-    const sectorHexes = graph.sectors.map(sec =>
+    let sectorHexes = graph.sectors.map(sec =>
       sec.territoryIds
         .map(id => graph.territories[id])
         .filter(t => t && t.state !== 'mountain')
         .map(t => t!.virtualKey),
     );
+    sectorHexes = expandBreakthroughSectorHexesForTerritoryMap(graph, sectorHexes, attackerSectorIdx);
     const sectorIndexByHex: Record<string, number> = {};
     sectorHexes.forEach((hexes, i) => { for (const k of hexes) sectorIndexByHex[k] = i; });
 
@@ -3776,7 +3829,20 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
 
     primeInitialBreakthroughProductionHexes(hexStates, mountainHexes);
 
-    const controlPointHexes: string[] = [];
+    const nSec = graph.sectors.length;
+    const frontlineIdx =
+      attackerOwner === PLAYER
+        ? sectorOwners.findIndex(o => o !== attackerOwner)
+        : (() => {
+            for (let i = nSec - 1; i >= 0; i--) {
+              if (sectorOwners[i] !== attackerOwner) return i;
+            }
+            return -1;
+          })();
+    const controlPointHexes =
+      frontlineIdx >= 0 && sectorControlPointHex[frontlineIdx]
+        ? [sectorControlPointHex[frontlineIdx]!]
+        : [];
 
     const pp: Record<Owner, number> = { 1: 0, 2: 0 };
     pp[attackerOwner] = config.breakthroughAttackerStartingPP;
