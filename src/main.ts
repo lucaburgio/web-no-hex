@@ -2412,7 +2412,7 @@ function buildRulesContent(): string {
       <div class="rules-group-title">Movement</div>
       <ul class="rules-list">
       <li>Each unit may move up to its movement range per turn (see <strong>Units in this match</strong>). Moving onto an empty hex <strong>conquers</strong> it.</li>
-      <li><strong>Polygon scenario maps:</strong> you move between territories that share a <strong>border edge</strong> (same as the map editor&rsquo;s internal adjacency), not merely a corner contact.</li>
+      <li><strong>Polygon scenario maps:</strong> you move between territories that share a <strong>border edge</strong> (same as the map editor&rsquo;s internal adjacency), not merely a corner contact. Long borders can cost more than one movement point in a single move (scaled from territory spacing), so infantry may need multiple turns to close long stretches.</li>
       <li>Moving onto an enemy unit triggers <strong>combat</strong>. If you need more than one hex to reach them, you move along the path into the hex adjacent to the enemy first, then combat resolves.</li>
       <li><strong>Artillery:</strong> each turn you either <strong>move</strong> one hex or fire a <strong>ranged attack</strong> at an enemy ${arRanged} (not both). Ranged fire does not use movement into the target&rsquo;s hex.
         On polygon scenario maps, maximum range also respects straight-line distance between territory centers (not only abstract connection hops), so artillery cannot shoot targets that are visually far away because the graph path is short.</li>
