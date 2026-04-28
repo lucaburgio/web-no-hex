@@ -410,6 +410,7 @@ const config: GameConfig = {
   upgradeBonusDefensePerStack: 0.1,
   /** Added to healOwnTerritory for end-of-turn heal on own territory. */
   upgradeBonusHealPerStack: 1,
+  maxUnitUpgradeStacks: 3,
 
   // Duration in ms for the unit move animation (0 = instant)
   unitMoveSpeed: 480,

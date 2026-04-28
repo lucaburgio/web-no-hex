@@ -830,7 +830,7 @@ function packageForUnitOnBoard(unit: Unit, state: GameState | null | undefined):
 function boardUnitUpgradeStarCount(unit: Unit): number {
   const n =
     unit.upgradeAttack + unit.upgradeDefense + unit.upgradeFlanking + unit.upgradeHeal;
-  return Math.min(5, Math.max(0, n));
+  return Math.min(config.maxUnitUpgradeStacks, Math.max(0, n));
 }
 
 function mapUnitHpFillColor(

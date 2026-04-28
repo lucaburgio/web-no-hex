@@ -32,6 +32,7 @@ import {
   isHexBlockedByOpponentHomeGuardOnly,
   playerApplyUnitUpgrade,
   resolvePendingAiUpgradeChoices,
+  totalUnitUpgradeStacks,
   unitTypeForUnit,
   unitShowsBoardPointerHover,
   type EndProductionOptions,
@@ -2435,7 +2436,7 @@ function buildRulesContent(): string {
         (max ${config.maxFlankingUnits} flankers = +${maxFlankBonus}%), in fixed neighbor order.
         Some unit types add <strong>extra flanking</strong> when they are among those adjacent flankers.</li>
       <li><strong>Damage:</strong> <code>floor(${config.combatDamageBase} × exp(±ΔCS / ${config.combatStrengthScale}))</code>, min 1 per side.</li>
-      <li><strong>Upgrade points:</strong> in <strong>adjacent combat</strong>, each side earns <strong>${config.upgradePointsPerDamageDealt}</strong> point per HP of damage it actually deals to the other, plus <strong>${config.upgradePointsKillBonus}</strong> extra if it destroys that unit. <strong>Ranged fire</strong> only damages the target (no return shot), so only the firing unit earns points from that exchange. Required points to level up depend on unit type (shown on the movement unit card). When you have enough points during movement, choose one upgrade: <strong>+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%</strong> CS per flanker when attacking (up to <strong>${Math.round(config.upgradeBonusFlankingPerStack * config.maxFlankingUnits * 100)}%</strong> with ${config.maxFlankingUnits} flankers), <strong>+${Math.round(config.upgradeBonusAttackPerStack * 100)}%</strong> CS when attacking, <strong>+${Math.round(config.upgradeBonusDefensePerStack * 100)}%</strong> CS when defending, or <strong>+${config.upgradeBonusHealPerStack}</strong> HP to your end-of-turn heal on own territory (stacks if you pick the same option again).</li>
+      <li><strong>Upgrade points:</strong> in <strong>adjacent combat</strong>, each side earns <strong>${config.upgradePointsPerDamageDealt}</strong> point per HP of damage it actually deals to the other, plus <strong>${config.upgradePointsKillBonus}</strong> extra if it destroys that unit. <strong>Ranged fire</strong> only damages the target (no return shot), so only the firing unit earns points from that exchange. A unit can have at most <strong>${config.maxUnitUpgradeStacks}</strong> upgrades total (stars on the card); at that cap it earns no further points and the upgrade menu does not appear. Required points to level up depend on unit type (shown on the movement unit card). When you have enough points during movement, choose one upgrade: <strong>+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%</strong> CS per flanker when attacking (up to <strong>${Math.round(config.upgradeBonusFlankingPerStack * config.maxFlankingUnits * 100)}%</strong> with ${config.maxFlankingUnits} flankers), <strong>+${Math.round(config.upgradeBonusAttackPerStack * 100)}%</strong> CS when attacking, <strong>+${Math.round(config.upgradeBonusDefensePerStack * 100)}%</strong> CS when defending, or <strong>+${config.upgradeBonusHealPerStack}</strong> HP to your end-of-turn heal on own territory (stacks if you pick the same option again).</li>
       <li>If defender dies: attacker advances and conquers the hex. If both die: both removed.</li>
       <li>Hover over an enemy unit during movement to see a combat forecast.</li>
     </ul>
@@ -3118,21 +3119,12 @@ function spectatorInspectIdForBoard(): number | null {
   return vsHumanOffTurnInspectUnitId;
 }
 
-function totalUpgradeTiers(unit: Unit): number {
-  return (
-    (unit.upgradeFlanking ?? 0) +
-    (unit.upgradeAttack ?? 0) +
-    (unit.upgradeDefense ?? 0) +
-    (unit.upgradeHeal ?? 0)
-  );
-}
-
 function patchMovementUnitCardStars(unit: Unit): void {
   const surface = movementUnitCardEl.querySelector('.movement-unit-card-surface');
   if (!surface) return;
   const starsWrap = surface.querySelector('.movement-unit-card-stars');
   if (!starsWrap) return;
-  const filled = Math.min(3, totalUpgradeTiers(unit));
+  const filled = Math.min(config.maxUnitUpgradeStacks, totalUnitUpgradeStacks(unit));
   starsWrap.querySelectorAll('img[data-mv-star]').forEach((img, i) => {
     (img as HTMLImageElement).src = i < filled ? 'icons/star-yellow.svg' : 'icons/star.svg';
   });
@@ -3218,7 +3210,10 @@ function buildUpgradePickerPanel(unit: Unit): void {
 }
 
 function syncUpgradePickerPanel(unit: Unit, unitType: UnitType): void {
-  if (unit.upgradePoints >= unitType.upgradePointsToLevel) {
+  if (
+    totalUnitUpgradeStacks(unit) < config.maxUnitUpgradeStacks &&
+    unit.upgradePoints >= unitType.upgradePointsToLevel
+  ) {
     buildUpgradePickerPanel(unit);
   } else {
     upgradePickerPanelEl.innerHTML = '';
@@ -3281,7 +3276,7 @@ function buildMovementUnitCardInner(unit: Unit, unitType: UnitType, isEnemy = fa
   const stars = document.createElement('div');
   stars.className = 'movement-unit-card-stars';
   stars.setAttribute('aria-hidden', 'true');
-  const starFill = Math.min(3, totalUpgradeTiers(unit));
+  const starFill = Math.min(config.maxUnitUpgradeStacks, totalUnitUpgradeStacks(unit));
   for (let i = 0; i < 3; i++) {
     const s = document.createElement('img');
     s.setAttribute('data-mv-star', String(i));

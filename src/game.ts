@@ -1122,6 +1122,16 @@ function unitClassOf(ut: UnitType): string {
   return ut.unitClass ?? ut.id;
 }
 
+/** Total upgrade stacks chosen for a unit (each level-up picks one stack). */
+export function totalUnitUpgradeStacks(unit: Unit): number {
+  return (
+    (unit.upgradeFlanking ?? 0) +
+    (unit.upgradeAttack ?? 0) +
+    (unit.upgradeDefense ?? 0) +
+    (unit.upgradeHeal ?? 0)
+  );
+}
+
 /** Upgrade points for a unit that dealt damage in combat (attacker or defender in melee). */
 function awardUpgradePointsForCombatDamage(
   dealer: Unit,
@@ -1129,6 +1139,7 @@ function awardUpgradePointsForCombatDamage(
   dmgToTarget: number,
   targetDied: boolean,
 ): void {
+  if (totalUnitUpgradeStacks(dealer) >= config.maxUnitUpgradeStacks) return;
   const hpLost = Math.min(dmgToTarget, Math.max(0, targetHpBefore));
   let gain = Math.floor(hpLost * config.upgradePointsPerDamageDealt);
   if (targetDied) gain += config.upgradePointsKillBonus;
@@ -1545,6 +1556,7 @@ export function playerApplyUnitUpgrade(
   const unit = getUnitById(state, unitId);
   if (!unit || unit.owner !== localPlayer) return state;
   const ut = unitTypeForUnit(unit);
+  if (totalUnitUpgradeStacks(unit) >= config.maxUnitUpgradeStacks) return state;
   if (unit.upgradePoints < ut.upgradePointsToLevel) return state;
   unit.upgradePoints -= ut.upgradePointsToLevel;
   if (kind === 'flanking') unit.upgradeFlanking += 1;
@@ -1560,7 +1572,10 @@ export function resolvePendingAiUpgradeChoices(state: GameState): void {
   for (const unit of state.units) {
     if (unit.owner !== AI) continue;
     const ut = unitTypeForUnit(unit);
-    while (unit.upgradePoints >= ut.upgradePointsToLevel) {
+    while (
+      totalUnitUpgradeStacks(unit) < config.maxUnitUpgradeStacks &&
+      unit.upgradePoints >= ut.upgradePointsToLevel
+    ) {
       unit.upgradePoints -= ut.upgradePointsToLevel;
       unit.upgradeAttack += 1;
       log(state, `AI unit #${unit.id} upgraded (attack).`);

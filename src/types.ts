@@ -390,6 +390,8 @@ export interface GameConfig {
   upgradeBonusDefensePerStack: number;
   /** Per stack: extra HP healed at end of turn on own territory (added to healOwnTerritory). */
   upgradeBonusHealPerStack: number;
+  /** Maximum upgrade stacks per unit (sum of flanking/attack/defense/heal stacks); further points are not earned. */
+  maxUnitUpgradeStacks: number;
   /** Tank melee: additive fraction to attacker CS when the approach uses the full movement allowance in one charge (path steps = movement, from rest that turn). */
   tankSpearheadAttackBonus: number;
   // Duration in ms for the unit move animation (0 = instant)
