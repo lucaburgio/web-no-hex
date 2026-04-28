@@ -26,6 +26,9 @@ export interface TerritoryMapControlPoint {
   name: string;
 }
 
+/** Where the note is shown in a match (map editor always shows all notes for editing). */
+export type TerritoryMapNoteVisibility = 'always' | 'breakthroughOnly';
+
 export interface TerritoryMapNote {
   id: string;
   x: number;
@@ -33,6 +36,8 @@ export interface TerritoryMapNote {
   text: string;
   align?: string;
   maxWidth?: number;
+  /** Omit or `always`: visible in every game mode. `breakthroughOnly`: hidden except in Breakthrough. */
+  visibility?: TerritoryMapNoteVisibility;
 }
 
 export interface TerritoryMapSector {

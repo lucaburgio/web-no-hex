@@ -54,6 +54,34 @@ function setAttrIfChanged(el: SVGElement, attr: string, value: string): void {
   if (el.getAttribute(attr) !== value) el.setAttribute(attr, value);
 }
 
+/** Dashed inter-sector lines and “breakthrough only” designer notes follow the current game mode. */
+function syncTerritoryMapModeDecorations(svgElement: SVGSVGElement, state: GameState): void {
+  const isBreakthrough = state.gameMode === 'breakthrough';
+
+  const sectorBorderLayer = svgElement.querySelector('#ev2-sector-border-layer') as SVGGElement | null;
+  if (sectorBorderLayer) {
+    if (isBreakthrough) {
+      if (sectorBorderLayer.getAttribute('display') === 'none') sectorBorderLayer.removeAttribute('display');
+    } else {
+      if (sectorBorderLayer.getAttribute('display') !== 'none') sectorBorderLayer.setAttribute('display', 'none');
+    }
+  }
+
+  const noteLayer = svgElement.querySelector('#ev2-note-layer') as SVGGElement | null;
+  if (noteLayer) {
+    for (const child of Array.from(noteLayer.children)) {
+      const g = child as SVGGElement;
+      const v = g.getAttribute('data-note-visibility') ?? 'always';
+      const hide = v === 'breakthroughOnly' && !isBreakthrough;
+      if (hide) {
+        if (g.getAttribute('display') !== 'none') g.setAttribute('display', 'none');
+      } else {
+        if (g.getAttribute('display') === 'none') g.removeAttribute('display');
+      }
+    }
+  }
+}
+
 function undirectedEdgeKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
@@ -475,6 +503,10 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     const anchor = anchorMap[note.align ?? 'center'] ?? 'middle';
     const g = mksvg('g');
     g.setAttribute('data-note-id', note.id);
+    g.setAttribute(
+      'data-note-visibility',
+      note.visibility === 'breakthroughOnly' ? 'breakthroughOnly' : 'always',
+    );
 
     if (note.maxWidth) {
       const mw = note.maxWidth;
@@ -566,6 +598,8 @@ export function renderTerritoryState(
 
   const { mapDef, points, territories } = graph;
   const edgeTerritoryIndex = rendererStateMap.get(svgElement)!.edgeTerritoryIndex;
+
+  syncTerritoryMapModeDecorations(svgElement, state);
 
   const unitsForDraw = opts?.unitDrawOverride != null ? opts.unitDrawOverride : state.units;
   const hexStatesForDraw = opts?.hexStatesDrawOverride != null ? opts.hexStatesDrawOverride : state.hexStates;

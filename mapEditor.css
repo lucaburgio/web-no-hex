@@ -293,6 +293,16 @@
 }
 .ev2-note-del-btn:hover { background: #7f1d1d; color: #fff; }
 
+.ev2-note-type-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.ev2-note-type-label { font-size: 10px; color: #666; flex: 0 0 auto; }
+.ev2-note-visibility-select {
+  flex: 1; min-width: 0; font-size: 11px; background: #1a1a1a; color: #e5e5e5;
+  border: 1px solid #444; border-radius: 3px; padding: 3px 5px; cursor: pointer;
+}
+.ev2-note-visibility-select:focus { border-color: #93c5fd; outline: none; }
+
 .ev2-note-maxwidth-row {
   display: flex; align-items: center; gap: 6px;
 }

@@ -5,6 +5,7 @@ import {
   computeRedundantPartitionParentIds,
   sanitizeTerritoryMapDef,
   type TerritoryMapDef,
+  type TerritoryMapNoteVisibility,
 } from './territoryMap';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -18,7 +19,15 @@ interface Pt { id: string; x: number; y: number }
 interface Edge { id: string; a: string; b: string }
 interface Territory { id: string; pointIds: string[]; state: TerritoryState }
 interface ControlPoint { id: string; territoryId: string; name: string }
-interface Note { id: string; x: number; y: number; text: string; align: 'left' | 'center' | 'right'; maxWidth?: number }
+interface Note {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  align: 'left' | 'center' | 'right';
+  maxWidth?: number;
+  visibility?: TerritoryMapNoteVisibility;
+}
 interface Sector { id: string; name: string; territoryIds: string[] }
 
 // ── Module-level state ────────────────────────────────────────────────────────
@@ -115,6 +124,12 @@ function findSnapPoint(x: number, y: number): Pt | null {
     }
   }
   return best;
+}
+
+function normalizeMapEditorNote(n: Note): Note {
+  if (n.visibility === 'breakthroughOnly' || n.visibility === 'always' || n.visibility === undefined) return n;
+  const { visibility: _drop, ...rest } = n;
+  return rest;
 }
 
 function findSnapNote(x: number, y: number): Note | null {
@@ -438,6 +453,11 @@ function renderNoteList(): void {
         const v = note.maxWidth ? String(note.maxWidth) : '';
         if (mwInput.value !== v) mwInput.value = v;
       }
+      const visSel = ul.querySelector<HTMLSelectElement>(`li[data-note-id="${note.id}"] .ev2-note-visibility-select`);
+      if (visSel) {
+        const want = note.visibility === 'breakthroughOnly' ? 'breakthroughOnly' : 'always';
+        if (visSel.value !== want) visSel.value = want;
+      }
       continue;
     }
 
@@ -474,6 +494,28 @@ function renderNoteList(): void {
 
     controls.appendChild(delBtn);
 
+    const typeRow = document.createElement('div');
+    typeRow.className = 'ev2-note-type-row';
+    const typeLabel = document.createElement('span');
+    typeLabel.className = 'ev2-note-type-label';
+    typeLabel.textContent = 'Show';
+    const typeSelect = document.createElement('select');
+    typeSelect.className = 'ev2-note-visibility-select';
+    typeSelect.dataset.noteId = note.id;
+    typeSelect.title = 'When this note appears on the map in a match';
+    for (const opt of [
+      { value: 'always' as const, label: 'Always visible' },
+      { value: 'breakthroughOnly' as const, label: 'Breakthrough only' },
+    ]) {
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.label;
+      typeSelect.appendChild(o);
+    }
+    typeSelect.value = note.visibility === 'breakthroughOnly' ? 'breakthroughOnly' : 'always';
+    typeRow.appendChild(typeLabel);
+    typeRow.appendChild(typeSelect);
+
     const mwRow = document.createElement('div');
     mwRow.className = 'ev2-note-maxwidth-row';
     const mwLabel = document.createElement('label');
@@ -492,6 +534,7 @@ function renderNoteList(): void {
 
     li.appendChild(input);
     li.appendChild(controls);
+    li.appendChild(typeRow);
     li.appendChild(mwRow);
     ul.appendChild(li);
   }
@@ -1047,6 +1090,10 @@ function render(): void {
 
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('data-note-id', note.id);
+    g.setAttribute(
+      'data-note-visibility',
+      note.visibility === 'breakthroughOnly' ? 'breakthroughOnly' : 'always',
+    );
 
     if (note.maxWidth) {
       const mw = note.maxWidth;
@@ -1322,7 +1369,7 @@ function handleEditClick(e: MouseEvent): void {
 
 function handleNoteClick(e: MouseEvent): void {
   const { x, y } = svgCoords(e);
-  notes.push({ id: newNoteId(), x, y, text: 'Note', align: 'center' });
+  notes.push({ id: newNoteId(), x, y, text: 'Note', align: 'center', visibility: 'always' });
   render();
 }
 
@@ -1583,7 +1630,7 @@ function importFromJson(json: string): void {
   edges = sanitized.edges as Edge[];
   territories = sanitized.territories as Territory[];
   controlPoints = sanitized.controlPoints as ControlPoint[];
-  notes = (sanitized.notes ?? []) as Note[];
+  notes = ((sanitized.notes ?? []) as Note[]).map(normalizeMapEditorNote);
   sectors = (sanitized.sectors ?? []) as Sector[];
   currentPath = [];
   hoveredPoint = null;
@@ -2002,6 +2049,16 @@ export function initMapEditor(onBack: () => void): void {
         render();
       }
     }
+  });
+
+  // Notes list — visibility (mode gating in match, not in editor)
+  document.getElementById('ev2-notes-list')?.addEventListener('change', (e) => {
+    const sel = (e.target as HTMLElement).closest('.ev2-note-visibility-select') as HTMLSelectElement | null;
+    if (!sel?.dataset.noteId) return;
+    const note = notes.find(n => n.id === sel.dataset.noteId);
+    if (!note) return;
+    note.visibility = sel.value === 'breakthroughOnly' ? 'breakthroughOnly' : 'always';
+    render();
   });
 
   // Notes list — text / maxWidth input (live update)
