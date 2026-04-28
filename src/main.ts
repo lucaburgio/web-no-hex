@@ -2415,7 +2415,7 @@ function buildRulesContent(): string {
       <li>Moving onto an enemy unit triggers <strong>combat</strong>. If you need more than one hex to reach them, you move along the path into the hex adjacent to the enemy first, then combat resolves.</li>
       <li><strong>Artillery:</strong> each turn you either <strong>move</strong> one hex or fire a <strong>ranged attack</strong> at an enemy ${arRanged} (not both). Ranged fire does not use movement into the target&rsquo;s hex.</li>
       <li><strong>Zone of Control (ZoC):</strong> a unit adjacent to an enemy is locked — it may only attack
-        or retreat to a hex not itself adjacent to any enemy. ZoC limits movement and adjacent attacks; it does not block artillery ranged fire at longer range.</li>
+        or retreat to a hex not itself adjacent to any enemy. <strong>Adjacent</strong> means one of the six neighboring hex cells on the board grid (movement on polygon maps may follow different borders). ZoC limits movement and adjacent attacks; it does not block artillery ranged fire at longer range.</li>
       <li><strong>Domination — guarded home row:</strong> with ZoC enabled, you cannot move onto an <strong>empty</strong> hex on the opponent&rsquo;s <strong>home row</strong> if any enemy is adjacent to that hex (this stops fast units from bypassing ZoC with multi-hex moves). You can still move onto that hex to attack an enemy unit sitting on it.</li>
     </ul>
       </div>

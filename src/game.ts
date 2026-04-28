@@ -767,7 +767,10 @@ export type EndProductionOptions = { skipReason?: 'no-placements' };
 // Returns true if (col,row) is under ZoC from any unit belonging to `enemyOwner`
 export function isInEnemyZoC(state: GameState, col: number, row: number, enemyOwner: Owner): boolean {
   if (!config.zoneOfControl) return false;
-  const neighbors = effectiveGetNeighbors(col, row, COLS, ROWS);
+  // Always use geometric hex neighbors (six adjacent cells). Movement on polygon territory maps uses
+  // `effectiveGetNeighbors` (shared borders); ZoC "adjacent" must match the visible grid so long
+  // graph chords do not lock units when the enemy is multiple hex steps away on the board.
+  const neighbors = getNeighbors(col, row, COLS, ROWS);
   return neighbors.some(([nc, nr]) => {
     const u = getUnit(state, nc, nr);
     return u && u.owner === enemyOwner;
