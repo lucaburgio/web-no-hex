@@ -94,6 +94,7 @@ img {
 
     /* Production phase (WW2 map ref): active placement territory vs dimmed friend/enemy */
     --color-production-territory-fill: #cccccc;
+    /* Non-selected placement: inset territory border + #trr-highlights ring on polygon maps; hex candidate stroke. */
     --color-production-territory-border: #333333;
     --color-production-disabled-friendly-fill: #ffffff;
     --color-production-disabled-enemy-stripe-base: #ffffff;
@@ -121,7 +122,7 @@ img {
     /* Production phase: hover on empty placement hexes (+) — see renderer (hex hit layer passes through) */
     --color-hex-prod-candidate-hover: #bdbdbd;
     --color-hex-prod-selected: #B8B8B8;
-    --color-hex-prod-stroke:   var(--color-yellow-500);
+    --color-hex-prod-stroke:   var(--color-dark);
     --color-hex-zoc:           #d58f8f;
     /* Unconquered hexes: transparent so the game-area line texture shows through */
     --color-hex-neutral:       var(--color-light);
@@ -596,9 +597,12 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 #recap-board .ev2-territory-border.ev2-prod-dim-border {
   --ev2-border-color: var(--color-production-disabled-border);
 }
-/* Valid / selected production hexes: hide inset border (fill + perimeter highlight + plus remain). */
+/* Non-selected placement territories: show inset border (--color-production-territory-border). */
 #board .ev2-territory-border.ev2-prod-placement-border,
-#recap-board .ev2-territory-border.ev2-prod-placement-border,
+#recap-board .ev2-territory-border.ev2-prod-placement-border {
+  --ev2-border-color: var(--color-production-territory-border);
+}
+/* Selected placement: outer ring is #trr-highlights; hide inset to avoid stacking with that stroke. */
 #board .ev2-territory-border.ev2-prod-selected-border,
 #recap-board .ev2-territory-border.ev2-prod-selected-border {
   display: none;
