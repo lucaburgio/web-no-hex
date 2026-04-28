@@ -67,6 +67,11 @@ const TERRITORY_MAPS_LIST: Array<{ id: string; def: unknown }> = Object.entries(
   id: path.replace('../public/maps/', '').replace('.json', ''),
   def,
 }));
+
+function territoryMapIdToDisplayName(mapId: string): string {
+  return mapId.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 import { aiDamageFloatDrawParams } from './combatPlayback';
 import type { MoveAnimation } from './renderer';
 import config, {
@@ -1188,7 +1193,8 @@ function buildStoriesList(scenarioId: string): void {
     } else {
       statusLabel = 'READY';
     }
-    statusEl.textContent = `${modeLabel} - ${statusLabel}`;
+    const mapDisplayName = territoryMapIdToDisplayName(story.map);
+    statusEl.textContent = `${modeLabel} - ${mapDisplayName} - ${statusLabel}`;
     info.appendChild(statusEl);
 
     card.appendChild(info);
@@ -2997,7 +3003,7 @@ function updateHeaderModeLabel(s: GameState): void {
     mapName = STORIES[activeStoryIndex]!.title;
   } else if (config.customMatchMapId) {
     const mapEntry = TERRITORY_MAPS_LIST.find(m => m.id === config.customMatchMapId);
-    if (mapEntry) mapName = mapEntry.id.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    if (mapEntry) mapName = territoryMapIdToDisplayName(mapEntry.id);
   }
 
   headerModeLabelEl.textContent = mapName ? `${modeLabel}\n${mapName}` : modeLabel;
