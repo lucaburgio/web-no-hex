@@ -757,11 +757,10 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
 @keyframes ranged-target-hex-glow {
   0%, 100% { opacity: 0; }
-  50% { opacity: 0.06; }
+  50% { opacity: 0.3; }
 }
 
 .ranged-target-glow-overlay {
-  fill: #ef4444;
   opacity: 0;
   pointer-events: none;
   animation: ranged-target-hex-glow 1.35s ease-in-out infinite;
@@ -2624,6 +2623,7 @@ body:has(#recap-overlay:not(.hidden)) #game-footer {
 }
 .settings-input[type="number"] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .settings-input[type="number"]::-webkit-outer-spin-button,

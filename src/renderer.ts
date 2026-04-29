@@ -19,6 +19,7 @@ import {
 } from './game';
 import type { GameState, HexState, Owner, Unit } from './types';
 import config from './gameconfig';
+import artilleryFirePatternSrc from '../public/images/misc/artillery-fire-pattern.png';
 import mountainHex01 from '../public/images/misc/mountain-hex/mountain-01.png';
 import mountainHex02 from '../public/images/misc/mountain-hex/mountain-02.png';
 import mountainHex03 from '../public/images/misc/mountain-hex/mountain-03.png';
@@ -1476,6 +1477,21 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   hatchPat.appendChild(hatchBg);
   hatchPat.appendChild(hatchFg);
   defsHexProd.appendChild(hatchPat);
+
+  const rangedFirePatternId = `${svgElement.id || 'board'}-ranged-target-fire-pattern`;
+  svgElement.dataset.rangedTargetFirePatternId = rangedFirePatternId;
+  const rangedFirePat = svgEl('pattern');
+  rangedFirePat.setAttribute('id', rangedFirePatternId);
+  rangedFirePat.setAttribute('patternUnits', 'userSpaceOnUse');
+  rangedFirePat.setAttribute('width', '48');
+  rangedFirePat.setAttribute('height', '48');
+  const rangedFireImg = svgEl('image');
+  rangedFireImg.setAttribute('href', artilleryFirePatternSrc);
+  rangedFireImg.setAttribute('width', '48');
+  rangedFireImg.setAttribute('height', '48');
+  rangedFirePat.appendChild(rangedFireImg);
+  defsHexProd.appendChild(rangedFirePat);
+
   svgElement.appendChild(defsHexProd);
 
   const boardOrigin = svgEl('g');
@@ -2477,6 +2493,8 @@ export function renderState(
       const poly = svgEl('polygon');
       poly.setAttribute('points', hexPoints(x, y));
       poly.setAttribute('class', 'ranged-target-glow-overlay');
+      const firePatternId = svgElement.dataset.rangedTargetFirePatternId;
+      if (firePatternId) poly.style.fill = `url(#${firePatternId})`;
       rangedTargetGlowLayerEl.appendChild(poly);
       glowMap.set(key, poly);
     }

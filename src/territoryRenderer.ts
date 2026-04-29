@@ -19,6 +19,7 @@ import {
   getOpponentHomeGuardBlockedHexes,
 } from './game';
 import { ensureMovePathPreviewLayer, inlineIcon, mountBoardUnitChipContents } from './renderer';
+import artilleryFirePatternSrc from '../public/images/misc/artillery-fire-pattern.png';
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
 import outsideBorderPatternSrc from '../public/images/misc/outside-border-pattern.png';
 import zocPatternSrc from '../public/images/misc/zoc-pattern.png';
@@ -328,6 +329,20 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   mountainImg.setAttribute('height', '60');
   mountainPattern.appendChild(mountainImg);
   defs.appendChild(mountainPattern);
+
+  const artilleryFirePattern = mksvg('pattern');
+  const artilleryFirePatternId = `${svgEl.id || 'trr'}-ranged-target-fire-pattern`;
+  svgEl.dataset.rangedTargetFirePatternId = artilleryFirePatternId;
+  artilleryFirePattern.id = artilleryFirePatternId;
+  artilleryFirePattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  artilleryFirePattern.setAttribute('width', '48');
+  artilleryFirePattern.setAttribute('height', '48');
+  const artilleryFireImg = mksvg('image');
+  artilleryFireImg.setAttribute('href', artilleryFirePatternSrc);
+  artilleryFireImg.setAttribute('width', '48');
+  artilleryFireImg.setAttribute('height', '48');
+  artilleryFirePattern.appendChild(artilleryFireImg);
+  defs.appendChild(artilleryFirePattern);
 
   const zocPattern = mksvg('pattern');
   zocPattern.id = 'ev2-zoc-pattern';
@@ -945,6 +960,8 @@ export function renderTerritoryState(
       const poly = document.createElementNS(SVG_NS, 'polygon') as SVGPolygonElement;
       poly.setAttribute('points', territoryPointsAttr(tDef, points));
       poly.setAttribute('class', 'ranged-target-glow-overlay');
+      const trPatternId = svgElement.dataset.rangedTargetFirePatternId;
+      if (trPatternId) poly.style.fill = `url(#${trPatternId})`;
       rangedGlowLayer.appendChild(poly);
       glowMap.set(key, poly);
     }
