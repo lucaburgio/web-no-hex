@@ -319,24 +319,24 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   const mountainPattern = mksvg('pattern');
   mountainPattern.id = 'ev2-mountain-pattern';
   mountainPattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  mountainPattern.setAttribute('width', '45');
-  mountainPattern.setAttribute('height', '45');
+  mountainPattern.setAttribute('width', '60');
+  mountainPattern.setAttribute('height', '60');
   const mountainImg = mksvg('image');
   mountainImg.setAttribute('href', mountainPatternSrc);
-  mountainImg.setAttribute('width', '45');
-  mountainImg.setAttribute('height', '45');
+  mountainImg.setAttribute('width', '60');
+  mountainImg.setAttribute('height', '60');
   mountainPattern.appendChild(mountainImg);
   defs.appendChild(mountainPattern);
 
   const zocPattern = mksvg('pattern');
   zocPattern.id = 'ev2-zoc-pattern';
   zocPattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  zocPattern.setAttribute('width', '45');
-  zocPattern.setAttribute('height', '45');
+  zocPattern.setAttribute('width', '60');
+  zocPattern.setAttribute('height', '60');
   const zocImg = mksvg('image');
   zocImg.setAttribute('href', zocPatternSrc);
-  zocImg.setAttribute('width', '45');
-  zocImg.setAttribute('height', '45');
+  zocImg.setAttribute('width', '60');
+  zocImg.setAttribute('height', '60');
   zocPattern.appendChild(zocImg);
   defs.appendChild(zocPattern);
 

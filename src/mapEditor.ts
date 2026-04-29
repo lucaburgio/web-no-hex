@@ -905,12 +905,12 @@ function render(): void {
   const mountainPattern = document.createElementNS(SVG_NS, 'pattern');
   mountainPattern.setAttribute('id', 'ev2-mountain-pattern');
   mountainPattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  mountainPattern.setAttribute('width', '45');
-  mountainPattern.setAttribute('height', '45');
+  mountainPattern.setAttribute('width', '60');
+  mountainPattern.setAttribute('height', '60');
   const mountainPatternImgEl = document.createElementNS(SVG_NS, 'image');
   mountainPatternImgEl.setAttribute('href', mountainPatternSrc);
-  mountainPatternImgEl.setAttribute('width', '45');
-  mountainPatternImgEl.setAttribute('height', '45');
+  mountainPatternImgEl.setAttribute('width', '60');
+  mountainPatternImgEl.setAttribute('height', '60');
   mountainPattern.appendChild(mountainPatternImgEl);
   defsEl.appendChild(mountainPattern);
 
