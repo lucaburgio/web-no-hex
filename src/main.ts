@@ -4516,13 +4516,14 @@ function updateUI(): void {
           toastText = multiCp
             ? "We're taking the sector — keep a unit on every control point"
             : "We're taking the sector, keep your unit to hold it";
+          toastVariant = 'yellow';
         } else {
           const turns = 2 - cpOccupation;
           toastText = multiCp
             ? `They're taking the sector — clear every control point before ${turns} turn${turns !== 1 ? 's' : ''}`
             : `They're taking the sector, remove their units before ${turns} turn${turns !== 1 ? 's' : ''}`;
+          toastVariant = 'red';
         }
-        toastVariant = 'yellow';
       } else {
         toastText = youAreAttacker
           ? multiCp
