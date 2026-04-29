@@ -2983,6 +2983,10 @@ export function aiMovement(state: GameState): {
     if (state.winner) break;
     if (!state.units.some(u => u.owner === PLAYER)) break;
 
+    /** Hex the unit left on its last empty move this phase — avoids A→B→A wobble animations. */
+    let prevMoveFromCol: number | null = null;
+    let prevMoveFromRow: number | null = null;
+
     while (unit.movesUsed < unit.movement && !state.winner) {
       const rangedTargets = getRangedAttackTargets(state, unit);
       if (rangedTargets.length > 0) {
@@ -3141,6 +3145,18 @@ export function aiMovement(state: GameState): {
         break;
       }
 
+      if (
+        best.kind === 'move' &&
+        unit.movesUsed > 0 &&
+        prevMoveFromCol !== null &&
+        prevMoveFromRow !== null &&
+        best.col === prevMoveFromCol &&
+        best.row === prevMoveFromRow
+      ) {
+        unit.movesUsed = unit.movement;
+        break;
+      }
+
       if (best.kind === 'move' && best.col === unit.col && best.row === unit.row) {
         unit.movesUsed = unit.movement;
         break;
@@ -3172,6 +3188,8 @@ export function aiMovement(state: GameState): {
         },
       });
       animUnitsAfter.push(snapshotUnits(state));
+      prevMoveFromCol = fromCol;
+      prevMoveFromRow = fromRow;
       checkVictory(state);
     }
   }
