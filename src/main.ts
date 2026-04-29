@@ -463,6 +463,7 @@ const introOverlayEl       = document.getElementById('intro-overlay') as HTMLDiv
 const introTextEl          = document.getElementById('intro-text') as HTMLParagraphElement;
 const introCursorEl        = document.getElementById('intro-cursor') as HTMLSpanElement;
 const introContinueBtn     = document.getElementById('intro-continue-btn') as HTMLButtonElement;
+const pointerBlobEl        = document.getElementById('pointer-blob') as HTMLDivElement | null;
 
 // ── Lobby DOM refs ────────────────────────────────────────────────────────────
 
@@ -480,6 +481,22 @@ const joinBtn           = document.getElementById('join-btn') as HTMLButtonEleme
 const lobbyCancelBtn    = document.getElementById('lobby-cancel-btn') as HTMLButtonElement;
 const lobbyCancelJoinBtn = document.getElementById('lobby-cancel-join-btn') as HTMLButtonElement;
 const lobbyJoinConfirm  = document.getElementById('lobby-join-confirm') as HTMLButtonElement;
+
+function pointerBlobInActiveMatch(): boolean {
+  return mainMenuOverlayEl.classList.contains('hidden')
+    && introOverlayEl.classList.contains('hidden')
+    && recapOverlayEl.classList.contains('hidden');
+}
+
+if (pointerBlobEl) {
+  document.addEventListener('pointermove', (e: PointerEvent) => {
+    const on = pointerBlobInActiveMatch();
+    pointerBlobEl.classList.toggle('pointer-blob--active', on);
+    if (!on) return;
+    pointerBlobEl.style.left = `${e.clientX}px`;
+    pointerBlobEl.style.top = `${e.clientY}px`;
+  });
+}
 
 // ── P2 waiting overlay DOM refs ───────────────────────────────────────────────
 const p2WaitingOverlayEl      = document.getElementById('p2-waiting-overlay') as HTMLDivElement;

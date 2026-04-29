@@ -537,6 +537,29 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   }
 }
 
+/* Soft cursor glow during play — position updated from main.ts (clientX/Y). */
+.pointer-blob {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 200px;
+  height: 200px;
+  margin: 0;
+  border-radius: 50%;
+  background: #636363;
+  mix-blend-mode: color-burn;
+  filter: blur(30px);
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.2s ease;
+}
+
+.pointer-blob.pointer-blob--active {
+  opacity: 0.8;
+}
+
 #game-area {
   position: relative;
   display: flex;
