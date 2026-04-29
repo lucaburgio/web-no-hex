@@ -1,6 +1,7 @@
 // ── Map editor — Polygon-based territory maps ───────────────────────────────
 
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
+import offmapPatternSrc from '../public/images/misc/offmap-pattern.png';
 import {
   computeRedundantPartitionParentIds,
   sanitizeTerritoryMapDef,
@@ -914,6 +915,19 @@ function render(): void {
   mountainPattern.appendChild(mountainPatternImgEl);
   defsEl.appendChild(mountainPattern);
 
+  // Pattern for offmap territory fill
+  const offmapPattern = document.createElementNS(SVG_NS, 'pattern');
+  offmapPattern.setAttribute('id', 'ev2-offmap-pattern');
+  offmapPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  offmapPattern.setAttribute('width', '60');
+  offmapPattern.setAttribute('height', '60');
+  const offmapPatternImgEl = document.createElementNS(SVG_NS, 'image');
+  offmapPatternImgEl.setAttribute('href', offmapPatternSrc);
+  offmapPatternImgEl.setAttribute('width', '60');
+  offmapPatternImgEl.setAttribute('height', '60');
+  offmapPattern.appendChild(offmapPatternImgEl);
+  defsEl.appendChild(offmapPattern);
+
   // ── Territory layer ──────────────────────────────────────────────────────
   const territoryLayer = svgEl.querySelector('#ev2-territory-layer') as SVGGElement;
   territoryLayer.innerHTML = '';
@@ -1698,6 +1712,7 @@ export function initMapEditor(onBack: () => void): void {
   _initialized = true;
 
   (document.getElementById('ev2-swatch-mountain-img') as HTMLImageElement | null)?.setAttribute('src', mountainPatternSrc);
+  (document.getElementById('ev2-swatch-offmap-img') as HTMLImageElement | null)?.setAttribute('src', offmapPatternSrc);
 
   overlayEl      = document.getElementById('map-editor-overlay') as HTMLElement;
   svgEl          = document.getElementById('ev2-svg') as unknown as SVGSVGElement;

@@ -21,6 +21,7 @@ import {
 import { ensureMovePathPreviewLayer, inlineIcon, mountBoardUnitChipContents } from './renderer';
 import artilleryFirePatternSrc from '../public/images/misc/artillery-fire-pattern.png';
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
+import offmapPatternSrc from '../public/images/misc/offmap-pattern.png';
 import outsideBorderPatternSrc from '../public/images/misc/outside-border-pattern.png';
 import zocPatternSrc from '../public/images/misc/zoc-pattern.png';
 
@@ -337,6 +338,18 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   mountainImg.setAttribute('height', '60');
   mountainPattern.appendChild(mountainImg);
   defs.appendChild(mountainPattern);
+
+  const offmapPattern = mksvg('pattern');
+  offmapPattern.id = 'ev2-offmap-pattern';
+  offmapPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  offmapPattern.setAttribute('width', '60');
+  offmapPattern.setAttribute('height', '60');
+  const offmapImg = mksvg('image');
+  offmapImg.setAttribute('href', offmapPatternSrc);
+  offmapImg.setAttribute('width', '60');
+  offmapImg.setAttribute('height', '60');
+  offmapPattern.appendChild(offmapImg);
+  defs.appendChild(offmapPattern);
 
   const artilleryFirePattern = mksvg('pattern');
   const artilleryFirePatternId = `${svgEl.id || 'trr'}-ranged-target-fire-pattern`;

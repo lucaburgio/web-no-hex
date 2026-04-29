@@ -20,7 +20,7 @@
 .ev2-state-allied   { fill: #eff6ff; }
 .ev2-state-enemy    { fill: #fff1f2; }
 .ev2-state-mountain { fill: url(#ev2-mountain-pattern); }
-.ev2-state-offmap   { fill: #8fa8b8; }
+.ev2-state-offmap   { fill: url(#ev2-offmap-pattern); }
 .ev2-state-zoc      { fill: url(#ev2-zoc-pattern); }
 .ev2-territory-fill { stroke: none; }
 
@@ -126,7 +126,7 @@
 .ev2-swatch-allied   { background: #eff6ff; border-color: #2563eb; }
 .ev2-swatch-enemy    { background: #fff1f2; border-color: #FE775E; }
 .ev2-swatch-mountain { overflow: hidden; border-color: #78716c; }
-.ev2-swatch-offmap   { background: #8fa8b8; border-color: #5f8499; }
+.ev2-swatch-offmap   { overflow: hidden; border-color: #5f8499; }
 
 /* Sector border — dashed black line between territories in different sectors */
 .ev2-sector-border {
