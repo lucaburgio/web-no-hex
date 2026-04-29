@@ -1195,6 +1195,38 @@ function aiConquestUnitPriority(
   return Math.min(toCapture, defend);
 }
 
+/**
+ * When every active frontline control point is currently held by the AI attacker, any empty
+ * move that would leave a CP without an attacker unit (cannot happen with a legal "stay").
+ */
+function breakthroughAttackerBreaksFullCpCoverage(
+  state: GameState,
+  unit: Unit,
+  toCol: number,
+  toRow: number,
+): boolean {
+  if (state.gameMode !== 'breakthrough' || getBreakthroughAttackerOwner(state) !== AI) return false;
+  if (unit.owner !== AI) return false;
+  const cps = state.controlPointHexes ?? [];
+  if (!cps.length) return false;
+  const att = getBreakthroughAttackerOwner(state);
+  const allCoveredNow = cps.every(k => state.units.some(u => u.owner === att && `${u.col},${u.row}` === k));
+  if (!allCoveredNow) return false;
+  for (const k of cps) {
+    let n = 0;
+    for (const u of state.units) {
+      if (u.id === unit.id) {
+        if (`${toCol},${toRow}` === k) n++;
+        continue;
+      }
+      if (u.owner !== att) continue;
+      if (`${u.col},${u.row}` === k) n++;
+    }
+    if (n === 0) return true;
+  }
+  return false;
+}
+
 /** When AI is the sole unit on a frontline breakthrough CP, stepping off (empty move) is heavily penalized. */
 function breakthroughLoneCpVacatePenalty(state: GameState, unit: Unit, toCol: number, toRow: number): number {
   if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return 0;
@@ -2660,6 +2692,9 @@ function scoreEmptyMove(
   bfsFn: (fromCol: number, fromRow: number, toCol: number, toRow: number) => number,
 ): number {
   if (unit.movesUsed + stepsCost > unit.movement) return -Infinity;
+  if (state.gameMode === 'breakthrough' && breakthroughAttackerBreaksFullCpCoverage(state, unit, toCol, toRow)) {
+    return -1_000_000_000;
+  }
   const before = minHomeStepsFn(unit.col, unit.row, AI);
   const after = minHomeStepsFn(toCol, toRow, AI);
   let s = (before - after) * 28 * (1 - pressure * 0.82);
