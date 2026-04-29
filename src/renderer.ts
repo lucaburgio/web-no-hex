@@ -919,7 +919,7 @@ function mapUnitChipStyle(
     };
   }
 
-  const bodyFill = c.boardUnitCardFill;
+  let bodyFill = c.boardUnitCardFill;
   let bodyStroke = opts.isSelected ? c.boardUnitBorderSelected : c.boardUnitBorder;
   const bodyStrokeW = opts.isSelected ? c.boardUnitBorderSelectedWidth : c.boardUnitBorderWidth;
   let bracketStroke = opts.isSelected ? c.boardUnitBracketSelected : c.boardUnitBracket;
@@ -928,6 +928,7 @@ function mapUnitChipStyle(
     bracketStroke = c.rangedTarget;
     bodyStroke = c.rangedTarget;
     bracketStrokeW = Math.max(bracketStrokeW, 1.6);
+    bodyFill = '#FFE5E5';
   }
   const hpFill = mapUnitHpFillColor(
     c,
