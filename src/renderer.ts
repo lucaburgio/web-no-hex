@@ -9,7 +9,6 @@ import {
   AI,
   getUnit,
   getUnitById,
-  hasHomeProductionAccess,
   isValidProductionPlacement,
   getValidMoves,
   getRangedAttackTargets,
@@ -713,7 +712,9 @@ interface Colors {
   aiDuringProduction: string;
   /** Gray shell / icon / HP during local player production phase */
   unitProductionDisabled: string;
-  rangedTarget: string;
+  rangedTargetFill: string;
+  rangedTargetBorder: string;
+  rangedTargetBracket: string;
   colorDark: string;
   /** Map unit shield card (design ref). */
   boardUnitCardFill: string;
@@ -807,7 +808,7 @@ function colors(): Colors {
     boardUnitHpSelected:          v('--color-board-unit-hp-selected') || '#FFCC00',
     boardUnitIconSilhouette:      v('--color-board-unit-icon-silhouette') || '#0A0A0A',
   };
-  return C;
+  return C!;
 }
 
 /** Selection ring for map unit chip (same rules as hex/unit selection in {@link renderState}). */
@@ -1863,10 +1864,6 @@ export function renderState(
   if (selectedUnit && state.activePlayer !== localPlayer && selectedUnit.owner === localPlayer) {
     selectedUnit = null;
   }
-
-  /** Tint for unit shape only — hex/move overlays use `selectedUnit` above. */
-  const isUnitVisuallySelected = (unit: Unit): boolean =>
-    unitIsVisuallySelectedForBoard(state, unit, localPlayer, localSpectatorInspectUnitId);
 
   const rangedTargetKeys = new Set<string>();
   if (selectedUnit && state.phase === 'movement' && state.activePlayer === localPlayer) {
