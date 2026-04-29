@@ -40,6 +40,19 @@ export const PLAYER = 1 as const;
 export const AI     = 2 as const;
 
 /**
+ * Map sector index of the attacker's home: the one sector with no `controlPoint` in its
+ * `territoryIds` (see {@link createInitialStateFromTerritoryMap}).
+ * Returns `null` when the embedded graph is missing (rare; hex fallback in callers).
+ */
+function getBreakthroughAttackerHomeSectorIndex(state: GameState): number | null {
+  const g = state.customMapGraph;
+  if (!g || !g.sectors.length) return null;
+  const cpTids = new Set(Object.values(g.controlPoints).map(cp => cp.territoryId));
+  const found = g.sectors.findIndex(sec => !sec.territoryIds.some(tid => cpTids.has(tid)));
+  return found >= 0 ? found : 0;
+}
+
+/**
  * The attacker's home is the unique sector with no control point on any of its `territoryIds`
  * (see {@link createInitialStateFromTerritoryMap} / `repairTerritoryBreakthroughLayoutFromGraph`).
  * Do **not** use the first `[]` row in `sectorControlPointHex` — defender sectors with no CP markers
@@ -47,12 +60,9 @@ export const AI     = 2 as const;
  * in `getBreakthroughAttackerOwner` and break CP occupation for the real attacker (e.g. AI).
  */
 function inferBreakthroughAttackerFromSectorLayout(state: GameState): Owner | null {
-  const g = state.customMapGraph;
-  if (g && g.sectors.length) {
-    const cpTids = new Set(Object.values(g.controlPoints).map(cp => cp.territoryId));
-    const found = g.sectors.findIndex(sec => !sec.territoryIds.some(tid => cpTids.has(tid)));
-    const homeIdx = found >= 0 ? found : 0;
-    const o = state.sectorOwners?.[homeIdx];
+  const h0 = getBreakthroughAttackerHomeSectorIndex(state);
+  if (h0 !== null) {
+    const o = state.sectorOwners?.[h0];
     if (o === PLAYER || o === AI) return o;
   }
   // Hex / legacy fallback: first row with no CP key list
@@ -529,23 +539,40 @@ function territoryBonusForHexCount(hexCount: number): number {
   return Math.floor(hexCount / config.territoryQuota) * config.pointsPerQuota;
 }
 
-/** Breakthrough: defender sector currently on the border with attacker-held sectors (frontline objective). */
+/** Breakthrough: defender sector on the current invasion front (closest to the attacker's home along sector index order; NOT tied to human vs AI owner enum). */
 export function breakthroughActiveFrontlineSectorIndex(state: GameState): number | null {
   if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return null;
-  const att = getBreakthroughAttackerOwner(state);
   const n = state.sectorOwners.length;
-  if (n === 0) return null;
-
-  if (att === PLAYER) {
-    for (let i = 0; i < n; i++) {
-      if (state.sectorOwners[i] !== att) return i;
+  const att = getBreakthroughAttackerOwner(state);
+  const home = getBreakthroughAttackerHomeSectorIndex(state);
+  const candidates: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (state.sectorOwners[i] !== att) candidates.push(i);
+  }
+  if (candidates.length === 0) return null;
+  if (home === null) {
+    if (att === PLAYER) {
+      for (let i = 0; i < n; i++) {
+        if (state.sectorOwners[i] !== att) return i;
+      }
+    } else {
+      for (let i = n - 1; i >= 0; i--) {
+        if (state.sectorOwners[i] !== att) return i;
+      }
     }
     return null;
   }
-  for (let i = n - 1; i >= 0; i--) {
-    if (state.sectorOwners[i] !== att) return i;
+  let best = candidates[0]!;
+  let bestD = Math.abs(best - home);
+  for (let j = 1; j < candidates.length; j++) {
+    const c = candidates[j]!;
+    const d = Math.abs(c - home);
+    if (d < bestD || (d === bestD && c < best)) {
+      bestD = d;
+      best = c;
+    }
   }
-  return null;
+  return best;
 }
 
 /** Breakthrough: only the current frontline sector’s control point(s) are active for markers and capture checks. */
