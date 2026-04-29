@@ -147,16 +147,19 @@
       <svg id="ev2-svg" xmlns="http://www.w3.org/2000/svg"></svg>
     </div>
     <div id="ev2-sidebar">
-      <div id="ev2-header">
-        <div id="ev2-title">MAP<br>EDITOR</div>
+      <div id="ev2-sidebar-top">
+        <div id="ev2-header">
+          <div id="ev2-title">MAP<br>EDITOR</div>
+        </div>
+        <div id="ev2-mode-switcher" class="ev2-mode-switcher">
+          <button id="ev2-btn-edit" class="ev2-mode-btn active">EDIT</button>
+          <button id="ev2-btn-borders" class="ev2-mode-btn">BORDERS</button>
+          <button id="ev2-btn-territory" class="ev2-mode-btn">TERRITORY</button>
+          <button id="ev2-btn-sectors" class="ev2-mode-btn">SECTORS</button>
+          <button id="ev2-btn-view" class="ev2-mode-btn">VIEW</button>
+        </div>
       </div>
-      <div id="ev2-mode-switcher" class="ev2-mode-switcher">
-        <button id="ev2-btn-edit" class="ev2-mode-btn active">EDIT</button>
-        <button id="ev2-btn-borders" class="ev2-mode-btn">BORDERS</button>
-        <button id="ev2-btn-territory" class="ev2-mode-btn">TERRITORY</button>
-        <button id="ev2-btn-sectors" class="ev2-mode-btn">SECTORS</button>
-        <button id="ev2-btn-view" class="ev2-mode-btn">VIEW</button>
-      </div>
+      <div id="ev2-sidebar-scroll">
       <div id="ev2-panel-edit">
         <div class="ev2-section-label">PEN TOOL</div>
         <p class="ev2-hint">Click to place points. Snap to an existing point to share a border. New territories are defined in <strong>BORDERS</strong> mode, not here. Esc cancels the current path.</p>
@@ -211,6 +214,7 @@
         <button type="button" id="ev2-sectors-save-btn" class="ev2-action-btn">SAVE SECTOR</button>
         <div class="ev2-section-label" style="margin-top: 14px;">SECTORS</div>
         <ul id="ev2-sector-list" class="ev2-territory-list" aria-label="Defined sectors"></ul>
+      </div>
       </div>
       <div id="ev2-footer">
         <button id="ev2-export-btn" class="ev2-action-btn">EXPORT (COPY JSON)</button>

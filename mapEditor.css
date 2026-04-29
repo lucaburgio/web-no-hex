@@ -4,9 +4,12 @@
 #map-editor-overlay {
   position: fixed; inset: 0; display: flex; z-index: 200;
   background: #f5f5f3;
+  min-height: 0;
+  overflow: hidden;
 }
 #ev2-canvas-area {
   flex: 1; overflow: hidden; position: relative;
+  min-height: 0;
   background: #EFF0F0; /* light gray map background */
 }
 #ev2-svg {
@@ -81,6 +84,23 @@
   width: 240px; min-width: 220px; max-width: 280px; background: #1a1a1a; color: #fff;
   display: flex; flex-direction: column; padding: 24px 16px;
   gap: 20px; flex-shrink: 0;
+  min-height: 0;
+  align-self: stretch;
+  overflow: hidden;
+}
+#ev2-sidebar-top {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+#ev2-sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 #ev2-title {
   font-size: 18px; font-weight: 700; letter-spacing: 0.1em;
@@ -327,7 +347,12 @@
 
 #ev2-note-tool-btn.active { background: #7c3aed; border-color: #a855f7; color: #fff; }
 
-#ev2-footer { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+#ev2-footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 /* Import modal */
 #ev2-import-modal {
