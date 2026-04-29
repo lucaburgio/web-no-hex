@@ -1,5 +1,5 @@
 import config from './gameconfig';
-import { migrateSectorControlPointHexLoaded, normalizeBattleStats } from './game';
+import { migrateSectorControlPointHexLoaded, normalizeBattleStats, syncBreakthroughAttackerOwnerOnLoad } from './game';
 import type { GameState } from './types';
 
 const STORAGE_KEY = 'web-strategic-save';
@@ -32,14 +32,12 @@ export function loadGameState(): GameState | null {
     if (!state.sectorControlPointHex) state.sectorControlPointHex = [];
     if (state.gameMode === 'breakthrough' && state.sectorOwners.length > 0) {
       migrateSectorControlPointHexLoaded(state);
+      syncBreakthroughAttackerOwnerOnLoad(state);
     }
     if (!state.breakthroughCpOccupation) state.breakthroughCpOccupation = [];
     if (!state.sectorIndexByHex) state.sectorIndexByHex = {};
     if (state.gameMode === 'breakthrough' && state.sectorOwners.length === 0) {
       state.gameMode = 'domination';
-    }
-    if (state.gameMode === 'breakthrough' && state.breakthroughAttackerOwner == null) {
-      state.breakthroughAttackerOwner = 1;
     }
     if (state.gameMode !== 'conquest') {
       state.conquestPoints = null;

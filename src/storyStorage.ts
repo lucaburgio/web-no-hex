@@ -1,4 +1,4 @@
-import { migrateSectorControlPointHexLoaded } from './game';
+import { migrateSectorControlPointHexLoaded, syncBreakthroughAttackerOwnerOnLoad } from './game';
 import config from './gameconfig';
 import type { GameState, StoryProgress } from './types';
 
@@ -66,6 +66,7 @@ export function loadStoryGameState(): GameState | null {
     if (!state.sectorControlPointHex) state.sectorControlPointHex = [];
     if (state.gameMode === 'breakthrough' && state.sectorOwners.length > 0) {
       migrateSectorControlPointHexLoaded(state);
+      syncBreakthroughAttackerOwnerOnLoad(state);
     }
     if (!state.breakthroughCpOccupation) state.breakthroughCpOccupation = [];
     if (!state.sectorIndexByHex) state.sectorIndexByHex = {};

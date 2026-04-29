@@ -39,10 +39,41 @@ function perfLog(section: string, ms: number): void {
 export const PLAYER = 1 as const;
 export const AI     = 2 as const;
 
-/** Breakthrough: which side is the attacker this match (old saves omit → south / PLAYER). */
+/**
+ * The sector with no control points is the attacker's home; that sector's `sectorOwners` entry
+ * is the real attacker for the match. Used when `breakthroughAttackerOwner` is missing or wrong
+ * in older saves (story / localStorage) so CP occupation and PP use the correct side.
+ */
+function inferBreakthroughAttackerFromSectorLayout(state: GameState): Owner | null {
+  const sch = state.sectorControlPointHex;
+  const so = state.sectorOwners;
+  if (!sch?.length || !so || sch.length !== so.length) return null;
+  for (let i = 0; i < sch.length; i++) {
+    const cps = sch[i];
+    if (cps && cps.length > 0) continue;
+    const o = so[i]!;
+    if (o === PLAYER || o === AI) return o;
+  }
+  return null;
+}
+
+/** Breakthrough: which side is the attacker this match. Prefers the attacker's home sector (no CPs) when present. */
 export function getBreakthroughAttackerOwner(state: GameState): Owner {
   if (state.gameMode !== 'breakthrough') return PLAYER;
-  return state.breakthroughAttackerOwner ?? PLAYER;
+  const fromLayout = inferBreakthroughAttackerFromSectorLayout(state);
+  if (fromLayout !== null) return fromLayout;
+  const raw = state.breakthroughAttackerOwner;
+  if (raw === PLAYER || raw === AI) return raw;
+  if (!config.breakthroughRandomRoles) {
+    return config.breakthroughPlayer1Role === 'attacker' ? PLAYER : AI;
+  }
+  return PLAYER;
+}
+
+/** Normalize {@link GameState.breakthroughAttackerOwner} after load or graph repair. */
+export function syncBreakthroughAttackerOwnerOnLoad(state: GameState): void {
+  if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return;
+  state.breakthroughAttackerOwner = getBreakthroughAttackerOwner(state);
 }
 
 export function getBreakthroughDefenderOwner(state: GameState): Owner {
@@ -244,6 +275,9 @@ export function applyGameStateBoardDimensions(state: GameState): void {
       repairTerritoryBreakthroughLayoutFromGraph(state);
       breakthroughRefreshActiveControlPoint(state);
     }
+    if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
+      syncBreakthroughAttackerOwnerOnLoad(state);
+    }
     return;
   }
   const { boardCols, boardRows } = resolveBoardDimensionsForState(state);
@@ -251,6 +285,9 @@ export function applyGameStateBoardDimensions(state: GameState): void {
   state.boardRows = boardRows;
   updateConfig({ boardCols, boardRows });
   syncDimensions();
+  if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
+    syncBreakthroughAttackerOwnerOnLoad(state);
+  }
 }
 
 let unitIdCounter = 0;
