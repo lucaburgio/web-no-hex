@@ -40,11 +40,22 @@ export const PLAYER = 1 as const;
 export const AI     = 2 as const;
 
 /**
- * The sector with no control points is the attacker's home; that sector's `sectorOwners` entry
- * is the real attacker for the match. Used when `breakthroughAttackerOwner` is missing or wrong
- * in older saves (story / localStorage) so CP occupation and PP use the correct side.
+ * The attacker's home is the unique sector with no control point on any of its `territoryIds`
+ * (see {@link createInitialStateFromTerritoryMap} / `repairTerritoryBreakthroughLayoutFromGraph`).
+ * Do **not** use the first `[]` row in `sectorControlPointHex` — defender sectors with no CP markers
+ * in the map also have empty rows and can appear first in the array, which would flip attacker/defender
+ * in `getBreakthroughAttackerOwner` and break CP occupation for the real attacker (e.g. AI).
  */
 function inferBreakthroughAttackerFromSectorLayout(state: GameState): Owner | null {
+  const g = state.customMapGraph;
+  if (g && g.sectors.length) {
+    const cpTids = new Set(Object.values(g.controlPoints).map(cp => cp.territoryId));
+    const found = g.sectors.findIndex(sec => !sec.territoryIds.some(tid => cpTids.has(tid)));
+    const homeIdx = found >= 0 ? found : 0;
+    const o = state.sectorOwners?.[homeIdx];
+    if (o === PLAYER || o === AI) return o;
+  }
+  // Hex / legacy fallback: first row with no CP key list
   const sch = state.sectorControlPointHex;
   const so = state.sectorOwners;
   if (!sch?.length || !so || sch.length !== so.length) return null;
