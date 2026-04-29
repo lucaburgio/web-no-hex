@@ -787,7 +787,9 @@ function colors(): Colors {
     aiTired:         v('--color-ai-tired'),
     aiDuringProduction: v('--color-ai-during-production'),
     unitProductionDisabled: v('--color-unit-production-disabled') || '#999999',
-    rangedTarget:    v('--color-red-500'),
+    rangedTargetFill:    v('--color-ranged-target-fill') || '#FFE5E5',
+    rangedTargetBorder:  v('--color-ranged-target-border') || '#ff6b6b',
+    rangedTargetBracket: v('--color-ranged-target-bracket') || '#ff6b6b',
     colorDark:       v('--color-dark'),
 
     boardUnitCardFill:            v('--color-board-unit-card-fill') || '#FFFFFF',
@@ -904,8 +906,8 @@ function mapUnitChipStyle(
     let bracketStroke = opts.isSelected ? c.boardUnitBracketSelected : m;
     let bracketStrokeW = opts.isSelected ? c.boardUnitBracketSelectedWidth : c.boardUnitBracketWidth;
     if (opts.isRangedTarget && !opts.isSelected) {
-      bracketStroke = c.rangedTarget;
-      bodyStroke = c.rangedTarget;
+      bracketStroke = c.rangedTargetBracket;
+      bodyStroke = c.rangedTargetBorder;
       bracketStrokeW = Math.max(bracketStrokeW, 1.6);
     }
     return {
@@ -925,10 +927,10 @@ function mapUnitChipStyle(
   let bracketStroke = opts.isSelected ? c.boardUnitBracketSelected : c.boardUnitBracket;
   let bracketStrokeW = opts.isSelected ? c.boardUnitBracketSelectedWidth : c.boardUnitBracketWidth;
   if (opts.isRangedTarget && !opts.isSelected) {
-    bracketStroke = c.rangedTarget;
-    bodyStroke = c.rangedTarget;
+    bracketStroke = c.rangedTargetBracket;
+    bodyStroke = c.rangedTargetBorder;
     bracketStrokeW = Math.max(bracketStrokeW, 1.6);
-    bodyFill = '#FFE5E5';
+    bodyFill = c.rangedTargetFill;
   }
   const hpFill = mapUnitHpFillColor(
     c,
@@ -1124,7 +1126,7 @@ export function mountBoardUnitChipContents(
   appendBoardUnitStars(unitWrap, p.x, starY, starN, starSize, chip.iconColor);
 
   if (showAim && isRangedTarget) {
-    const aim = inlineIcon('icons/artillery.svg', p.x, p.y - HEX_SIZE * 1, HEX_SIZE * 0.5, c.rangedTarget, opacity);
+    const aim = inlineIcon('icons/artillery.svg', p.x, p.y - HEX_SIZE * 1, HEX_SIZE * 0.5, c.rangedTargetBorder, opacity);
     if (aim) {
       const aimWrap = svgEl('g');
       aimWrap.setAttribute('class', 'ranged-target-aim');

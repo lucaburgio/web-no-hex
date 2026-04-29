@@ -158,7 +158,10 @@ img {
     --color-board-unit-hp-enemy: #FE775E;
     --color-board-unit-hp-selected: #ffcc00;
     --color-board-unit-icon-silhouette: #0a0a0a;
-  
+    --color-ranged-target-fill: #FFE5E5;
+    --color-ranged-target-border: #ff6b6b;
+    --color-ranged-target-bracket: #ff6b6b;
+
     --color-hp-high: #81E2A0;
     --color-hp-mid:  #FFBE00;
     --color-hp-low:  #FF765E;
