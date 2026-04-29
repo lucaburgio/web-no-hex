@@ -560,10 +560,31 @@ function renderSectorList(): void {
   const ul = document.getElementById('ev2-sector-list') as HTMLUListElement | null;
   if (!ul) return;
   ul.replaceChildren();
-  for (const s of sectors) {
+  sectors.forEach((s, i) => {
     const li = document.createElement('li');
     li.dataset.sectorId = s.id;
     li.className = 'ev2-sector-item';
+
+    const reorderCol = document.createElement('div');
+    reorderCol.className = 'ev2-sector-reorder';
+    const upBtn = document.createElement('button');
+    upBtn.type = 'button';
+    upBtn.className = 'ev2-sector-reorder-btn';
+    upBtn.textContent = '↑';
+    upBtn.title = 'Move up';
+    upBtn.dataset.sectorMove = 'up';
+    upBtn.dataset.sectorId = s.id;
+    upBtn.disabled = i === 0;
+    const downBtn = document.createElement('button');
+    downBtn.type = 'button';
+    downBtn.className = 'ev2-sector-reorder-btn';
+    downBtn.textContent = '↓';
+    downBtn.title = 'Move down';
+    downBtn.dataset.sectorMove = 'down';
+    downBtn.dataset.sectorId = s.id;
+    downBtn.disabled = i === sectors.length - 1;
+    reorderCol.appendChild(upBtn);
+    reorderCol.appendChild(downBtn);
 
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
@@ -589,12 +610,13 @@ function renderSectorList(): void {
     delBtn.title = 'Delete sector';
     delBtn.dataset.sectorDelete = s.id;
 
+    li.appendChild(reorderCol);
     li.appendChild(nameInput);
     li.appendChild(countBadge);
     li.appendChild(editBtn);
     li.appendChild(delBtn);
     ul.appendChild(li);
-  }
+  });
 
   // Update selection count display
   const selEl = document.getElementById('ev2-sectors-selection');
@@ -1931,6 +1953,19 @@ export function initMapEditor(onBack: () => void): void {
   document.getElementById('ev2-sector-list')?.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
     if (!b) return;
+    if (b.dataset.sectorMove && b.dataset.sectorId && !b.disabled) {
+      const idx = sectors.findIndex((x) => x.id === b.dataset.sectorId);
+      if (idx < 0) return;
+      if (b.dataset.sectorMove === 'up' && idx > 0) {
+        [sectors[idx - 1], sectors[idx]] = [sectors[idx], sectors[idx - 1]];
+      } else if (b.dataset.sectorMove === 'down' && idx < sectors.length - 1) {
+        [sectors[idx], sectors[idx + 1]] = [sectors[idx + 1], sectors[idx]];
+      } else {
+        return;
+      }
+      render();
+      return;
+    }
     if (b.dataset.sectorDelete) {
       sectors = sectors.filter((s) => s.id !== b.dataset.sectorDelete);
       if (editingSectorId === b.dataset.sectorDelete) {

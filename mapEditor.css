@@ -215,6 +215,32 @@
 }
 .ev2-sector-edit-btn:hover { background: #444; }
 
+.ev2-sectors-order-hint { margin-bottom: 8px; }
+
+.ev2-sector-reorder {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ev2-sector-reorder-btn {
+  padding: 0;
+  width: 22px;
+  height: 16px;
+  font-size: 10px;
+  line-height: 1;
+  background: #333;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.ev2-sector-reorder-btn:hover:not(:disabled) { background: #444; }
+.ev2-sector-reorder-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* Territory tool selector */
 .ev2-tool-selector { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 .ev2-tool-btn {
