@@ -1195,26 +1195,74 @@ function aiConquestUnitPriority(
   return Math.min(toCapture, defend);
 }
 
-/** Breakthrough: lower = act earlier — defend CPs in sectors still owned by the defender, then react to threats. */
+/** When AI is the sole unit on a frontline breakthrough CP, stepping off (empty move) is heavily penalized. */
+function breakthroughLoneCpVacatePenalty(state: GameState, unit: Unit, toCol: number, toRow: number): number {
+  if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return 0;
+  if (unit.owner !== AI) return 0;
+  if (toCol === unit.col && toRow === unit.row) return 0;
+  const fromK = `${unit.col},${unit.row}`;
+  if (!(state.controlPointHexes ?? []).includes(fromK)) return 0;
+  const others = state.units.filter(
+    o => o.owner === AI && o.id !== unit.id && `${o.col},${o.row}` === fromK,
+  );
+  if (others.length > 0) return 0;
+  return -2800;
+}
+
+/**
+ * Breakthrough: lower = act earlier.
+ * Attacker: first empty out toward unstaffed frontline CPs, then act flex units, then hold CPs.
+ * Defender: last man on a CP defends; otherwise pressure toward frontline CPs and threats.
+ */
 function aiBreakthroughUnitPriority(
   state: GameState,
   u: Unit,
   minPlayerBfsToHexFn: (tcol: number, trow: number) => number,
 ): number {
+  const isAiAttacker = getBreakthroughAttackerOwner(state) === AI;
   const def = getBreakthroughDefenderOwner(state);
-  let best = 999;
+  const active = state.controlPointHexes ?? [];
+  const uk = `${u.col},${u.row}`;
+
+  if (isAiAttacker) {
+    const unstaffed = active.filter(
+      k => !state.units.some(ut => ut.owner === AI && `${ut.col},${ut.row}` === k),
+    );
+    if (unstaffed.length) {
+      let toReach = 999;
+      for (const k of unstaffed) {
+        const [c, r] = k.split(',').map(Number);
+        toReach = Math.min(toReach, bfsDistance(state, u.col, u.row, c, r));
+      }
+      return toReach;
+    }
+    if (active.length && active.includes(uk)) {
+      return 700;
+    }
+    return 300;
+  }
+
+  if (active.includes(uk)) {
+    const n = state.units.filter(ut => ut.owner === AI && `${ut.col},${ut.row}` === uk).length;
+    if (n <= 1) return 700;
+  }
+
   const sid = breakthroughActiveFrontlineSectorIndex(state);
   if (sid !== null && state.sectorOwners[sid] === def) {
+    let best = 999;
     for (const cp of state.sectorControlPointHex[sid] ?? []) {
       const [cc, cr] = cp.split(',').map(Number);
       const dist = bfsDistance(state, u.col, u.row, cc, cr);
       const pd = minPlayerBfsToHexFn(cc, cr);
       best = Math.min(best, dist - Math.min(pd, 6) * 2.5);
     }
+    const thr = criticalThreatPlayerUnit(state);
+    if (thr) best = Math.min(best, bfsDistance(state, u.col, u.row, thr.col, thr.row));
+    return best;
   }
-  const thr = criticalThreatPlayerUnit(state);
-  if (thr) best = Math.min(best, bfsDistance(state, u.col, u.row, thr.col, thr.row));
-  return best;
+  const thr2 = criticalThreatPlayerUnit(state);
+  if (thr2) return bfsDistance(state, u.col, u.row, thr2.col, thr2.row);
+  return 999;
 }
 
 function removeUnit(state: GameState, id: number): void {
@@ -2653,6 +2701,7 @@ function scoreEmptyMove(
   if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
     const defOw = getBreakthroughDefenderOwner(state);
     const isAiAttacker = getBreakthroughAttackerOwner(state) === AI;
+    const cpKeys = state.controlPointHexes ?? [];
     const cpApproachMult = isAiAttacker ? 1.8 : 1.0;
     const beforeC = minBfsToCpWhereFn(unit.col, unit.row, key => {
       const sid = state.sectorIndexByHex[key];
@@ -2664,17 +2713,24 @@ function scoreEmptyMove(
     });
     s += (beforeC - afterC) * 40 * cpApproachMult;
     if (isAiAttacker) {
-      // Extra forward pressure: attacker must close distance every turn
-      s += (before - after) * 16;
+      const allCpsStaffed = cpKeys.length
+        ? cpKeys.every(k => state.units.some(ut => ut.owner === AI && `${ut.col},${ut.row}` === k))
+        : true;
+      const uk = `${unit.col},${unit.row}`;
+      const holdStance = allCpsStaffed && cpKeys.includes(uk);
+      if (!holdStance) {
+        s += (before - after) * 16;
+      }
     }
     const tk = `${toCol},${toRow}`;
-    if ((state.controlPointHexes ?? []).includes(tk)) {
+    if (cpKeys.includes(tk)) {
       const sid = state.sectorIndexByHex[tk];
       if (sid !== undefined && state.sectorOwners[sid] === defOw) {
         const hx = state.hexStates[tk];
         if (!hx || hx.owner !== defOw) s += isAiAttacker ? 340 : 240;
       }
     }
+    s += breakthroughLoneCpVacatePenalty(state, unit, toCol, toRow);
   }
   return s;
 }
