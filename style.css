@@ -756,8 +756,8 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 }
 
 @keyframes ranged-target-hex-glow {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 0.3; }
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.8; }
 }
 
 .ranged-target-glow-overlay {

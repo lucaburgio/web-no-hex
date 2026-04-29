@@ -335,12 +335,12 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   svgEl.dataset.rangedTargetFirePatternId = artilleryFirePatternId;
   artilleryFirePattern.id = artilleryFirePatternId;
   artilleryFirePattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  artilleryFirePattern.setAttribute('width', '48');
-  artilleryFirePattern.setAttribute('height', '48');
+  artilleryFirePattern.setAttribute('width', '60');
+  artilleryFirePattern.setAttribute('height', '60');
   const artilleryFireImg = mksvg('image');
   artilleryFireImg.setAttribute('href', artilleryFirePatternSrc);
-  artilleryFireImg.setAttribute('width', '48');
-  artilleryFireImg.setAttribute('height', '48');
+  artilleryFireImg.setAttribute('width', '60');
+  artilleryFireImg.setAttribute('height', '60');
   artilleryFirePattern.appendChild(artilleryFireImg);
   defs.appendChild(artilleryFirePattern);
 
