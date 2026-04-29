@@ -532,7 +532,7 @@ function expandBreakthroughSectorHexesForTerritoryMap(
   for (let s = 0; s < nSec; s++) {
     for (const tid of graph.sectors[s]!.territoryIds) {
       const node = graph.territories[tid];
-      if (!node || node.state === 'mountain') continue;
+      if (!node || node.state === 'mountain' || node.state === 'offmap') continue;
       tidToSectorIdx.set(tid, s);
     }
   }
@@ -543,7 +543,7 @@ function expandBreakthroughSectorHexesForTerritoryMap(
     for (const nb of graph.adjacency[tid] ?? []) {
       if (visited.has(nb)) continue;
       const nbNode = graph.territories[nb];
-      if (!nbNode || nbNode.state === 'mountain') continue;
+      if (!nbNode || nbNode.state === 'mountain' || nbNode.state === 'offmap') continue;
       visited.add(nb);
       tidToSectorIdx.set(nb, sid);
       out[sid]!.push(nbNode.virtualKey);
@@ -555,7 +555,7 @@ function expandBreakthroughSectorHexesForTerritoryMap(
   for (const tid of graph.passableTerritoryIds) {
     if (tidToSectorIdx.has(tid)) continue;
     const node = graph.territories[tid];
-    if (!node || node.state === 'mountain') continue;
+    if (!node || node.state === 'mountain' || node.state === 'offmap') continue;
     tidToSectorIdx.set(tid, orphanSid);
     out[orphanSid]!.push(node.virtualKey);
   }
@@ -598,7 +598,7 @@ function repairTerritoryBreakthroughLayoutFromGraph(state: GameState): void {
     let sectorHexes = graph.sectors.map(sec =>
       sec.territoryIds
         .map(id => graph.territories[id])
-        .filter(t => t && t.state !== 'mountain')
+        .filter(t => t && t.state !== 'mountain' && t.state !== 'offmap')
         .map(t => t!.virtualKey),
     );
     sectorHexes = expandBreakthroughSectorHexesForTerritoryMap(graph, sectorHexes, attackerSectorIdx);
@@ -3180,7 +3180,7 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
     let sectorHexes = graph.sectors.map(sec =>
       sec.territoryIds
         .map(id => graph.territories[id])
-        .filter(t => t && t.state !== 'mountain')
+        .filter(t => t && t.state !== 'mountain' && t.state !== 'offmap')
         .map(t => t!.virtualKey),
     );
     sectorHexes = expandBreakthroughSectorHexesForTerritoryMap(graph, sectorHexes, attackerSectorIdx);

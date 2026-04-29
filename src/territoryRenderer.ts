@@ -432,7 +432,7 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     const fill = mksvg('polygon');
     fill.setAttribute('class', 'ev2-territory-fill ev2-state-neutral');
     fill.setAttribute('points', territoryPointsAttr(t, points));
-    if (t.state === 'mountain') {
+    if (t.state === 'mountain' || t.state === 'offmap') {
       fill.style.cursor = TERRITORY_MOUNTAIN_CURSOR;
       fill.setAttribute('pointer-events', 'none');
     } else {
@@ -441,7 +441,7 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     group.appendChild(fill);
 
     // Border compositing group — only shown for owned (allied/enemy) territories
-    if (t.state !== 'mountain') {
+    if (t.state !== 'mountain' && t.state !== 'offmap') {
       const borderGroup = mksvg('g');
       borderGroup.setAttribute('class', 'ev2-territory-border ev2-border-allied');
       borderGroup.setAttribute('pointer-events', 'none');
@@ -651,7 +651,7 @@ export function renderTerritoryState(
   /** Selected unit territory + valid-move destinations: same inset border treatment as allied/enemy */
   const moveHighlightTids = new Set<string>();
   for (const t of mapDef.territories) {
-    if (t.state === 'mountain') continue;
+    if (t.state === 'mountain' || t.state === 'offmap') continue;
     const node = territories[t.id];
     if (!node) continue;
     const key = node.virtualKey;
@@ -703,15 +703,15 @@ export function renderTerritoryState(
     const virtKey = nodeTerr?.virtualKey ?? '';
     const isProdSel = productionKey != null && virtKey === productionKey;
 
-    const vizState: 'neutral' | 'allied' | 'enemy' | 'mountain' =
-      t.state === 'mountain' ? 'mountain' : ownerState(t.id);
+    const vizState: 'neutral' | 'allied' | 'enemy' | 'mountain' | 'offmap' =
+      t.state === 'mountain' ? 'mountain' : t.state === 'offmap' ? 'offmap' : ownerState(t.id);
 
     const isMoveHl = moveHighlightTids.has(t.id);
     const isZocHl =
-      !isMoveHl && t.state !== 'mountain' && virtKey !== '' && zocKeys.has(virtKey);
+      !isMoveHl && t.state !== 'mountain' && t.state !== 'offmap' && virtKey !== '' && zocKeys.has(virtKey);
 
     let prodFillMod = '';
-    if (!isMoveHl && !isZocHl && inLocalProd && t.state !== 'mountain') {
+    if (!isMoveHl && !isZocHl && inLocalProd && t.state !== 'mountain' && t.state !== 'offmap') {
       if (isProdSel) prodFillMod = ' ev2-prod-selected';
       else if (productionPlacementKeys.has(virtKey)) prodFillMod = ' ev2-prod-placement';
       else if (vizState === 'allied') prodFillMod = ' ev2-prod-dim-friendly';

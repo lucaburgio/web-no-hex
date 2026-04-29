@@ -12,7 +12,7 @@ export interface TerritoryMapEdge {
   b: string;
 }
 
-export type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain';
+export type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain' | 'offmap';
 
 export interface TerritoryMapTerritory {
   id: string;
@@ -165,7 +165,7 @@ export function buildTerritoryAdjacency(mapDef: TerritoryMapDef): Record<string,
         const ta = byId.get(idA);
         const tb = byId.get(idB);
         if (!ta || !tb) continue;
-        if (ta.state === 'mountain' || tb.state === 'mountain') continue;
+        if (ta.state === 'mountain' || tb.state === 'mountain' || ta.state === 'offmap' || tb.state === 'offmap') continue;
         if (!adjacency[idA]!.includes(idB)) adjacency[idA]!.push(idB);
         if (!adjacency[idB]!.includes(idA)) adjacency[idB]!.push(idA);
       }
@@ -480,10 +480,12 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
   const allied: TerritoryMapTerritory[] = [];
   const enemy: TerritoryMapTerritory[] = [];
   const others: TerritoryMapTerritory[] = []; // neutral + mountain
+  const offmapTerrs: TerritoryMapTerritory[] = []; // offmap (decorative, excluded from grid)
 
   for (const t of cleanMapDef.territories) {
     if (t.state === 'allied') allied.push(t);
     else if (t.state === 'enemy') enemy.push(t);
+    else if (t.state === 'offmap') offmapTerrs.push(t);
     else others.push(t);
   }
 
@@ -516,6 +518,11 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
   assignTerritories(allied, 2);
   assignTerritories(enemy, 0);
   assignTerritories(others, 1);
+  // Offmap territories are decorative — no virtual grid slot, not added to keyToId
+  for (const t of offmapTerrs) {
+    const centroid = computeCentroid(t.pointIds, points);
+    territories[t.id] = { id: t.id, state: t.state, pointIds: t.pointIds, virtualCol: -1, virtualRow: -1, virtualKey: '', centroid };
+  }
 
   const adjacency = buildTerritoryAdjacency(cleanMapDef);
 

@@ -12,7 +12,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain';
+type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain' | 'offmap';
 type TerritoryTool = TerritoryState | 'controlpoint';
 
 interface Pt { id: string; x: number; y: number }
@@ -1030,7 +1030,7 @@ function render(): void {
     // Inset border rendered as a compositing group so opacity never compounds at
     // sub-path endpoints. The glow layer uses butt caps (no end-cap blobs);
     // the main line uses round caps for clean termination.
-    if (t.state !== 'neutral' && t.state !== 'mountain') {
+    if (t.state !== 'neutral' && t.state !== 'mountain' && t.state !== 'offmap') {
       const borderPathD = buildInsetBorderPath(t, edgeIndex, -10);
       if (borderPathD) {
         const borderGroup = document.createElementNS(SVG_NS, 'g');
