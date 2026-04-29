@@ -787,7 +787,7 @@ function colors(): Colors {
     aiTired:         v('--color-ai-tired'),
     aiDuringProduction: v('--color-ai-during-production'),
     unitProductionDisabled: v('--color-unit-production-disabled') || '#999999',
-    rangedTarget:    v('--color-red-700'),
+    rangedTarget:    v('--color-red-500'),
     colorDark:       v('--color-dark'),
 
     boardUnitCardFill:            v('--color-board-unit-card-fill') || '#FFFFFF',
@@ -899,12 +899,13 @@ function mapUnitChipStyle(
 ): MapUnitChipStyle {
   if (opts.productionPhaseUiDisabled) {
     const m = c.unitProductionDisabled;
-    const bodyStroke = opts.isSelected ? c.boardUnitBorderSelected : m;
+    let bodyStroke = opts.isSelected ? c.boardUnitBorderSelected : m;
     const bodyStrokeW = opts.isSelected ? c.boardUnitBorderSelectedWidth : c.boardUnitBorderWidth;
     let bracketStroke = opts.isSelected ? c.boardUnitBracketSelected : m;
     let bracketStrokeW = opts.isSelected ? c.boardUnitBracketSelectedWidth : c.boardUnitBracketWidth;
     if (opts.isRangedTarget && !opts.isSelected) {
       bracketStroke = c.rangedTarget;
+      bodyStroke = c.rangedTarget;
       bracketStrokeW = Math.max(bracketStrokeW, 1.6);
     }
     return {
@@ -919,12 +920,13 @@ function mapUnitChipStyle(
   }
 
   const bodyFill = c.boardUnitCardFill;
-  const bodyStroke = opts.isSelected ? c.boardUnitBorderSelected : c.boardUnitBorder;
+  let bodyStroke = opts.isSelected ? c.boardUnitBorderSelected : c.boardUnitBorder;
   const bodyStrokeW = opts.isSelected ? c.boardUnitBorderSelectedWidth : c.boardUnitBorderWidth;
   let bracketStroke = opts.isSelected ? c.boardUnitBracketSelected : c.boardUnitBracket;
   let bracketStrokeW = opts.isSelected ? c.boardUnitBracketSelectedWidth : c.boardUnitBracketWidth;
   if (opts.isRangedTarget && !opts.isSelected) {
     bracketStroke = c.rangedTarget;
+    bodyStroke = c.rangedTarget;
     bracketStrokeW = Math.max(bracketStrokeW, 1.6);
   }
   const hpFill = mapUnitHpFillColor(
