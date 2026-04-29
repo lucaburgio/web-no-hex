@@ -105,9 +105,17 @@ function territoryPathD(t: TerritoryMapTerritory, points: Record<string, { x: nu
   return coords.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ') + ' Z';
 }
 
-function computeMapExtents(pts: Record<string, { x: number; y: number }>): { minX: number; minY: number; maxX: number; maxY: number } {
+function computeMapExtents(
+  pts: Record<string, { x: number; y: number }>,
+  territories?: TerritoryMapTerritory[],
+): { minX: number; minY: number; maxX: number; maxY: number } {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const pt of Object.values(pts)) {
+  // Only consider points belonging to at least one non-offmap territory
+  const includedPtIds = territories
+    ? new Set(territories.filter(t => t.state !== 'offmap').flatMap(t => t.pointIds))
+    : null;
+  for (const [id, pt] of Object.entries(pts)) {
+    if (includedPtIds && !includedPtIds.has(id)) continue;
     if (pt.x < minX) minX = pt.x;
     if (pt.y < minY) minY = pt.y;
     if (pt.x > maxX) maxX = pt.x;
@@ -290,7 +298,7 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   svgEl.innerHTML = '';
 
   const { mapDef, points } = graph;
-  const { minX, minY, maxX, maxY } = computeMapExtents(points);
+  const { minX, minY, maxX, maxY } = computeMapExtents(points, mapDef.territories);
   // 80px padding so the 72px outer-border pattern overhang is fully visible
   const pad = 80;
   svgEl.setAttribute('viewBox', `${minX - pad} ${minY - pad} ${maxX - minX + 2 * pad} ${maxY - minY + 2 * pad}`);
