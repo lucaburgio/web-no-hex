@@ -34,7 +34,7 @@ const TERRITORY_MOUNTAIN_CURSOR = "url('/icons/pointer.svg') 13 14, default";
 const STROKE_WIDTH_HIGHLIGHT = 2;
 /** Territory production marker: `public/icons/plus.svg` (preloaded in main via loadIconDefs). */
 const PROD_PLACEMENT_ICON_SRC = 'icons/plus.svg';
-const PROD_PLACEMENT_ICON_PX = 18;
+const PROD_PLACEMENT_ICON_PX = 12;
 
 interface RendererState {
   graph: TerritoryGraphData;
@@ -868,7 +868,7 @@ export function renderTerritoryState(
         cx,
         cy,
         PROD_PLACEMENT_ICON_PX,
-        'var(--color-dark)',
+        'var(--color-gray-700)',
         '1',
         'trr-prod-marker',
       );

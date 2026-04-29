@@ -2832,6 +2832,16 @@
   ],
   "sectors": [
     {
+      "id": "sec6",
+      "name": "Sector 4",
+      "territoryIds": [
+        "t12",
+        "t20",
+        "t34",
+        "t27"
+      ]
+    },
+    {
       "id": "sec3",
       "name": "Sector 1",
       "territoryIds": [
@@ -2876,16 +2886,6 @@
         "t5",
         "t42",
         "t41"
-      ]
-    },
-    {
-      "id": "sec6",
-      "name": "Sector 4",
-      "territoryIds": [
-        "t12",
-        "t20",
-        "t34",
-        "t27"
       ]
     }
   ]
