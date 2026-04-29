@@ -1320,6 +1320,28 @@ function breakthroughLoneCpVacatePenalty(state: GameState, unit: Unit, toCol: nu
 }
 
 /**
+ * True when the AI attacker may end the turn on an active frontline CP without moving (stand pat)
+ * so occupation progress is not reset. Used when every CP is covered, or this unit is the only
+ * attacker on this CP (must not vacate).
+ */
+function breakthroughAiAttackerMayStandPatOnCp(state: GameState, unit: Unit): boolean {
+  if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return false;
+  if (getBreakthroughAttackerOwner(state) !== AI || unit.owner !== AI) return false;
+  const defOw = getBreakthroughDefenderOwner(state);
+  const activeSid = breakthroughActiveFrontlineSectorIndex(state);
+  if (activeSid === null || state.sectorOwners[activeSid] !== defOw) return false;
+  const cps = breakthroughFrontlineCpKeys(state);
+  if (!cps.length) return false;
+  const uk = `${unit.col},${unit.row}`;
+  if (!cps.includes(uk)) return false;
+  const allStaffed = cps.every(k => state.units.some(u => u.owner === AI && `${u.col},${u.row}` === k));
+  const soleOnThisCp = !state.units.some(
+    o => o.owner === AI && o.id !== unit.id && `${o.col},${o.row}` === uk,
+  );
+  return allStaffed || soleOnThisCp;
+}
+
+/**
  * Breakthrough: lower = act earlier.
  * Attacker: first empty out toward unstaffed frontline CPs, then act flex units, then hold CPs.
  * Defender: last man on a CP defends; otherwise pressure toward frontline CPs and threats.
@@ -2770,6 +2792,9 @@ function scoreEmptyMove(
   bfsFn: (fromCol: number, fromRow: number, toCol: number, toRow: number) => number,
 ): number {
   if (unit.movesUsed + stepsCost > unit.movement) return -Infinity;
+  if (toCol === unit.col && toRow === unit.row) {
+    return breakthroughAiAttackerMayStandPatOnCp(state, unit) ? 1_000_000 : -Infinity;
+  }
   if (state.gameMode === 'breakthrough' && breakthroughAttackerBreaksFullCpCoverage(state, unit, toCol, toRow)) {
     return -1_000_000_000;
   }
@@ -2980,7 +3005,16 @@ export function aiMovement(state: GameState): {
       }
 
       const validMoves = getValidMoves(state, unit);
-      if (validMoves.length === 0) break;
+      let moveCandidates: [number, number][] = validMoves;
+      if (
+        state.gameMode === 'breakthrough' &&
+        state.sectorOwners?.length &&
+        breakthroughAiAttackerMayStandPatOnCp(state, unit) &&
+        !validMoves.some(([c, r]) => c === unit.col && r === unit.row)
+      ) {
+        moveCandidates = [[unit.col, unit.row], ...validMoves];
+      }
+      if (moveCandidates.length === 0) break;
 
       type BestAct =
         | { kind: 'attack'; col: number; row: number; score: number }
@@ -2988,7 +3022,7 @@ export function aiMovement(state: GameState): {
 
       let best: BestAct | null = null;
 
-      for (const [nc, nr] of validMoves) {
+      for (const [nc, nr] of moveCandidates) {
         const occupant = getUnit(state, nc, nr);
         if (occupant && occupant.owner === PLAYER) {
           const s = scoreMeleeAttack(state, unit, occupant, pressure, minHomeStepsFn);
@@ -3104,6 +3138,11 @@ export function aiMovement(state: GameState): {
         animSteps.push({ type: 'combat', vfx });
         animUnitsAfter.push(snapshotUnits(state));
         checkVictory(state);
+        break;
+      }
+
+      if (best.kind === 'move' && best.col === unit.col && best.row === unit.row) {
+        unit.movesUsed = unit.movement;
         break;
       }
 
