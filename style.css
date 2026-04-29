@@ -755,6 +755,18 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   animation: ranged-target-aim-bounce 1.35s ease-in-out infinite;
 }
 
+@keyframes ranged-target-hex-glow {
+  0%, 100% { fill-opacity: 0; }
+  50% { fill-opacity: 0.06; }
+}
+
+.ranged-target-glow-overlay {
+  fill: #ef4444;
+  fill-opacity: 0;
+  pointer-events: none;
+  animation: ranged-target-hex-glow 1.35s ease-in-out infinite;
+}
+
 @keyframes control-point-ring-dash {
   to {
     stroke-dashoffset: -14;

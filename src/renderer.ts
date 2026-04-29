@@ -1414,12 +1414,15 @@ interface RenderDomCache {
   sectorOutlinePrimary: SVGPathElement | null;
   sectorOutlineSecondary: SVGPathElement | null;
   markerLayer: SVGGElement | null;
+  rangedTargetGlowLayer: SVGGElement | null;
   moveBoundary: SVGPathElement | null;
 }
 
 const renderDomCacheBySvg = new WeakMap<SVGSVGElement, RenderDomCache>();
 /** Persistent CP groups by hex key — cleared in {@link initRenderer} so nodes are not stale after rebuild. */
 const controlPointGroupsBySvg = new WeakMap<SVGSVGElement, Map<string, SVGGElement>>();
+/** Persistent ranged-target glow overlays by hex key — cleared in {@link initRenderer}. */
+const rangedTargetGlowGroupsBySvg = new WeakMap<SVGSVGElement, Map<string, SVGPolygonElement>>();
 
 export interface InitRendererOptions {
   /** When true (vs-human guest), mirror the board through its center (horizontal + vertical). */
@@ -1430,6 +1433,7 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   document.getElementById('board-prod-marker-hover-style')?.remove();
   svgElement.innerHTML = '';
   controlPointGroupsBySvg.delete(svgElement);
+  rangedTargetGlowGroupsBySvg.delete(svgElement);
   const flipBoardY = !!options?.flipBoardY;
   svgElement.dataset.boardFlipY = flipBoardY ? '1' : '';
   const c = colors();
@@ -1569,6 +1573,11 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
   controlPointLayer.setAttribute('pointer-events', 'none');
   hexLayer.appendChild(controlPointLayer);
 
+  const rangedTargetGlowLayer = svgEl('g');
+  rangedTargetGlowLayer.id = 'ranged-target-glow-layer';
+  rangedTargetGlowLayer.setAttribute('pointer-events', 'none');
+  hexLayer.appendChild(rangedTargetGlowLayer);
+
   const markerLayer = svgEl('g');
   markerLayer.id = 'marker-layer';
   markerLayer.setAttribute('pointer-events', 'none');
@@ -1661,6 +1670,7 @@ export function initRenderer(svgElement: SVGSVGElement, options?: InitRendererOp
     sectorOutlinePrimary,
     sectorOutlineSecondary,
     markerLayer,
+    rangedTargetGlowLayer,
     moveBoundary: boundary,
   });
 
@@ -2446,6 +2456,32 @@ export function renderState(
           syncSvgAttr(upright, 'transform', tr);
         }
       }
+    }
+  }
+
+  // Ranged-target hex glow overlays (stable keyed polygons; animation survives re-renders).
+  const rangedTargetGlowLayerEl = domCache?.rangedTargetGlowLayer ?? (svgElement.querySelector('#ranged-target-glow-layer') as SVGGElement | null);
+  if (rangedTargetGlowLayerEl) {
+    let glowMap = rangedTargetGlowGroupsBySvg.get(svgElement);
+    if (!glowMap) {
+      glowMap = new Map();
+      rangedTargetGlowGroupsBySvg.set(svgElement, glowMap);
+    }
+    for (const key of [...glowMap.keys()]) {
+      if (!rangedTargetKeys.has(key)) {
+        glowMap.get(key)?.remove();
+        glowMap.delete(key);
+      }
+    }
+    for (const key of rangedTargetKeys) {
+      if (glowMap.has(key)) continue;
+      const [gc, gr] = key.split(',').map(Number);
+      const { x, y } = hexToPixel(gc, gr);
+      const poly = svgEl('polygon');
+      poly.setAttribute('points', hexPoints(x, y));
+      poly.setAttribute('class', 'ranged-target-glow-overlay');
+      rangedTargetGlowLayerEl.appendChild(poly);
+      glowMap.set(key, poly);
     }
   }
 
