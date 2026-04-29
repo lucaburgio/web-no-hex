@@ -40,6 +40,7 @@ interface RendererState {
 }
 
 const rendererStateMap = new WeakMap<SVGSVGElement, RendererState>();
+const rangedGlowMapTr = new WeakMap<SVGSVGElement, Map<string, SVGPolygonElement>>();
 
 /** Optional draw overrides for move / combat animation frames (mirrors {@link renderState} ideas). */
 export interface RenderTerritoryStateOptions {
@@ -381,6 +382,7 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     'ev2-note-layer',
     'trr-prod-markers',
     'trr-highlights',
+    'trr-ranged-glow',
     'trr-units',
   ]) {
     const g = mksvg('g');
@@ -541,6 +543,7 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   ensureMovePathPreviewLayer(svgEl);
 
   rendererStateMap.set(svgEl, { graph, edgeTerritoryIndex });
+  rangedGlowMapTr.delete(svgEl);
 }
 
 // ── getTerritoryFromEvent ─────────────────────────────────────────────────────
@@ -920,6 +923,32 @@ export function renderTerritoryState(
   }
   const productionTiredVisualTr =
     state.phase === 'production' && state.activePlayer === localPlayer;
+
+  const rangedGlowLayer = svgElement.querySelector('#trr-ranged-glow') as SVGGElement | null;
+  if (rangedGlowLayer) {
+    let glowMap = rangedGlowMapTr.get(svgElement);
+    if (!glowMap) {
+      glowMap = new Map();
+      rangedGlowMapTr.set(svgElement, glowMap);
+    }
+    for (const key of [...glowMap.keys()]) {
+      if (!rangedTargetKeysTr.has(key)) {
+        glowMap.get(key)?.remove();
+        glowMap.delete(key);
+      }
+    }
+    for (const key of rangedTargetKeysTr) {
+      if (glowMap.has(key)) continue;
+      const tid = graph.keyToId[key];
+      const tDef = tid ? mapDef.territories.find(t => t.id === tid) : null;
+      if (!tDef) continue;
+      const poly = document.createElementNS(SVG_NS, 'polygon') as SVGPolygonElement;
+      poly.setAttribute('points', territoryPointsAttr(tDef, points));
+      poly.setAttribute('class', 'ranged-target-glow-overlay');
+      rangedGlowLayer.appendChild(poly);
+      glowMap.set(key, poly);
+    }
+  }
 
   const unitsLayer = svgElement.querySelector('#trr-units')!;
   const existingUnits = new Map<number, SVGGElement>();
