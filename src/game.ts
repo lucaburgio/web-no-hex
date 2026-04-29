@@ -1149,9 +1149,12 @@ function minBfsToCpWhere(
   col: number,
   row: number,
   pred: (key: string) => boolean,
+  /** When set (e.g. Breakthrough), use only these keys — not {@link GameState.controlPointHexes}. */
+  cpKeyList?: string[] | null,
 ): number {
+  const keys = cpKeyList != null ? cpKeyList : (state.controlPointHexes ?? []);
   let min = Infinity;
-  for (const key of state.controlPointHexes ?? []) {
+  for (const key of keys) {
     if (!pred(key)) continue;
     const [c, r] = key.split(',').map(Number);
     min = Math.min(min, bfsDistance(state, col, row, c, r));
@@ -1207,7 +1210,7 @@ function breakthroughAttackerBreaksFullCpCoverage(
 ): boolean {
   if (state.gameMode !== 'breakthrough' || getBreakthroughAttackerOwner(state) !== AI) return false;
   if (unit.owner !== AI) return false;
-  const cps = state.controlPointHexes ?? [];
+  const cps = breakthroughFrontlineCpKeys(state);
   if (!cps.length) return false;
   const att = getBreakthroughAttackerOwner(state);
   const allCoveredNow = cps.every(k => state.units.some(u => u.owner === att && `${u.col},${u.row}` === k));
@@ -1233,7 +1236,7 @@ function breakthroughLoneCpVacatePenalty(state: GameState, unit: Unit, toCol: nu
   if (unit.owner !== AI) return 0;
   if (toCol === unit.col && toRow === unit.row) return 0;
   const fromK = `${unit.col},${unit.row}`;
-  if (!(state.controlPointHexes ?? []).includes(fromK)) return 0;
+  if (!breakthroughFrontlineCpKeys(state).includes(fromK)) return 0;
   const others = state.units.filter(
     o => o.owner === AI && o.id !== unit.id && `${o.col},${o.row}` === fromK,
   );
@@ -1253,7 +1256,7 @@ function aiBreakthroughUnitPriority(
 ): number {
   const isAiAttacker = getBreakthroughAttackerOwner(state) === AI;
   const def = getBreakthroughDefenderOwner(state);
-  const active = state.controlPointHexes ?? [];
+  const active = breakthroughFrontlineCpKeys(state);
   const uk = `${u.col},${u.row}`;
 
   if (isAiAttacker) {
@@ -1952,6 +1955,7 @@ function breakthroughRemoveSectorControlPoint(state: GameState, sectorIndex: num
   const remove = new Set(cps);
   state.controlPointHexes = state.controlPointHexes.filter(k => !remove.has(k));
   state.sectorControlPointHex[sectorIndex] = [];
+  breakthroughRefreshActiveControlPoint(state);
 }
 
 /** Breakthrough: when a sector is captured, every playable hex in it becomes attacker territory. */
@@ -2322,6 +2326,9 @@ function scoreAiProductionPlacement(
 
 export function aiProduction(state: GameState): GameState {
   const tStart = performance.now();
+  if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
+    breakthroughRefreshActiveControlPoint(state);
+  }
   let placed = 0;
   const pressure = aiDefensivePressure(state);
   const distToGoalMap = buildDistanceToOpponentHomeRowMap(state, AI);
@@ -2622,11 +2629,7 @@ function pickBestRangedTarget(
     }
     if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
       const k = `${t.col},${t.row}`;
-      if ((state.controlPointHexes ?? []).includes(k)) {
-        const sid = state.sectorIndexByHex[k];
-        const def = getBreakthroughDefenderOwner(state);
-        if (sid !== undefined && state.sectorOwners[sid] === def) s += 210;
-      }
+      if (breakthroughFrontlineCpKeys(state).includes(k)) s += 210;
     }
     if (s > bestScore) {
       bestScore = s;
@@ -2669,9 +2672,9 @@ function scoreMeleeAttack(
   }
   if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
     const dk = `${defender.col},${defender.row}`;
-    if ((state.controlPointHexes ?? []).includes(dk)) {
-      const sid = state.sectorIndexByHex[dk];
+    if (breakthroughFrontlineCpKeys(state).includes(dk)) {
       const defOw = getBreakthroughDefenderOwner(state);
+      const sid = state.sectorIndexByHex[dk];
       if (sid !== undefined && state.sectorOwners[sid] === defOw) s += 175;
     }
   }
@@ -2736,7 +2739,7 @@ function scoreEmptyMove(
   if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
     const defOw = getBreakthroughDefenderOwner(state);
     const isAiAttacker = getBreakthroughAttackerOwner(state) === AI;
-    const cpKeys = state.controlPointHexes ?? [];
+    const cpKeys = breakthroughFrontlineCpKeys(state);
     const cpApproachMult = isAiAttacker ? 1.8 : 1.0;
     const beforeC = minBfsToCpWhereFn(unit.col, unit.row, key => {
       const sid = state.sectorIndexByHex[key];
@@ -2807,6 +2810,13 @@ export function aiMovement(state: GameState): {
   const animUnitsBefore: Unit[][] = [];
   const animHexStatesBefore: Record<string, HexState>[] = [];
   const animUnitsAfter: Unit[][] = [];
+  if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
+    breakthroughRefreshActiveControlPoint(state);
+  }
+  const breakthroughObjectiveCps: string[] | null =
+    state.gameMode === 'breakthrough' && state.sectorOwners?.length
+      ? breakthroughFrontlineCpKeys(state)
+      : null;
   const pressure = aiDefensivePressure(state);
   const threat = criticalThreatPlayerUnit(state);
   const localBfsCache = new Map<string, number>();
@@ -2830,11 +2840,12 @@ export function aiMovement(state: GameState): {
     return d;
   };
   const minBfsToCpWhereFn = (col: number, row: number, pred: (key: string) => boolean): number => {
-    const cpKeys = (state.controlPointHexes ?? []).filter(pred).join('|');
-    const k = `${col},${row}|${cpKeys}`;
+    const keyList = breakthroughObjectiveCps;
+    const cpKeySig = (keyList ?? (state.controlPointHexes ?? [])).filter(pred).join('|');
+    const k = `${col},${row}|${cpKeySig}`;
     const v = localMinCpCache.get(k);
     if (v !== undefined) return v;
-    const d = minBfsToCpWhere(state, col, row, pred);
+    const d = minBfsToCpWhere(state, col, row, pred, keyList);
     localMinCpCache.set(k, d);
     return d;
   };
