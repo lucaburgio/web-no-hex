@@ -984,7 +984,7 @@ export function renderTerritoryState(
       if (t.state === 'mountain') continue;
       const nodePm = territories[t.id];
       if (!nodePm || !productionPlacementKeys.has(nodePm.virtualKey)) continue;
-      // Polygon centroid from buildTerritoryGraph (vertex average); matches unit/CP placement.
+      // Geometric (area-weighted) polygon centroid from buildTerritoryGraph; matches unit/CP placement.
       const cx = nodePm.centroid.x;
       const cy = nodePm.centroid.y;
       const g = mksvg('g');

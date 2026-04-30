@@ -617,14 +617,37 @@ export function boardPixelForVirtualHex(
   return node ? { x: node.centroid.x, y: node.centroid.y } : null;
 }
 
+/**
+ * Area-weighted centroid of a simple closed polygon (vertex order from map data).
+ * Falls back to {@link vertexCentroid} when the ring is degenerate (fewer than 3 vertices or ~zero area).
+ */
+function polygonGeometricCentroid(
+  pointIds: string[],
+  pts: Record<string, { x: number; y: number }>,
+): { x: number; y: number } {
+  const poly = territoryPolyPoints(pointIds, pts);
+  const n = poly.length;
+  if (n < 3) return vertexCentroid(pointIds, pts);
+
+  let twiceSigned = 0;
+  let cxAccum = 0;
+  let cyAccum = 0;
+  for (let i = 0; i < n; i++) {
+    const p = poly[i]!;
+    const q = poly[(i + 1) % n]!;
+    const cross = p.x * q.y - q.x * p.y;
+    twiceSigned += cross;
+    cxAccum += (p.x + q.x) * cross;
+    cyAccum += (p.y + q.y) * cross;
+  }
+  if (Math.abs(twiceSigned) < 1e-12) return vertexCentroid(pointIds, pts);
+  const inv = 1 / (3 * twiceSigned);
+  return { x: cxAccum * inv, y: cyAccum * inv };
+}
+
 function computeCentroid(
   pointIds: string[],
   points: Record<string, { x: number; y: number }>,
 ): { x: number; y: number } {
-  let sx = 0, sy = 0, count = 0;
-  for (const pid of pointIds) {
-    const p = points[pid];
-    if (p) { sx += p.x; sy += p.y; count++; }
-  }
-  return count > 0 ? { x: sx / count, y: sy / count } : { x: 0, y: 0 };
+  return polygonGeometricCentroid(pointIds, points);
 }
