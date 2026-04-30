@@ -215,6 +215,13 @@ function computeAvgAdjacentCentroidPx(
 /** Pixel-area tolerance when checking whether child territories partition a parent polygon. */
 const PARTITION_AREA_EPS = 1;
 
+/** Sum of many shoelace areas vs parent — allows accumulated float error on large maps. */
+function areasPartitionSumMatches(sumChildren: number, parentArea: number): boolean {
+  if (parentArea < PARTITION_AREA_EPS) return false;
+  const diff = Math.abs(sumChildren - parentArea);
+  return diff <= Math.max(PARTITION_AREA_EPS, parentArea * 1e-10);
+}
+
 function shoelaceAbsArea(
   pointIds: string[],
   pts: Record<string, { x: number; y: number }>,
@@ -343,12 +350,17 @@ function findSubsetSummingToArea(
 
 /**
  * Territory ids that {@link sanitizeTerritoryMapDef} would strip: an enclosing polygon whose
- * interior is fully tiled by smaller same-`state` faces (same area sum **and** every parent
- * boundary segment appears on some child in that subset). Candidates are restricted to faces
- * whose vertices are all corners of the parent (no centroid-in-parent test: for concave
- * parents the vertex mean of a child can lie outside the parent polygon). Other candidates
- * still use centroid-in-parent. This avoids the small-subset cap from unrelated same-state
- * territories whose centroids fall inside a large concave parent.
+ * interior is fully tiled by smaller faces **and** every parent boundary segment appears on
+ * some tile (planar partition).
+ *
+ * Two cases:
+ * 1. **Mixed-state tiling** — Children may be any combination of neutral / enemy / allied /
+ *    mountain (not `offmap`). Required when the obsolete shell is neutral but interior faces
+ *    were reassigned (e.g. large neutral `t1` left after filling the map with mixed states).
+ *    Uses the **full** candidate set whose areas sum to the parent’s area (no subset search).
+ * 2. **Same-state subset** — Legacy path: smaller territories with the **same** `state` as
+ *    the parent, subset-sum match (≤ {@link MAX_PARTITION_SUBSET} candidates), centroid /
+ *    vertices-from-parent rules as before.
  */
 export function computeRedundantPartitionParentIds(mapDef: TerritoryMapDef): Set<string> {
   const pts: Record<string, { x: number; y: number }> = {};
@@ -378,6 +390,31 @@ export function computeRedundantPartitionParentIds(mapDef: TerritoryMapDef): Set
 
     /** Vertices of a child face from splitting P use only corners of P (no Steiner points). */
     const pVertSet = new Set(P.pointIds);
+
+    // ── Mixed-state full partition (obsolete outer shell tiled by interior faces of any passable state)
+    if (P.state !== 'offmap') {
+      const candidatesMixed = mapDef.territories.filter(T => {
+        if (T.id === P.id || toRemove.has(T.id)) return false;
+        if (T.state === 'offmap') return false;
+        const aT = areas.get(T.id) ?? 0;
+        if (aT >= areaP - PARTITION_AREA_EPS) return false;
+        const vertsOnlyFromP = T.pointIds.every(pid => pVertSet.has(pid));
+        if (vertsOnlyFromP) return true;
+        const c = vertexCentroid(T.pointIds, pts);
+        return pointInPolygon(c.x, c.y, polyP);
+      });
+
+      if (candidatesMixed.length >= 2) {
+        const sumMixed = candidatesMixed.reduce((s, t) => s + (areas.get(t.id) ?? 0), 0);
+        if (
+          areasPartitionSumMatches(sumMixed, areaP) &&
+          partitionSubsetCoversParentEdges(P, candidatesMixed.map(t => t.id), byId)
+        ) {
+          toRemove.add(P.id);
+          continue;
+        }
+      }
+    }
 
     const candidates = mapDef.territories.filter(T => {
       if (T.id === P.id || toRemove.has(T.id)) return false;
@@ -411,11 +448,11 @@ export function computeRedundantPartitionParentIds(mapDef: TerritoryMapDef): Set
 
 /**
  * Removes territories that duplicate an outer boundary after a **split without deleting the
- * original**: smaller territories lie inside the parent polygon, have the same `state`, their
- * areas sum to the parent's area, and **every edge of the parent boundary appears on at least
- * one** of those faces (planar partition). Common when auto-detect or "save as new" adds faces
- * **t63/t64** but leaves **t50** as the old enclosing ring. Runs multiple passes so nested
- * obsolete shells are removed in one call.
+ * original**: smaller territories tile the parent’s interior, their areas sum to the parent’s
+ * area, and **every edge of the parent boundary appears on at least one** child face. Children
+ * may be **mixed states** (neutral shell around enemy/allied/mountain tiles) or **same-state**
+ * subsets (smaller maps). Common when auto-detect or "save as new" fills the interior but leaves
+ * **t1** as the old enclosing ring. Runs multiple passes so nested obsolete shells are removed in one call.
  *
  * **Note:** dropping entries changes neutral/mountain **virtual column** indices (see
  * `assignTerritories` in {@link buildTerritoryGraph}); embedded saves for the same map id may
