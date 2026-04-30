@@ -88,7 +88,7 @@
 
 /* Sidebar */
 #ev2-sidebar {
-  width: 240px; min-width: 220px; max-width: 280px; background: #1a1a1a; color: #fff;
+  width: 320px; background: #1a1a1a; color: #fff;
   display: flex; flex-direction: column; padding: 24px 16px;
   gap: 20px; flex-shrink: 0;
   min-height: 0;
