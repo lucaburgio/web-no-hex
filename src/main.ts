@@ -165,106 +165,6 @@ const svg        = document.getElementById('board') as unknown as SVGSVGElement;
 const gameAreaEl = document.getElementById('game-area') as HTMLElement | null;
 const boardWrapEl = document.getElementById('board-wrap') as HTMLElement | null;
 
-/** Rubber-band overscroll on #board-wrap at document scroll limits + damped spring settle. */
-let mapScrollElasticX = 0;
-let mapScrollElasticY = 0;
-let mapScrollVelX = 0;
-let mapScrollVelY = 0;
-let mapScrollSpringRaf: number | null = null;
-let mapScrollWheelIdleTimer: ReturnType<typeof setTimeout> | null = null;
-
-const MAP_SCROLL_ELASTIC_MAX = 52;
-const MAP_SCROLL_RUBBER = 0.26;
-const MAP_SCROLL_SPRING_K = 280;
-const MAP_SCROLL_SPRING_C = 19;
-
-function mapScrollSpringMotionReduced(): boolean {
-  try {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch {
-    return false;
-  }
-}
-
-function applyMapScrollElasticTransform(): void {
-  if (!boardWrapEl) return;
-  if (mapScrollElasticX === 0 && mapScrollElasticY === 0) {
-    boardWrapEl.style.transform = '';
-    return;
-  }
-  boardWrapEl.style.transform = `translate3d(${mapScrollElasticX}px, ${mapScrollElasticY}px, 0)`;
-}
-
-function stopMapScrollSpring(): void {
-  if (mapScrollSpringRaf !== null) {
-    cancelAnimationFrame(mapScrollSpringRaf);
-    mapScrollSpringRaf = null;
-  }
-}
-
-function resetMapScrollElastic(): void {
-  stopMapScrollSpring();
-  if (mapScrollWheelIdleTimer !== null) {
-    clearTimeout(mapScrollWheelIdleTimer);
-    mapScrollWheelIdleTimer = null;
-  }
-  mapScrollElasticX = 0;
-  mapScrollElasticY = 0;
-  mapScrollVelX = 0;
-  mapScrollVelY = 0;
-  applyMapScrollElasticTransform();
-}
-
-function scheduleMapScrollSpringAfterIdle(): void {
-  if (mapScrollWheelIdleTimer !== null) clearTimeout(mapScrollWheelIdleTimer);
-  mapScrollWheelIdleTimer = setTimeout(() => {
-    mapScrollWheelIdleTimer = null;
-    if (mapScrollElasticX === 0 && mapScrollElasticY === 0) return;
-    startMapScrollSpring();
-  }, 120);
-}
-
-function startMapScrollSpring(): void {
-  if (mapScrollSpringMotionReduced()) return;
-  if (mapScrollSpringRaf !== null) return;
-  if (
-    mapScrollElasticX === 0 &&
-    mapScrollElasticY === 0 &&
-    mapScrollVelX === 0 &&
-    mapScrollVelY === 0
-  ) {
-    return;
-  }
-  let prev = performance.now();
-  const step = (now: number): void => {
-    const dt = Math.min(0.045, (now - prev) / 1000);
-    prev = now;
-    const ax = -MAP_SCROLL_SPRING_K * mapScrollElasticX - MAP_SCROLL_SPRING_C * mapScrollVelX;
-    const ay = -MAP_SCROLL_SPRING_K * mapScrollElasticY - MAP_SCROLL_SPRING_C * mapScrollVelY;
-    mapScrollVelX += ax * dt;
-    mapScrollVelY += ay * dt;
-    mapScrollElasticX += mapScrollVelX * dt;
-    mapScrollElasticY += mapScrollVelY * dt;
-    if (
-      Math.abs(mapScrollElasticX) < 0.5 &&
-      Math.abs(mapScrollVelX) < 3.2 &&
-      Math.abs(mapScrollElasticY) < 0.5 &&
-      Math.abs(mapScrollVelY) < 3.2
-    ) {
-      mapScrollElasticX = 0;
-      mapScrollElasticY = 0;
-      mapScrollVelX = 0;
-      mapScrollVelY = 0;
-      applyMapScrollElasticTransform();
-      mapScrollSpringRaf = null;
-      return;
-    }
-    applyMapScrollElasticTransform();
-    mapScrollSpringRaf = requestAnimationFrame(step);
-  };
-  mapScrollSpringRaf = requestAnimationFrame(step);
-}
-
 /**
  * Map editor pans with both wheel deltas at once (`panX += deltaX`, `panY += deltaY`).
  * Native page scroll on `body` often follows only one axis per gesture; mirror editor behavior here.
@@ -293,55 +193,8 @@ function installGameAreaWheelScroll(): void {
       if (dx === 0 && dy === 0) return;
       const root = document.scrollingElement ?? document.documentElement;
       e.preventDefault();
-
-      const reduced = mapScrollSpringMotionReduced();
-      if (reduced || !boardWrapEl) {
-        root.scrollLeft += dx;
-        root.scrollTop += dy;
-        return;
-      }
-
-      stopMapScrollSpring();
-      if (mapScrollWheelIdleTimer !== null) {
-        clearTimeout(mapScrollWheelIdleTimer);
-        mapScrollWheelIdleTimer = null;
-      }
-
-      const maxSL = Math.max(0, root.scrollWidth - root.clientWidth);
-      const maxST = Math.max(0, root.scrollHeight - root.clientHeight);
-      const sl0 = root.scrollLeft;
-      const st0 = root.scrollTop;
-      const sl1 = Math.min(maxSL, Math.max(0, sl0 + dx));
-      const st1 = Math.min(maxST, Math.max(0, st0 + dy));
-      const ox = sl0 + dx - sl1;
-      const oy = st0 + dy - st1;
-
-      root.scrollLeft = sl1;
-      root.scrollTop = st1;
-
-      if (ox !== 0) {
-        mapScrollElasticX = Math.max(
-          -MAP_SCROLL_ELASTIC_MAX,
-          Math.min(MAP_SCROLL_ELASTIC_MAX, mapScrollElasticX + ox * MAP_SCROLL_RUBBER),
-        );
-      } else {
-        mapScrollElasticX *= 0.52;
-        if (Math.abs(mapScrollElasticX) < 0.65) mapScrollElasticX = 0;
-      }
-      if (oy !== 0) {
-        mapScrollElasticY = Math.max(
-          -MAP_SCROLL_ELASTIC_MAX,
-          Math.min(MAP_SCROLL_ELASTIC_MAX, mapScrollElasticY + oy * MAP_SCROLL_RUBBER),
-        );
-      } else {
-        mapScrollElasticY *= 0.52;
-        if (Math.abs(mapScrollElasticY) < 0.65) mapScrollElasticY = 0;
-      }
-
-      mapScrollVelX = 0;
-      mapScrollVelY = 0;
-      applyMapScrollElasticTransform();
-      scheduleMapScrollSpringAfterIdle();
+      root.scrollLeft += dx;
+      root.scrollTop += dy;
     },
     { passive: false },
   );
@@ -357,7 +210,6 @@ function centerBoardInViewport(): void {
   const root = document.scrollingElement ?? document.documentElement;
   if (!wrap) return;
   const run = (): void => {
-    resetMapScrollElastic();
     const r = wrap.getBoundingClientRect();
     if (r.width <= 0 && r.height <= 0) return;
     const boardCx = r.left + r.width / 2;
