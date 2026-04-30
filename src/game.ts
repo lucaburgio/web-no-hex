@@ -1581,6 +1581,14 @@ function tankSpearheadFromApproach(unit: Unit, stepsCost: number, movesUsedBefor
   return unitClassOf(unitTypeForUnit(unit)) === 'tank' && movesUsedBefore === 0 && stepsCost === unit.movement;
 }
 
+/** True when `b` lies on a combat/movement neighbor of `a` (hex neighbor or shared-border territory). */
+function unitsAreMeleeAdjacent(a: Unit, b: Unit): boolean {
+  for (const [c, r] of effectiveGetNeighbors(a.col, a.row, COLS, ROWS)) {
+    if (c === b.col && r === b.row) return true;
+  }
+  return false;
+}
+
 /** True when limit-artillery mode blocks ranged fire (any enemy adjacent to this ranged unit). */
 function limitArtilleryBlocksRanged(state: GameState, unit: Unit): boolean {
   if (!config.limitArtillery) return false;
@@ -1600,16 +1608,17 @@ function rangedDistanceAllowsRangedFire(d: number, maxRange: number): boolean {
   return d >= 2 && d <= maxRange;
 }
 
-/** Ranged attack: hex boards distance 2..range; polygon maps centroid distance up to `range` only (no minimum). */
+/** Ranged attack: not melee-adjacent to defender; hex boards distance 2..range; polygon maps centroid distance up to `range` only (no minimum). */
 function isRangedCombat(state: GameState, attacker: Unit, defender: Unit): boolean {
   const ut = unitTypeForUnit(attacker);
   if (!ut.range) return false;
   if (limitArtilleryBlocksRanged(state, attacker)) return false;
+  if (unitsAreMeleeAdjacent(attacker, defender)) return false;
   const d = rangedCombatHexDistance(attacker.col, attacker.row, defender.col, defender.row);
   return rangedDistanceAllowsRangedFire(d, ut.range);
 }
 
-/** Enemies the unit can shoot without moving (hex: 2..range; polygon: within max circle). */
+/** Enemies the unit can shoot without moving (hex: 2..range; polygon: within max circle, not melee-adjacent). */
 export function getRangedAttackTargets(state: GameState, unit: Unit): Unit[] {
   const ut = unitTypeForUnit(unit);
   if (!ut.range || unit.movesUsed >= unit.movement) return [];
@@ -1618,6 +1627,7 @@ export function getRangedAttackTargets(state: GameState, unit: Unit): Unit[] {
   const out: Unit[] = [];
   for (const u of state.units) {
     if (u.owner !== enemy) continue;
+    if (unitsAreMeleeAdjacent(unit, u)) continue;
     const d = rangedCombatHexDistance(unit.col, unit.row, u.col, u.row);
     if (rangedDistanceAllowsRangedFire(d, ut.range)) out.push(u);
   }
