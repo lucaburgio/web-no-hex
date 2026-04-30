@@ -679,6 +679,7 @@ function syncArtilleryRangeCircle(
   layer.querySelector('#trr-artillery-range-outer')?.remove();
   layer.querySelector('#trr-artillery-range-circle')?.remove();
   if (!band || !ownerStyle) {
+    layer.querySelector('#trr-artillery-range-bloom')?.remove();
     layer.querySelector('#trr-artillery-range-fill')?.remove();
     layer.querySelector('#trr-artillery-range-ring')?.remove();
     return;
@@ -687,23 +688,53 @@ function syncArtilleryRangeCircle(
   const fillCls = `trr-artillery-range-fill trr-artillery-range--${clsSuffix}`;
   const ringCls = `trr-artillery-range-ring trr-artillery-range--${clsSuffix}`;
 
-  let fillEl = layer.querySelector('#trr-artillery-range-fill') as SVGCircleElement | null;
+  let bloom = layer.querySelector('#trr-artillery-range-bloom') as SVGGElement | null;
+  if (!bloom) {
+    bloom = document.createElementNS(SVG_NS, 'g') as SVGGElement;
+    bloom.id = 'trr-artillery-range-bloom';
+    bloom.setAttribute('pointer-events', 'none');
+    layer.appendChild(bloom);
+  }
+  let scaleG = bloom.querySelector('g.trr-artillery-range-scale') as SVGGElement | null;
+  if (!scaleG) {
+    scaleG = document.createElementNS(SVG_NS, 'g') as SVGGElement;
+    scaleG.setAttribute('class', 'trr-artillery-range-scale');
+    bloom.appendChild(scaleG);
+  }
+  const orphanFill = layer.querySelector('#trr-artillery-range-fill');
+  if (orphanFill && orphanFill.parentNode !== scaleG) {
+    orphanFill.remove();
+    layer.querySelector('#trr-artillery-range-ring')?.remove();
+  }
+
+  let fillEl = scaleG.querySelector('#trr-artillery-range-fill') as SVGCircleElement | null;
   if (!fillEl) {
     fillEl = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
     fillEl.id = 'trr-artillery-range-fill';
     fillEl.setAttribute('pointer-events', 'none');
-    layer.appendChild(fillEl);
+    scaleG.appendChild(fillEl);
   }
-  let ringEl = layer.querySelector('#trr-artillery-range-ring') as SVGCircleElement | null;
+  let ringEl = scaleG.querySelector('#trr-artillery-range-ring') as SVGCircleElement | null;
   if (!ringEl) {
     ringEl = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
     ringEl.id = 'trr-artillery-range-ring';
     ringEl.setAttribute('pointer-events', 'none');
-    layer.appendChild(ringEl);
+    scaleG.appendChild(ringEl);
   }
   if (ringEl.previousElementSibling !== fillEl) {
-    layer.insertBefore(fillEl, ringEl);
+    scaleG.insertBefore(fillEl, ringEl);
   }
+
+  setAttrIfChanged(bloom, 'transform', `translate(${band.cx},${band.cy})`);
+
+  const introKey = `${band.cx},${band.cy},${band.rMaxPx},${ownerStyle}`;
+  const prevIntroKey = scaleG.dataset.introKey ?? '';
+  if (prevIntroKey !== '' && prevIntroKey !== introKey) {
+    scaleG.style.animation = 'none';
+    void scaleG.getBoundingClientRect();
+    scaleG.style.removeProperty('animation');
+  }
+  scaleG.dataset.introKey = introKey;
 
   setAttrIfChanged(fillEl, 'class', fillCls);
   setAttrIfChanged(ringEl, 'class', ringCls);
@@ -711,14 +742,12 @@ function syncArtilleryRangeCircle(
   fillEl.removeAttribute('stroke');
   ringEl.removeAttribute('fill');
   ringEl.removeAttribute('stroke');
-  const cx = String(band.cx);
-  const cy = String(band.cy);
   const r = String(band.rMaxPx);
-  setAttrIfChanged(fillEl, 'cx', cx);
-  setAttrIfChanged(fillEl, 'cy', cy);
+  setAttrIfChanged(fillEl, 'cx', '0');
+  setAttrIfChanged(fillEl, 'cy', '0');
   setAttrIfChanged(fillEl, 'r', r);
-  setAttrIfChanged(ringEl, 'cx', cx);
-  setAttrIfChanged(ringEl, 'cy', cy);
+  setAttrIfChanged(ringEl, 'cx', '0');
+  setAttrIfChanged(ringEl, 'cy', '0');
   setAttrIfChanged(ringEl, 'r', r);
 }
 

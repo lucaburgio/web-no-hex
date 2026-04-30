@@ -617,10 +617,13 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   /* Dashed rotating outline (#trr-artillery-range-ring) */
   --trr-artillery-range-ring-stroke-width: 2px;
   --trr-artillery-range-ring-stroke-opacity: 0.9;
-  --trr-artillery-range-ring-dasharray: 10 16;
+  --trr-artillery-range-ring-dasharray: 120 8;
   --trr-artillery-range-ring-linecap: round;
-  --trr-artillery-range-ring-spin-duration: 14s;
+  --trr-artillery-range-ring-spin-duration: 20s;
   --trr-artillery-range-ring-spin-timing: linear;
+  /* Scale-in when range first appears (g.trr-artillery-range-scale) */
+  --trr-artillery-range-intro-duration: 0.42s;
+  --trr-artillery-range-intro-timing: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 #board {
@@ -638,7 +641,15 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   --ev2-border-color: var(--color-yellow-500);
 }
 
-/* Polygon map: artillery range — fill disc + dashed rotating ring (two circles in #trr-artillery-range). */
+/* Polygon map: artillery range — translate(#trr-artillery-range-bloom) + scale intro + two circles. */
+#board .trr-artillery-range-scale,
+#recap-board .trr-artillery-range-scale {
+  transform-origin: 0 0;
+  transform-box: fill-box;
+  animation: trr-artillery-range-bloom-in var(--trr-artillery-range-intro-duration, 0.42s)
+    var(--trr-artillery-range-intro-timing, cubic-bezier(0.22, 1, 0.36, 1)) forwards;
+}
+
 #board .trr-artillery-range-fill.trr-artillery-range--friendly,
 #recap-board .trr-artillery-range-fill.trr-artillery-range--friendly {
   stroke: none;
@@ -706,6 +717,15 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 @keyframes trr-artillery-range-ring-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes trr-artillery-range-bloom-in {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
   }
 }
 
