@@ -89,6 +89,9 @@ function sectorEditorPaletteIndex(s: Sector | undefined, orderFallback: number):
   return ((orderFallback % 6) + 6) % 6;
 }
 
+/** Sectors mode: hex fills (same as `mapEditor.css` `--ev2-sector-palette-*`). Inlined so `.ev2-state-*` fills never override sector colors on the canvas. */
+const SECTOR_EDITOR_FILL_HEX = ['#f97316', '#2563eb', '#059669', '#9333ea', '#0891b2', '#e11d48'] as const;
+
 /** Assign missing {@link Sector.colorIndex} from list index (legacy JSON); clamp to 0–5. */
 function normalizeSectorColorIndices(list: Sector[]): void {
   for (let i = 0; i < list.length; i++) {
@@ -1106,8 +1109,11 @@ function render(): void {
     // Filled polygon
     const fill = document.createElementNS(SVG_NS, 'polygon');
     const pal = sectorPaletteIndexForTerritory(t.id);
-    const palClass = pal !== null ? ` ev2-sector-palette-${pal}` : '';
-    fill.setAttribute('class', `ev2-territory-fill ev2-state-${t.state}${palClass}`);
+    fill.setAttribute('class', `ev2-territory-fill ev2-state-${t.state}`);
+    if (pal !== null) {
+      fill.style.setProperty('fill', SECTOR_EDITOR_FILL_HEX[pal]);
+      fill.style.setProperty('fill-opacity', '0.8');
+    }
     fill.setAttribute('points', pts_str);
     group.appendChild(fill);
 
