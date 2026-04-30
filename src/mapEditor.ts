@@ -1570,16 +1570,56 @@ function handleSectorsClick(e: MouseEvent): void {
   render();
 }
 
-function saveSector(): void {
-  const ids = [...selectedSectorTerritoryIds];
+/**
+ * Each territory may belong to at most one sector. After assigning `claimedIds`
+ * to `keeperSectorId`, removes those ids from every other sector’s list.
+ */
+function dedupeTerritoriesAcrossSectors(keeperSectorId: string, claimedIds: readonly string[]): void {
+  const claimed = new Set(claimedIds);
+  for (const s of sectors) {
+    if (s.id === keeperSectorId) continue;
+    s.territoryIds = s.territoryIds.filter((tid) => !claimed.has(tid));
+  }
+}
+
+function pruneEmptySectors(): void {
+  sectors = sectors.filter((s) => s.territoryIds.length > 0);
+}
+
+/**
+ * Commits the current map selection as one sector and resyncs the whole sector
+ * list so no territory remains in more than one sector (others are stripped).
+ * Drops sectors that end up with zero territories.
+ */
+function saveSectors(): void {
+  const ids = [...new Set(selectedSectorTerritoryIds)];
   if (ids.length === 0) return;
+
+  let keeperId: string;
   if (editingSectorId) {
     const existing = sectors.find((s) => s.id === editingSectorId);
-    if (existing) existing.territoryIds = ids;
+    if (!existing) {
+      editingSectorId = null;
+      selectedSectorTerritoryIds = new Set();
+      render();
+      return;
+    }
+    existing.territoryIds = ids;
+    keeperId = existing.id;
     editingSectorId = null;
   } else {
-    sectors.push({ id: newSectorId(), name: `Sector ${sectors.length + 1}`, territoryIds: ids });
+    const newS: Sector = {
+      id: newSectorId(),
+      name: `Sector ${sectors.length + 1}`,
+      territoryIds: ids,
+    };
+    sectors.push(newS);
+    keeperId = newS.id;
   }
+
+  dedupeTerritoriesAcrossSectors(keeperId, ids);
+  pruneEmptySectors();
+
   selectedSectorTerritoryIds = new Set();
   render();
 }
@@ -1963,7 +2003,7 @@ export function initMapEditor(onBack: () => void): void {
 
   // Sectors panel
   (document.getElementById('ev2-sectors-save-btn') as HTMLButtonElement)
-    .addEventListener('click', () => saveSector());
+    .addEventListener('click', () => saveSectors());
   (document.getElementById('ev2-sectors-clear-btn') as HTMLButtonElement)
     .addEventListener('click', () => {
       selectedSectorTerritoryIds = new Set();
