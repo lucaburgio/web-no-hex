@@ -29,7 +29,7 @@ interface Note {
   maxWidth?: number;
   visibility?: TerritoryMapNoteVisibility;
 }
-interface Sector { id: string; name: string; territoryIds: string[] }
+interface Sector { id: string; name: string; territoryIds: string[]; colorIndex?: number }
 
 // ── Module-level state ────────────────────────────────────────────────────────
 
@@ -80,6 +80,26 @@ function newTerritoryId(): string { return `t${++_territoryCounter}`; }
 function newCpId(): string { return `cp${++_cpCounter}`; }
 function newNoteId(): string { return `note${++_noteCounter}`; }
 function newSectorId(): string { return `sec${++_sectorCounter}`; }
+
+/** Palette class 0–5 for editor fills and list swatches; uses {@link Sector.colorIndex} so reorder does not reshuffle colors. */
+function sectorEditorPaletteIndex(s: Sector | undefined, orderFallback: number): number {
+  if (s && typeof s.colorIndex === 'number' && Number.isFinite(s.colorIndex)) {
+    return ((Math.trunc(s.colorIndex) % 6) + 6) % 6;
+  }
+  return ((orderFallback % 6) + 6) % 6;
+}
+
+/** Assign missing {@link Sector.colorIndex} from list index (legacy JSON); clamp to 0–5. */
+function normalizeSectorColorIndices(list: Sector[]): void {
+  for (let i = 0; i < list.length; i++) {
+    const s = list[i]!;
+    if (typeof s.colorIndex === 'number' && Number.isFinite(s.colorIndex)) {
+      s.colorIndex = ((Math.trunc(s.colorIndex) % 6) + 6) % 6;
+    } else {
+      s.colorIndex = i % 6;
+    }
+  }
+}
 
 /** Space should insert a character, not start space+drag pan. */
 function eventTargetAcceptsSpaceForTyping(t: EventTarget | null): boolean {
@@ -587,7 +607,7 @@ function renderSectorList(): void {
     reorderCol.appendChild(downBtn);
 
     const swatch = document.createElement('span');
-    swatch.className = `ev2-sector-color-swatch ev2-sector-color-swatch-${i % 6}`;
+    swatch.className = `ev2-sector-color-swatch ev2-sector-color-swatch-${sectorEditorPaletteIndex(s, i)}`;
     swatch.title = 'Map color for this sector';
     swatch.setAttribute('aria-hidden', 'true');
 
@@ -898,6 +918,7 @@ function render(): void {
   // Keep territory list in sync with sanitize rules every frame so redundant enclosing
   // rings never linger (which would zero-out outer-edge territory counts and hide the map border).
   applySanitizeToEditorState();
+  if (sectors.length) normalizeSectorColorIndices(sectors);
 
   svgEl.setAttribute('data-ev2-mode', mode);
 
@@ -965,19 +986,20 @@ function render(): void {
 
   const edgeIndex = buildEdgeTerritoryIndex();
 
-  /** Sectors mode: palette index 0–5 cycles per sector order; draft uses next/editing slot. */
+  /** Sectors mode: palette index from each sector's colorIndex; draft selection uses next/editing sector's slot. */
   const sectorPaletteIndexForTerritory = (tid: string): number | null => {
     if (mode !== 'sectors') return null;
     if (selectedSectorTerritoryIds.has(tid)) {
       if (editingSectorId) {
-        const i = sectors.findIndex((s) => s.id === editingSectorId);
-        return (i >= 0 ? i : 0) % 6;
+        const ei = sectors.findIndex((s) => s.id === editingSectorId);
+        const sec = ei >= 0 ? sectors[ei] : undefined;
+        return sectorEditorPaletteIndex(sec, ei >= 0 ? ei : 0);
       }
       return sectors.length % 6;
     }
     const si = sectors.findIndex((s) => s.territoryIds.includes(tid));
     if (si < 0) return null;
-    return si % 6;
+    return sectorEditorPaletteIndex(sectors[si], si);
   };
 
   const redundantPartitionParentIds = computeRedundantPartitionParentIds({
@@ -1612,6 +1634,7 @@ function saveSectors(): void {
       id: newSectorId(),
       name: `Sector ${sectors.length + 1}`,
       territoryIds: ids,
+      colorIndex: sectors.length % 6,
     };
     sectors.push(newS);
     keeperId = newS.id;

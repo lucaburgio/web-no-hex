@@ -44,6 +44,8 @@ export interface TerritoryMapSector {
   id: string;
   name: string;
   territoryIds: string[];
+  /** Map editor: palette slot 0–5 for sector fills; stable when sector **order** changes (Breakthrough conquest order). */
+  colorIndex?: number;
 }
 
 export interface TerritoryMapDef {
