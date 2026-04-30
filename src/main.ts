@@ -2412,10 +2412,7 @@ function buildRulesContent(): string {
   const ar = getAvailableUnitTypes(1).find(u => u.id === 'artillery')
     ?? getAvailableUnitTypes(2).find(u => u.id === 'artillery')
     ?? config.unitTypes.find(u => u.id === 'artillery');
-  const arRanged =
-    ar?.range != null
-      ? `2–${ar.range} hexes away`
-      : '2+ hexes away';
+  const arRangeNum = ar?.range;
   const maxFlankBonus = Math.round(config.maxFlankingUnits * config.flankingBonus * 100);
   const brPct = Math.round(config.breakthroughEnemySectorStrengthMult * 100);
   const riverDefPct = Math.round(config.riverDefenseBonus * 100);
@@ -2502,8 +2499,8 @@ function buildRulesContent(): string {
       <li>Each unit may move up to its movement range per turn (see <strong>Units in this match</strong>). Moving onto an empty hex <strong>conquers</strong> it.</li>
       <li><strong>Polygon scenario maps:</strong> you move between territories that share a <strong>border edge</strong> (same as the map editor&rsquo;s internal adjacency), not merely a corner contact.</li>
       <li>Moving onto an enemy unit triggers <strong>combat</strong>. If you need more than one hex to reach them, you move along the path into the hex adjacent to the enemy first, then combat resolves.</li>
-      <li><strong>Artillery:</strong> each turn you either <strong>move</strong> one hex or fire a <strong>ranged attack</strong> at an enemy ${arRanged} (not both). Ranged fire does not use movement into the target&rsquo;s hex.
-        On polygon scenario maps, valid ranged targets are enemies whose position lies inside the <strong>annulus</strong> shown when you select your artillery (inner ring ≈ minimum range 2, outer ring = maximum range), measured as straight-line distance between territory centers in units of average neighbor spacing; mountains do not block. When you inspect an enemy artillery piece, its ring uses the opponent color so you can read their reach.</li>
+      <li><strong>Artillery:</strong> each turn you either <strong>move</strong> one hex or fire a <strong>ranged attack</strong> at an enemy (not both). Ranged fire does not use movement into the target&rsquo;s hex.
+        On a <strong>standard hex board</strong>, the target must lie at <strong>hex distance 2–${arRangeNum ?? 'range'}</strong> (axial grid distance). On polygon scenario maps, valid ranged targets are enemies whose position lies <strong>inside</strong> the max-range circle shown when you select your artillery (straight-line distance between territory centers, in units of average neighbor spacing, up to your type&rsquo;s <code>range</code>; no minimum distance; mountains do not block). When you inspect an enemy artillery piece, its circle uses the opponent color so you can read their reach.</li>
       <li><strong>Zone of Control (ZoC):</strong> a unit adjacent to an enemy is locked — it may only attack
         or retreat to a hex not itself adjacent to any enemy. <strong>Adjacent</strong> for ZoC is the same as for movement: on a standard hex board, the six grid neighbors; on <strong>polygon scenario maps</strong>, territories that share a <strong>border edge</strong> (not merely close virtual indices on the abstract grid). ZoC limits movement and adjacent attacks; it does not block artillery ranged fire at longer range.</li>
       <li><strong>Domination — guarded home row:</strong> with ZoC enabled, you cannot move onto an <strong>empty</strong> hex on the opponent&rsquo;s <strong>home row</strong> if any enemy is adjacent to that hex (this stops fast units from bypassing ZoC with multi-hex moves). You can still move onto that hex to attack an enemy unit sitting on it.</li>
@@ -2516,7 +2513,7 @@ function buildRulesContent(): string {
       <div class="rules-group-title">Combat</div>
       <ul class="rules-list">
       <li><strong>Adjacent combat:</strong> both sides deal damage <strong>simultaneously</strong>. If the defender is destroyed, the attacker advances and conquers the hex.</li>
-      <li><strong>Artillery ranged (2+ hexes):</strong> only the defender takes damage (no return fire). Destroying a unit with a ranged attack does <strong>not</strong> move the artillery or conquer that hex.</li>
+      <li><strong>Artillery ranged fire:</strong> only the defender takes damage (no return fire). Used when you <strong>shoot</strong> instead of moving into melee (see <strong>Movement</strong> for valid ranged targets by map type). Destroying a unit with a ranged attack does <strong>not</strong> move the artillery or conquer that hex.</li>
       <li><strong>Limit Artillery</strong> (optional game setting): when enabled, if <strong>any</strong> enemy is adjacent to your artillery, it cannot use ranged attacks against other hexes until no adjacent enemies remain — use adjacent combat (move to attack) first.</li>
       <li><strong>CS</strong> = unit type&rsquo;s base strength × condition (50–100% of current max HP) × flanking bonus. Defenders on a <strong>river</strong> hex gain <strong>+${riverDefPct}%</strong> effective strength.</li>
       <li><strong>Tank spearhead:</strong> a <strong>tank</strong> gains <strong>+${Math.round(config.tankSpearheadAttackBonus * 100)}%</strong> attacker CS when it moves into <strong>adjacent</strong> melee after a <strong>straight-line approach that uses its full movement allowance in one move</strong> (e.g. movement 2 = two hexes along the attack path; movement 3 = three hexes).</li>

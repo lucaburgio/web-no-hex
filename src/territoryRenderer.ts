@@ -632,44 +632,32 @@ function graphHasVirtualCell(gra: { keyToId: Record<string, string> }, col: numb
   return gra.keyToId[`${col},${row}`] !== undefined;
 }
 
-/** Min/max range circles for selected / inspected artillery; stable nodes to avoid animation flicker. */
-function syncArtilleryRangeAnnulus(
+/** Single max-range circle for selected / inspected artillery; stable node to avoid animation flicker. */
+function syncArtilleryRangeCircle(
   layer: SVGGElement | null,
-  band: { cx: number; cy: number; rMinPx: number; rMaxPx: number } | null,
+  band: { cx: number; cy: number; rMaxPx: number } | null,
   stroke: string | null,
 ): void {
   if (!layer) return;
+  layer.querySelector('#trr-artillery-range-inner')?.remove();
+  layer.querySelector('#trr-artillery-range-outer')?.remove();
   if (!band || !stroke) {
-    layer.querySelector('#trr-artillery-range-inner')?.remove();
-    layer.querySelector('#trr-artillery-range-outer')?.remove();
+    layer.querySelector('#trr-artillery-range-circle')?.remove();
     return;
   }
-  let inner = layer.querySelector('#trr-artillery-range-inner') as SVGCircleElement | null;
-  let outer = layer.querySelector('#trr-artillery-range-outer') as SVGCircleElement | null;
-  if (!inner) {
-    inner = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
-    inner.id = 'trr-artillery-range-inner';
-    inner.setAttribute('fill', 'none');
-    inner.setAttribute('pointer-events', 'none');
-    layer.appendChild(inner);
+  let c = layer.querySelector('#trr-artillery-range-circle') as SVGCircleElement | null;
+  if (!c) {
+    c = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
+    c.id = 'trr-artillery-range-circle';
+    c.setAttribute('fill', 'none');
+    c.setAttribute('pointer-events', 'none');
+    layer.appendChild(c);
   }
-  if (!outer) {
-    outer = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
-    outer.id = 'trr-artillery-range-outer';
-    outer.setAttribute('fill', 'none');
-    outer.setAttribute('pointer-events', 'none');
-    layer.appendChild(outer);
-  }
-  setAttrIfChanged(inner, 'cx', String(band.cx));
-  setAttrIfChanged(inner, 'cy', String(band.cy));
-  setAttrIfChanged(inner, 'r', String(band.rMinPx));
-  setAttrIfChanged(inner, 'stroke', stroke);
-  setAttrIfChanged(inner, 'stroke-width', '2');
-  setAttrIfChanged(outer, 'cx', String(band.cx));
-  setAttrIfChanged(outer, 'cy', String(band.cy));
-  setAttrIfChanged(outer, 'r', String(band.rMaxPx));
-  setAttrIfChanged(outer, 'stroke', stroke);
-  setAttrIfChanged(outer, 'stroke-width', '2');
+  setAttrIfChanged(c, 'cx', String(band.cx));
+  setAttrIfChanged(c, 'cy', String(band.cy));
+  setAttrIfChanged(c, 'r', String(band.rMaxPx));
+  setAttrIfChanged(c, 'stroke', stroke);
+  setAttrIfChanged(c, 'stroke-width', '2');
 }
 
 // ── renderTerritoryState ──────────────────────────────────────────────────────
@@ -988,7 +976,7 @@ export function renderTerritoryState(
   }
   for (const [cpid, el] of existingCP) if (!seenCP.has(cpid)) el.remove();
 
-  // ── Artillery range annulus (matches polygon {@link getRangedAttackTargets}) ──
+  // ── Artillery range circle (matches polygon {@link getRangedAttackTargets}) ──
   let inspectedEnemyArtillery: Unit | null = null;
   if (state.phase === 'movement' && state.selectedUnit !== null) {
     const u = state.units.find(x => x.id === state.selectedUnit) ?? null;
@@ -1048,7 +1036,7 @@ export function renderTerritoryState(
         ? 'var(--color-player)'
         : 'var(--color-ai)'
       : null;
-  syncArtilleryRangeAnnulus(
+  syncArtilleryRangeCircle(
     svgElement.querySelector('#trr-artillery-range') as SVGGElement | null,
     ringBand,
     ringStroke,

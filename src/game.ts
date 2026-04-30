@@ -175,17 +175,16 @@ function effectiveHexDistance(c1: number, r1: number, c2: number, r2: number): n
   return hexDistance(c1, r1, c2, r2, COLS, ROWS);
 }
 
-/** Board-space min/max radii for artillery ranged band on polygon maps (centroid distance in px). */
+/** Board-space max-radius circle for artillery on polygon maps (centroid in px). */
 export interface ArtilleryRangedBandPx {
   cx: number;
   cy: number;
-  rMinPx: number;
   rMaxPx: number;
 }
 
 /**
- * Territory maps: annulus in board pixels between {@code 2 * avgAdjacentCentroidPx} and
- * {@code rangeSteps * avgAdjacentCentroidPx} (same scale as ranged-attack distance checks on polygon maps).
+ * Territory maps: max-range circle radius {@code rangeSteps * avgAdjacentCentroidPx}
+ * (same scale as ranged-attack distance checks on polygon maps).
  */
 export function artilleryRangedBandPx(
   graph: TerritoryGraphData,
@@ -197,12 +196,12 @@ export function artilleryRangedBandPx(
   if (avg === undefined || avg <= 0) return null;
   const p = boardPixelForVirtualHex(graph, col, row);
   if (!p) return null;
-  return { cx: p.x, cy: p.y, rMinPx: 2 * avg, rMaxPx: rangeSteps * avg };
+  return { cx: p.x, cy: p.y, rMaxPx: rangeSteps * avg };
 }
 
 /**
  * Artillery “distance” for range checks: on polygon maps, straight-line centroid distance in units of
- * {@code avgAdjacentCentroidPx} (matches the annulus in the territory UI). Hex boards use axial hex distance.
+ * {@code avgAdjacentCentroidPx} (matches the max-range circle in the territory UI). Hex boards use axial hex distance.
  */
 function rangedCombatHexDistance(c1: number, r1: number, c2: number, r2: number): number {
   const g = _activeTerritoryGraph;
@@ -1595,16 +1594,22 @@ function limitArtilleryBlocksRanged(state: GameState, unit: Unit): boolean {
   return false;
 }
 
-/** Ranged attack: distance 2..range for unit types that define `range`. */
+/** True for ranged fire distance `d` vs `maxRange` (unit type `range`). Hex boards keep min 2; polygon maps use max only (centroid scale). */
+function rangedDistanceAllowsRangedFire(d: number, maxRange: number): boolean {
+  if (_activeTerritoryGraph) return d > 0 && d <= maxRange;
+  return d >= 2 && d <= maxRange;
+}
+
+/** Ranged attack: hex boards distance 2..range; polygon maps centroid distance up to `range` only (no minimum). */
 function isRangedCombat(state: GameState, attacker: Unit, defender: Unit): boolean {
   const ut = unitTypeForUnit(attacker);
   if (!ut.range) return false;
   if (limitArtilleryBlocksRanged(state, attacker)) return false;
   const d = rangedCombatHexDistance(attacker.col, attacker.row, defender.col, defender.row);
-  return d >= 2 && d <= ut.range;
+  return rangedDistanceAllowsRangedFire(d, ut.range);
 }
 
-/** Enemies the unit can shoot without moving (hex distance 2..range). */
+/** Enemies the unit can shoot without moving (hex: 2..range; polygon: within max circle). */
 export function getRangedAttackTargets(state: GameState, unit: Unit): Unit[] {
   const ut = unitTypeForUnit(unit);
   if (!ut.range || unit.movesUsed >= unit.movement) return [];
@@ -1614,7 +1619,7 @@ export function getRangedAttackTargets(state: GameState, unit: Unit): Unit[] {
   for (const u of state.units) {
     if (u.owner !== enemy) continue;
     const d = rangedCombatHexDistance(unit.col, unit.row, u.col, u.row);
-    if (d >= 2 && d <= ut.range) out.push(u);
+    if (rangedDistanceAllowsRangedFire(d, ut.range)) out.push(u);
   }
   return out;
 }
