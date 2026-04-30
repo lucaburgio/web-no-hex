@@ -403,6 +403,8 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
   prodEnemyHatch.appendChild(peFg);
   defs.appendChild(prodEnemyHatch);
 
+  appendArtilleryRangeRadialGradients(svgEl, defs);
+
   // Clip paths per territory (same as map editor)
   for (const t of mapDef.territories) {
     const clipPath = mksvg('clipPath');
@@ -630,6 +632,40 @@ export function getTerritoryFromEvent(e: MouseEvent, svgEl: SVGSVGElement): { co
 
 function graphHasVirtualCell(gra: { keyToId: Record<string, string> }, col: number, row: number): boolean {
   return gra.keyToId[`${col},${row}`] !== undefined;
+}
+
+/**
+ * SVG radialGradient fills for artillery range (same SVG as the circle).
+ * CSS `radial-gradient` + `hsl(from …)` on SVG `fill` is often unsupported in WKWebView → invalid paint (black).
+ * Theme colors come from `stop-color: var(--color-player)` / `--color-ai`; stop opacities from CSS vars below.
+ */
+function appendArtilleryRangeRadialGradients(svgEl: SVGSVGElement, defs: SVGDefsElement): void {
+  const sid = svgEl.id || 'board';
+  const defaults = [0.48, 0.26, 0.1, 0.02] as const;
+  const offsets = ['0%', '34%', '58%', '100%'] as const;
+  const mk = (suffix: 'friendly' | 'opponent', colorVar: string) => {
+    const gid = `${sid}-trr-artillery-radial-${suffix}`;
+    if (defs.querySelector(`#${CSS.escape(gid)}`)) return;
+    const rg = mksvg('radialGradient');
+    rg.id = gid;
+    rg.setAttribute('gradientUnits', 'objectBoundingBox');
+    rg.setAttribute('cx', '0.5');
+    rg.setAttribute('cy', '0.5');
+    rg.setAttribute('r', '0.5');
+    for (let i = 0; i < defaults.length; i++) {
+      const stop = mksvg('stop');
+      stop.setAttribute('offset', offsets[i]!);
+      stop.setAttribute('stop-color', colorVar);
+      stop.setAttribute(
+        'stop-opacity',
+        `var(--trr-artillery-range-radial-stop${i}-op, ${String(defaults[i]!)})`,
+      );
+      rg.appendChild(stop);
+    }
+    defs.appendChild(rg);
+  };
+  mk('friendly', 'var(--color-player)');
+  mk('opponent', 'var(--color-ai)');
 }
 
 /** Max-range circle for selected / inspected artillery; paint from `style.css` (gradients + pulse). */

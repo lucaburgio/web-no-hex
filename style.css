@@ -604,25 +604,15 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   --board-unit-icon-filter: none;
 
   /*
-   * Polygon artillery max-range circle — radial fill + stroke; pulse animates fill-opacity only.
-   * Use hsl(from … / α) for stops — do not use color-mix(…, transparent); transparent is black in sRGB mix.
-   * Tune stops / alphas here; pulse in @keyframes trr-artillery-range-pulse and --trr-artillery-range-pulse-duration.
+   * Polygon artillery range circle — fill uses SVG radialGradient in defs (see appendArtilleryRangeRadialGradients
+   * in territoryRenderer.ts); WKWebView often treats CSS radial-gradient + relative colors on SVG fill as invalid → black.
+   * Stroke stays here; tweak radial falloff via --trr-artillery-range-radial-stop*-op (0–1).
    */
-  --trr-artillery-range-fill-friendly: radial-gradient(
-    circle at center,
-    hsl(from var(--color-player) h s l / 0.48) 0%,
-    hsl(from var(--color-player) h s l / 0.26) 32%,
-    hsl(from var(--color-player) h s l / 0.1) 56%,
-    hsl(from var(--color-player) h s l / 0.02) 76%
-  );
+  --trr-artillery-range-radial-stop0-op: 0.48;
+  --trr-artillery-range-radial-stop1-op: 0.26;
+  --trr-artillery-range-radial-stop2-op: 0.1;
+  --trr-artillery-range-radial-stop3-op: 0.02;
   --trr-artillery-range-stroke-friendly: var(--color-player);
-  --trr-artillery-range-fill-opponent: radial-gradient(
-    circle at center,
-    hsl(from var(--color-ai) h s l / 0.46) 0%,
-    hsl(from var(--color-ai) h s l / 0.24) 32%,
-    hsl(from var(--color-ai) h s l / 0.09) 56%,
-    hsl(from var(--color-ai) h s l / 0.02) 76%
-  );
   --trr-artillery-range-stroke-opponent: var(--color-ai);
   --trr-artillery-range-pulse-duration: 2.6s;
 }
@@ -642,23 +632,33 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   --ev2-border-color: var(--color-yellow-500);
 }
 
-/* Polygon map: artillery max-range disc (radial fill from vars above; fill-opacity eases in keyframes). */
+/* Polygon map: artillery max-range disc (SVG radialGradient fill; fill-opacity eases in keyframes). */
 #board .trr-artillery-range-circle.trr-artillery-range-circle--friendly,
 #recap-board .trr-artillery-range-circle.trr-artillery-range-circle--friendly {
-  fill: var(--trr-artillery-range-fill-friendly);
   stroke: var(--trr-artillery-range-stroke-friendly);
   stroke-width: 2;
   fill-opacity: 0.38;
   animation: trr-artillery-range-pulse var(--trr-artillery-range-pulse-duration, 2.6s) ease-in-out infinite;
 }
+#board .trr-artillery-range-circle.trr-artillery-range-circle--friendly {
+  fill: url(#board-trr-artillery-radial-friendly);
+}
+#recap-board .trr-artillery-range-circle.trr-artillery-range-circle--friendly {
+  fill: url(#recap-board-trr-artillery-radial-friendly);
+}
 
 #board .trr-artillery-range-circle.trr-artillery-range-circle--opponent,
 #recap-board .trr-artillery-range-circle.trr-artillery-range-circle--opponent {
-  fill: var(--trr-artillery-range-fill-opponent);
   stroke: var(--trr-artillery-range-stroke-opponent);
   stroke-width: 2;
   fill-opacity: 0.38;
   animation: trr-artillery-range-pulse var(--trr-artillery-range-pulse-duration, 2.6s) ease-in-out infinite;
+}
+#board .trr-artillery-range-circle.trr-artillery-range-circle--opponent {
+  fill: url(#board-trr-artillery-radial-opponent);
+}
+#recap-board .trr-artillery-range-circle.trr-artillery-range-circle--opponent {
+  fill: url(#recap-board-trr-artillery-radial-opponent);
 }
 
 @keyframes trr-artillery-range-pulse {
