@@ -74,8 +74,8 @@ const config: GameConfig = {
   conquestPointsPlayer: 40,
   conquestPointsAi: 40,
 
-  breakthroughAttackerStartingPP: 120,
-  breakthroughDefenderStartingPP: 23,
+  breakthroughAttackerStartingPP: 180,
+  breakthroughDefenderStartingPP: 60,
   breakthroughSectorCount: 3,
   breakthroughEnemySectorStrengthMult: 0.5,
   breakthroughSectorCaptureBonusPP: 120,
