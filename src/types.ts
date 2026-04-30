@@ -148,6 +148,11 @@ export interface GameState {
   battleStats?: Record<Owner, BattleStatsSide>;
   /** Territory graph for polygon-based maps (tutorial map etc.); omitted for hex grid games. */
   customMapGraph?: TerritoryGraphData;
+  /**
+   * `public/maps/<id>.json` id when this match was started from a built-in territory map.
+   * Persisted so Continue / reload can restore the header map name without relying on settings `customMatchMapId`.
+   */
+  territoryMapSourceId?: string | null;
 }
 
 /** One AI turn animation step, in chronological order (same order as aiMovement resolves). */

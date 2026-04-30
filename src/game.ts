@@ -2210,7 +2210,11 @@ export function createInitialStatePreservingTerrain(previous: GameState): GameSt
   if (!mapDef) {
     throw new Error('createInitialStatePreservingTerrain: expected customMapGraph.mapDef (territory map)');
   }
-  const next = createInitialStateFromTerritoryMap(mapDef, config.gameMode as GameMode);
+  const next = createInitialStateFromTerritoryMap(
+    mapDef,
+    config.gameMode as GameMode,
+    previous.territoryMapSourceId ?? null,
+  );
   if (previous.unitPackage != null) {
     next.unitPackage = previous.unitPackage;
     next.unitPackagePlayer2 = previous.unitPackagePlayer2 ?? previous.unitPackage;
@@ -2225,7 +2229,7 @@ export function createInitialStatePreservingTerrain(previous: GameState): GameSt
  * Call {@link updateConfig} with story overrides and unit packages before this.
  */
 export function createStoryState(story: StoryDef, mapDef: TerritoryMapDef): GameState {
-  const base = createInitialStateFromTerritoryMap(mapDef, story.gameMode);
+  const base = createInitialStateFromTerritoryMap(mapDef, story.gameMode, story.map);
   if (story.gameMode === 'breakthrough') {
     return {
       ...base,
@@ -3363,6 +3367,7 @@ function buildTerritoryState(
     breakthroughCpOccupation: number[];
     breakthroughAttackerOwner: Owner | undefined;
     productionPoints: Record<Owner, number>;
+    territoryMapSourceId?: string | null;
   },
 ): GameState {
   const pkgs = snapshotActiveUnitPackagesForSave();
@@ -3394,10 +3399,17 @@ function buildTerritoryState(
     matchStartedAtMs: Date.now(),
     battleStats: initBattleStatsFromUnits(units),
     customMapGraph: graph,
+    ...(opts.territoryMapSourceId != null && opts.territoryMapSourceId !== ''
+      ? { territoryMapSourceId: opts.territoryMapSourceId }
+      : {}),
   };
 }
 
-export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, gameMode: GameMode): GameState {
+export function createInitialStateFromTerritoryMap(
+  mapDef: TerritoryMapDef,
+  gameMode: GameMode,
+  territoryMapSourceId?: string | null,
+): GameState {
   const graph = buildTerritoryGraph(mapDef);
   setActiveTerritoryGraph(graph);
   updateConfig({ boardCols: graph.virtualCols, boardRows: graph.virtualRows });
@@ -3540,6 +3552,7 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
       breakthroughCpOccupation: graph.sectors.map(() => 0),
       breakthroughAttackerOwner: attackerOwner,
       productionPoints: pp,
+      territoryMapSourceId,
     });
 
   } else {
@@ -3572,6 +3585,7 @@ export function createInitialStateFromTerritoryMap(mapDef: TerritoryMapDef, game
       breakthroughCpOccupation: [],
       breakthroughAttackerOwner: undefined,
       productionPoints: { [PLAYER]: config.productionPointsPerTurn, [AI]: config.productionPointsPerTurnAi } as Record<Owner, number>,
+      territoryMapSourceId,
     });
   }
 }

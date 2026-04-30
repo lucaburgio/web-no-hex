@@ -566,7 +566,7 @@ function createInitialStateForMenu(): GameState {
     : TERRITORY_MAPS_LIST[0];
   const mapDef = mapEntry?.def ?? TERRITORY_MAPS_LIST[0]?.def;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return createInitialStateFromTerritoryMap(mapDef as any, config.gameMode);
+  return createInitialStateFromTerritoryMap(mapDef as any, config.gameMode, mapEntry?.id ?? null);
 }
 
 let state: GameState = createInitialStateForMenu();
@@ -2985,6 +2985,13 @@ function startGame(initialState: GameState): void {
   applyGameStateBoardDimensions(initialState);
   applyUnitPackagesFromGameState(initialState);
   state = initialState;
+  if (
+    activeStoryIndex === null &&
+    state.territoryMapSourceId != null &&
+    state.territoryMapSourceId !== ''
+  ) {
+    updateConfig({ customMatchMapId: state.territoryMapSourceId });
+  }
   if (!state.winner) {
     state.matchDurationMs = undefined;
     if (state.matchStartedAtMs == null) state.matchStartedAtMs = Date.now();
@@ -3020,9 +3027,16 @@ function updateHeaderModeLabel(s: GameState): void {
   let mapName = '';
   if (activeStoryIndex !== null) {
     mapName = STORIES[activeStoryIndex]!.title;
-  } else if (config.customMatchMapId) {
-    const mapEntry = TERRITORY_MAPS_LIST.find(m => m.id === config.customMatchMapId);
-    if (mapEntry) mapName = territoryMapIdToDisplayName(mapEntry.id);
+  } else {
+    const mapId =
+      (config.customMatchMapId && config.customMatchMapId !== ''
+        ? config.customMatchMapId
+        : null) ??
+      (s.territoryMapSourceId && s.territoryMapSourceId !== '' ? s.territoryMapSourceId : null);
+    if (mapId) {
+      const mapEntry = TERRITORY_MAPS_LIST.find(m => m.id === mapId);
+      if (mapEntry) mapName = territoryMapIdToDisplayName(mapEntry.id);
+    }
   }
 
   headerModeLabelEl.textContent = mapName ? `${modeLabel}\n${mapName}` : modeLabel;
