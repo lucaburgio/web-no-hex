@@ -148,6 +148,41 @@
 .ev2-swatch-mountain { overflow: hidden; border-color: #78716c; }
 .ev2-swatch-offmap   { overflow: hidden; border-color: #5f8499; }
 
+/* Sector fill palette (sectors mode) — six colors, cycled by sector order; fill-opacity 0.8 */
+#ev2-svg[data-ev2-mode="sectors"] {
+  --ev2-sector-palette-0: #f97316;
+  --ev2-sector-palette-1: #2563eb;
+  --ev2-sector-palette-2: #059669;
+  --ev2-sector-palette-3: #9333ea;
+  --ev2-sector-palette-4: #0891b2;
+  --ev2-sector-palette-5: #e11d48;
+}
+
+#ev2-svg[data-ev2-mode="sectors"] .ev2-territory-fill.ev2-sector-palette-0 {
+  fill: var(--ev2-sector-palette-0);
+  fill-opacity: 0.8;
+}
+#ev2-svg[data-ev2-mode="sectors"] .ev2-territory-fill.ev2-sector-palette-1 {
+  fill: var(--ev2-sector-palette-1);
+  fill-opacity: 0.8;
+}
+#ev2-svg[data-ev2-mode="sectors"] .ev2-territory-fill.ev2-sector-palette-2 {
+  fill: var(--ev2-sector-palette-2);
+  fill-opacity: 0.8;
+}
+#ev2-svg[data-ev2-mode="sectors"] .ev2-territory-fill.ev2-sector-palette-3 {
+  fill: var(--ev2-sector-palette-3);
+  fill-opacity: 0.8;
+}
+#ev2-svg[data-ev2-mode="sectors"] .ev2-territory-fill.ev2-sector-palette-4 {
+  fill: var(--ev2-sector-palette-4);
+  fill-opacity: 0.8;
+}
+#ev2-svg[data-ev2-mode="sectors"] .ev2-territory-fill.ev2-sector-palette-5 {
+  fill: var(--ev2-sector-palette-5);
+  fill-opacity: 0.8;
+}
+
 /* Sector border — dashed black line between territories in different sectors */
 .ev2-sector-border {
   stroke: #4C4D4C;

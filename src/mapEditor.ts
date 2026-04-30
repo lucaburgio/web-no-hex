@@ -893,6 +893,8 @@ function render(): void {
   // rings never linger (which would zero-out outer-edge territory counts and hide the map border).
   applySanitizeToEditorState();
 
+  svgEl.setAttribute('data-ev2-mode', mode);
+
   // Ensure defs element exists and is first
   let defsEl = svgEl.querySelector('defs') as SVGDefsElement | null;
   if (!defsEl) {
@@ -956,6 +958,22 @@ function render(): void {
   territoryLayer.style.pointerEvents = mode === 'territory' ? 'auto' : 'none';
 
   const edgeIndex = buildEdgeTerritoryIndex();
+
+  /** Sectors mode: palette index 0–5 cycles per sector order; draft uses next/editing slot. */
+  const sectorPaletteIndexForTerritory = (tid: string): number | null => {
+    if (mode !== 'sectors') return null;
+    if (selectedSectorTerritoryIds.has(tid)) {
+      if (editingSectorId) {
+        const i = sectors.findIndex((s) => s.id === editingSectorId);
+        return (i >= 0 ? i : 0) % 6;
+      }
+      return sectors.length % 6;
+    }
+    const si = sectors.findIndex((s) => s.territoryIds.includes(tid));
+    if (si < 0) return null;
+    return si % 6;
+  };
+
   const redundantPartitionParentIds = computeRedundantPartitionParentIds({
     version: 2,
     pts,
@@ -1059,7 +1077,9 @@ function render(): void {
 
     // Filled polygon
     const fill = document.createElementNS(SVG_NS, 'polygon');
-    fill.setAttribute('class', `ev2-territory-fill ev2-state-${t.state}`);
+    const pal = sectorPaletteIndexForTerritory(t.id);
+    const palClass = pal !== null ? ` ev2-sector-palette-${pal}` : '';
+    fill.setAttribute('class', `ev2-territory-fill ev2-state-${t.state}${palClass}`);
     fill.setAttribute('points', pts_str);
     group.appendChild(fill);
 
