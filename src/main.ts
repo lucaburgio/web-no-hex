@@ -2485,6 +2485,7 @@ function buildRulesContent(): string {
       <li><strong>Production hex:</strong> an owned hex stable for <strong>${config.productionTurns} consecutive turns</strong>.
         Stability requires all hexes within distance ${config.productionSafeDistance} to be owned by you
         (impassable <strong>mountain</strong> hexes in that ring count as secure — they are not neutral or enemy territory).
+        On <strong>polygon scenario maps</strong>, each &ldquo;distance&rdquo; step follows <strong>shared-border adjacency</strong> (same as movement), not the abstract virtual grid layout.
         Resets immediately if that condition breaks.
         <strong>Breakthrough:</strong> sectors start pre-owned, so any owned hex already meeting this stability rule is available as a production hex from turn 1.</li>
       <li>You can place multiple units per turn as long as you have PP.</li>

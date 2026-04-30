@@ -817,14 +817,25 @@ function skipRangedBorderRevertToNative(defRow: number, defOwner: Owner, borderO
   return native !== undefined && defOwner !== native && borderOwner === native;
 }
 
-function getHexesWithinDistance(col: number, row: number, dist: number, cols: number, rows: number): [number, number][] {
+/**
+ * Cells at graph distance 1…`dist` from `(col,row)` using `getNbrs` per step.
+ * Used for production stability rings; on standard boards `getNbrs` is the six hex neighbors.
+ */
+function getCellsWithinNeighborDistance(
+  col: number,
+  row: number,
+  dist: number,
+  cols: number,
+  rows: number,
+  getNbrs: (c: number, r: number) => [number, number][],
+): [number, number][] {
   const visited = new Set<string>([`${col},${row}`]);
   let frontier: [number, number][] = [[col, row]];
   const result: [number, number][] = [];
   for (let d = 0; d < dist; d++) {
     const next: [number, number][] = [];
     for (const [c, r] of frontier) {
-      for (const [nc, nr] of getNeighbors(c, r, cols, rows)) {
+      for (const [nc, nr] of getNbrs(c, r)) {
         const key = `${nc},${nr}`;
         if (!visited.has(key)) {
           visited.add(key);
@@ -838,12 +849,24 @@ function getHexesWithinDistance(col: number, row: number, dist: number, cols: nu
   return result;
 }
 
+function getHexesWithinDistance(col: number, row: number, dist: number, cols: number, rows: number): [number, number][] {
+  return getCellsWithinNeighborDistance(col, row, dist, cols, rows, (c, r) => getNeighbors(c, r, cols, rows));
+}
+
+/** Production stability “ring”: hex grid on standard boards; shared-border adjacency on territory maps (same as movement). */
+function getProductionSafetyRing(col: number, row: number, dist: number, cols: number, rows: number): [number, number][] {
+  if (_activeTerritoryGraph) {
+    return getCellsWithinNeighborDistance(col, row, dist, cols, rows, (c, r) => effectiveGetNeighbors(c, r, cols, rows));
+  }
+  return getHexesWithinDistance(col, row, dist, cols, rows);
+}
+
 function updateHexStability(state: GameState): void {
   const mountains = new Set(state.mountainHexes ?? []);
   for (const [key, hex] of Object.entries(state.hexStates)) {
     if (hex.owner === null) continue;
     const [col, row] = key.split(',').map(Number);
-    const nearby = getHexesWithinDistance(col, row, config.productionSafeDistance, COLS, ROWS);
+    const nearby = getProductionSafetyRing(col, row, config.productionSafeDistance, COLS, ROWS);
 
     const isStable = nearby.every(([nc, nr]) => {
       const nk = `${nc},${nr}`;
@@ -871,7 +894,7 @@ function primeInitialBreakthroughProductionHexes(
   for (const [key, hex] of Object.entries(hexStates)) {
     if (hex.owner === null) continue;
     const [col, row] = key.split(',').map(Number);
-    const nearby = getHexesWithinDistance(col, row, config.productionSafeDistance, COLS, ROWS);
+    const nearby = getProductionSafetyRing(col, row, config.productionSafeDistance, COLS, ROWS);
     const isStable = nearby.every(([nc, nr]) => {
       const nk = `${nc},${nr}`;
       if (mountains.has(nk)) return true;
