@@ -78,23 +78,37 @@ function inferBreakthroughAttackerFromSectorLayout(state: GameState): Owner | nu
   return null;
 }
 
-/** Breakthrough: which side is the attacker this match. Prefers the attacker's home sector (no CPs) when present. */
-export function getBreakthroughAttackerOwner(state: GameState): Owner {
-  if (state.gameMode !== 'breakthrough') return PLAYER;
+/** When {@link GameState.breakthroughAttackerOwner} is absent, infer attacker from sector layout or config. */
+function resolveMissingBreakthroughAttackerOwner(state: GameState): Owner {
   const fromLayout = inferBreakthroughAttackerFromSectorLayout(state);
   if (fromLayout !== null) return fromLayout;
-  const raw = state.breakthroughAttackerOwner;
-  if (raw === PLAYER || raw === AI) return raw;
   if (!config.breakthroughRandomRoles) {
     return config.breakthroughPlayer1Role === 'attacker' ? PLAYER : AI;
   }
   return PLAYER;
 }
 
-/** Normalize {@link GameState.breakthroughAttackerOwner} after load or graph repair. */
+/**
+ * Breakthrough: canonical attacker for rules, economy, and sector logic.
+ * Prefers persisted {@link GameState.breakthroughAttackerOwner} so per-turn defender PP and AI production
+ * stay aligned with the role chosen at match start; layout-only inference can disagree in edge cases.
+ */
+export function getBreakthroughAttackerOwner(state: GameState): Owner {
+  if (state.gameMode !== 'breakthrough') return PLAYER;
+  const raw = state.breakthroughAttackerOwner;
+  if (raw === PLAYER || raw === AI) return raw;
+  return resolveMissingBreakthroughAttackerOwner(state);
+}
+
+/**
+ * Fill {@link GameState.breakthroughAttackerOwner} when missing after load or graph repair.
+ * Do not overwrite a valid saved value — inferring from `sectorOwners[home]` alone can misidentify the attacker.
+ */
 export function syncBreakthroughAttackerOwnerOnLoad(state: GameState): void {
   if (state.gameMode !== 'breakthrough' || !state.sectorOwners?.length) return;
-  state.breakthroughAttackerOwner = getBreakthroughAttackerOwner(state);
+  const raw = state.breakthroughAttackerOwner;
+  if (raw === PLAYER || raw === AI) return;
+  state.breakthroughAttackerOwner = resolveMissingBreakthroughAttackerOwner(state);
 }
 
 export function getBreakthroughDefenderOwner(state: GameState): Owner {
@@ -2234,6 +2248,18 @@ export function playerEndProduction(state: GameState, options?: EndProductionOpt
 }
 
 function collectAiProductionCandidates(state: GameState, occupied: Set<string>): [number, number][] {
+  // Territory breakthrough: home rows follow sectors (spawn swap), not virtual row 0 = AI.
+  if (state.gameMode === 'breakthrough' && state.customMapGraph && state.sectorHexes?.length) {
+    const out: [number, number][] = [];
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (occupied.has(`${c},${r}`)) continue;
+        if (isValidProductionPlacement(state, c, r, AI)) out.push([c, r]);
+      }
+    }
+    return out;
+  }
+
   const candidates: [number, number][] = [];
   const mountains = state.mountainHexes ?? [];
   for (let c = 0; c < COLS; c++) {
