@@ -14,9 +14,12 @@ import {
   PLAYER,
   AI,
   getUnit,
+  getUnitById,
+  unitTypeForUnit,
   isInEnemyZoC,
   getBoardNeighbors,
   getOpponentHomeGuardBlockedHexes,
+  artilleryRangedBandPx,
 } from './game';
 import { ensureMovePathPreviewLayer, inlineIcon, mountBoardUnitChipContents } from './renderer';
 import artilleryFirePatternSrc from '../public/images/misc/artillery-fire-pattern.png';
@@ -48,6 +51,8 @@ const rangedGlowMapTr = new WeakMap<SVGSVGElement, Map<string, SVGPolygonElement
 export interface RenderTerritoryStateOptions {
   unitDrawOverride?: readonly Unit[] | null;
   hexStatesDrawOverride?: Record<string, HexState> | null;
+  /** vs human: local-only inspected unit id while waiting for your turn (mirrors hex {@link renderState}). */
+  localSpectatorInspectUnitId?: number | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -418,6 +423,7 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     'ev2-note-layer',
     'trr-prod-markers',
     'trr-highlights',
+    'trr-artillery-range',
     'trr-ranged-glow',
     'trr-units',
   ]) {
@@ -425,6 +431,8 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     g.id = id;
     svgEl.appendChild(g);
   }
+  const arRangeLayer = svgEl.querySelector('#trr-artillery-range');
+  if (arRangeLayer) arRangeLayer.setAttribute('pointer-events', 'none');
 
   // ── ev2-outer-border-layer ────────────────────────────────────────────────────
   const outerBorderLayer = svgEl.querySelector('#ev2-outer-border-layer') as SVGGElement;
@@ -622,6 +630,46 @@ export function getTerritoryFromEvent(e: MouseEvent, svgEl: SVGSVGElement): { co
 
 function graphHasVirtualCell(gra: { keyToId: Record<string, string> }, col: number, row: number): boolean {
   return gra.keyToId[`${col},${row}`] !== undefined;
+}
+
+/** Min/max range circles for selected / inspected artillery; stable nodes to avoid animation flicker. */
+function syncArtilleryRangeAnnulus(
+  layer: SVGGElement | null,
+  band: { cx: number; cy: number; rMinPx: number; rMaxPx: number } | null,
+  stroke: string | null,
+): void {
+  if (!layer) return;
+  if (!band || !stroke) {
+    layer.querySelector('#trr-artillery-range-inner')?.remove();
+    layer.querySelector('#trr-artillery-range-outer')?.remove();
+    return;
+  }
+  let inner = layer.querySelector('#trr-artillery-range-inner') as SVGCircleElement | null;
+  let outer = layer.querySelector('#trr-artillery-range-outer') as SVGCircleElement | null;
+  if (!inner) {
+    inner = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
+    inner.id = 'trr-artillery-range-inner';
+    inner.setAttribute('fill', 'none');
+    inner.setAttribute('pointer-events', 'none');
+    layer.appendChild(inner);
+  }
+  if (!outer) {
+    outer = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
+    outer.id = 'trr-artillery-range-outer';
+    outer.setAttribute('fill', 'none');
+    outer.setAttribute('pointer-events', 'none');
+    layer.appendChild(outer);
+  }
+  setAttrIfChanged(inner, 'cx', String(band.cx));
+  setAttrIfChanged(inner, 'cy', String(band.cy));
+  setAttrIfChanged(inner, 'r', String(band.rMinPx));
+  setAttrIfChanged(inner, 'stroke', stroke);
+  setAttrIfChanged(inner, 'stroke-width', '2');
+  setAttrIfChanged(outer, 'cx', String(band.cx));
+  setAttrIfChanged(outer, 'cy', String(band.cy));
+  setAttrIfChanged(outer, 'r', String(band.rMaxPx));
+  setAttrIfChanged(outer, 'stroke', stroke);
+  setAttrIfChanged(outer, 'stroke-width', '2');
 }
 
 // ── renderTerritoryState ──────────────────────────────────────────────────────
@@ -940,6 +988,19 @@ export function renderTerritoryState(
   }
   for (const [cpid, el] of existingCP) if (!seenCP.has(cpid)) el.remove();
 
+  // ── Artillery range annulus (matches polygon {@link getRangedAttackTargets}) ──
+  let inspectedEnemyArtillery: Unit | null = null;
+  if (state.phase === 'movement' && state.selectedUnit !== null) {
+    const u = state.units.find(x => x.id === state.selectedUnit) ?? null;
+    if (u && u.owner !== localPlayer && unitTypeForUnit(u).range) inspectedEnemyArtillery = u;
+  }
+  let spectatorEnemyArtillery: Unit | null = null;
+  const specInspectId = opts?.localSpectatorInspectUnitId ?? null;
+  if (specInspectId != null) {
+    const u = getUnitById(state, specInspectId);
+    if (u && u.owner !== localPlayer && unitTypeForUnit(u).range) spectatorEnemyArtillery = u;
+  }
+
   // ── trr-units (same map chip as hex {@link mountBoardUnitChipContents}) ───────
   let selectedUnitTr =
     state.selectedUnit !== null ? (state.units.find(u => u.id === state.selectedUnit) ?? null) : null;
@@ -951,12 +1012,48 @@ export function renderTerritoryState(
   ) {
     selectedUnitTr = null;
   }
+  const friendlyRangedArtillery: Unit | null =
+    selectedUnitTr &&
+    state.phase === 'movement' &&
+    state.activePlayer === localPlayer &&
+    unitTypeForUnit(selectedUnitTr).range
+      ? selectedUnitTr
+      : null;
+  const enemyRangedArtilleryForDisplay: Unit | null =
+    state.phase === 'movement' && !friendlyRangedArtillery
+      ? (inspectedEnemyArtillery ?? spectatorEnemyArtillery)
+      : null;
+  const artilleryRingUnit: Unit | null = friendlyRangedArtillery ?? enemyRangedArtilleryForDisplay;
+
   const rangedTargetKeysTr = new Set<string>();
-  if (selectedUnitTr && state.phase === 'movement' && state.activePlayer === localPlayer) {
-    for (const t of getRangedAttackTargets(state, selectedUnitTr)) {
+  if (friendlyRangedArtillery) {
+    for (const t of getRangedAttackTargets(state, friendlyRangedArtillery)) {
+      rangedTargetKeysTr.add(`${t.col},${t.row}`);
+    }
+  } else if (enemyRangedArtilleryForDisplay) {
+    for (const t of getRangedAttackTargets(state, enemyRangedArtilleryForDisplay)) {
       rangedTargetKeysTr.add(`${t.col},${t.row}`);
     }
   }
+
+  const utRing = artilleryRingUnit ? unitTypeForUnit(artilleryRingUnit) : null;
+  const maxRangeSteps = utRing?.range;
+  const ringBand =
+    artilleryRingUnit && maxRangeSteps
+      ? artilleryRangedBandPx(graph, artilleryRingUnit.col, artilleryRingUnit.row, maxRangeSteps)
+      : null;
+  const ringStroke =
+    ringBand && artilleryRingUnit
+      ? artilleryRingUnit.owner === localPlayer
+        ? 'var(--color-player)'
+        : 'var(--color-ai)'
+      : null;
+  syncArtilleryRangeAnnulus(
+    svgElement.querySelector('#trr-artillery-range') as SVGGElement | null,
+    ringBand,
+    ringStroke,
+  );
+
   const productionTiredVisualTr =
     state.phase === 'production' && state.activePlayer === localPlayer;
 
@@ -1029,7 +1126,7 @@ export function renderTerritoryState(
       displayHp: unit.hp,
       productionTiredVisual: productionTiredVisualTr,
       rangedTargetKeys: rangedTargetKeysTr,
-      localSpectatorInspectUnitId: null,
+      localSpectatorInspectUnitId: opts?.localSpectatorInspectUnitId ?? null,
     });
   }
   for (const [uid, el] of existingUnits) if (!seenUnits.has(uid)) el.remove();

@@ -175,22 +175,48 @@ function effectiveHexDistance(c1: number, r1: number, c2: number, r2: number): n
   return hexDistance(c1, r1, c2, r2, COLS, ROWS);
 }
 
+/** Board-space min/max radii for artillery ranged band on polygon maps (centroid distance in px). */
+export interface ArtilleryRangedBandPx {
+  cx: number;
+  cy: number;
+  rMinPx: number;
+  rMaxPx: number;
+}
+
 /**
- * Artillery range uses integer “hex steps”. On polygon maps, {@link effectiveHexDistance} is graph
- * BFS only — hop count can be small while territory centroids are far apart. Blend in pixel steps
- * (straight-line centroid distance / average neighbor spacing) so ranged bands match the map.
+ * Territory maps: annulus in board pixels between {@code 2 * avgAdjacentCentroidPx} and
+ * {@code rangeSteps * avgAdjacentCentroidPx} (same scale as ranged-attack distance checks on polygon maps).
+ */
+export function artilleryRangedBandPx(
+  graph: TerritoryGraphData,
+  col: number,
+  row: number,
+  rangeSteps: number,
+): ArtilleryRangedBandPx | null {
+  const avg = graph.avgAdjacentCentroidPx;
+  if (avg === undefined || avg <= 0) return null;
+  const p = boardPixelForVirtualHex(graph, col, row);
+  if (!p) return null;
+  return { cx: p.x, cy: p.y, rMinPx: 2 * avg, rMaxPx: rangeSteps * avg };
+}
+
+/**
+ * Artillery “distance” for range checks: on polygon maps, straight-line centroid distance in units of
+ * {@code avgAdjacentCentroidPx} (matches the annulus in the territory UI). Hex boards use axial hex distance.
  */
 function rangedCombatHexDistance(c1: number, r1: number, c2: number, r2: number): number {
-  const graphSteps = effectiveHexDistance(c1, r1, c2, r2);
   const g = _activeTerritoryGraph;
-  const avg = g?.avgAdjacentCentroidPx;
-  if (!g || avg === undefined || avg <= 0) return graphSteps;
+  if (!g) {
+    return hexDistance(c1, r1, c2, r2, COLS, ROWS);
+  }
+  const avg = g.avgAdjacentCentroidPx;
+  if (avg === undefined || avg <= 0) {
+    return effectiveHexDistance(c1, r1, c2, r2);
+  }
   const p1 = boardPixelForVirtualHex(g, c1, r1);
   const p2 = boardPixelForVirtualHex(g, c2, r2);
-  if (!p1 || !p2) return graphSteps;
-  const px = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-  const pixelSteps = Math.ceil(px / avg);
-  return Math.max(graphSteps, pixelSteps);
+  if (!p1 || !p2) return Infinity;
+  return Math.hypot(p2.x - p1.x, p2.y - p1.y) / avg;
 }
 
 const HEX_KEY_RE = /^(\d+),(\d+)$/;

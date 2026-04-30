@@ -750,11 +750,11 @@ function renderForMoveAnim(
 ): void {
   if (state.customMapGraph) {
     const pk = pending ? `${pending.col},${pending.row}` : null;
-    const opts =
-      unitOverride != null || hexOverride != null
-        ? { unitDrawOverride: unitOverride ?? undefined, hexStatesDrawOverride: hexOverride ?? undefined }
-        : undefined;
-    renderTerritoryState(svg, state, state.customMapGraph, pk, animStaticHiddenUnitIds, localPlayer, opts);
+    renderTerritoryState(svg, state, state.customMapGraph, pk, animStaticHiddenUnitIds, localPlayer, {
+      localSpectatorInspectUnitId: spectatorInspectIdForBoard(),
+      ...(unitOverride != null ? { unitDrawOverride: unitOverride } : {}),
+      ...(hexOverride != null ? { hexStatesDrawOverride: hexOverride } : {}),
+    });
   } else {
     renderState(
       svg,
@@ -876,7 +876,9 @@ function render(): void {
   }
   if (state.customMapGraph) {
     const pkHex = pendingProductionHex ? `${pendingProductionHex.col},${pendingProductionHex.row}` : null;
-    renderTerritoryState(svg, state, state.customMapGraph, pkHex, animStaticHiddenUnitIds, localPlayer);
+    renderTerritoryState(svg, state, state.customMapGraph, pkHex, animStaticHiddenUnitIds, localPlayer, {
+      localSpectatorInspectUnitId: spectatorInspectIdForBoard(),
+    });
     return;
   }
   renderState(svg, state, pendingProductionHex, animStaticHiddenUnitIds, localPlayer, undefined, spectatorInspectIdForBoard());
@@ -2501,7 +2503,7 @@ function buildRulesContent(): string {
       <li><strong>Polygon scenario maps:</strong> you move between territories that share a <strong>border edge</strong> (same as the map editor&rsquo;s internal adjacency), not merely a corner contact.</li>
       <li>Moving onto an enemy unit triggers <strong>combat</strong>. If you need more than one hex to reach them, you move along the path into the hex adjacent to the enemy first, then combat resolves.</li>
       <li><strong>Artillery:</strong> each turn you either <strong>move</strong> one hex or fire a <strong>ranged attack</strong> at an enemy ${arRanged} (not both). Ranged fire does not use movement into the target&rsquo;s hex.
-        On polygon scenario maps, maximum range also respects straight-line distance between territory centers (not only abstract connection hops), so artillery cannot shoot targets that are visually far away because the graph path is short.</li>
+        On polygon scenario maps, valid ranged targets are enemies whose position lies inside the <strong>annulus</strong> shown when you select your artillery (inner ring ≈ minimum range 2, outer ring = maximum range), measured as straight-line distance between territory centers in units of average neighbor spacing; mountains do not block. When you inspect an enemy artillery piece, its ring uses the opponent color so you can read their reach.</li>
       <li><strong>Zone of Control (ZoC):</strong> a unit adjacent to an enemy is locked — it may only attack
         or retreat to a hex not itself adjacent to any enemy. <strong>Adjacent</strong> for ZoC is the same as for movement: on a standard hex board, the six grid neighbors; on <strong>polygon scenario maps</strong>, territories that share a <strong>border edge</strong> (not merely close virtual indices on the abstract grid). ZoC limits movement and adjacent attacks; it does not block artillery ranged fire at longer range.</li>
       <li><strong>Domination — guarded home row:</strong> with ZoC enabled, you cannot move onto an <strong>empty</strong> hex on the opponent&rsquo;s <strong>home row</strong> if any enemy is adjacent to that hex (this stops fast units from bypassing ZoC with multi-hex moves). You can still move onto that hex to attack an enemy unit sitting on it.</li>
