@@ -14,14 +14,6 @@ export interface TerritoryMapEdge {
 
 export type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain' | 'offmap';
 
-/**
- * How passable territories are assigned to abstract `(virtualCol, virtualRow)` slots (3 rows:
- * enemy / neutral+mountain / allied). `json` preserves the order of territories in the map file
- * (legacy). `spatial` sorts by centroid top-to-bottom then left-to-right within each state group
- * so graph neighbors tend to have nearby virtual coordinates (smoother moves / ZoC UX).
- */
-export type TerritoryVirtualSlotOrder = 'json' | 'spatial';
-
 export interface TerritoryMapTerritory {
   id: string;
   pointIds: string[];
@@ -70,8 +62,6 @@ export interface TerritoryMapDef {
    * the adjacency built from shared polygon edges.
    */
   adjacencyBlockPairs?: Array<[string, string]>;
-  /** Omit or `json`: column index follows territory order in this file. `spatial`: see {@link TerritoryVirtualSlotOrder}. */
-  virtualSlotOrder?: TerritoryVirtualSlotOrder;
 }
 
 /** A territory node in the processed graph */
@@ -475,33 +465,6 @@ export function sanitizeTerritoryMapDef(mapDef: TerritoryMapDef): TerritoryMapDe
   return cur;
 }
 
-function computeCentroid(
-  pointIds: string[],
-  pts: Record<string, { x: number; y: number }>,
-): { x: number; y: number } {
-  let sx = 0, sy = 0, count = 0;
-  for (const pid of pointIds) {
-    const p = pts[pid];
-    if (p) { sx += p.x; sy += p.y; count++; }
-  }
-  return count > 0 ? { x: sx / count, y: sy / count } : { x: 0, y: 0 };
-}
-
-function sortTerritoriesForVirtualSlots(
-  list: TerritoryMapTerritory[],
-  slotOrder: TerritoryVirtualSlotOrder | undefined,
-  pts: Record<string, { x: number; y: number }>,
-): TerritoryMapTerritory[] {
-  if (slotOrder !== 'spatial') return list;
-  return [...list].sort((a, b) => {
-    const ca = computeCentroid(a.pointIds, pts);
-    const cb = computeCentroid(b.pointIds, pts);
-    if (ca.y !== cb.y) return ca.y - cb.y;
-    if (ca.x !== cb.x) return ca.x - cb.x;
-    return a.id.localeCompare(b.id);
-  });
-}
-
 /**
  * Build a territory graph from a map definition.
  * - Allied territories → player home row (ROWS-1 = 2)
@@ -528,12 +491,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
     else others.push(t);
   }
 
-  const slotOrder = cleanMapDef.virtualSlotOrder;
-  const alliedSlots = sortTerritoriesForVirtualSlots(allied, slotOrder, points);
-  const enemySlots = sortTerritoriesForVirtualSlots(enemy, slotOrder, points);
-  const othersSlots = sortTerritoriesForVirtualSlots(others, slotOrder, points);
-
-  const virtualCols = Math.max(alliedSlots.length, enemySlots.length, othersSlots.length, 4);
+  const virtualCols = Math.max(allied.length, enemy.length, others.length, 4);
   const virtualRows = 3;
 
   const territories: Record<string, TerritoryNode> = {};
@@ -559,9 +517,9 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
   }
 
   // Player home = row 2 (ROWS-1), AI home = row 0
-  assignTerritories(alliedSlots, 2);
-  assignTerritories(enemySlots, 0);
-  assignTerritories(othersSlots, 1);
+  assignTerritories(allied, 2);
+  assignTerritories(enemy, 0);
+  assignTerritories(others, 1);
   // Offmap territories are decorative — no virtual grid slot, not added to keyToId
   for (const t of offmapTerrs) {
     const centroid = computeCentroid(t.pointIds, points);
@@ -570,10 +528,10 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
 
   const adjacency = buildTerritoryAdjacency(cleanMapDef);
 
-  const playerHomeTerritoryIds = alliedSlots.map(t => t.id);
-  const aiHomeTerritoryIds = enemySlots.map(t => t.id);
-  const mountainTerritoryIds = othersSlots.filter(t => t.state === 'mountain').map(t => t.id);
-  const passableTerritoryIds = [...alliedSlots, ...enemySlots, ...othersSlots.filter(t => t.state !== 'mountain')].map(t => t.id);
+  const playerHomeTerritoryIds = allied.map(t => t.id);
+  const aiHomeTerritoryIds = enemy.map(t => t.id);
+  const mountainTerritoryIds = others.filter(t => t.state === 'mountain').map(t => t.id);
+  const passableTerritoryIds = [...allied, ...enemy, ...others.filter(t => t.state !== 'mountain')].map(t => t.id);
 
   const controlPoints: Record<string, TerritoryControlPoint> = {};
   for (const cp of cleanMapDef.controlPoints) {
@@ -620,4 +578,16 @@ export function boardPixelForVirtualHex(
   if (!tid) return null;
   const node = graph.territories[tid];
   return node ? { x: node.centroid.x, y: node.centroid.y } : null;
+}
+
+function computeCentroid(
+  pointIds: string[],
+  points: Record<string, { x: number; y: number }>,
+): { x: number; y: number } {
+  let sx = 0, sy = 0, count = 0;
+  for (const pid of pointIds) {
+    const p = points[pid];
+    if (p) { sx += p.x; sy += p.y; count++; }
+  }
+  return count > 0 ? { x: sx / count, y: sy / count } : { x: 0, y: 0 };
 }

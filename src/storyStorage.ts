@@ -1,4 +1,4 @@
-import { migrateSectorControlPointHexLoaded, syncBreakthroughAttackerOwnerOnLoad, fillTerritoryUnitAnchorsForPersistence } from './game';
+import { migrateSectorControlPointHexLoaded, syncBreakthroughAttackerOwnerOnLoad } from './game';
 import config from './gameconfig';
 import type { GameState, StoryProgress } from './types';
 
@@ -45,7 +45,6 @@ export function saveStoryGameState(state: GameState): void {
     return;
   }
   try {
-    fillTerritoryUnitAnchorsForPersistence(state);
     localStorage.setItem(STORY_SAVE_KEY, JSON.stringify(state));
   } catch (e) {
     console.error('Failed to save story game state:', e);

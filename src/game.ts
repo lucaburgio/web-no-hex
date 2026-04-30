@@ -313,36 +313,6 @@ export function resolveBoardDimensionsForState(state: GameState): { boardCols: n
   };
 }
 
-function applyTerritoryUnitAnchorsAfterGraphBuild(state: GameState): void {
-  const g = state.customMapGraph;
-  const anchors = state.territoryUnitAnchors;
-  if (!g || !anchors || Object.keys(anchors).length === 0) return;
-  for (const u of state.units) {
-    const tid = anchors[u.id];
-    if (!tid) continue;
-    const node = g.territories[tid];
-    if (node?.virtualKey) {
-      u.col = node.virtualCol;
-      u.row = node.virtualRow;
-    }
-  }
-}
-
-/** Polygon maps: set `territoryUnitAnchors` from current unit positions before save / wire send. */
-export function fillTerritoryUnitAnchorsForPersistence(state: GameState): void {
-  const g = state.customMapGraph;
-  if (!g?.keyToId) {
-    delete state.territoryUnitAnchors;
-    return;
-  }
-  const anchors: Record<number, string> = {};
-  for (const u of state.units) {
-    const tid = g.keyToId[`${u.col},${u.row}`];
-    if (tid) anchors[u.id] = tid;
-  }
-  state.territoryUnitAnchors = anchors;
-}
-
 /** Align global `config`, `COLS`/`ROWS`, and optional fields on `state` with the match map size. */
 export function applyGameStateBoardDimensions(state: GameState): void {
   if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
@@ -368,11 +338,8 @@ export function applyGameStateBoardDimensions(state: GameState): void {
     if (state.gameMode === 'breakthrough' && state.sectorOwners?.length) {
       syncBreakthroughAttackerOwnerOnLoad(state);
     }
-    applyTerritoryUnitAnchorsAfterGraphBuild(state);
-    fillTerritoryUnitAnchorsForPersistence(state);
     return;
   }
-  delete state.territoryUnitAnchors;
   const { boardCols, boardRows } = resolveBoardDimensionsForState(state);
   state.boardCols = boardCols;
   state.boardRows = boardRows;
