@@ -285,6 +285,7 @@ export interface StoryDef {
   // Breakthrough-specific overrides
   breakthroughSectorCount?: number;
   breakthroughAttackerStartingPP?: number;
+  breakthroughDefenderStartingPP?: number;
   breakthroughPlayer1Role?: 'attacker' | 'defender';
   breakthroughRandomRoles?: boolean;
   breakthroughEnemySectorStrengthMult?: number;
@@ -328,6 +329,8 @@ export interface GameConfig {
 
   /** Breakthrough: attacker (south) starts with this PP pool only (no further income). */
   breakthroughAttackerStartingPP: number;
+  /** Breakthrough: defender starts with this PP before the first production phase (then earns per-turn PP + territory). */
+  breakthroughDefenderStartingPP: number;
   /** Breakthrough: number of sectors (≥2); map is split south → north. */
   breakthroughSectorCount: number;
   /** Breakthrough: defender strength multiplier while in a sector controlled by the attacker. */

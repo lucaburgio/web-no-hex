@@ -543,6 +543,7 @@ const STORY_CONFIG_DEFAULTS = {
   conquestPointsPlayer: config.conquestPointsPlayer,
   conquestPointsAi: config.conquestPointsAi,
   breakthroughAttackerStartingPP: config.breakthroughAttackerStartingPP,
+  breakthroughDefenderStartingPP: config.breakthroughDefenderStartingPP,
   breakthroughSectorCount: config.breakthroughSectorCount,
   breakthroughPlayer1Role: config.breakthroughPlayer1Role,
   breakthroughRandomRoles: config.breakthroughRandomRoles,
@@ -1298,6 +1299,7 @@ function startStory(storyIndex: number, savedState?: GameState): void {
     conquestPointsPlayer: config.conquestPointsPlayer,
     conquestPointsAi: config.conquestPointsAi,
     breakthroughAttackerStartingPP: config.breakthroughAttackerStartingPP,
+    breakthroughDefenderStartingPP: config.breakthroughDefenderStartingPP,
     breakthroughSectorCount: config.breakthroughSectorCount,
     breakthroughPlayer1Role: config.breakthroughPlayer1Role,
     breakthroughRandomRoles: config.breakthroughRandomRoles,
@@ -1320,6 +1322,7 @@ function startStory(storyIndex: number, savedState?: GameState): void {
     ...(story.conquestPointsPlayer !== undefined ? { conquestPointsPlayer: story.conquestPointsPlayer } : {}),
     ...(story.conquestPointsAi !== undefined ? { conquestPointsAi: story.conquestPointsAi } : {}),
     ...(story.breakthroughAttackerStartingPP !== undefined ? { breakthroughAttackerStartingPP: story.breakthroughAttackerStartingPP } : {}),
+    ...(story.breakthroughDefenderStartingPP !== undefined ? { breakthroughDefenderStartingPP: story.breakthroughDefenderStartingPP } : {}),
     ...(story.breakthroughSectorCount !== undefined ? { breakthroughSectorCount: story.breakthroughSectorCount } : {}),
     ...(story.breakthroughPlayer1Role !== undefined ? { breakthroughPlayer1Role: story.breakthroughPlayer1Role } : {}),
     ...(story.breakthroughRandomRoles !== undefined ? { breakthroughRandomRoles: story.breakthroughRandomRoles } : {}),
@@ -1518,6 +1521,7 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
   ['cfg-conquestPointsPlayer',    'conquestPointsPlayer',    1],
   ['cfg-conquestPointsAi',        'conquestPointsAi',        1],
   ['cfg-breakthroughAttackerStartingPP', 'breakthroughAttackerStartingPP', 1],
+  ['cfg-breakthroughDefenderStartingPP', 'breakthroughDefenderStartingPP', 1],
   ['cfg-breakthroughSectorCount', 'breakthroughSectorCount', 1],
   ['cfg-breakthroughEnemySectorStrengthMult', 'breakthroughEnemySectorStrengthMult', 100],
   ['cfg-breakthroughSectorCaptureBonusPP', 'breakthroughSectorCaptureBonusPP', 1],
@@ -1539,7 +1543,7 @@ const NUM_FIELDS: Array<[string, keyof typeof _cfgNumProxy, number]> = [
 // Proxy type for key checking only — never instantiated
 declare const _cfgNumProxy: {
   conquestPointsPlayer: number; conquestPointsAi: number;
-  breakthroughAttackerStartingPP: number; breakthroughSectorCount: number; breakthroughEnemySectorStrengthMult: number;
+  breakthroughAttackerStartingPP: number; breakthroughDefenderStartingPP: number; breakthroughSectorCount: number; breakthroughEnemySectorStrengthMult: number;
   breakthroughSectorCaptureBonusPP: number;
   startingUnitsPlayer1: number; startingUnitsPlayer2: number; startingUnitsDefender: number; startingUnitsAttacker: number;
   productionPointsPerTurn: number;
@@ -1569,6 +1573,7 @@ const RULES_PRESET_NUM_FIELDS: Array<[string, keyof RulesPresetValues, number]> 
   ['cfg-maxFlankingUnits', 'maxFlankingUnits', 1],
   ['cfg-healOwnTerritory', 'healOwnTerritory', 1],
   ['cfg-breakthroughAttackerStartingPP', 'breakthroughAttackerStartingPP', 1],
+  ['cfg-breakthroughDefenderStartingPP', 'breakthroughDefenderStartingPP', 1],
   ['cfg-breakthroughEnemySectorStrengthMult', 'breakthroughEnemySectorStrengthMult', 100],
   ['cfg-breakthroughSectorCaptureBonusPP', 'breakthroughSectorCaptureBonusPP', 1],
 ];
@@ -1621,6 +1626,7 @@ function populateSettings(): void {
     conquestPointsPlayer: config.conquestPointsPlayer,
     conquestPointsAi: config.conquestPointsAi,
     breakthroughAttackerStartingPP: config.breakthroughAttackerStartingPP,
+    breakthroughDefenderStartingPP: config.breakthroughDefenderStartingPP,
     breakthroughSectorCount: config.breakthroughSectorCount,
     breakthroughEnemySectorStrengthMult: config.breakthroughEnemySectorStrengthMult,
     breakthroughSectorCaptureBonusPP: config.breakthroughSectorCaptureBonusPP,
@@ -2570,7 +2576,7 @@ function buildRulesContent(): string {
         You also lose immediately if you have <strong>no units</strong> and <strong>no owned territory</strong> (even if your Conquer Points are still above 0).
         Reaching the opponent&rsquo;s home row alone does <strong>not</strong> end the match.
         If both sides hit 0 Conquer Points in the same tick, the side with more <strong>owned hexes</strong> wins; if hex counts are also equal, the <strong>northern</strong> player wins the tie. Both sides totally eliminated from the map at once → northern player wins.</li>
-      <li><strong>Breakthrough:</strong> the map is split into <strong>${config.breakthroughSectorCount}</strong> sectors (configurable, south to north). In <strong>Game settings</strong> you can set whether <strong>player 1</strong> (south / host) is <strong>attacker</strong> or <strong>defender</strong>, or enable <strong>random role</strong> to pick at match start. The <strong>attacker</strong> starts with <strong>${config.breakthroughAttackerStartingPP} PP</strong> and earns <strong>no further PP</strong>; the <strong>defender</strong> earns the usual per-turn PP plus territory bonus.
+      <li><strong>Breakthrough:</strong> the map is split into <strong>${config.breakthroughSectorCount}</strong> sectors (configurable, south to north). In <strong>Game settings</strong> you can set whether <strong>player 1</strong> (south / host) is <strong>attacker</strong> or <strong>defender</strong>, or enable <strong>random role</strong> to pick at match start. The <strong>attacker</strong> starts with <strong>${config.breakthroughAttackerStartingPP} PP</strong> and earns <strong>no further PP</strong>; the <strong>defender</strong> starts with <strong>${config.breakthroughDefenderStartingPP} PP</strong>, then earns the usual per-turn PP plus territory bonus each round.
         The attacker&rsquo;s <strong>home sector</strong> (south if player 1 is attacker, north if player 1 is defender) has no control point. Only the <strong>frontline defender sector on the attacker-facing border</strong> shows its control point(s) at a time. To capture that sector, the attacker must keep at least one unit on <strong>each</strong> of that sector&rsquo;s control points <strong>at the same time</strong> for <strong>two full rounds</strong> (checked after both sides move); the occupation counter only advances while every CP in the sector is held. When a sector is captured, those markers are removed, <strong>every hex in that sector</strong> becomes attacker territory, and the next defender-border sector&rsquo;s control point(s) appear. The attacker also gains <strong>+${config.breakthroughSectorCaptureBonusPP} PP</strong> (configurable; 0 to disable).
         After that, the defender <strong>cannot regain those hexes</strong> — they may still fight and move there, but hex ownership stays with the attacker. The sector itself also <strong>never</strong> flips back politically.
         <strong>Defender units</strong> in a sector already captured by the attacker fight at <strong>${Math.round(config.breakthroughEnemySectorStrengthMult * 100)}%</strong> strength (configurable).
@@ -2734,6 +2740,7 @@ function broadcastSettingsPreview(): void {
     if (isBreakthrough) {
       sec('BREAKTHROUGH RULES');
       row('Attacker starting PP', v('cfg-breakthroughAttackerStartingPP'));
+      row('Defender starting PP', v('cfg-breakthroughDefenderStartingPP'));
       row('Defender str. in captured sector (%)', v('cfg-breakthroughEnemySectorStrengthMult'));
       row('PP bonus per captured sector', v('cfg-breakthroughSectorCaptureBonusPP'));
     }

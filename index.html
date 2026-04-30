@@ -441,10 +441,14 @@
 
       <div class="settings-group">
         <div class="settings-group-title">BREAKTHROUGH</div>
-        <div class="settings-note neutral" role="note">Used in Breakthrough mode: attacker PP pool, defender malus in captured sectors, and PP granted per sector capture.</div>
+        <div class="settings-note neutral" role="note">Used in Breakthrough mode: attacker and defender starting PP, defender malus in captured sectors, and PP granted per sector capture.</div>
         <div class="settings-row">
           <label class="settings-label" for="cfg-breakthroughAttackerStartingPP">Attacker starting PP</label>
           <input class="settings-input" type="number" id="cfg-breakthroughAttackerStartingPP" min="1" max="9999" step="1" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="cfg-breakthroughDefenderStartingPP">Defender starting PP</label>
+          <input class="settings-input" type="number" id="cfg-breakthroughDefenderStartingPP" min="0" max="9999" step="1" />
         </div>
         <div class="settings-row">
           <label class="settings-label" for="cfg-breakthroughEnemySectorStrengthMult">Defender strength in captured sector (%)</label>

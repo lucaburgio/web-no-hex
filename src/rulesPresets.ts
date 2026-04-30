@@ -21,6 +21,7 @@ export type RulesPresetValues = Pick<
   | 'conquestPointsPlayer'
   | 'conquestPointsAi'
   | 'breakthroughAttackerStartingPP'
+  | 'breakthroughDefenderStartingPP'
   | 'breakthroughEnemySectorStrengthMult'
   | 'breakthroughSectorCaptureBonusPP'
 >;
@@ -51,6 +52,7 @@ function rulesValuesMatchConfig(cfg: GameConfig, p: RulesPresetValues): boolean 
     cfg.conquestPointsPlayer === p.conquestPointsPlayer &&
     cfg.conquestPointsAi === p.conquestPointsAi &&
     cfg.breakthroughAttackerStartingPP === p.breakthroughAttackerStartingPP &&
+    cfg.breakthroughDefenderStartingPP === p.breakthroughDefenderStartingPP &&
     Math.abs(cfg.breakthroughEnemySectorStrengthMult - p.breakthroughEnemySectorStrengthMult) < FRAC_EPS &&
     cfg.breakthroughSectorCaptureBonusPP === p.breakthroughSectorCaptureBonusPP
   );
@@ -77,6 +79,7 @@ export const RULES_PRESETS: RulesPreset[] = [
     conquestPointsPlayer: 40,
     conquestPointsAi: 40,
     breakthroughAttackerStartingPP: 120,
+    breakthroughDefenderStartingPP: 23,
     breakthroughEnemySectorStrengthMult: 0.5,
     breakthroughSectorCaptureBonusPP: 120,
   },
@@ -100,6 +103,7 @@ export const RULES_PRESETS: RulesPreset[] = [
     conquestPointsPlayer: 40,
     conquestPointsAi: 40,
     breakthroughAttackerStartingPP: 40,
+    breakthroughDefenderStartingPP: 9,
     breakthroughEnemySectorStrengthMult: 0.5,
     breakthroughSectorCaptureBonusPP: 40,
   },

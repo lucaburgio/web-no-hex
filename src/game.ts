@@ -3557,13 +3557,9 @@ export function createInitialStateFromTerritoryMap(
     const frontCps = frontlineIdx >= 0 ? sectorControlPointHex[frontlineIdx] ?? [] : [];
     const controlPointHexes = frontCps.length ? [...frontCps] : [];
 
-    const defHexCount = Object.values(hexStates).filter(h => h.owner === defenderOwner).length;
-    const defBonus = territoryBonusForHexCount(defHexCount);
-    const defBasePP = defenderOwner === AI ? config.productionPointsPerTurnAi : config.productionPointsPerTurn;
-    const defPP = defBasePP + defBonus;
     const pp: Record<Owner, number> = { 1: 0, 2: 0 };
     pp[attackerOwner] = config.breakthroughAttackerStartingPP;
-    pp[defenderOwner] = defPP;
+    pp[defenderOwner] = config.breakthroughDefenderStartingPP;
 
     return buildTerritoryState(graph, units, hexStates, mountainHexes, gameMode, {
       controlPointHexes,
