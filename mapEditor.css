@@ -6,6 +6,13 @@
   background: #f5f5f3;
   min-height: 0;
   overflow: hidden;
+  /* Sector palette (map + sidebar swatches), cycled mod 6 */
+  --ev2-sector-palette-0: #f97316;
+  --ev2-sector-palette-1: #2563eb;
+  --ev2-sector-palette-2: #059669;
+  --ev2-sector-palette-3: #9333ea;
+  --ev2-sector-palette-4: #0891b2;
+  --ev2-sector-palette-5: #e11d48;
 }
 #ev2-canvas-area {
   flex: 1; overflow: hidden; position: relative;
@@ -148,16 +155,7 @@
 .ev2-swatch-mountain { overflow: hidden; border-color: #78716c; }
 .ev2-swatch-offmap   { overflow: hidden; border-color: #5f8499; }
 
-/* Sector fill palette (sectors mode) — six colors, cycled by sector order; fill-opacity 0.8 */
-#ev2-svg[data-ev2-mode="sectors"] {
-  --ev2-sector-palette-0: #f97316;
-  --ev2-sector-palette-1: #2563eb;
-  --ev2-sector-palette-2: #059669;
-  --ev2-sector-palette-3: #9333ea;
-  --ev2-sector-palette-4: #0891b2;
-  --ev2-sector-palette-5: #e11d48;
-}
-
+/* Sector fill (sectors mode) — same palette vars as #map-editor-overlay; fill-opacity 0.8 */
 #ev2-svg[data-ev2-mode="sectors"] .ev2-territory-fill.ev2-sector-palette-0 {
   fill: var(--ev2-sector-palette-0);
   fill-opacity: 0.8;
@@ -238,6 +236,21 @@
 .ev2-sector-item {
   display: flex; align-items: center; gap: 6px; padding: 5px 8px;
 }
+.ev2-sector-color-swatch {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-sizing: border-box;
+  opacity: 0.88;
+}
+.ev2-sector-color-swatch-0 { background: var(--ev2-sector-palette-0); }
+.ev2-sector-color-swatch-1 { background: var(--ev2-sector-palette-1); }
+.ev2-sector-color-swatch-2 { background: var(--ev2-sector-palette-2); }
+.ev2-sector-color-swatch-3 { background: var(--ev2-sector-palette-3); }
+.ev2-sector-color-swatch-4 { background: var(--ev2-sector-palette-4); }
+.ev2-sector-color-swatch-5 { background: var(--ev2-sector-palette-5); }
 .ev2-sector-count-badge {
   flex: 0 0 auto; background: #333; color: #999; border: 1px solid #555;
   border-radius: 10px; font-size: 9px; font-weight: 700;

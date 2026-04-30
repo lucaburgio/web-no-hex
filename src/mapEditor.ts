@@ -586,6 +586,11 @@ function renderSectorList(): void {
     reorderCol.appendChild(upBtn);
     reorderCol.appendChild(downBtn);
 
+    const swatch = document.createElement('span');
+    swatch.className = `ev2-sector-color-swatch ev2-sector-color-swatch-${i % 6}`;
+    swatch.title = 'Map color for this sector';
+    swatch.setAttribute('aria-hidden', 'true');
+
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.value = s.name;
@@ -611,6 +616,7 @@ function renderSectorList(): void {
     delBtn.dataset.sectorDelete = s.id;
 
     li.appendChild(reorderCol);
+    li.appendChild(swatch);
     li.appendChild(nameInput);
     li.appendChild(countBadge);
     li.appendChild(editBtn);
