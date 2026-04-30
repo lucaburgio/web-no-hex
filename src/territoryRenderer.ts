@@ -632,16 +632,16 @@ function graphHasVirtualCell(gra: { keyToId: Record<string, string> }, col: numb
   return gra.keyToId[`${col},${row}`] !== undefined;
 }
 
-/** Single max-range circle for selected / inspected artillery; stable node to avoid animation flicker. */
+/** Max-range circle for selected / inspected artillery; paint from `style.css` (gradients + pulse). */
 function syncArtilleryRangeCircle(
   layer: SVGGElement | null,
   band: { cx: number; cy: number; rMaxPx: number } | null,
-  stroke: string | null,
+  ownerStyle: 'player' | 'ai' | null,
 ): void {
   if (!layer) return;
   layer.querySelector('#trr-artillery-range-inner')?.remove();
   layer.querySelector('#trr-artillery-range-outer')?.remove();
-  if (!band || !stroke) {
+  if (!band || !ownerStyle) {
     layer.querySelector('#trr-artillery-range-circle')?.remove();
     return;
   }
@@ -649,15 +649,19 @@ function syncArtilleryRangeCircle(
   if (!c) {
     c = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
     c.id = 'trr-artillery-range-circle';
-    c.setAttribute('fill', 'none');
     c.setAttribute('pointer-events', 'none');
     layer.appendChild(c);
   }
+  const cls =
+    ownerStyle === 'player'
+      ? 'trr-artillery-range-circle trr-artillery-range-circle--friendly'
+      : 'trr-artillery-range-circle trr-artillery-range-circle--opponent';
+  setAttrIfChanged(c, 'class', cls);
+  c.removeAttribute('fill');
+  c.removeAttribute('stroke');
   setAttrIfChanged(c, 'cx', String(band.cx));
   setAttrIfChanged(c, 'cy', String(band.cy));
   setAttrIfChanged(c, 'r', String(band.rMaxPx));
-  setAttrIfChanged(c, 'stroke', stroke);
-  setAttrIfChanged(c, 'stroke-width', '2');
 }
 
 // ── renderTerritoryState ──────────────────────────────────────────────────────
@@ -1030,16 +1034,16 @@ export function renderTerritoryState(
     artilleryRingUnit && maxRangeSteps
       ? artilleryRangedBandPx(graph, artilleryRingUnit.col, artilleryRingUnit.row, maxRangeSteps)
       : null;
-  const ringStroke =
+  const ringOwnerStyle: 'player' | 'ai' | null =
     ringBand && artilleryRingUnit
       ? artilleryRingUnit.owner === localPlayer
-        ? 'var(--color-player)'
-        : 'var(--color-ai)'
+        ? 'player'
+        : 'ai'
       : null;
   syncArtilleryRangeCircle(
     svgElement.querySelector('#trr-artillery-range') as SVGGElement | null,
     ringBand,
-    ringStroke,
+    ringOwnerStyle,
   );
 
   const productionTiredVisualTr =
