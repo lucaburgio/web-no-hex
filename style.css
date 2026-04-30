@@ -605,22 +605,23 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
 
   /*
    * Polygon artillery max-range circle — radial fill + stroke; pulse animates fill-opacity only.
-   * Edit gradient stops here; tune timing in --trr-artillery-range-pulse-duration and @keyframes trr-artillery-range-pulse.
+   * Use hsl(from … / α) for stops — do not use color-mix(…, transparent); transparent is black in sRGB mix.
+   * Tune stops / alphas here; pulse in @keyframes trr-artillery-range-pulse and --trr-artillery-range-pulse-duration.
    */
   --trr-artillery-range-fill-friendly: radial-gradient(
     circle at center,
-    color-mix(in srgb, var(--color-player) 52%, transparent) 0%,
-    color-mix(in srgb, var(--color-player) 26%, transparent) 34%,
-    color-mix(in srgb, var(--color-player) 10%, transparent) 56%,
-    transparent 74%
+    hsl(from var(--color-player) h s l / 0.48) 0%,
+    hsl(from var(--color-player) h s l / 0.26) 32%,
+    hsl(from var(--color-player) h s l / 0.1) 56%,
+    hsl(from var(--color-player) h s l / 0.02) 76%
   );
   --trr-artillery-range-stroke-friendly: var(--color-player);
   --trr-artillery-range-fill-opponent: radial-gradient(
     circle at center,
-    color-mix(in srgb, var(--color-ai) 50%, transparent) 0%,
-    color-mix(in srgb, var(--color-ai) 24%, transparent) 34%,
-    color-mix(in srgb, var(--color-ai) 9%, transparent) 56%,
-    transparent 74%
+    hsl(from var(--color-ai) h s l / 0.46) 0%,
+    hsl(from var(--color-ai) h s l / 0.24) 32%,
+    hsl(from var(--color-ai) h s l / 0.09) 56%,
+    hsl(from var(--color-ai) h s l / 0.02) 76%
   );
   --trr-artillery-range-stroke-opponent: var(--color-ai);
   --trr-artillery-range-pulse-duration: 2.6s;
