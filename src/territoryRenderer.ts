@@ -664,11 +664,11 @@ function appendArtilleryRangeRadialGradients(svgEl: SVGSVGElement, defs: SVGDefs
     }
     defs.appendChild(rg);
   };
-  mk('friendly', 'var(--color-player)');
+  mk('friendly', 'var(--color-yellow-500)');
   mk('opponent', 'var(--color-ai)');
 }
 
-/** Max-range circle for selected / inspected artillery; paint from `style.css` (gradients + pulse). */
+/** Max-range: fill disc + dashed stroke ring (ring rotates; fill keeps gradient). */
 function syncArtilleryRangeCircle(
   layer: SVGGElement | null,
   band: { cx: number; cy: number; rMaxPx: number } | null,
@@ -677,27 +677,49 @@ function syncArtilleryRangeCircle(
   if (!layer) return;
   layer.querySelector('#trr-artillery-range-inner')?.remove();
   layer.querySelector('#trr-artillery-range-outer')?.remove();
+  layer.querySelector('#trr-artillery-range-circle')?.remove();
   if (!band || !ownerStyle) {
-    layer.querySelector('#trr-artillery-range-circle')?.remove();
+    layer.querySelector('#trr-artillery-range-fill')?.remove();
+    layer.querySelector('#trr-artillery-range-ring')?.remove();
     return;
   }
-  let c = layer.querySelector('#trr-artillery-range-circle') as SVGCircleElement | null;
-  if (!c) {
-    c = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
-    c.id = 'trr-artillery-range-circle';
-    c.setAttribute('pointer-events', 'none');
-    layer.appendChild(c);
+  const clsSuffix = ownerStyle === 'player' ? 'friendly' : 'opponent';
+  const fillCls = `trr-artillery-range-fill trr-artillery-range--${clsSuffix}`;
+  const ringCls = `trr-artillery-range-ring trr-artillery-range--${clsSuffix}`;
+
+  let fillEl = layer.querySelector('#trr-artillery-range-fill') as SVGCircleElement | null;
+  if (!fillEl) {
+    fillEl = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
+    fillEl.id = 'trr-artillery-range-fill';
+    fillEl.setAttribute('pointer-events', 'none');
+    layer.appendChild(fillEl);
   }
-  const cls =
-    ownerStyle === 'player'
-      ? 'trr-artillery-range-circle trr-artillery-range-circle--friendly'
-      : 'trr-artillery-range-circle trr-artillery-range-circle--opponent';
-  setAttrIfChanged(c, 'class', cls);
-  c.removeAttribute('fill');
-  c.removeAttribute('stroke');
-  setAttrIfChanged(c, 'cx', String(band.cx));
-  setAttrIfChanged(c, 'cy', String(band.cy));
-  setAttrIfChanged(c, 'r', String(band.rMaxPx));
+  let ringEl = layer.querySelector('#trr-artillery-range-ring') as SVGCircleElement | null;
+  if (!ringEl) {
+    ringEl = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
+    ringEl.id = 'trr-artillery-range-ring';
+    ringEl.setAttribute('pointer-events', 'none');
+    layer.appendChild(ringEl);
+  }
+  if (ringEl.previousElementSibling !== fillEl) {
+    layer.insertBefore(fillEl, ringEl);
+  }
+
+  setAttrIfChanged(fillEl, 'class', fillCls);
+  setAttrIfChanged(ringEl, 'class', ringCls);
+  fillEl.removeAttribute('fill');
+  fillEl.removeAttribute('stroke');
+  ringEl.removeAttribute('fill');
+  ringEl.removeAttribute('stroke');
+  const cx = String(band.cx);
+  const cy = String(band.cy);
+  const r = String(band.rMaxPx);
+  setAttrIfChanged(fillEl, 'cx', cx);
+  setAttrIfChanged(fillEl, 'cy', cy);
+  setAttrIfChanged(fillEl, 'r', r);
+  setAttrIfChanged(ringEl, 'cx', cx);
+  setAttrIfChanged(ringEl, 'cy', cy);
+  setAttrIfChanged(ringEl, 'r', r);
 }
 
 // ── renderTerritoryState ──────────────────────────────────────────────────────

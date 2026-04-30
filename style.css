@@ -604,17 +604,23 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   --board-unit-icon-filter: none;
 
   /*
-   * Polygon artillery range circle — fill uses SVG radialGradient in defs (see appendArtilleryRangeRadialGradients
-   * in territoryRenderer.ts); WKWebView often treats CSS radial-gradient + relative colors on SVG fill as invalid → black.
-   * Stroke stays here; tweak radial falloff via --trr-artillery-range-radial-stop*-op (0–1).
+   * Polygon artillery range: SVG radialGradient fill (see territoryRenderer appendArtilleryRangeRadialGradients).
+   * Radial falloff: --trr-artillery-range-radial-stop*-op. Ring (dashed + spin): --trr-artillery-range-ring-*.
    */
-  --trr-artillery-range-radial-stop0-op: 0.48;
-  --trr-artillery-range-radial-stop1-op: 0.26;
-  --trr-artillery-range-radial-stop2-op: 0.1;
-  --trr-artillery-range-radial-stop3-op: 0.02;
-  --trr-artillery-range-stroke-friendly: var(--color-player);
+  --trr-artillery-range-radial-stop0-op: 0;
+  --trr-artillery-range-radial-stop1-op: 0.0;
+  --trr-artillery-range-radial-stop2-op: 0.0;
+  --trr-artillery-range-radial-stop3-op: 0.6;
+  --trr-artillery-range-stroke-friendly: var(--color-yellow-500);
   --trr-artillery-range-stroke-opponent: var(--color-ai);
   --trr-artillery-range-pulse-duration: 2.6s;
+  /* Dashed rotating outline (#trr-artillery-range-ring) */
+  --trr-artillery-range-ring-stroke-width: 2px;
+  --trr-artillery-range-ring-stroke-opacity: 0.9;
+  --trr-artillery-range-ring-dasharray: 10 16;
+  --trr-artillery-range-ring-linecap: round;
+  --trr-artillery-range-ring-spin-duration: 14s;
+  --trr-artillery-range-ring-spin-timing: linear;
 }
 
 #board {
@@ -632,42 +638,74 @@ button { cursor: url('/icons/pointer.svg') 13 14, pointer; user-select: none; -w
   --ev2-border-color: var(--color-yellow-500);
 }
 
-/* Polygon map: artillery max-range disc (SVG radialGradient fill; fill-opacity eases in keyframes). */
-#board .trr-artillery-range-circle.trr-artillery-range-circle--friendly,
-#recap-board .trr-artillery-range-circle.trr-artillery-range-circle--friendly {
-  stroke: var(--trr-artillery-range-stroke-friendly);
-  stroke-width: 2;
-  fill-opacity: 0.38;
+/* Polygon map: artillery range — fill disc + dashed rotating ring (two circles in #trr-artillery-range). */
+#board .trr-artillery-range-fill.trr-artillery-range--friendly,
+#recap-board .trr-artillery-range-fill.trr-artillery-range--friendly {
+  stroke: none;
+  fill-opacity: 0.2;
   animation: trr-artillery-range-pulse var(--trr-artillery-range-pulse-duration, 2.6s) ease-in-out infinite;
 }
-#board .trr-artillery-range-circle.trr-artillery-range-circle--friendly {
+#board .trr-artillery-range-fill.trr-artillery-range--friendly {
   fill: url(#board-trr-artillery-radial-friendly);
 }
-#recap-board .trr-artillery-range-circle.trr-artillery-range-circle--friendly {
+#recap-board .trr-artillery-range-fill.trr-artillery-range--friendly {
   fill: url(#recap-board-trr-artillery-radial-friendly);
 }
 
-#board .trr-artillery-range-circle.trr-artillery-range-circle--opponent,
-#recap-board .trr-artillery-range-circle.trr-artillery-range-circle--opponent {
-  stroke: var(--trr-artillery-range-stroke-opponent);
-  stroke-width: 2;
-  fill-opacity: 0.38;
+#board .trr-artillery-range-ring.trr-artillery-range--friendly,
+#recap-board .trr-artillery-range-ring.trr-artillery-range--friendly {
+  fill: none;
+  stroke: var(--trr-artillery-range-stroke-friendly);
+  stroke-opacity: var(--trr-artillery-range-ring-stroke-opacity, 0.9);
+  stroke-width: var(--trr-artillery-range-ring-stroke-width, 2px);
+  stroke-dasharray: var(--trr-artillery-range-ring-dasharray, 10 16);
+  stroke-linecap: var(--trr-artillery-range-ring-linecap, round);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: trr-artillery-range-ring-spin var(--trr-artillery-range-ring-spin-duration, 14s)
+    var(--trr-artillery-range-ring-spin-timing, linear) infinite;
+}
+
+#board .trr-artillery-range-fill.trr-artillery-range--opponent,
+#recap-board .trr-artillery-range-fill.trr-artillery-range--opponent {
+  stroke: none;
+  fill-opacity: 0.2;
   animation: trr-artillery-range-pulse var(--trr-artillery-range-pulse-duration, 2.6s) ease-in-out infinite;
 }
-#board .trr-artillery-range-circle.trr-artillery-range-circle--opponent {
+#board .trr-artillery-range-fill.trr-artillery-range--opponent {
   fill: url(#board-trr-artillery-radial-opponent);
 }
-#recap-board .trr-artillery-range-circle.trr-artillery-range-circle--opponent {
+#recap-board .trr-artillery-range-fill.trr-artillery-range--opponent {
   fill: url(#recap-board-trr-artillery-radial-opponent);
+}
+
+#board .trr-artillery-range-ring.trr-artillery-range--opponent,
+#recap-board .trr-artillery-range-ring.trr-artillery-range--opponent {
+  fill: none;
+  stroke: var(--trr-artillery-range-stroke-opponent);
+  stroke-opacity: var(--trr-artillery-range-ring-stroke-opacity, 0.9);
+  stroke-width: var(--trr-artillery-range-ring-stroke-width, 2px);
+  stroke-dasharray: var(--trr-artillery-range-ring-dasharray, 10 16);
+  stroke-linecap: var(--trr-artillery-range-ring-linecap, round);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: trr-artillery-range-ring-spin var(--trr-artillery-range-ring-spin-duration, 14s)
+    var(--trr-artillery-range-ring-spin-timing, linear) infinite;
 }
 
 @keyframes trr-artillery-range-pulse {
   0%,
   100% {
-    fill-opacity: 0.28;
+    fill-opacity: 0.1;
   }
   50% {
-    fill-opacity: 0.55;
+    fill-opacity: 0.4;
+  }
+}
+
+@keyframes trr-artillery-range-ring-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
