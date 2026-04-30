@@ -1,5 +1,5 @@
 import config from './gameconfig';
-import { migrateSectorControlPointHexLoaded, normalizeBattleStats, syncBreakthroughAttackerOwnerOnLoad } from './game';
+import { migrateSectorControlPointHexLoaded, normalizeBattleStats, syncBreakthroughAttackerOwnerOnLoad, fillTerritoryUnitAnchorsForPersistence } from './game';
 import type { GameState } from './types';
 
 const STORAGE_KEY = 'web-strategic-save';
@@ -10,6 +10,7 @@ export function saveGameState(state: GameState): void {
     return;
   }
   try {
+    fillTerritoryUnitAnchorsForPersistence(state);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (error) {
     console.error('Failed to save game state:', error);

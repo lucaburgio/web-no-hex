@@ -38,6 +38,7 @@ import {
   unitShowsBoardPointerHover,
   type EndProductionOptions,
   getBreakthroughTerritoryStartingSlotCounts,
+  fillTerritoryUnitAnchorsForPersistence,
 } from './game';
 import {
   initTerritoryRenderer,
@@ -2749,6 +2750,7 @@ function broadcastSettingsPreview(): void {
 
 function sendStateUpdate(anim?: WsAnimationPayload | MoveAnimation): void {
   if (gameMode === 'vsHuman' && ws && ws.readyState === WebSocket.OPEN) {
+    fillTerritoryUnitAnchorsForPersistence(state);
     const payload: Record<string, unknown> = { type: 'state-update', state };
     if (anim) payload.animation = anim;
     ws.send(JSON.stringify(payload));
@@ -2806,6 +2808,7 @@ function handleWsMessage(msg: { type: string; [key: string]: unknown }): void {
     showSettings((settings) => {
       state = createInitialStateForMenu();
       state.matchStartedAtMs = Date.now();
+      fillTerritoryUnitAnchorsForPersistence(state);
       if (ws) ws.send(JSON.stringify({ type: 'game-start', state, settings: { ...settings, unitPackage: settingsUnitPackage, unitPackagePlayer2: settingsUnitPackagePlayer2 } }));
       startGame(state);
     }, 'PLAYER 2 CONNECTED');
@@ -4030,6 +4033,7 @@ endMoveBtn.addEventListener('click', () => {
       render(); updateUI(); checkWinner();
       if (ws && ws.readyState === WebSocket.OPEN) {
         const msgType = localPlayer === PLAYER ? 'state-after-host-move' : 'state-after-guest-move';
+        fillTerritoryUnitAnchorsForPersistence(state);
         ws.send(JSON.stringify({ type: msgType, state }));
       }
     }
@@ -4378,6 +4382,7 @@ function maybeAutoEnd(): void {
       render(); updateUI(); checkWinner();
       if (ws && ws.readyState === WebSocket.OPEN) {
         const msgType = localPlayer === PLAYER ? 'state-after-host-move' : 'state-after-guest-move';
+        fillTerritoryUnitAnchorsForPersistence(state);
         ws.send(JSON.stringify({ type: msgType, state }));
       }
     }

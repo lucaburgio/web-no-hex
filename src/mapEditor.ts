@@ -7,6 +7,7 @@ import {
   sanitizeTerritoryMapDef,
   type TerritoryMapDef,
   type TerritoryMapNoteVisibility,
+  type TerritoryVirtualSlotOrder,
 } from './territoryMap';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -39,6 +40,8 @@ let territories: Territory[] = [];
 let controlPoints: ControlPoint[] = [];
 let notes: Note[] = [];
 let sectors: Sector[] = [];
+/** Passed through map JSON; `spatial` sorts virtual columns by centroid (gameplay). */
+let mapVirtualSlotOrder: TerritoryVirtualSlotOrder = 'spatial';
 let currentPath: string[] = [];      // point IDs in-progress
 let mode: 'edit' | 'borders' | 'territory' | 'sectors' | 'view' = 'edit';
 let isRemovingDot = false;           // remove-dot sub-mode within edit
@@ -1690,6 +1693,7 @@ function clearAll(): void {
   controlPoints = [];
   notes = [];
   sectors = [];
+  mapVirtualSlotOrder = 'spatial';
   currentPath = [];
   hoveredPoint = null;
   _ptCounter = 0;
@@ -1719,6 +1723,7 @@ function applySanitizeToEditorState(): number {
     controlPoints,
     notes,
     sectors,
+    virtualSlotOrder: mapVirtualSlotOrder,
   };
   const next = sanitizeTerritoryMapDef(raw);
   const beforeIds = new Set(territories.map((t) => t.id));
@@ -1743,6 +1748,7 @@ function exportState(): void {
     controlPoints,
     notes,
     sectors,
+    virtualSlotOrder: mapVirtualSlotOrder,
   };
   const data = sanitizeTerritoryMapDef(raw);
   const json = JSON.stringify(data, null, 2);
@@ -1765,6 +1771,7 @@ function importFromJson(json: string): void {
   if (!Array.isArray(data.pts) || !Array.isArray(data.edges) || !Array.isArray(data.territories)) {
     throw new Error('Invalid format: missing pts, edges, or territories arrays.');
   }
+  mapVirtualSlotOrder = data.virtualSlotOrder === 'spatial' ? 'spatial' : 'json';
   const loaded: TerritoryMapDef = {
     version: data.version,
     pts: data.pts,
@@ -1774,6 +1781,7 @@ function importFromJson(json: string): void {
     notes: Array.isArray(data.notes) ? data.notes : [],
     sectors: Array.isArray(data.sectors) ? data.sectors : [],
     adjacencyBlockPairs: Array.isArray(data.adjacencyBlockPairs) ? data.adjacencyBlockPairs : undefined,
+    virtualSlotOrder: mapVirtualSlotOrder,
   };
   const sanitized = sanitizeTerritoryMapDef(loaded);
   pts = sanitized.pts as Pt[];
@@ -2312,6 +2320,7 @@ export function showMapEditor(): void {
   controlPoints = [];
   notes = [];
   sectors = [];
+  mapVirtualSlotOrder = 'spatial';
   currentPath = [];
   hoveredPoint = null;
   cursorPos = { x: 0, y: 0 };

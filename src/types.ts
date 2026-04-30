@@ -148,6 +148,12 @@ export interface GameState {
   battleStats?: Record<Owner, BattleStatsSide>;
   /** Territory graph for polygon-based maps (tutorial map etc.); omitted for hex grid games. */
   customMapGraph?: TerritoryGraphData;
+  /**
+   * Polygon maps only: unit id → territory id at last persistence / wire send. After
+   * {@link buildTerritoryGraph} remaps virtual columns (e.g. `virtualSlotOrder`), used to
+   * restore each unit's `col,row` from its territory. Omitted on hex boards and older saves.
+   */
+  territoryUnitAnchors?: Record<number, string>;
 }
 
 /** One AI turn animation step, in chronological order (same order as aiMovement resolves). */
