@@ -642,7 +642,7 @@ export function inlineIcon(
   x: number,
   y: number,
   size: number,
-  color: string,
+  color: string | null,
   opacity: string,
   /** Optional class on the root `<g>` (e.g. `board-unit__icon`). */
   rootClass?: string,
@@ -654,15 +654,17 @@ export function inlineIcon(
   const g = svgEl('g');
   if (rootClass) g.setAttribute('class', rootClass);
   g.setAttribute('transform', `translate(${x - size / 2},${y - size / 2}) scale(${scale})`);
-  if (def.mode === 'fill') {
-    g.setAttribute('fill', color);
-    g.setAttribute('stroke', 'none');
-  } else {
-    g.setAttribute('fill', 'none');
-    g.setAttribute('stroke', color);
-    g.setAttribute('stroke-width', String(2 / scale));
-    g.setAttribute('stroke-linecap', 'round');
-    g.setAttribute('stroke-linejoin', 'round');
+  if (color !== null) {
+    if (def.mode === 'fill') {
+      g.setAttribute('fill', color);
+      g.setAttribute('stroke', 'none');
+    } else {
+      g.setAttribute('fill', 'none');
+      g.setAttribute('stroke', color);
+      g.setAttribute('stroke-width', String(2 / scale));
+      g.setAttribute('stroke-linecap', 'round');
+      g.setAttribute('stroke-linejoin', 'round');
+    }
   }
   g.setAttribute('opacity', opacity);
   g.setAttribute('pointer-events', 'none');
@@ -1131,7 +1133,7 @@ export function mountBoardUnitChipContents(
   if (unitHasRiverDefensePotential(p.state, p.unit)) {
     const spacing = starSize * unitStarsSpacingPerSize;
     const shieldX = starN > 0 ? p.x + (starN / 2 + 0.325) * spacing : p.x;
-    const shieldG = inlineIcon('icons/unit-shield.svg', shieldX, starY, starSize, chip.iconColor, '1');
+    const shieldG = inlineIcon('icons/unit-shield.svg', shieldX, starY, starSize, null, '1');
     if (shieldG) unitWrap.appendChild(shieldG);
   }
 
@@ -2727,7 +2729,7 @@ export function animateMoves(
     if (hasRiverShield0) {
       const spacing = starSize * unitStarsSpacingPerSize;
       const shieldRelX = starN > 0 ? (starN / 2 + 0.325) * spacing : 0;
-      const sg = inlineIcon('icons/unit-shield.svg', shieldRelX, 0, starSize, chip0.iconColor, '1');
+      const sg = inlineIcon('icons/unit-shield.svg', shieldRelX, 0, starSize, null, '1');
       if (sg) starsOuter.appendChild(sg);
     }
     if (starN > 0 || hasRiverShield0) unitWrap.appendChild(starsOuter);
@@ -2979,7 +2981,7 @@ export function animateStrikeAndReturn(
   if (hasRiverShieldStrike) {
     const spacing = starSize * unitStarsSpacingPerSize;
     const shieldRelX = starN > 0 ? (starN / 2 + 0.325) * spacing : 0;
-    const sg = inlineIcon('icons/unit-shield.svg', shieldRelX, 0, starSize, chip0.iconColor, '1');
+    const sg = inlineIcon('icons/unit-shield.svg', shieldRelX, 0, starSize, null, '1');
     if (sg) starsOuter.appendChild(sg);
   }
   if (starN > 0 || hasRiverShieldStrike) unitWrap.appendChild(starsOuter);
