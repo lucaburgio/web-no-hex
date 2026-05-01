@@ -471,6 +471,15 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     }
     group.appendChild(fill);
 
+    if (t.state === 'river') {
+      const riverOverlay = mksvg('polygon');
+      riverOverlay.setAttribute('points', territoryPointsAttr(t, points));
+      riverOverlay.setAttribute('fill', 'black');
+      riverOverlay.setAttribute('fill-opacity', '0.1');
+      riverOverlay.setAttribute('pointer-events', 'none');
+      group.appendChild(riverOverlay);
+    }
+
     // Border compositing group — only shown for owned (allied/enemy) territories
     if (t.state !== 'mountain' && t.state !== 'offmap') {
       const borderGroup = mksvg('g');

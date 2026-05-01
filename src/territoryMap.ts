@@ -12,7 +12,7 @@ export interface TerritoryMapEdge {
   b: string;
 }
 
-export type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain' | 'offmap';
+export type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain' | 'offmap' | 'river';
 
 export interface TerritoryMapTerritory {
   id: string;
@@ -107,6 +107,8 @@ export interface TerritoryGraphData {
   mountainTerritoryIds: string[];
   /** Territory IDs for all passable territories */
   passableTerritoryIds: string[];
+  /** Territory IDs for river territories (passable, grants defense bonus) */
+  riverTerritoryIds: string[];
   /** Control points from the JSON */
   controlPoints: Record<string, TerritoryControlPoint>;
   /** Sectors from the JSON */
@@ -518,7 +520,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
 
   const allied: TerritoryMapTerritory[] = [];
   const enemy: TerritoryMapTerritory[] = [];
-  const others: TerritoryMapTerritory[] = []; // neutral + mountain
+  const others: TerritoryMapTerritory[] = []; // neutral + mountain + river
   const offmapTerrs: TerritoryMapTerritory[] = []; // offmap (decorative, excluded from grid)
 
   for (const t of cleanMapDef.territories) {
@@ -569,6 +571,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
   const aiHomeTerritoryIds = enemy.map(t => t.id);
   const mountainTerritoryIds = others.filter(t => t.state === 'mountain').map(t => t.id);
   const passableTerritoryIds = [...allied, ...enemy, ...others.filter(t => t.state !== 'mountain')].map(t => t.id);
+  const riverTerritoryIds = others.filter(t => t.state === 'river').map(t => t.id);
 
   const controlPoints: Record<string, TerritoryControlPoint> = {};
   for (const cp of cleanMapDef.controlPoints) {
@@ -597,6 +600,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
     aiHomeTerritoryIds,
     mountainTerritoryIds,
     passableTerritoryIds,
+    riverTerritoryIds,
     controlPoints,
     sectors,
     mapDef: cleanMapDef,

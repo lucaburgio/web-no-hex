@@ -1555,6 +1555,11 @@ function breakthroughStrengthMult(state: GameState, unit: Unit): number {
 }
 
 function isUnitOnRiver(state: GameState, unit: Unit): boolean {
+  if (state.customMapGraph) {
+    const key = `${unit.col},${unit.row}`;
+    const tid = state.customMapGraph.keyToId[key];
+    return tid != null && state.customMapGraph.riverTerritoryIds.includes(tid);
+  }
   const hexes = state.riverHexes;
   if (!hexes?.length) return false;
   return hexes.some(rh => rh.col === unit.col && rh.row === unit.row);

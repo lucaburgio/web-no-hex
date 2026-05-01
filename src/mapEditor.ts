@@ -13,7 +13,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain' | 'offmap';
+type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain' | 'offmap' | 'river';
 type TerritoryTool = TerritoryState | 'controlpoint';
 
 interface Pt { id: string; x: number; y: number }
