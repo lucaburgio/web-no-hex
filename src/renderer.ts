@@ -1150,7 +1150,7 @@ export function mountBoardUnitChipContents(
   const hasShield = unitHasRiverDefensePotential(p.state, p.unit);
   const spacing = starSize * unitStarsSpacingPerSize;
   if (hasShield) {
-    const shieldX = starN > 0 ? p.x - (starN + 0.35) / 2 * spacing : p.x;
+    const shieldX = p.x - (starN + 0.35) / 2 * spacing;
     const shieldG = inlineIcon('icons/unit-shield.svg', shieldX, starY, starSize, null, '1');
     if (shieldG) unitWrap.appendChild(shieldG);
   }
@@ -2740,7 +2740,7 @@ export function animateMoves(
     {
       const spacing = starSize * unitStarsSpacingPerSize;
       if (hasRiverShield0) {
-        const shieldRelX = starN > 0 ? -(starN + 0.35) / 2 * spacing : 0;
+        const shieldRelX = -(starN + 0.35) / 2 * spacing;
         const sg = inlineIcon('icons/unit-shield.svg', shieldRelX, 0, starSize, null, '1');
         if (sg) starsOuter.appendChild(sg);
       }
