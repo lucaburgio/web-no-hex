@@ -16,6 +16,7 @@ import {
   getBoardNeighbors,
   getOpponentHomeGuardBlockedHexes,
   getBreakthroughDefenderOwner,
+  unitHasRiverDefensePotential,
 } from './game';
 import type { GameState, HexState, Owner, Unit } from './types';
 import config from './gameconfig';
@@ -1126,6 +1127,13 @@ export function mountBoardUnitChipContents(
   const starSize = HEX_SIZE * unitStarsOuterMultiplier;
   const starY = p.y - unitStarsAnchorYScMult * sc - starSize * unitStarsBelowAnchorSizeMult;
   appendBoardUnitStars(unitWrap, p.x, starY, starN, starSize, chip.iconColor);
+
+  if (unitHasRiverDefensePotential(p.state, p.unit)) {
+    const spacing = starSize * unitStarsSpacingPerSize;
+    const shieldX = starN > 0 ? p.x + (starN / 2 + 0.325) * spacing : p.x;
+    const shieldG = inlineIcon('icons/unit-shield.svg', shieldX, starY, starSize, chip.iconColor, '1');
+    if (shieldG) unitWrap.appendChild(shieldG);
+  }
 
   if (showAim && isRangedTarget) {
     const aim = inlineIcon('icons/artillery.svg', p.x, p.y - HEX_SIZE * 1, HEX_SIZE * 0.5, c.rangedTargetBorder, opacity);
@@ -2706,6 +2714,7 @@ export function animateMoves(
     const starsOuter = svgEl('g');
     starsOuter.setAttribute('class', 'board-unit__stars');
     starsOuter.setAttribute('pointer-events', 'none');
+    const hasRiverShield0 = !!(liveStateForHp && unitHasRiverDefensePotential(liveStateForHp, anim.unit));
     if (starN > 0) {
       const spacing = starSize * unitStarsSpacingPerSize;
       const totalW = (starN - unitStarsTotalWidthCountOffset) * spacing;
@@ -2714,8 +2723,14 @@ export function animateMoves(
         const sg = inlineIcon('icons/star.svg', lx, 0, starSize, unitStarIconFill, '1');
         if (sg) starsOuter.appendChild(sg);
       }
-      unitWrap.appendChild(starsOuter);
     }
+    if (hasRiverShield0) {
+      const spacing = starSize * unitStarsSpacingPerSize;
+      const shieldRelX = starN > 0 ? (starN / 2 + 0.325) * spacing : 0;
+      const sg = inlineIcon('icons/unit-shield.svg', shieldRelX, 0, starSize, chip0.iconColor, '1');
+      if (sg) starsOuter.appendChild(sg);
+    }
+    if (starN > 0 || hasRiverShield0) unitWrap.appendChild(starsOuter);
 
     const startTime = performance.now();
 
@@ -2747,7 +2762,7 @@ export function animateMoves(
       factionImg.setAttribute('y', String(facPos.fy + unitFactionImageDomInsetPx));
       factionImg.setAttribute('width', String(facW));
       factionImg.setAttribute('height', String(facW));
-      if (starN > 0) {
+      if (starN > 0 || hasRiverShield0) {
         starsOuter.setAttribute(
           'transform',
           `translate(${x},${y - unitStarsAnchorYScMult * unitSc - starSize * unitStarsBelowAnchorSizeMult})`,
@@ -2951,6 +2966,7 @@ export function animateStrikeAndReturn(
   const starsOuter = svgEl('g');
   starsOuter.setAttribute('class', 'board-unit__stars');
   starsOuter.setAttribute('pointer-events', 'none');
+  const hasRiverShieldStrike = !!(liveStateForHp && unitHasRiverDefensePotential(liveStateForHp, unit));
   if (starN > 0) {
     const spacing = starSize * unitStarsSpacingPerSize;
     const totalW = (starN - unitStarsTotalWidthCountOffset) * spacing;
@@ -2959,8 +2975,14 @@ export function animateStrikeAndReturn(
       const sg = inlineIcon('icons/star.svg', lx, 0, starSize, unitStarIconFill, '1');
       if (sg) starsOuter.appendChild(sg);
     }
-    unitWrap.appendChild(starsOuter);
   }
+  if (hasRiverShieldStrike) {
+    const spacing = starSize * unitStarsSpacingPerSize;
+    const shieldRelX = starN > 0 ? (starN / 2 + 0.325) * spacing : 0;
+    const sg = inlineIcon('icons/unit-shield.svg', shieldRelX, 0, starSize, chip0.iconColor, '1');
+    if (sg) starsOuter.appendChild(sg);
+  }
+  if (starN > 0 || hasRiverShieldStrike) unitWrap.appendChild(starsOuter);
 
   const startTime = performance.now();
 
@@ -2997,7 +3019,7 @@ export function animateStrikeAndReturn(
     factionImg.setAttribute('y', String(facPosStrike.fy + unitFactionImageDomInsetPx));
     factionImg.setAttribute('width', String(facW));
     factionImg.setAttribute('height', String(facW));
-    if (starN > 0) {
+    if (starN > 0 || hasRiverShieldStrike) {
       starsOuter.setAttribute(
         'transform',
         `translate(${x},${y - unitStarsAnchorYScMult * unitSc - starSize * unitStarsBelowAnchorSizeMult})`,

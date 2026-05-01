@@ -1572,6 +1572,22 @@ function isAttackCrossingRiverEdge(state: GameState, attacker: Unit, defender: U
   return riverAdjacencyPairs.has(pairKey);
 }
 
+/** True when the unit is on a territory (or hex) that has at least one river edge on its border. */
+export function unitHasRiverDefensePotential(state: GameState, unit: Unit): boolean {
+  if (state.customMapGraph) {
+    const { riverAdjacencyPairs, keyToId } = state.customMapGraph;
+    if (!riverAdjacencyPairs.size) return false;
+    const tid = keyToId[`${unit.col},${unit.row}`];
+    if (!tid) return false;
+    for (const pair of riverAdjacencyPairs) {
+      const bar = pair.indexOf('|');
+      if (pair.slice(0, bar) === tid || pair.slice(bar + 1) === tid) return true;
+    }
+    return false;
+  }
+  return isUnitOnRiver(state, unit);
+}
+
 /** Rounds effective CS to one decimal for UI and logs; combat resolution uses full precision until this step. */
 function roundCombatStrengthForDisplay(cs: number): number {
   return Math.round(cs * 10) / 10;

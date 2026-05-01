@@ -5026,6 +5026,7 @@ loadIconDefs([
   ...config.unitTypes.map(t => t.icon).filter((i): i is string => !!i),
   'icons/star.svg',
   'icons/plus.svg',
+  'icons/unit-shield.svg',
 ]);
 showMainMenu();
 

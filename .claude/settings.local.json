@@ -31,7 +31,8 @@
       "Bash(git revert *)",
       "WebFetch(domain:localhost)",
       "Bash(curl -s http://localhost:5173/)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(git reset *)"
     ]
   }
 }

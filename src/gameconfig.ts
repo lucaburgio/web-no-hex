@@ -347,7 +347,7 @@ const config: GameConfig = {
   riverDefenseBonus: 0.15,
 
   // Minimum edge length (in map SVG units) for a river-edge icon to be shown at its midpoint
-  riverEdgeIconMinLength: 100,
+  riverEdgeIconMinLength: 60,
 
   // HP recovered per turn when unit is on owned territory
   healOwnTerritory: 2,
