@@ -604,7 +604,8 @@ function unitIcon(unitTypeId: string): string | undefined {
   return config.unitTypes.find(t => t.id === unitTypeId)?.icon;
 }
 
-interface IconDef { viewBox: number; mode: 'stroke' | 'fill'; paths: string[]; }
+interface IconPathDef { d: string; fill?: string; stroke?: string; strokeWidth?: string; }
+interface IconDef { viewBox: number; mode: 'stroke' | 'fill'; paths: string[]; pathDefs: IconPathDef[]; }
 
 const iconDefsCache: Record<string, IconDef> = {};
 
@@ -623,6 +624,13 @@ export async function loadIconDefs(iconPaths: string[]): Promise<void> {
       const viewBox = vb.length >= 3 ? vb[2] : 48;
       const pathEls = Array.from(doc.querySelectorAll('path'));
       const paths = pathEls.map(p => p.getAttribute('d')).filter((d): d is string => !!d);
+      const pathDefs: IconPathDef[] = pathEls.map(p => {
+        const def: IconPathDef = { d: p.getAttribute('d') ?? '' };
+        const fill = p.getAttribute('fill'); if (fill) def.fill = fill;
+        const stroke = p.getAttribute('stroke'); if (stroke) def.stroke = stroke;
+        const sw = p.getAttribute('stroke-width'); if (sw) def.strokeWidth = sw;
+        return def;
+      }).filter(p => p.d);
       const mode: 'fill' | 'stroke' = pathEls.some(p => {
         const s = p.getAttribute('stroke');
         return !!s && s !== 'none';
@@ -630,7 +638,7 @@ export async function loadIconDefs(iconPaths: string[]): Promise<void> {
         const f = p.getAttribute('fill');
         return !!f && f !== 'none';
       }) ? 'stroke' : 'fill';
-      iconDefsCache[iconPath] = { viewBox, mode, paths };
+      iconDefsCache[iconPath] = { viewBox, mode, paths, pathDefs };
     } catch (e) {
       console.warn(`[renderer] Failed to load icon: ${iconPath}`, e);
     }
@@ -668,10 +676,21 @@ export function inlineIcon(
   }
   g.setAttribute('opacity', opacity);
   g.setAttribute('pointer-events', 'none');
-  for (const d of def.paths) {
-    const p = svgEl('path');
-    p.setAttribute('d', d);
-    g.appendChild(p);
+  if (color === null) {
+    for (const pd of def.pathDefs) {
+      const p = svgEl('path');
+      p.setAttribute('d', pd.d);
+      if (pd.fill) p.setAttribute('fill', pd.fill);
+      if (pd.stroke) p.setAttribute('stroke', pd.stroke);
+      if (pd.strokeWidth) p.setAttribute('stroke-width', pd.strokeWidth);
+      g.appendChild(p);
+    }
+  } else {
+    for (const d of def.paths) {
+      const p = svgEl('path');
+      p.setAttribute('d', d);
+      g.appendChild(p);
+    }
   }
   return g;
 }
