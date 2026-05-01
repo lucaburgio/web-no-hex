@@ -2,6 +2,8 @@
 
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
 import offmapPatternSrc from '../public/images/misc/offmap-pattern.png';
+import riverEdgeIconSrc from '../public/icons/river-territory.svg';
+import config from './gameconfig';
 import {
   computeRedundantPartitionParentIds,
   sanitizeTerritoryMapDef,
@@ -1306,6 +1308,20 @@ function render(): void {
       riverLine.setAttribute('y2', String(pb.y));
       riverLine.setAttribute('pointer-events', 'none');
       edgeLayer.appendChild(riverLine);
+      const dx = pb.x - pa.x, dy = pb.y - pa.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len >= config.riverEdgeIconMinLength) {
+        const iconSize = 28;
+        const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2;
+        const img = document.createElementNS(SVG_NS, 'image');
+        img.setAttribute('href', riverEdgeIconSrc);
+        img.setAttribute('x', String(mx - iconSize / 2));
+        img.setAttribute('y', String(my - iconSize / 2));
+        img.setAttribute('width', String(iconSize));
+        img.setAttribute('height', String(iconSize));
+        img.setAttribute('pointer-events', 'none');
+        edgeLayer.appendChild(img);
+      }
     }
   }
 
