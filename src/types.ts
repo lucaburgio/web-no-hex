@@ -369,6 +369,8 @@ export interface GameConfig {
   maxFlankingUnits: number;
   /** Additive fraction applied to defender CS on a river hex (e.g. 0.15 = +15%). */
   riverDefenseBonus: number;
+  /** Minimum edge length in SVG map units for a river-edge icon to be displayed at its midpoint. */
+  riverEdgeIconMinLength: number;
   healOwnTerritory: number;
   zoneOfControl: boolean;
   /** If true, artillery cannot use ranged fire while any enemy is adjacent; must clear adjacencies first. */

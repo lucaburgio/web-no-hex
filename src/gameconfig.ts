@@ -346,6 +346,9 @@ const config: GameConfig = {
   // Defender CS multiplier while standing on a river hex (additive: 0.15 = +15%)
   riverDefenseBonus: 0.15,
 
+  // Minimum edge length (in map SVG units) for a river-edge icon to be shown at its midpoint
+  riverEdgeIconMinLength: 100,
+
   // HP recovered per turn when unit is on owned territory
   healOwnTerritory: 2,
 

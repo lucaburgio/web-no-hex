@@ -21,12 +21,14 @@ import {
   getOpponentHomeGuardBlockedHexes,
   artilleryRangedBandPx,
 } from './game';
+import config from './gameconfig';
 import { ensureMovePathPreviewLayer, inlineIcon, mountBoardUnitChipContents } from './renderer';
 import artilleryFirePatternSrc from '../public/images/misc/artillery-fire-pattern.png';
 import mountainPatternSrc from '../public/images/misc/mountain-pattern.png';
 import offmapPatternSrc from '../public/images/misc/offmap-pattern.png';
 import outsideBorderPatternSrc from '../public/images/misc/outside-border-pattern.png';
 import zocPatternSrc from '../public/images/misc/zoc-pattern.png';
+import riverEdgeIconSrc from '../public/icons/river-territory.svg';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Match `#board` / `renderer.ts` so SVG territory hits use the app pointer art, not the OS cursor. */
@@ -528,6 +530,8 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
 
   if (mapDef.riverEdgeIds?.length) {
     const riverSet = new Set(mapDef.riverEdgeIds);
+    const iconSize = 28;
+    const iconHalf = iconSize / 2;
     for (const edge of mapDef.edges) {
       if (!riverSet.has(edge.id)) continue;
       const pa = points[edge.a], pb = points[edge.b];
@@ -537,6 +541,21 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
       line.setAttribute('x1', String(pa.x)); line.setAttribute('y1', String(pa.y));
       line.setAttribute('x2', String(pb.x)); line.setAttribute('y2', String(pb.y));
       riverEdgeLayer.appendChild(line);
+
+      const dx = pb.x - pa.x;
+      const dy = pb.y - pa.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < config.riverEdgeIconMinLength) continue;
+      const mx = (pa.x + pb.x) / 2;
+      const my = (pa.y + pb.y) / 2;
+      const img = mksvg('image');
+      img.setAttribute('href', riverEdgeIconSrc);
+      img.setAttribute('x', String(mx - iconHalf));
+      img.setAttribute('y', String(my - iconHalf));
+      img.setAttribute('width', String(iconSize));
+      img.setAttribute('height', String(iconSize));
+      img.setAttribute('pointer-events', 'none');
+      riverEdgeLayer.appendChild(img);
     }
   }
 
