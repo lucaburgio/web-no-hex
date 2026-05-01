@@ -1147,14 +1147,15 @@ export function mountBoardUnitChipContents(
   const starN = boardUnitUpgradeStarCount(p.unit);
   const starSize = HEX_SIZE * unitStarsOuterMultiplier;
   const starY = p.y - unitStarsAnchorYScMult * sc - starSize * unitStarsBelowAnchorSizeMult;
-  appendBoardUnitStars(unitWrap, p.x, starY, starN, starSize, chip.iconColor);
-
-  if (unitHasRiverDefensePotential(p.state, p.unit)) {
-    const spacing = starSize * unitStarsSpacingPerSize;
-    const shieldX = starN > 0 ? p.x + (starN / 2 + 0.325) * spacing : p.x;
+  const hasShield = unitHasRiverDefensePotential(p.state, p.unit);
+  const spacing = starSize * unitStarsSpacingPerSize;
+  if (hasShield) {
+    const shieldX = starN > 0 ? p.x - (starN + 0.35) / 2 * spacing : p.x;
     const shieldG = inlineIcon('icons/unit-shield.svg', shieldX, starY, starSize, null, '1');
     if (shieldG) unitWrap.appendChild(shieldG);
   }
+  const starsXCenter = hasShield && starN > 0 ? p.x + 0.5 * spacing : p.x;
+  appendBoardUnitStars(unitWrap, starsXCenter, starY, starN, starSize, chip.iconColor);
 
   if (showAim && isRangedTarget) {
     const aim = inlineIcon('icons/artillery.svg', p.x, p.y - HEX_SIZE * 1, HEX_SIZE * 0.5, c.rangedTargetBorder, opacity);
@@ -2736,20 +2737,22 @@ export function animateMoves(
     starsOuter.setAttribute('class', 'board-unit__stars');
     starsOuter.setAttribute('pointer-events', 'none');
     const hasRiverShield0 = !!(liveStateForHp && unitHasRiverDefensePotential(liveStateForHp, anim.unit));
-    if (starN > 0) {
+    {
       const spacing = starSize * unitStarsSpacingPerSize;
-      const totalW = (starN - unitStarsTotalWidthCountOffset) * spacing;
-      for (let si = 0; si < starN; si++) {
-        const lx = -totalW / 2 + si * spacing;
-        const sg = inlineIcon('icons/star.svg', lx, 0, starSize, unitStarIconFill, '1');
+      if (hasRiverShield0) {
+        const shieldRelX = starN > 0 ? -(starN + 0.35) / 2 * spacing : 0;
+        const sg = inlineIcon('icons/unit-shield.svg', shieldRelX, 0, starSize, null, '1');
         if (sg) starsOuter.appendChild(sg);
       }
-    }
-    if (hasRiverShield0) {
-      const spacing = starSize * unitStarsSpacingPerSize;
-      const shieldRelX = starN > 0 ? (starN / 2 + 0.325) * spacing : 0;
-      const sg = inlineIcon('icons/unit-shield.svg', shieldRelX, 0, starSize, null, '1');
-      if (sg) starsOuter.appendChild(sg);
+      if (starN > 0) {
+        const totalW = (starN - unitStarsTotalWidthCountOffset) * spacing;
+        const starsOffset = hasRiverShield0 ? 0.5 * spacing : 0;
+        for (let si = 0; si < starN; si++) {
+          const lx = starsOffset - totalW / 2 + si * spacing;
+          const sg = inlineIcon('icons/star.svg', lx, 0, starSize, unitStarIconFill, '1');
+          if (sg) starsOuter.appendChild(sg);
+        }
+      }
     }
     if (starN > 0 || hasRiverShield0) unitWrap.appendChild(starsOuter);
 
@@ -2988,20 +2991,22 @@ export function animateStrikeAndReturn(
   starsOuter.setAttribute('class', 'board-unit__stars');
   starsOuter.setAttribute('pointer-events', 'none');
   const hasRiverShieldStrike = !!(liveStateForHp && unitHasRiverDefensePotential(liveStateForHp, unit));
-  if (starN > 0) {
+  {
     const spacing = starSize * unitStarsSpacingPerSize;
-    const totalW = (starN - unitStarsTotalWidthCountOffset) * spacing;
-    for (let si = 0; si < starN; si++) {
-      const lx = -totalW / 2 + si * spacing;
-      const sg = inlineIcon('icons/star.svg', lx, 0, starSize, unitStarIconFill, '1');
+    if (hasRiverShieldStrike) {
+      const shieldRelX = starN > 0 ? -(starN + 0.35) / 2 * spacing : 0;
+      const sg = inlineIcon('icons/unit-shield.svg', shieldRelX, 0, starSize, null, '1');
       if (sg) starsOuter.appendChild(sg);
     }
-  }
-  if (hasRiverShieldStrike) {
-    const spacing = starSize * unitStarsSpacingPerSize;
-    const shieldRelX = starN > 0 ? (starN / 2 + 0.325) * spacing : 0;
-    const sg = inlineIcon('icons/unit-shield.svg', shieldRelX, 0, starSize, null, '1');
-    if (sg) starsOuter.appendChild(sg);
+    if (starN > 0) {
+      const totalW = (starN - unitStarsTotalWidthCountOffset) * spacing;
+      const starsOffset = hasRiverShieldStrike ? 0.5 * spacing : 0;
+      for (let si = 0; si < starN; si++) {
+        const lx = starsOffset - totalW / 2 + si * spacing;
+        const sg = inlineIcon('icons/star.svg', lx, 0, starSize, unitStarIconFill, '1');
+        if (sg) starsOuter.appendChild(sg);
+      }
+    }
   }
   if (starN > 0 || hasRiverShieldStrike) unitWrap.appendChild(starsOuter);
 
