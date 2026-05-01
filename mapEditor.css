@@ -31,8 +31,8 @@
 .ev2-state-enemy    { fill: #fff1f2; }
 .ev2-state-mountain { fill: url(#ev2-mountain-pattern); }
 .ev2-state-offmap   { fill: url(#ev2-offmap-pattern); }
-.ev2-state-river    { fill: #bfdbfe; }
 .ev2-state-zoc      { fill: url(#ev2-zoc-pattern); }
+.ev2-river-edge     { stroke: white; stroke-width: 6; stroke-linecap: round; }
 .ev2-territory-fill { stroke: none; }
 
 /* Owner border color tokens (inherited by glow + line via var) */
@@ -155,7 +155,7 @@
 .ev2-swatch-enemy    { background: #fff1f2; border-color: #FE775E; }
 .ev2-swatch-mountain { overflow: hidden; border-color: #78716c; }
 .ev2-swatch-offmap   { overflow: hidden; border-color: #5f8499; }
-.ev2-swatch-river    { background: #bfdbfe; border-color: #38bdf8; }
+.ev2-swatch-river    { background: white; border-color: #38bdf8; }
 
 /* Sector fill (sectors mode) — same palette vars as #map-editor-overlay; fill-opacity 0.8 */
 #ev2-svg[data-ev2-mode="sectors"] .ev2-territory-fill.ev2-sector-palette-0 {

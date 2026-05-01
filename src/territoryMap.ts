@@ -12,7 +12,7 @@ export interface TerritoryMapEdge {
   b: string;
 }
 
-export type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain' | 'offmap' | 'river';
+export type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain' | 'offmap';
 
 export interface TerritoryMapTerritory {
   id: string;
@@ -62,6 +62,8 @@ export interface TerritoryMapDef {
    * the adjacency built from shared polygon edges.
    */
   adjacencyBlockPairs?: Array<[string, string]>;
+  /** Edge IDs (from the `edges` array) that are river crossings. Defenders get a CS bonus when attacked across these edges. */
+  riverEdgeIds?: string[];
 }
 
 /** A territory node in the processed graph */
@@ -107,8 +109,8 @@ export interface TerritoryGraphData {
   mountainTerritoryIds: string[];
   /** Territory IDs for all passable territories */
   passableTerritoryIds: string[];
-  /** Territory IDs for river territories (passable, grants defense bonus) */
-  riverTerritoryIds: string[];
+  /** Sorted territory-id pairs (tid1|tid2) separated by a river edge */
+  riverAdjacencyPairs: Set<string>;
   /** Control points from the JSON */
   controlPoints: Record<string, TerritoryControlPoint>;
   /** Sectors from the JSON */
@@ -504,6 +506,51 @@ export function sanitizeTerritoryMapDef(mapDef: TerritoryMapDef): TerritoryMapDe
   return cur;
 }
 
+function buildRiverAdjacencyPairs(
+  mapDef: TerritoryMapDef,
+  territories: Record<string, TerritoryNode>,
+): Set<string> {
+  const riverEdgeIds = mapDef.riverEdgeIds;
+  if (!riverEdgeIds?.length) return new Set();
+
+  // Build undirected-edge-key → territory IDs from polygon vertex pairs
+  const edgeKeyToTids = new Map<string, string[]>();
+  for (const t of mapDef.territories) {
+    for (let i = 0; i < t.pointIds.length; i++) {
+      const a = t.pointIds[i]!;
+      const b = t.pointIds[(i + 1) % t.pointIds.length]!;
+      const key = a < b ? `${a}\0${b}` : `${b}\0${a}`;
+      let arr = edgeKeyToTids.get(key);
+      if (!arr) { arr = []; edgeKeyToTids.set(key, arr); }
+      arr.push(t.id);
+    }
+  }
+
+  // Build a point-pair key → edge ID lookup from the edges array
+  const pointPairToEdgeId = new Map<string, string>();
+  for (const e of mapDef.edges) {
+    const key = e.a < e.b ? `${e.a}\0${e.b}` : `${e.b}\0${e.a}`;
+    pointPairToEdgeId.set(key, e.id);
+  }
+
+  const riverSet = new Set(riverEdgeIds);
+  const pairs = new Set<string>();
+
+  for (const [ppKey, tids] of edgeKeyToTids) {
+    const edgeId = pointPairToEdgeId.get(ppKey);
+    if (!edgeId || !riverSet.has(edgeId)) continue;
+    if (tids.length < 2) continue;
+    // Find two territories that both have virtual keys (i.e. are on the playable grid)
+    const playable = tids.filter(id => territories[id]?.virtualKey);
+    if (playable.length < 2) continue;
+    const [t1, t2] = playable;
+    const pairKey = t1! < t2! ? `${t1}|${t2}` : `${t2}|${t1}`;
+    pairs.add(pairKey);
+  }
+
+  return pairs;
+}
+
 /**
  * Build a territory graph from a map definition.
  * - Allied territories → player home row (ROWS-1 = 2)
@@ -520,7 +567,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
 
   const allied: TerritoryMapTerritory[] = [];
   const enemy: TerritoryMapTerritory[] = [];
-  const others: TerritoryMapTerritory[] = []; // neutral + mountain + river
+  const others: TerritoryMapTerritory[] = []; // neutral + mountain
   const offmapTerrs: TerritoryMapTerritory[] = []; // offmap (decorative, excluded from grid)
 
   for (const t of cleanMapDef.territories) {
@@ -571,7 +618,6 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
   const aiHomeTerritoryIds = enemy.map(t => t.id);
   const mountainTerritoryIds = others.filter(t => t.state === 'mountain').map(t => t.id);
   const passableTerritoryIds = [...allied, ...enemy, ...others.filter(t => t.state !== 'mountain')].map(t => t.id);
-  const riverTerritoryIds = others.filter(t => t.state === 'river').map(t => t.id);
 
   const controlPoints: Record<string, TerritoryControlPoint> = {};
   for (const cp of cleanMapDef.controlPoints) {
@@ -600,7 +646,7 @@ export function buildTerritoryGraph(mapDef: TerritoryMapDef): TerritoryGraphData
     aiHomeTerritoryIds,
     mountainTerritoryIds,
     passableTerritoryIds,
-    riverTerritoryIds,
+    riverAdjacencyPairs: buildRiverAdjacencyPairs(cleanMapDef, territories),
     controlPoints,
     sectors,
     mapDef: cleanMapDef,

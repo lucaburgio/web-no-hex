@@ -1555,14 +1555,21 @@ function breakthroughStrengthMult(state: GameState, unit: Unit): number {
 }
 
 function isUnitOnRiver(state: GameState, unit: Unit): boolean {
-  if (state.customMapGraph) {
-    const key = `${unit.col},${unit.row}`;
-    const tid = state.customMapGraph.keyToId[key];
-    return tid != null && state.customMapGraph.riverTerritoryIds.includes(tid);
-  }
   const hexes = state.riverHexes;
   if (!hexes?.length) return false;
   return hexes.some(rh => rh.col === unit.col && rh.row === unit.row);
+}
+
+function isAttackCrossingRiverEdge(state: GameState, attacker: Unit, defender: Unit): boolean {
+  const graph = state.customMapGraph;
+  if (!graph) return false;
+  const { riverAdjacencyPairs, keyToId } = graph;
+  if (!riverAdjacencyPairs.size) return false;
+  const aTid = keyToId[`${attacker.col},${attacker.row}`];
+  const dTid = keyToId[`${defender.col},${defender.row}`];
+  if (!aTid || !dTid) return false;
+  const pairKey = aTid < dTid ? `${aTid}|${dTid}` : `${dTid}|${aTid}`;
+  return riverAdjacencyPairs.has(pairKey);
 }
 
 /** Rounds effective CS to one decimal for UI and logs; combat resolution uses full precision until this step. */
@@ -1577,6 +1584,7 @@ function effectiveCS(
   extraFlankingSum: number = 0,
   combatRole: 'attacker' | 'defender' = 'defender',
   spearhead: boolean = false,
+  attackerUnit?: Unit,
 ): number {
   const hpRatio = unit.hp / unit.maxHp;
   const woundedMult = 0.5 + 0.5 * hpRatio;
@@ -1598,8 +1606,11 @@ function effectiveCS(
   if (combatRole === 'attacker' && spearhead) {
     cs *= 1 + config.tankSpearheadAttackBonus;
   }
-  if (combatRole === 'defender' && isUnitOnRiver(state, unit)) {
-    cs *= 1 + config.riverDefenseBonus;
+  if (combatRole === 'defender') {
+    const riverBonus = state.customMapGraph
+      ? (attackerUnit != null && isAttackCrossingRiverEdge(state, attackerUnit, unit))
+      : isUnitOnRiver(state, unit);
+    if (riverBonus) cs *= 1 + config.riverDefenseBonus;
   }
   return cs;
 }
@@ -1683,7 +1694,7 @@ function resolveCombat(
   const spearhead = !ranged && (opts?.spearhead ?? false);
   const { count: flanking, extraSum } = analyzeFlanking(state, attacker, defender);
   const csA = effectiveCS(state, attacker, flanking, extraSum, 'attacker', spearhead);
-  const csD = effectiveCS(state, defender, 0, 0, 'defender');
+  const csD = effectiveCS(state, defender, 0, 0, 'defender', false, ranged ? undefined : attacker);
   const delta = csA - csD;
   const scale = config.combatStrengthScale;
   const base  = config.combatDamageBase;
@@ -1899,7 +1910,7 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
     approachSteps === attacker.movement;
   const { count: flanking, extraSum, extraFlankingFrom } = analyzeFlanking(state, attackerForFlank, defender);
   const csA = effectiveCS(state, attacker, flanking, extraSum, 'attacker', spearhead);
-  const csD = effectiveCS(state, defender, 0, 0, 'defender');
+  const csD = effectiveCS(state, defender, 0, 0, 'defender', false, ranged ? undefined : attacker);
   const delta = csA - csD;
   const scale = config.combatStrengthScale;
   const base  = config.combatDamageBase;
@@ -1924,9 +1935,12 @@ export function forecastCombat(state: GameState, attacker: Unit, defender: Unit)
     defenderConditionPct: Math.round((0.5 + 0.5 * (defender.hp / defender.maxHp)) * 100),
     breakthroughDefenderMalus:
       state.gameMode === 'breakthrough' && breakthroughStrengthMult(state, defender) < 1 ? true : undefined,
-    defenderRiverDefenseBonusPct: isUnitOnRiver(state, defender)
-      ? Math.round(config.riverDefenseBonus * 100)
-      : undefined,
+    defenderRiverDefenseBonusPct:
+      (!ranged && (state.customMapGraph
+        ? isAttackCrossingRiverEdge(state, attacker, defender)
+        : isUnitOnRiver(state, defender)))
+        ? Math.round(config.riverDefenseBonus * 100)
+        : undefined,
     attackerUpgradeForecastLines: attackerUpgradeForecastLines(attacker, flanking),
     defenderUpgradeForecastLines: defenderUpgradeForecastLines(defender),
     spearheadBonusPct: spearhead ? Math.round(config.tankSpearheadAttackBonus * 100) : undefined,

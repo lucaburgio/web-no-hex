@@ -420,6 +420,7 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     'ev2-outer-border-layer',
     'ev2-territory-layer',
     'ev2-edge-layer',
+    'ev2-river-edge-layer',
     'ev2-sector-border-layer',
     'ev2-cp-layer',
     'ev2-note-layer',
@@ -471,15 +472,6 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     }
     group.appendChild(fill);
 
-    if (t.state === 'river') {
-      const riverOverlay = mksvg('polygon');
-      riverOverlay.setAttribute('points', territoryPointsAttr(t, points));
-      riverOverlay.setAttribute('fill', 'black');
-      riverOverlay.setAttribute('fill-opacity', '0.1');
-      riverOverlay.setAttribute('pointer-events', 'none');
-      group.appendChild(riverOverlay);
-    }
-
     // Border compositing group — only shown for owned (allied/enemy) territories
     if (t.state !== 'mountain' && t.state !== 'offmap') {
       const borderGroup = mksvg('g');
@@ -528,6 +520,24 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
     line.setAttribute('x1', String(pa.x)); line.setAttribute('y1', String(pa.y));
     line.setAttribute('x2', String(pb.x)); line.setAttribute('y2', String(pb.y));
     edgeLayer.appendChild(line);
+  }
+
+  // ── ev2-river-edge-layer (static) ─────────────────────────────────────────────
+  const riverEdgeLayer = svgEl.querySelector('#ev2-river-edge-layer') as SVGGElement;
+  riverEdgeLayer.setAttribute('pointer-events', 'none');
+
+  if (mapDef.riverEdgeIds?.length) {
+    const riverSet = new Set(mapDef.riverEdgeIds);
+    for (const edge of mapDef.edges) {
+      if (!riverSet.has(edge.id)) continue;
+      const pa = points[edge.a], pb = points[edge.b];
+      if (!pa || !pb) continue;
+      const line = mksvg('line');
+      line.setAttribute('class', 'ev2-river-edge');
+      line.setAttribute('x1', String(pa.x)); line.setAttribute('y1', String(pa.y));
+      line.setAttribute('x2', String(pb.x)); line.setAttribute('y2', String(pb.y));
+      riverEdgeLayer.appendChild(line);
+    }
   }
 
   // ── ev2-sector-border-layer (static) ─────────────────────────────────────────

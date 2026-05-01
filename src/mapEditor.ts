@@ -13,8 +13,8 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain' | 'offmap' | 'river';
-type TerritoryTool = TerritoryState | 'controlpoint';
+type TerritoryState = 'neutral' | 'allied' | 'enemy' | 'mountain' | 'offmap';
+type TerritoryTool = TerritoryState | 'controlpoint' | 'river';
 
 interface Pt { id: string; x: number; y: number }
 interface Edge { id: string; a: string; b: string }
@@ -45,6 +45,7 @@ let isRemovingDot = false;           // remove-dot sub-mode within edit
 let isNoteTool = false;              // note placement sub-mode within edit
 let territoryTool: TerritoryTool = 'allied';
 let selectedEdgeIds = new Set<string>();
+let riverEdgeIds = new Set<string>();
 let selectedTerritoryId: string | null = null;
 let selectedSectorTerritoryIds = new Set<string>();
 let editingSectorId: string | null = null;
@@ -1266,7 +1267,8 @@ function render(): void {
     glow.setAttribute('y2', String(pb.y));
     glowGroup.appendChild(glow);
 
-    if (mode === 'borders') {
+    const isRiverMode = mode === 'territory' && territoryTool === 'river';
+    if (mode === 'borders' || isRiverMode) {
       const hit = document.createElementNS(SVG_NS, 'line');
       hit.setAttribute('class', 'ev2-edge-hit');
       hit.setAttribute('data-ev2-edge-id', edge.id);
@@ -1294,6 +1296,17 @@ function render(): void {
     line.setAttribute('y2', String(pb.y));
     line.setAttribute('pointer-events', 'none');
     edgeLayer.appendChild(line);
+
+    if (riverEdgeIds.has(edge.id)) {
+      const riverLine = document.createElementNS(SVG_NS, 'line');
+      riverLine.setAttribute('class', 'ev2-river-edge');
+      riverLine.setAttribute('x1', String(pa.x));
+      riverLine.setAttribute('y1', String(pa.y));
+      riverLine.setAttribute('x2', String(pb.x));
+      riverLine.setAttribute('y2', String(pb.y));
+      riverLine.setAttribute('pointer-events', 'none');
+      edgeLayer.appendChild(riverLine);
+    }
   }
 
   // ── Sector border layer ──────────────────────────────────────────────────
@@ -1492,7 +1505,7 @@ function applyTerritoryTool(t: Territory): void {
     } else {
       controlPoints.push({ id: newCpId(), territoryId: t.id, name: t.id.toUpperCase() });
     }
-  } else {
+  } else if (territoryTool !== 'river') {
     t.state = t.state === territoryTool ? 'neutral' : territoryTool;
   }
   render();
@@ -1567,6 +1580,15 @@ function territoryIdFromTopFillPolygonAt(e: MouseEvent): string | null {
 }
 
 function handleTerritoryClick(e: MouseEvent): void {
+  if (territoryTool === 'river') {
+    const edgeId = findEdgeIdAtEvent(e);
+    if (edgeId) {
+      if (riverEdgeIds.has(edgeId)) riverEdgeIds.delete(edgeId);
+      else riverEdgeIds.add(edgeId);
+      render();
+    }
+    return;
+  }
   const fromFill = territoryIdFromTopFillPolygonAt(e);
   if (fromFill) {
     const t = territories.find((x) => x.id === fromFill);
@@ -1743,6 +1765,7 @@ function exportState(): void {
     controlPoints,
     notes,
     sectors,
+    ...(riverEdgeIds.size > 0 ? { riverEdgeIds: [...riverEdgeIds] } : {}),
   };
   const data = sanitizeTerritoryMapDef(raw);
   const json = JSON.stringify(data, null, 2);
@@ -1774,6 +1797,7 @@ function importFromJson(json: string): void {
     notes: Array.isArray(data.notes) ? data.notes : [],
     sectors: Array.isArray(data.sectors) ? data.sectors : [],
     adjacencyBlockPairs: Array.isArray(data.adjacencyBlockPairs) ? data.adjacencyBlockPairs : undefined,
+    riverEdgeIds: Array.isArray(data.riverEdgeIds) ? data.riverEdgeIds : undefined,
   };
   const sanitized = sanitizeTerritoryMapDef(loaded);
   pts = sanitized.pts as Pt[];
@@ -1782,6 +1806,7 @@ function importFromJson(json: string): void {
   controlPoints = sanitized.controlPoints as ControlPoint[];
   notes = ((sanitized.notes ?? []) as Note[]).map(normalizeMapEditorNote);
   sectors = (sanitized.sectors ?? []) as Sector[];
+  riverEdgeIds = new Set(sanitized.riverEdgeIds ?? []);
   currentPath = [];
   hoveredPoint = null;
   selectedEdgeIds = new Set();
