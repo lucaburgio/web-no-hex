@@ -379,6 +379,11 @@ ppInfoEl.addEventListener('mouseleave', () => {
   ppTooltipEl.classList.add('hidden');
 });
 
+function passableHexCount(s: GameState): number {
+  if (s.customMapGraph) return s.customMapGraph.passableTerritoryIds.length;
+  return COLS * ROWS - (s.mountainHexes ?? []).length;
+}
+
 // ── Conquest header tooltip ────────────────────────────────────────────────────
 
 headerTerritoryEl.addEventListener('mouseenter', () => {
@@ -386,7 +391,7 @@ headerTerritoryEl.addEventListener('mouseenter', () => {
   const cp = state.conquestPoints;
   const youCp  = localPlayer === PLAYER ? cp[PLAYER] : cp[AI];
   const oppCp  = localPlayer === PLAYER ? cp[AI] : cp[PLAYER];
-  const totalHexes = COLS * ROWS;
+  const totalHexes = passableHexCount(state);
   const oppOwner = localPlayer === PLAYER ? AI : PLAYER;
   const localTerPct = Math.round(Object.values(state.hexStates).filter(h => h.owner === localPlayer).length / totalHexes * 100);
   const oppTerPct   = Math.round(Object.values(state.hexStates).filter(h => h.owner === oppOwner).length / totalHexes * 100);
@@ -4445,7 +4450,7 @@ function updateUI(): void {
     const cp = state.conquestPoints!;
     const youCp = localPlayer === PLAYER ? cp[PLAYER] : cp[AI];
     const oppCp = localPlayer === PLAYER ? cp[AI] : cp[PLAYER];
-    const totalHexes = COLS * ROWS;
+    const totalHexes = passableHexCount(state);
     const oppOwner = localPlayer === PLAYER ? AI : PLAYER;
     const localTerPct = Math.round(Object.values(state.hexStates).filter(h => h.owner === localPlayer).length / totalHexes * 100);
     const oppTerPct   = Math.round(Object.values(state.hexStates).filter(h => h.owner === oppOwner).length / totalHexes * 100);
@@ -4456,7 +4461,7 @@ function updateUI(): void {
     opponentPct = oppCp;
     leftPct = sum > 0 ? Math.round((youCp / sum) * 100) : 50;
   } else {
-    const totalHexes = COLS * ROWS;
+    const totalHexes = passableHexCount(state);
     const playerHexes = Object.values(state.hexStates).filter(h => h.owner === PLAYER).length;
     const aiHexes     = Object.values(state.hexStates).filter(h => h.owner === AI).length;
     const playerPct = Math.round(playerHexes / totalHexes * 100);
