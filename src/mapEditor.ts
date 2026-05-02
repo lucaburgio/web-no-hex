@@ -1428,10 +1428,12 @@ function render(): void {
     _edgeLayerStructKey = '';
   }
 
-  // Struct key: anything that adds/removes DOM elements (mode, edge set, river set)
+  // Struct key: anything that adds/removes DOM elements (mode, edge set, river set).
+  // Uses the edges array directly (not the territory-based topology key) so path edges
+  // drawn before any territory is formed are immediately reflected.
   const _isRiverMode = mode === 'territory' && territoryTool === 'river';
   const _edgeHasHit = mode === 'borders' || _isRiverMode;
-  const _edgeStructKey = (_edgeHasHit ? '1' : '0') + '|' + _edgeIndexTopologyKey
+  const _edgeStructKey = (_edgeHasHit ? '1' : '0') + '|' + edges.map(e => e.id).join(',')
     + '|' + [...riverEdgeIds].sort().join(',');
 
   if (_edgeStructKey !== _edgeLayerStructKey) {
