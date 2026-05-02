@@ -44,6 +44,7 @@ const PROD_PLACEMENT_ICON_PX = 12;
 interface RendererState {
   graph: TerritoryGraphData;
   edgeTerritoryIndex: Map<string, string[]>;
+  territoryGroupMap: Map<string, SVGGElement>;
 }
 
 const rendererStateMap = new WeakMap<SVGSVGElement, RendererState>();
@@ -626,7 +627,14 @@ export function initTerritoryRenderer(svgEl: SVGSVGElement, graph: TerritoryGrap
 
   ensureMovePathPreviewLayer(svgEl);
 
-  rendererStateMap.set(svgEl, { graph, edgeTerritoryIndex });
+  // Build territory group lookup map for O(1) access in renderTerritoryState
+  const territoryGroupMap = new Map<string, SVGGElement>();
+  for (const child of Array.from(territoryLayer.children)) {
+    const tid = (child as SVGElement).getAttribute('data-ev2-territory-id');
+    if (tid) territoryGroupMap.set(tid, child as SVGGElement);
+  }
+
+  rendererStateMap.set(svgEl, { graph, edgeTerritoryIndex, territoryGroupMap });
   rangedGlowMapTr.delete(svgEl);
 }
 
@@ -876,14 +884,14 @@ export function renderTerritoryState(
   const inLocalProd = state.phase === 'production' && state.activePlayer === localPlayer;
 
   // ── ev2-territory-layer ───────────────────────────────────────────────────────
-  const territoryLayer = svgElement.querySelector('#ev2-territory-layer')!;
+  const territoryGroupMap = rendererStateMap.get(svgElement)!.territoryGroupMap;
 
   for (const t of mapDef.territories) {
-    const group = territoryLayer.querySelector(`[data-ev2-territory-id="${t.id}"]`) as SVGGElement | null;
+    const group = territoryGroupMap.get(t.id) ?? null;
     if (!group) continue;
 
-    const fillPoly = group.querySelector('.ev2-territory-fill') as SVGElement | null;
-    const borderGroup = group.querySelector('.ev2-territory-border') as SVGGElement | null;
+    const fillPoly = group.children[0] as SVGElement | null;
+    const borderGroup = group.children[1] as SVGGElement | null;
 
     const nodeTerr = territories[t.id];
     const virtKey = nodeTerr?.virtualKey ?? '';

@@ -107,6 +107,74 @@ function normalizeSectorColorIndices(list: Sector[]): void {
   }
 }
 
+// ── Render performance caches ─────────────────────────────────────────────────
+
+function setAttrIfChanged(el: Element, attr: string, value: string): void {
+  if (el.getAttribute(attr) !== value) el.setAttribute(attr, value);
+}
+
+let _edgeIndexCache: Map<string, Territory[]> | null = null;
+let _edgeIndexTopologyKey = '';
+const _borderPathCache = new Map<string, string>();
+const _territoryGroupCache = new Map<string, SVGGElement>();
+const _clipPathCache = new Map<string, SVGClipPathElement>();
+let _outerBorderCacheKey = '';
+let _rafPending = false;
+
+// Cached DOM layer references — set once per SVG lifetime, avoids querySelector per render
+let _cachedDefs: SVGDefsElement | null = null;
+let _cachedLayerTerritory: SVGGElement | null = null;
+let _cachedLayerOuterBorder: SVGGElement | null = null;
+let _cachedLayerEdge: SVGGElement | null = null;
+let _cachedLayerCp: SVGGElement | null = null;
+let _cachedLayerNote: SVGGElement | null = null;
+let _cachedLayerSectorBorder: SVGGElement | null = null;
+let _cachedLayerPoint: SVGGElement | null = null;
+let _cachedLayerPreview: SVGGElement | null = null;
+
+function getEdgeIndex(): Map<string, Territory[]> {
+  const key = territories.map(t => `${t.id}|${t.pointIds.join(',')}`).join('\n');
+  if (_edgeIndexCache && key === _edgeIndexTopologyKey) return _edgeIndexCache;
+  _edgeIndexTopologyKey = key;
+  _edgeIndexCache = buildEdgeTerritoryIndex();
+  _borderPathCache.clear();
+  _outerBorderCacheKey = '';
+  return _edgeIndexCache;
+}
+
+function getCachedBorderPath(t: Territory, edgeIndex: Map<string, Territory[]>): string {
+  const cacheKey = `${t.id}:${t.state}:${t.pointIds.join(',')}`;
+  const cached = _borderPathCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const path = buildInsetBorderPath(t, edgeIndex, -10);
+  _borderPathCache.set(cacheKey, path);
+  return path;
+}
+
+function clearAllRenderCaches(): void {
+  _edgeIndexCache = null;
+  _edgeIndexTopologyKey = '';
+  _borderPathCache.clear();
+  _territoryGroupCache.clear();
+  _clipPathCache.clear();
+  _outerBorderCacheKey = '';
+  _cachedDefs = null;
+  _cachedLayerTerritory = null;
+  _cachedLayerOuterBorder = null;
+  _cachedLayerEdge = null;
+  _cachedLayerCp = null;
+  _cachedLayerNote = null;
+  _cachedLayerSectorBorder = null;
+  _cachedLayerPoint = null;
+  _cachedLayerPreview = null;
+}
+
+function scheduleRender(): void {
+  if (_rafPending) return;
+  _rafPending = true;
+  requestAnimationFrame(() => { _rafPending = false; render(); });
+}
+
 /** Space should insert a character, not start space+drag pan. */
 function eventTargetAcceptsSpaceForTyping(t: EventTarget | null): boolean {
   if (!t || !(t instanceof Element)) return false;
@@ -928,69 +996,80 @@ function render(): void {
 
   svgEl.setAttribute('data-ev2-mode', mode);
 
-  // Ensure defs element exists and is first
-  let defsEl = svgEl.querySelector('defs') as SVGDefsElement | null;
-  if (!defsEl) {
-    defsEl = document.createElementNS(SVG_NS, 'defs') as SVGDefsElement;
-    svgEl.prepend(defsEl);
+  // Ensure defs element exists and cache its reference
+  if (!_cachedDefs) {
+    _cachedDefs = svgEl.querySelector('defs') as SVGDefsElement | null;
+    if (!_cachedDefs) {
+      _cachedDefs = document.createElementNS(SVG_NS, 'defs') as SVGDefsElement;
+      svgEl.prepend(_cachedDefs);
+    }
   }
-  // Rebuild defs clip paths and outer-border pattern
-  defsEl.innerHTML = '';
+  const defsEl = _cachedDefs;
 
+  // Create static patterns once — they never change across renders
+  if (!defsEl.querySelector('#ev2-outer-border-pattern')) {
+    const outerPattern = document.createElementNS(SVG_NS, 'pattern');
+    outerPattern.setAttribute('id', 'ev2-outer-border-pattern');
+    outerPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+    outerPattern.setAttribute('width', '48');
+    outerPattern.setAttribute('height', '48');
+    const outerPatternImg = document.createElementNS(SVG_NS, 'image');
+    outerPatternImg.setAttribute('href', 'images/misc/outside-border-pattern.png');
+    outerPatternImg.setAttribute('width', '48');
+    outerPatternImg.setAttribute('height', '48');
+    outerPattern.appendChild(outerPatternImg);
+    defsEl.appendChild(outerPattern);
+
+    const mountainPattern = document.createElementNS(SVG_NS, 'pattern');
+    mountainPattern.setAttribute('id', 'ev2-mountain-pattern');
+    mountainPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+    mountainPattern.setAttribute('width', '60');
+    mountainPattern.setAttribute('height', '60');
+    const mountainPatternImgEl = document.createElementNS(SVG_NS, 'image');
+    mountainPatternImgEl.setAttribute('href', mountainPatternSrc);
+    mountainPatternImgEl.setAttribute('width', '60');
+    mountainPatternImgEl.setAttribute('height', '60');
+    mountainPattern.appendChild(mountainPatternImgEl);
+    defsEl.appendChild(mountainPattern);
+
+    const offmapPattern = document.createElementNS(SVG_NS, 'pattern');
+    offmapPattern.setAttribute('id', 'ev2-offmap-pattern');
+    offmapPattern.setAttribute('patternUnits', 'userSpaceOnUse');
+    offmapPattern.setAttribute('width', '60');
+    offmapPattern.setAttribute('height', '60');
+    const offmapPatternImgEl = document.createElementNS(SVG_NS, 'image');
+    offmapPatternImgEl.setAttribute('href', offmapPatternSrc);
+    offmapPatternImgEl.setAttribute('width', '60');
+    offmapPatternImgEl.setAttribute('height', '60');
+    offmapPattern.appendChild(offmapPatternImgEl);
+    defsEl.appendChild(offmapPattern);
+  }
+
+  // Sync clip paths incrementally — avoid clearing/recreating all of them every frame
+  const _clipTidSet = new Set(territories.map(t => t.id));
+  for (const [tid, clipEl] of _clipPathCache) {
+    if (!_clipTidSet.has(tid)) { clipEl.remove(); _clipPathCache.delete(tid); }
+  }
   for (const t of territories) {
-    const clipPath = document.createElementNS(SVG_NS, 'clipPath');
-    clipPath.setAttribute('id', `ev2-clip-${t.id}`);
-    const clipPoly = document.createElementNS(SVG_NS, 'polygon');
-    clipPoly.setAttribute('points', territoryPointsAttr(t));
-    clipPath.appendChild(clipPoly);
-    defsEl.appendChild(clipPath);
+    let clipPath = _clipPathCache.get(t.id);
+    if (!clipPath) {
+      clipPath = document.createElementNS(SVG_NS, 'clipPath') as SVGClipPathElement;
+      clipPath.setAttribute('id', `ev2-clip-${t.id}`);
+      const poly = document.createElementNS(SVG_NS, 'polygon');
+      clipPath.appendChild(poly);
+      defsEl.appendChild(clipPath);
+      _clipPathCache.set(t.id, clipPath);
+    }
+    const poly = clipPath.firstElementChild as SVGPolygonElement;
+    setAttrIfChanged(poly, 'points', territoryPointsAttr(t));
   }
-
-  // Pattern for outer border
-  const outerPattern = document.createElementNS(SVG_NS, 'pattern');
-  outerPattern.setAttribute('id', 'ev2-outer-border-pattern');
-  outerPattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  outerPattern.setAttribute('width', '48');
-  outerPattern.setAttribute('height', '48');
-  const outerPatternImg = document.createElementNS(SVG_NS, 'image');
-  outerPatternImg.setAttribute('href', 'images/misc/outside-border-pattern.png');
-  outerPatternImg.setAttribute('width', '48');
-  outerPatternImg.setAttribute('height', '48');
-  outerPattern.appendChild(outerPatternImg);
-  defsEl.appendChild(outerPattern);
-
-  // Pattern for mountain territory fill
-  const mountainPattern = document.createElementNS(SVG_NS, 'pattern');
-  mountainPattern.setAttribute('id', 'ev2-mountain-pattern');
-  mountainPattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  mountainPattern.setAttribute('width', '60');
-  mountainPattern.setAttribute('height', '60');
-  const mountainPatternImgEl = document.createElementNS(SVG_NS, 'image');
-  mountainPatternImgEl.setAttribute('href', mountainPatternSrc);
-  mountainPatternImgEl.setAttribute('width', '60');
-  mountainPatternImgEl.setAttribute('height', '60');
-  mountainPattern.appendChild(mountainPatternImgEl);
-  defsEl.appendChild(mountainPattern);
-
-  // Pattern for offmap territory fill
-  const offmapPattern = document.createElementNS(SVG_NS, 'pattern');
-  offmapPattern.setAttribute('id', 'ev2-offmap-pattern');
-  offmapPattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  offmapPattern.setAttribute('width', '60');
-  offmapPattern.setAttribute('height', '60');
-  const offmapPatternImgEl = document.createElementNS(SVG_NS, 'image');
-  offmapPatternImgEl.setAttribute('href', offmapPatternSrc);
-  offmapPatternImgEl.setAttribute('width', '60');
-  offmapPatternImgEl.setAttribute('height', '60');
-  offmapPattern.appendChild(offmapPatternImgEl);
-  defsEl.appendChild(offmapPattern);
 
   // ── Territory layer ──────────────────────────────────────────────────────
-  const territoryLayer = svgEl.querySelector('#ev2-territory-layer') as SVGGElement;
-  territoryLayer.innerHTML = '';
+  if (!_cachedLayerTerritory) _cachedLayerTerritory = svgEl.querySelector('#ev2-territory-layer') as SVGGElement;
+  const territoryLayer = _cachedLayerTerritory;
   territoryLayer.style.pointerEvents = mode === 'territory' ? 'auto' : 'none';
 
-  const edgeIndex = buildEdgeTerritoryIndex();
+  const edgeIndex = getEdgeIndex();
 
   /** Sectors mode: palette index from each sector's colorIndex; draft selection uses next/editing sector's slot. */
   const sectorPaletteIndexForTerritory = (tid: string): number | null => {
@@ -1022,11 +1101,17 @@ function render(): void {
   // Build a unified perimeter path from all outer edges (touching only 1 territory).
   // Stroke it 144px wide (half inside, half outside) — the territory layer covers
   // the inner half, leaving 72px of pattern border visible around the map.
-  const outerBorderLayer = svgEl.querySelector('#ev2-outer-border-layer') as SVGGElement;
-  outerBorderLayer.innerHTML = '';
+  if (!_cachedLayerOuterBorder) _cachedLayerOuterBorder = svgEl.querySelector('#ev2-outer-border-layer') as SVGGElement;
+  const outerBorderLayer = _cachedLayerOuterBorder;
   outerBorderLayer.setAttribute('pointer-events', 'none');
+  const _outerBorderNewKey = _edgeIndexTopologyKey + '|' + [...redundantPartitionParentIds].sort().join(',');
+  const _outerBorderNeedsRebuild = _outerBorderCacheKey !== _outerBorderNewKey;
+  if (_outerBorderNeedsRebuild) {
+    _outerBorderCacheKey = _outerBorderNewKey;
+    outerBorderLayer.innerHTML = '';
+  }
 
-  if (territories.length > 0) {
+  if (_outerBorderNeedsRebuild && territories.length > 0) {
     // Collect outer edge segments as [pa, pb] pairs
     const outerSegments: Array<[Pt, Pt]> = [];
     for (const edge of edges) {
@@ -1097,58 +1182,91 @@ function render(): void {
     }
   }
 
+  // Sync territory groups incrementally — create/update/remove instead of full rebuild
+  const _tids = new Set(territories.map(t => t.id));
+  for (const [tid, g] of _territoryGroupCache) {
+    if (!_tids.has(tid)) { g.remove(); _territoryGroupCache.delete(tid); }
+  }
   for (const t of territories) {
-    const pts_str = territoryPointsAttr(t);
+    let group = _territoryGroupCache.get(t.id);
+    if (!group) {
+      group = document.createElementNS(SVG_NS, 'g') as SVGGElement;
+      group.setAttribute('data-ev2-territory-id', t.id);
 
-    const group = document.createElementNS(SVG_NS, 'g');
-    group.setAttribute('data-ev2-territory-id', t.id);
-    if (mode === 'borders' && selectedTerritoryId === t.id) {
-      group.classList.add('ev2-territory-selected');
-    }
-    if (mode === 'sectors' && selectedSectorTerritoryIds.has(t.id)) {
-      group.classList.add('ev2-territory-sector-selected');
+      const fill = document.createElementNS(SVG_NS, 'polygon');
+      group.appendChild(fill);
+
+      // Always create a border group (display:none when not needed) so state
+      // transitions don't require DOM restructuring.
+      const borderGroup = document.createElementNS(SVG_NS, 'g');
+      borderGroup.setAttribute('pointer-events', 'none');
+      borderGroup.setAttribute('display', 'none');
+      const glowEl = document.createElementNS(SVG_NS, 'path');
+      glowEl.setAttribute('class', 'ev2-border-glow');
+      borderGroup.appendChild(glowEl);
+      const lineEl = document.createElementNS(SVG_NS, 'path');
+      lineEl.setAttribute('class', 'ev2-border-line');
+      borderGroup.appendChild(lineEl);
+      group.appendChild(borderGroup);
+
+      territoryLayer.appendChild(group);
+      _territoryGroupCache.set(t.id, group);
     }
 
-    // Filled polygon
-    const fill = document.createElementNS(SVG_NS, 'polygon');
+    // Selection class
+    const wantSel = mode === 'borders' && selectedTerritoryId === t.id;
+    const wantSecSel = mode === 'sectors' && selectedSectorTerritoryIds.has(t.id);
+    if (wantSel) {
+      if (!group.classList.contains('ev2-territory-selected')) group.classList.add('ev2-territory-selected');
+      group.classList.remove('ev2-territory-sector-selected');
+    } else if (wantSecSel) {
+      if (!group.classList.contains('ev2-territory-sector-selected')) group.classList.add('ev2-territory-sector-selected');
+      group.classList.remove('ev2-territory-selected');
+    } else {
+      group.classList.remove('ev2-territory-selected');
+      group.classList.remove('ev2-territory-sector-selected');
+    }
+
+    // Fill polygon
+    const fill = group.children[0] as SVGPolygonElement;
     const pal = sectorPaletteIndexForTerritory(t.id);
-    fill.setAttribute('class', `ev2-territory-fill ev2-state-${t.state}`);
+    setAttrIfChanged(fill, 'class', `ev2-territory-fill ev2-state-${t.state}`);
     if (pal !== null) {
       fill.style.setProperty('fill', SECTOR_EDITOR_FILL_HEX[pal]);
       fill.style.setProperty('fill-opacity', '0.8');
+    } else {
+      fill.style.removeProperty('fill');
+      fill.style.removeProperty('fill-opacity');
     }
-    fill.setAttribute('points', pts_str);
-    group.appendChild(fill);
+    setAttrIfChanged(fill, 'points', territoryPointsAttr(t));
 
-    // Inset border rendered as a compositing group so opacity never compounds at
-    // sub-path endpoints. The glow layer uses butt caps (no end-cap blobs);
-    // the main line uses round caps for clean termination.
-    if (t.state !== 'neutral' && t.state !== 'mountain' && t.state !== 'offmap') {
-      const borderPathD = buildInsetBorderPath(t, edgeIndex, -10);
-      if (borderPathD) {
-        const borderGroup = document.createElementNS(SVG_NS, 'g');
-        borderGroup.setAttribute('class', `ev2-territory-border ev2-border-${t.state}`);
-        borderGroup.setAttribute('pointer-events', 'none');
-
-        const glowEl = document.createElementNS(SVG_NS, 'path');
-        glowEl.setAttribute('d', borderPathD);
-        glowEl.setAttribute('class', 'ev2-border-glow');
-        borderGroup.appendChild(glowEl);
-
-        const lineEl = document.createElementNS(SVG_NS, 'path');
-        lineEl.setAttribute('d', borderPathD);
-        lineEl.setAttribute('class', 'ev2-border-line');
-        borderGroup.appendChild(lineEl);
-
-        group.appendChild(borderGroup);
-      }
+    // Border group (inset border, only for owned territories)
+    const borderGroup = group.children[1] as SVGGElement;
+    const showBorder = t.state !== 'neutral' && t.state !== 'mountain' && t.state !== 'offmap';
+    if (!showBorder) {
+      if (borderGroup.getAttribute('display') !== 'none') borderGroup.setAttribute('display', 'none');
+    } else {
+      if (borderGroup.getAttribute('display') === 'none') borderGroup.removeAttribute('display');
+      setAttrIfChanged(borderGroup, 'class', `ev2-territory-border ev2-border-${t.state}`);
+      const borderPathD = getCachedBorderPath(t, edgeIndex);
+      const glowEl = borderGroup.children[0] as SVGPathElement;
+      const lineEl = borderGroup.children[1] as SVGPathElement;
+      setAttrIfChanged(glowEl, 'd', borderPathD);
+      setAttrIfChanged(lineEl, 'd', borderPathD);
     }
+  }
 
-    territoryLayer.appendChild(group);
+  // Ensure DOM order matches the territories array (matters for hit-testing)
+  for (let i = 0; i < territories.length; i++) {
+    const g = _territoryGroupCache.get(territories[i]!.id);
+    if (g && territoryLayer.children[i] !== g) {
+      territoryLayer.insertBefore(g, territoryLayer.children[i] ?? null);
+    }
   }
 
   // ── Control point layer ──────────────────────────────────────────────────
-  const cpLayer = svgEl.querySelector('#ev2-cp-layer') as SVGGElement;
+  if (!_cachedLayerCp) _cachedLayerCp = svgEl.querySelector('#ev2-cp-layer') as SVGGElement;
+  const cpLayer = _cachedLayerCp;
   cpLayer.innerHTML = '';
   cpLayer.setAttribute('pointer-events', 'none');
   for (const cp of controlPoints) {
@@ -1193,7 +1311,8 @@ function render(): void {
   }
 
   // ── Note layer ───────────────────────────────────────────────────────────
-  const noteLayer = svgEl.querySelector('#ev2-note-layer') as SVGGElement;
+  if (!_cachedLayerNote) _cachedLayerNote = svgEl.querySelector('#ev2-note-layer') as SVGGElement;
+  const noteLayer = _cachedLayerNote;
   noteLayer.innerHTML = '';
   noteLayer.setAttribute('pointer-events', 'none');
   for (const note of notes) {
@@ -1246,7 +1365,8 @@ function render(): void {
   }
 
   // ── Edge layer ───────────────────────────────────────────────────────────
-  const edgeLayer = svgEl.querySelector('#ev2-edge-layer') as SVGGElement;
+  if (!_cachedLayerEdge) _cachedLayerEdge = svgEl.querySelector('#ev2-edge-layer') as SVGGElement;
+  const edgeLayer = _cachedLayerEdge;
   edgeLayer.innerHTML = '';
 
   // All glow lines go into one compositing group so their opacity is applied
@@ -1326,7 +1446,8 @@ function render(): void {
   }
 
   // ── Sector border layer ──────────────────────────────────────────────────
-  const sectorBorderLayer = svgEl.querySelector('#ev2-sector-border-layer') as SVGGElement;
+  if (!_cachedLayerSectorBorder) _cachedLayerSectorBorder = svgEl.querySelector('#ev2-sector-border-layer') as SVGGElement;
+  const sectorBorderLayer = _cachedLayerSectorBorder;
   sectorBorderLayer.innerHTML = '';
   sectorBorderLayer.setAttribute('pointer-events', 'none');
 
@@ -1358,7 +1479,8 @@ function render(): void {
   }
 
   // ── Point layer ──────────────────────────────────────────────────────────
-  const pointLayer = svgEl.querySelector('#ev2-point-layer') as SVGGElement;
+  if (!_cachedLayerPoint) _cachedLayerPoint = svgEl.querySelector('#ev2-point-layer') as SVGGElement;
+  const pointLayer = _cachedLayerPoint;
   pointLayer.innerHTML = '';
   pointLayer.style.pointerEvents = mode === 'territory' || mode === 'borders' ? 'none' : 'auto';
   edgeLayer.style.pointerEvents = mode === 'territory' ? 'none' : 'auto';
@@ -1386,7 +1508,8 @@ function render(): void {
   }
 
   // ── Preview layer ────────────────────────────────────────────────────────
-  const previewLayer = svgEl.querySelector('#ev2-preview-layer') as SVGGElement;
+  if (!_cachedLayerPreview) _cachedLayerPreview = svgEl.querySelector('#ev2-preview-layer') as SVGGElement;
+  const previewLayer = _cachedLayerPreview;
   previewLayer.innerHTML = '';
 
   updateBordersPanel();
@@ -1936,7 +2059,7 @@ export function initMapEditor(onBack: () => void): void {
       panX = panStartPanX - dx / zoom;
       panY = panStartPanY - dy / zoom;
       updateViewBox();
-      render();
+      scheduleRender();
       return;
     }
 
@@ -1947,7 +2070,7 @@ export function initMapEditor(onBack: () => void): void {
       const note = notes.find(n => n.id === dragNoteId);
       if (note) { note.x = x; note.y = y; hasDragged = true; }
       svgEl.style.cursor = 'grabbing';
-      render();
+      scheduleRender();
       return;
     }
 
@@ -1955,14 +2078,14 @@ export function initMapEditor(onBack: () => void): void {
       const pt = pts.find((p) => p.id === dragPointId);
       if (pt) { pt.x = x; pt.y = y; hasDragged = true; }
       svgEl.style.cursor = 'grabbing';
-      render();
+      scheduleRender();
       return;
     }
 
     if (mode === 'borders') {
       hoveredPoint = null;
       svgEl.style.cursor = 'default';
-      render();
+      scheduleRender();
       return;
     }
 
@@ -1973,7 +2096,7 @@ export function initMapEditor(onBack: () => void): void {
     else svgEl.style.cursor = mode === 'edit' && isRemovingDot ? 'cell'
                              : mode === 'edit' ? 'crosshair'
                              : 'default';
-    render();
+    scheduleRender();
   });
 
   window.addEventListener('mouseup', () => {
@@ -2394,6 +2517,7 @@ export function showMapEditor(): void {
     b.classList.toggle('active', (b as HTMLElement).dataset.tool === 'allied');
   });
 
+  clearAllRenderCaches();
   resizeSvg();
   render();
 }
