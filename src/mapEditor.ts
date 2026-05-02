@@ -113,12 +113,40 @@ function setAttrIfChanged(el: Element, attr: string, value: string): void {
   if (el.getAttribute(attr) !== value) el.setAttribute(attr, value);
 }
 
+// ── Point map (O(1) ptById) ───────────────────────────────────────────────────
+let _ptMapCache: Map<string, Pt> | null = null;
+let _ptMapLen = -1;
+
+// ── Edge index + border path caches ──────────────────────────────────────────
 let _edgeIndexCache: Map<string, Territory[]> | null = null;
 let _edgeIndexTopologyKey = '';
 const _borderPathCache = new Map<string, string>();
+
+// ── Territory group / clip path caches ────────────────────────────────────────
 const _territoryGroupCache = new Map<string, SVGGElement>();
 const _clipPathCache = new Map<string, SVGClipPathElement>();
 let _outerBorderCacheKey = '';
+
+// ── Sanitize + redundant-parent cache ────────────────────────────────────────
+let _sanitizeCacheKey = '';
+let _cachedRedundantPartitionIds = new Set<string>();
+
+// ── Edge layer caches ─────────────────────────────────────────────────────────
+interface EdgeElements {
+  glow: SVGLineElement;
+  main: SVGLineElement;
+  hit?: SVGLineElement;
+  river?: SVGLineElement;
+  riverIcon?: SVGImageElement;
+}
+const _edgeElementCache = new Map<string, EdgeElements>();
+let _edgeLayerStructKey = '';
+let _edgeLayerGlowGroup: SVGGElement | null = null;
+
+// ── Point layer cache ─────────────────────────────────────────────────────────
+const _pointCircleCache = new Map<string, SVGCircleElement>();
+
+// ── RAF throttle ──────────────────────────────────────────────────────────────
 let _rafPending = false;
 
 // Cached DOM layer references — set once per SVG lifetime, avoids querySelector per render
@@ -139,6 +167,7 @@ function getEdgeIndex(): Map<string, Territory[]> {
   _edgeIndexCache = buildEdgeTerritoryIndex();
   _borderPathCache.clear();
   _outerBorderCacheKey = '';
+  _edgeLayerStructKey = ''; // edge outer-edge status depends on edge index
   return _edgeIndexCache;
 }
 
@@ -151,13 +180,35 @@ function getCachedBorderPath(t: Territory, edgeIndex: Map<string, Territory[]>):
   return path;
 }
 
+/**
+ * Run sanitize + redundant-partition computation, but only when the map actually changed.
+ * Both are O(n²); calling them every render frame was the #1 CPU sink.
+ */
+function runSanitizeAndGetRedundantIds(): Set<string> {
+  const stateKey = territories.map(t => `${t.id}:${t.state}:${t.pointIds.join(',')}`).join('\n')
+    + '\n' + pts.map(p => `${Math.round(p.x)},${Math.round(p.y)}`).join('|');
+  if (stateKey === _sanitizeCacheKey) return _cachedRedundantPartitionIds;
+  _sanitizeCacheKey = stateKey;
+  applySanitizeToEditorState();
+  const raw: TerritoryMapDef = { version: 2, pts, edges, territories, controlPoints, notes, sectors };
+  _cachedRedundantPartitionIds = computeRedundantPartitionParentIds(raw);
+  return _cachedRedundantPartitionIds;
+}
+
 function clearAllRenderCaches(): void {
+  _ptMapCache = null; _ptMapLen = -1;
   _edgeIndexCache = null;
   _edgeIndexTopologyKey = '';
   _borderPathCache.clear();
   _territoryGroupCache.clear();
   _clipPathCache.clear();
   _outerBorderCacheKey = '';
+  _sanitizeCacheKey = '';
+  _cachedRedundantPartitionIds = new Set();
+  _edgeElementCache.clear();
+  _edgeLayerStructKey = '';
+  _edgeLayerGlowGroup = null;
+  _pointCircleCache.clear();
   _cachedDefs = null;
   _cachedLayerTerritory = null;
   _cachedLayerOuterBorder = null;
@@ -810,7 +861,11 @@ function resizeSvg(): void {
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
 function ptById(id: string): Pt | undefined {
-  return pts.find((p) => p.id === id);
+  if (!_ptMapCache || _ptMapLen !== pts.length) {
+    _ptMapCache = new Map(pts.map(p => [p.id, p]));
+    _ptMapLen = pts.length;
+  }
+  return _ptMapCache.get(id);
 }
 
 function territoryPoints(t: Territory): Array<{ x: number; y: number }> {
@@ -989,9 +1044,10 @@ function shouldSuppressBorderOnEdge(
 }
 
 function render(): void {
-  // Keep territory list in sync with sanitize rules every frame so redundant enclosing
-  // rings never linger (which would zero-out outer-edge territory counts and hide the map border).
-  applySanitizeToEditorState();
+  // Keep territory list in sync with sanitize rules, but only when map state actually changed.
+  // applySanitizeToEditorState + computeRedundantPartitionParentIds are O(n²); caching them
+  // is the single biggest CPU win when the user is just hovering/panning with many territories.
+  const redundantPartitionParentIds = runSanitizeAndGetRedundantIds();
   if (sectors.length) normalizeSectorColorIndices(sectors);
 
   svgEl.setAttribute('data-ev2-mode', mode);
@@ -1087,15 +1143,7 @@ function render(): void {
     return sectorEditorPaletteIndex(sectors[si], si);
   };
 
-  const redundantPartitionParentIds = computeRedundantPartitionParentIds({
-    version: 2,
-    pts,
-    edges,
-    territories,
-    controlPoints,
-    notes,
-    sectors,
-  });
+  // redundantPartitionParentIds is already computed and cached at the top of render()
 
   // ── Outer border layer ───────────────────────────────────────────────────
   // Build a unified perimeter path from all outer edges (touching only 1 territory).
@@ -1367,81 +1415,156 @@ function render(): void {
   // ── Edge layer ───────────────────────────────────────────────────────────
   if (!_cachedLayerEdge) _cachedLayerEdge = svgEl.querySelector('#ev2-edge-layer') as SVGGElement;
   const edgeLayer = _cachedLayerEdge;
-  edgeLayer.innerHTML = '';
+  edgeLayer.style.pointerEvents = mode === 'territory' ? 'none' : 'auto';
 
-  // All glow lines go into one compositing group so their opacity is applied
-  // once to the full composite — overlapping strokes at vertices stay uniform.
-  const glowGroup = document.createElementNS(SVG_NS, 'g');
-  glowGroup.setAttribute('class', 'ev2-edge-glow-group');
-  glowGroup.setAttribute('pointer-events', 'none');
-  edgeLayer.appendChild(glowGroup);
+  // Glow lines must all live inside a single compositing group for uniform opacity.
+  if (!_edgeLayerGlowGroup || !edgeLayer.contains(_edgeLayerGlowGroup)) {
+    edgeLayer.innerHTML = '';
+    _edgeElementCache.clear();
+    _edgeLayerGlowGroup = document.createElementNS(SVG_NS, 'g') as SVGGElement;
+    _edgeLayerGlowGroup.setAttribute('class', 'ev2-edge-glow-group');
+    _edgeLayerGlowGroup.setAttribute('pointer-events', 'none');
+    edgeLayer.appendChild(_edgeLayerGlowGroup);
+    _edgeLayerStructKey = '';
+  }
 
+  // Struct key: anything that adds/removes DOM elements (mode, edge set, river set)
+  const _isRiverMode = mode === 'territory' && territoryTool === 'river';
+  const _edgeHasHit = mode === 'borders' || _isRiverMode;
+  const _edgeStructKey = (_edgeHasHit ? '1' : '0') + '|' + _edgeIndexTopologyKey
+    + '|' + [...riverEdgeIds].sort().join(',');
+
+  if (_edgeStructKey !== _edgeLayerStructKey) {
+    // Structure changed — sync DOM elements (create new, remove deleted)
+    _edgeLayerStructKey = _edgeStructKey;
+    const currentEdgeIds = new Set(edges.map(e => e.id));
+
+    // Remove elements for deleted edges
+    for (const [eid, elms] of _edgeElementCache) {
+      if (!currentEdgeIds.has(eid)) {
+        elms.glow.remove();
+        elms.main.remove();
+        elms.hit?.remove();
+        elms.river?.remove();
+        elms.riverIcon?.remove();
+        _edgeElementCache.delete(eid);
+      }
+    }
+
+    // Create elements for new edges; for existing edges update structure if needed
+    for (const edge of edges) {
+      const existing = _edgeElementCache.get(edge.id);
+      const pa = ptById(edge.a);
+      const pb = ptById(edge.b);
+      if (!pa || !pb) continue;
+
+      if (!existing) {
+        // Create all elements for this edge
+        const glow = document.createElementNS(SVG_NS, 'line') as SVGLineElement;
+        glow.setAttribute('class', 'ev2-edge-glow');
+        _edgeLayerGlowGroup.appendChild(glow);
+
+        const main = document.createElementNS(SVG_NS, 'line') as SVGLineElement;
+        main.setAttribute('pointer-events', 'none');
+        edgeLayer.appendChild(main);
+
+        const elms: EdgeElements = { glow, main };
+
+        if (_edgeHasHit) {
+          const hit = document.createElementNS(SVG_NS, 'line') as SVGLineElement;
+          hit.setAttribute('class', 'ev2-edge-hit');
+          hit.setAttribute('data-ev2-edge-id', edge.id);
+          hit.setAttribute('stroke', 'rgba(0,0,0,0.01)');
+          hit.setAttribute('stroke-width', '22');
+          hit.setAttribute('stroke-linecap', 'round');
+          hit.setAttribute('pointer-events', 'stroke');
+          edgeLayer.insertBefore(hit, main);
+          elms.hit = hit;
+        }
+
+        if (riverEdgeIds.has(edge.id)) {
+          const riverLine = document.createElementNS(SVG_NS, 'line') as SVGLineElement;
+          riverLine.setAttribute('class', 'ev2-river-edge');
+          riverLine.setAttribute('pointer-events', 'none');
+          edgeLayer.appendChild(riverLine);
+          elms.river = riverLine;
+          const dx = pb.x - pa.x, dy = pb.y - pa.y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          if (len >= config.riverEdgeIconMinLength) {
+            const img = document.createElementNS(SVG_NS, 'image') as SVGImageElement;
+            img.setAttribute('href', riverEdgeIconSrc);
+            img.setAttribute('width', String(28));
+            img.setAttribute('height', String(28));
+            img.setAttribute('pointer-events', 'none');
+            edgeLayer.appendChild(img);
+            elms.riverIcon = img;
+          }
+        }
+
+        _edgeElementCache.set(edge.id, elms);
+      } else {
+        // Existing edge: sync presence of hit/river elements
+        if (_edgeHasHit && !existing.hit) {
+          const hit = document.createElementNS(SVG_NS, 'line') as SVGLineElement;
+          hit.setAttribute('class', 'ev2-edge-hit');
+          hit.setAttribute('data-ev2-edge-id', edge.id);
+          hit.setAttribute('stroke', 'rgba(0,0,0,0.01)');
+          hit.setAttribute('stroke-width', '22');
+          hit.setAttribute('stroke-linecap', 'round');
+          hit.setAttribute('pointer-events', 'stroke');
+          edgeLayer.insertBefore(hit, existing.main);
+          existing.hit = hit;
+        } else if (!_edgeHasHit && existing.hit) {
+          existing.hit.remove();
+          existing.hit = undefined;
+        }
+        if (riverEdgeIds.has(edge.id) && !existing.river) {
+          const riverLine = document.createElementNS(SVG_NS, 'line') as SVGLineElement;
+          riverLine.setAttribute('class', 'ev2-river-edge');
+          riverLine.setAttribute('pointer-events', 'none');
+          edgeLayer.appendChild(riverLine);
+          existing.river = riverLine;
+        } else if (!riverEdgeIds.has(edge.id) && existing.river) {
+          existing.river.remove(); existing.river = undefined;
+          existing.riverIcon?.remove(); existing.riverIcon = undefined;
+        }
+      }
+    }
+  }
+
+  // Always update coords + classes (cheap with setAttrIfChanged; no-ops when unchanged)
   for (const edge of edges) {
+    const elms = _edgeElementCache.get(edge.id);
+    if (!elms) continue;
     const pa = ptById(edge.a);
     const pb = ptById(edge.b);
     if (!pa || !pb) continue;
 
-    const glow = document.createElementNS(SVG_NS, 'line');
-    glow.setAttribute('class', 'ev2-edge-glow');
-    glow.setAttribute('x1', String(pa.x));
-    glow.setAttribute('y1', String(pa.y));
-    glow.setAttribute('x2', String(pb.x));
-    glow.setAttribute('y2', String(pb.y));
-    glowGroup.appendChild(glow);
-
-    const isRiverMode = mode === 'territory' && territoryTool === 'river';
-    if (mode === 'borders' || isRiverMode) {
-      const hit = document.createElementNS(SVG_NS, 'line');
-      hit.setAttribute('class', 'ev2-edge-hit');
-      hit.setAttribute('data-ev2-edge-id', edge.id);
-      hit.setAttribute('x1', String(pa.x));
-      hit.setAttribute('y1', String(pa.y));
-      hit.setAttribute('x2', String(pb.x));
-      hit.setAttribute('y2', String(pb.y));
-      hit.setAttribute('stroke', 'rgba(0,0,0,0.01)');
-      hit.setAttribute('stroke-width', '22');
-      hit.setAttribute('stroke-linecap', 'round');
-      hit.setAttribute('pointer-events', 'stroke');
-      edgeLayer.appendChild(hit);
+    const x1 = String(pa.x), y1 = String(pa.y), x2 = String(pb.x), y2 = String(pb.y);
+    setAttrIfChanged(elms.glow, 'x1', x1); setAttrIfChanged(elms.glow, 'y1', y1);
+    setAttrIfChanged(elms.glow, 'x2', x2); setAttrIfChanged(elms.glow, 'y2', y2);
+    if (elms.hit) {
+      setAttrIfChanged(elms.hit, 'x1', x1); setAttrIfChanged(elms.hit, 'y1', y1);
+      setAttrIfChanged(elms.hit, 'x2', x2); setAttrIfChanged(elms.hit, 'y2', y2);
     }
-
-    const line = document.createElementNS(SVG_NS, 'line');
     const edgeTerritories = edgeIndex.get(undirectedEdgeKey(edge.a, edge.b));
     const isOuterEdge = edgeTerritories !== undefined && edgeTerritories.length === 1;
     let cls = isOuterEdge ? 'ev2-edge ev2-edge-outer' : 'ev2-edge';
     if (mode === 'borders' && selectedEdgeIds.has(edge.id)) cls += ' ev2-edge-selected';
-    line.setAttribute('class', cls);
-    if (mode === 'borders') line.setAttribute('data-ev2-edge-id', edge.id);
-    line.setAttribute('x1', String(pa.x));
-    line.setAttribute('y1', String(pa.y));
-    line.setAttribute('x2', String(pb.x));
-    line.setAttribute('y2', String(pb.y));
-    line.setAttribute('pointer-events', 'none');
-    edgeLayer.appendChild(line);
-
-    if (riverEdgeIds.has(edge.id)) {
-      const riverLine = document.createElementNS(SVG_NS, 'line');
-      riverLine.setAttribute('class', 'ev2-river-edge');
-      riverLine.setAttribute('x1', String(pa.x));
-      riverLine.setAttribute('y1', String(pa.y));
-      riverLine.setAttribute('x2', String(pb.x));
-      riverLine.setAttribute('y2', String(pb.y));
-      riverLine.setAttribute('pointer-events', 'none');
-      edgeLayer.appendChild(riverLine);
-      const dx = pb.x - pa.x, dy = pb.y - pa.y;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      if (len >= config.riverEdgeIconMinLength) {
-        const iconSize = 28;
-        const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2;
-        const img = document.createElementNS(SVG_NS, 'image');
-        img.setAttribute('href', riverEdgeIconSrc);
-        img.setAttribute('x', String(mx - iconSize / 2));
-        img.setAttribute('y', String(my - iconSize / 2));
-        img.setAttribute('width', String(iconSize));
-        img.setAttribute('height', String(iconSize));
-        img.setAttribute('pointer-events', 'none');
-        edgeLayer.appendChild(img);
-      }
+    setAttrIfChanged(elms.main, 'class', cls);
+    if (mode === 'borders') { if (!elms.main.hasAttribute('data-ev2-edge-id')) elms.main.setAttribute('data-ev2-edge-id', edge.id); }
+    else elms.main.removeAttribute('data-ev2-edge-id');
+    setAttrIfChanged(elms.main, 'x1', x1); setAttrIfChanged(elms.main, 'y1', y1);
+    setAttrIfChanged(elms.main, 'x2', x2); setAttrIfChanged(elms.main, 'y2', y2);
+    if (elms.river) {
+      setAttrIfChanged(elms.river, 'x1', x1); setAttrIfChanged(elms.river, 'y1', y1);
+      setAttrIfChanged(elms.river, 'x2', x2); setAttrIfChanged(elms.river, 'y2', y2);
+    }
+    if (elms.riverIcon) {
+      const iconSize = 28;
+      const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2;
+      setAttrIfChanged(elms.riverIcon, 'x', String(mx - iconSize / 2));
+      setAttrIfChanged(elms.riverIcon, 'y', String(my - iconSize / 2));
     }
   }
 
@@ -1481,29 +1604,42 @@ function render(): void {
   // ── Point layer ──────────────────────────────────────────────────────────
   if (!_cachedLayerPoint) _cachedLayerPoint = svgEl.querySelector('#ev2-point-layer') as SVGGElement;
   const pointLayer = _cachedLayerPoint;
-  pointLayer.innerHTML = '';
   pointLayer.style.pointerEvents = mode === 'territory' || mode === 'borders' ? 'none' : 'auto';
-  edgeLayer.style.pointerEvents = mode === 'territory' ? 'none' : 'auto';
 
-  if (mode !== 'view') {
+  if (mode === 'view') {
+    // In view mode there are no points to show — clear the cache
+    for (const c of _pointCircleCache.values()) c.remove();
+    _pointCircleCache.clear();
+  } else {
+    // Sync point circles incrementally
     const firstPathPointId = currentPath.length > 0 ? currentPath[0] : null;
-
+    const currentPtIds = new Set(pts.map(p => p.id));
+    for (const [pid, circle] of _pointCircleCache) {
+      if (!currentPtIds.has(pid)) { circle.remove(); _pointCircleCache.delete(pid); }
+    }
     for (const p of pts) {
-      const circle = document.createElementNS(SVG_NS, 'circle');
+      let circle = _pointCircleCache.get(p.id);
+      if (!circle) {
+        circle = document.createElementNS(SVG_NS, 'circle') as SVGCircleElement;
+        pointLayer.appendChild(circle);
+        _pointCircleCache.set(p.id, circle);
+      }
       const isHovered = p.id === hoveredPoint;
       const isCloseable = p.id === firstPathPointId && currentPath.length >= 3;
       const isDeleteTarget = isRemovingDot && isHovered;
-
       let cls = 'ev2-point';
-      if (isDeleteTarget)      cls += ' ev2-point-delete';
-      else if (isCloseable)    cls += ' ev2-point-closeable';
-      else if (isHovered)      cls += ' ev2-point-hover';
-
-      circle.setAttribute('class', cls);
-      circle.setAttribute('cx', String(p.x));
-      circle.setAttribute('cy', String(p.y));
-      circle.setAttribute('r', isHovered || isCloseable ? '7' : '5');
-      pointLayer.appendChild(circle);
+      if (isDeleteTarget)   cls += ' ev2-point-delete';
+      else if (isCloseable) cls += ' ev2-point-closeable';
+      else if (isHovered)   cls += ' ev2-point-hover';
+      setAttrIfChanged(circle, 'class', cls);
+      setAttrIfChanged(circle, 'cx', String(p.x));
+      setAttrIfChanged(circle, 'cy', String(p.y));
+      setAttrIfChanged(circle, 'r', isHovered || isCloseable ? '7' : '5');
+    }
+    // Ensure DOM order matches pts array (new points appended above; reorder if needed)
+    for (let i = 0; i < pts.length; i++) {
+      const c = _pointCircleCache.get(pts[i]!.id);
+      if (c && pointLayer.children[i] !== c) pointLayer.insertBefore(c, pointLayer.children[i] ?? null);
     }
   }
 
