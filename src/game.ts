@@ -2471,6 +2471,7 @@ function scoreAiProductionPlacement(
   counts: Record<string, number>,
   distToGoalMap: Map<string, number>,
   occupiedByEnemy: Set<string>,
+  frontlineSectorIdx: number | null,
 ): number {
   const neighbors = effectiveGetNeighbors(col, row, COLS, ROWS);
   let adjacentEnemy = 0;
@@ -2544,6 +2545,11 @@ function scoreAiProductionPlacement(
     } else {
       // Defender holds the line — reinforce existing artillery/infantry preference
       if (utClass === 'artillery') score += 20;
+      // Strongly prefer spawning in the active frontline sector that the attacker is pushing into
+      if (frontlineSectorIdx !== null) {
+        const hexSid = state.sectorIndexByHex[`${col},${row}`];
+        if (hexSid === frontlineSectorIdx) score += 110;
+      }
     }
   }
 
@@ -2559,6 +2565,10 @@ export function aiProduction(state: GameState): GameState {
   const pressure = aiDefensivePressure(state);
   const distToGoalMap = buildDistanceToOpponentHomeRowMap(state, AI);
   const hasHomeAccess = hasHomeProductionAccess(state, AI);
+  const frontlineSectorIdx =
+    state.gameMode === 'breakthrough' && getBreakthroughAttackerOwner(state) !== AI
+      ? breakthroughActiveFrontlineSectorIndex(state)
+      : null;
   while (true) {
     const affordable = getAvailableUnitTypes(AI).filter(t => state.productionPoints[AI] >= t.cost);
     if (affordable.length === 0) {
@@ -2594,6 +2604,7 @@ export function aiProduction(state: GameState): GameState {
           counts,
           distToGoalMap,
           occupiedByEnemy,
+          frontlineSectorIdx,
         );
         if (
           !best ||
