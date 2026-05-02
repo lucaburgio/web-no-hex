@@ -2438,7 +2438,6 @@ function buildRulesContent(): string {
       <div class="rules-nav-group">
         <div class="rules-nav-group-label">Introduction</div>
         <a class="rules-nav-link" href="#rules-units">Units in this match</a>
-        <a class="rules-nav-link" href="#rules-overview">Overview</a>
         <a class="rules-nav-link" href="#rules-turn-phases">Turn phases</a>
       </div>
       <div class="rules-nav-group">
@@ -2454,17 +2453,7 @@ function buildRulesContent(): string {
     <section id="rules-units" class="rules-anchor-section">
       <div class="settings-group rules-section">
       <div class="rules-group-title">Units in this match</div>
-      <p class="rules-prose rules-prose">Production and combat use the stats below. Asymmetric matches list separate rosters for south and north.</p>
       ${buildMatchUnitsRosterHtml()}
-      </div>
-    </section>
-
-    <section id="rules-overview" class="rules-anchor-section">
-      <div class="settings-group rules-section">
-      <div class="rules-group-title">Overview</div>
-      <p class="rules-prose">Turn-based hex strategy on a ${config.boardCols}×${config.boardRows} grid.
-         You play from the south (bottom row); the opponent plays from the north (top row).
-         Pick a <strong>map layout</strong> in custom match settings (maps define terrain and mode-specific objectives in the editor).</p>
       </div>
     </section>
 
@@ -2485,18 +2474,16 @@ function buildRulesContent(): string {
       <div class="rules-group-title">Production</div>
       <ul class="rules-list">
       <li>Each turn you earn <strong>${config.productionPointsPerTurn} PP</strong> (production points).</li>
-      <li><strong>Breakthrough:</strong> the <strong>southern attacker</strong> does not receive PP after the match starts (only the configured starting pool). The <strong>northern defender</strong> earns PP each turn as above.</li>
-      <li><strong>Territory bonus:</strong> +${config.pointsPerQuota} PP for every ${config.territoryQuota} hexes you own.</li>
-      <li>Which units you can build is listed under <strong>Units in this match</strong> (north and south may differ).</li>
-      <li>Valid placement: your <strong>home row</strong> (bottom on a standard hex board), or any owned <strong>production hex</strong>.
-        On <strong>polygon Breakthrough</strong> maps, your &ldquo;home&rdquo; for supply and placement is your <strong>starting sector</strong>
+      <li><strong>Breakthrough:</strong> the <strong>attacker</strong> does not receive PP after the match starts (only the configured starting pool). The <strong>defender</strong> earns PP each turn as above.</li>
+      <li><strong>Territory bonus:</strong> +${config.pointsPerQuota} PP for every ${config.territoryQuota} territories you own.</li>
+      <li>Which units you can build is listed under <strong>Units in this match</strong>.</li>
+      <li>Valid placement: 
+        On <strong>Breakthrough</strong> maps, your &ldquo;home&rdquo; for supply and placement is your <strong>starting sector</strong>
         (the sector without a control point for the attacker, and defender-held sectors for the defender), not only the bottom row of the abstract placement grid.
-        You must control <strong>at least one such home hex</strong> to produce anywhere; if the enemy takes every home-sector hex, reconquer one before you can build again.
-        You cannot place on home-area hexes the enemy controls until you retake them.</li>
-      <li><strong>Production hex:</strong> an owned hex stable for <strong>${config.productionTurns} consecutive turns</strong>.
-        Stability requires all hexes within distance ${config.productionSafeDistance} to be owned by you
-        (impassable <strong>mountain</strong> hexes in that ring count as secure — they are not neutral or enemy territory).
-        On <strong>polygon scenario maps</strong>, each &ldquo;distance&rdquo; step follows <strong>shared-border adjacency</strong> (same as movement), not the abstract virtual grid layout.
+        You must control <strong>at least one such home territory</strong> to produce anywhere; if the enemy takes every home-sector territory, reconquer one before you can build again.
+        You cannot place on home-area territories the enemy controls until you retake them.</li>
+      <li><strong>Production territory:</strong> an owned territory stable for <strong>${config.productionTurns} consecutive turns</strong>.
+        Stability requires all territories within <strong>${config.productionSafeDistance} border steps</strong> (following shared-border adjacency, same as movement) to be owned by you — impassable <strong>mountain</strong> territories in that ring count as secure.
         Resets immediately if that condition breaks.
         <strong>Breakthrough:</strong> sectors start pre-owned, so any owned hex already meeting this stability rule is available as a production hex from turn 1.</li>
       <li>You can place multiple units per turn as long as you have PP.</li>
@@ -2508,14 +2495,12 @@ function buildRulesContent(): string {
       <div class="settings-group rules-section">
       <div class="rules-group-title">Movement</div>
       <ul class="rules-list">
-      <li>Each unit may move up to its movement range per turn (see <strong>Units in this match</strong>). Moving onto an empty hex <strong>conquers</strong> it.</li>
-      <li><strong>Polygon scenario maps:</strong> you move between territories that share a <strong>border edge</strong> (same as the map editor&rsquo;s internal adjacency), not merely a corner contact.</li>
-      <li>Moving onto an enemy unit triggers <strong>combat</strong>. If you need more than one hex to reach them, you move along the path into the hex adjacent to the enemy first, then combat resolves.</li>
-      <li><strong>Artillery:</strong> each turn you either <strong>move</strong> one hex or fire a <strong>ranged attack</strong> at an enemy (not both). Ranged fire does not use movement into the target&rsquo;s hex.
-        On a <strong>standard hex board</strong>, the target must lie at <strong>hex distance 2–${arRangeNum ?? 'range'}</strong> (axial grid distance). On polygon scenario maps, valid ranged targets are enemies whose position lies <strong>inside</strong> the max-range circle shown when you select your artillery (straight-line distance between territory centers, in units of average neighbor spacing, up to your type&rsquo;s <code>range</code>; no minimum distance; mountains do not block). A **melee-adjacent** enemy (same adjacency as movement) is **never** a ranged target—<strong>move</strong> onto their hex for normal simultaneous combat (standard move highlight). When you inspect an enemy artillery piece, its circle uses the opponent color so you can read their reach.</li>
-      <li><strong>Zone of Control (ZoC):</strong> a unit adjacent to an enemy is locked — it may only attack
-        or retreat to a hex not itself adjacent to any enemy. <strong>Adjacent</strong> for ZoC is the same as for movement: on a standard hex board, the six grid neighbors; on <strong>polygon scenario maps</strong>, territories that share a <strong>border edge</strong> (not merely close virtual indices on the abstract grid). ZoC limits movement and adjacent attacks; it does not block artillery ranged fire at non-adjacent targets.</li>
-      <li><strong>Domination — guarded home row:</strong> with ZoC enabled, you cannot move onto an <strong>empty</strong> hex on the opponent&rsquo;s <strong>home row</strong> if any enemy is adjacent to that hex (this stops fast units from bypassing ZoC with multi-hex moves). You can still move onto that hex to attack an enemy unit sitting on it.</li>
+      <li>Each unit may move up to its movement range per turn (see <strong>Units in this match</strong>). You move between territories that share a <strong>border edge</strong>. Moving onto an empty territory <strong>conquers</strong> it.</li>
+      <li>Moving onto an enemy unit triggers <strong>combat</strong>. If you need more than one step to reach them, you move along the path to the territory adjacent to the enemy first, then combat resolves.</li>
+      <li><strong>Artillery:</strong> each turn you either <strong>move</strong> one territory or fire a <strong>ranged attack</strong> at an enemy (not both). Ranged fire does not use movement into the target&rsquo;s territory.
+        Valid ranged targets are enemies shown inside the range circle when you select your artillery (straight-line distance between territory centers, in units of average neighbor spacing, up to your type&rsquo;s <code>range</code>; no minimum distance; mountains do not block). A <strong>melee-adjacent</strong> enemy (shares a border edge) is <strong>never</strong> a ranged target — <strong>move</strong> onto their territory for normal simultaneous combat. When you inspect an enemy artillery piece, its circle uses the opponent color so you can read their reach.</li>
+      <li><strong>Zone of Control (ZoC):</strong> a unit adjacent to an enemy is locked — it may only attack or retreat to a territory not itself adjacent to any enemy. <strong>Adjacent</strong> means sharing a <strong>border edge</strong> (same as movement). ZoC limits movement and adjacent attacks; it does not block artillery ranged fire at non-adjacent targets.</li>
+      <li><strong>Domination — guarded home area:</strong> with ZoC enabled, you cannot move onto an <strong>empty</strong> territory on the opponent&rsquo;s <strong>home area</strong> if any enemy is adjacent to that territory (this stops fast units from bypassing ZoC with multi-step moves). You can still move onto that territory to attack an enemy unit occupying it.</li>
     </ul>
       </div>
     </section>
@@ -2524,10 +2509,10 @@ function buildRulesContent(): string {
       <div class="settings-group rules-section">
       <div class="rules-group-title">Combat</div>
       <ul class="rules-list">
-      <li><strong>Adjacent combat:</strong> both sides deal damage <strong>simultaneously</strong>. If the defender is destroyed, the attacker advances and conquers the hex.</li>
-      <li><strong>Artillery ranged fire:</strong> only the defender takes damage (no return fire). Used when you <strong>shoot</strong> instead of moving into melee (see <strong>Movement</strong> for valid ranged targets by map type). Destroying a unit with a ranged attack does <strong>not</strong> move the artillery or conquer that hex.</li>
+      <li><strong>Adjacent combat:</strong> both sides deal damage <strong>simultaneously</strong>. If the defender is destroyed, the attacker advances and conquers the territory.</li>
+      <li><strong>Artillery ranged fire:</strong> only the defender takes damage (no return fire). Used when you <strong>shoot</strong> instead of moving into melee (see <strong>Movement</strong> for valid ranged targets). Destroying a unit with a ranged attack does <strong>not</strong> move the artillery or conquer that territory.</li>
       <li><strong>Limit Artillery</strong> (optional game setting): when enabled, if <strong>any</strong> enemy is adjacent to your artillery, it cannot use ranged attacks against other hexes until no adjacent enemies remain — use adjacent combat (move to attack) first.</li>
-      <li><strong>CS</strong> = unit type&rsquo;s base strength × condition (50–100% of current max HP) × flanking bonus. Defenders on a <strong>river</strong> hex gain <strong>+${riverDefPct}%</strong> effective strength.</li>
+      <li><strong>CS</strong> = unit type&rsquo;s base strength × condition (50–100% of current max HP) × flanking bonus. Defenders on a <strong>river</strong> territory gain <strong>+${riverDefPct}%</strong> effective strength.</li>
       <li><strong>Tank spearhead:</strong> a <strong>tank</strong> gains <strong>+${Math.round(config.tankSpearheadAttackBonus * 100)}%</strong> attacker CS when it moves into <strong>adjacent</strong> melee after a <strong>straight-line approach that uses its full movement allowance in one move</strong> (e.g. movement 2 = two hexes along the attack path; movement 3 = three hexes).</li>
       <li><strong>Breakthrough:</strong> northern (defender) units in a <strong>sector already captured</strong> by the attacker use reduced effective strength in combat (see game settings for the percentage).</li>
       <li><strong>Flanking:</strong> +${Math.round(config.flankingBonus * 100)}% CS per adjacent friendly
@@ -2535,7 +2520,7 @@ function buildRulesContent(): string {
         Some unit types add <strong>extra flanking</strong> when they are among those adjacent flankers.</li>
       <li><strong>Damage:</strong> <code>floor(${config.combatDamageBase} × exp(±ΔCS / ${config.combatStrengthScale}))</code>, min 1 per side.</li>
       <li><strong>Upgrade points:</strong> in <strong>adjacent combat</strong>, each side earns <strong>${config.upgradePointsPerDamageDealt}</strong> point per HP of damage it actually deals to the other, plus <strong>${config.upgradePointsKillBonus}</strong> extra if it destroys that unit. <strong>Ranged fire</strong> only damages the target (no return shot), so only the firing unit earns points from that exchange. A unit can have at most <strong>${config.maxUnitUpgradeStacks}</strong> upgrades total (stars on the card); at that cap it earns no further points and the upgrade menu does not appear. Required points to level up depend on unit type (shown on the movement unit card). When you have enough points during movement, choose one upgrade: <strong>+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%</strong> CS per flanker when attacking (up to <strong>${Math.round(config.upgradeBonusFlankingPerStack * config.maxFlankingUnits * 100)}%</strong> with ${config.maxFlankingUnits} flankers), <strong>+${Math.round(config.upgradeBonusAttackPerStack * 100)}%</strong> CS when attacking, <strong>+${Math.round(config.upgradeBonusDefensePerStack * 100)}%</strong> CS when defending, or <strong>+${config.upgradeBonusHealPerStack}</strong> HP to your end-of-turn heal on own territory (stacks if you pick the same option again).</li>
-      <li>If defender dies: attacker advances and conquers the hex. If both die: both removed.</li>
+      <li>If defender dies: attacker advances and conquers the territory. If both die: both removed.</li>
       <li>Hover over an enemy unit during movement to see a combat forecast.</li>
     </ul>
     </div>
@@ -2549,7 +2534,7 @@ function buildRulesContent(): string {
       <li><strong>Condition mult</strong> = <code>0.5 + 0.5 × (current HP / max HP)</code> — from <strong>50%</strong> of full effectiveness at 0 HP up to <strong>100%</strong> at full HP (linear in HP fraction).</li>
       <li><strong>Flank mult</strong> (attacker only) = <code>1 + <em>f</em> × ${Math.round(config.flankingBonus * 100)}%</code> where <em>f</em> is the number of contributing adjacent friendlies next to the defender, capped at <strong>${config.maxFlankingUnits}</strong>, in fixed neighbor order, plus any per-unit-type <strong>extra flanking</strong> from those flankers (see short Combat section).</li>
       <li><strong>Breakthrough</strong> mult for a defender in a sector already captured by the attacker = <strong>${brPct}%</strong> (same setting as above).</li>
-      <li><strong>River defense</strong> mult for a defender whose unit is on a river hex = <strong>${100 + riverDefPct}%</strong> (additive +${riverDefPct}% to CS).</li>
+      <li><strong>River defense</strong> mult for a defender on a river territory = <strong>${100 + riverDefPct}%</strong> (additive +${riverDefPct}% to CS).</li>
       <li><strong>Upgrade</strong> mult: when attacking, stacks of attack upgrade add <strong>+${Math.round(config.upgradeBonusAttackPerStack * 100)}%</strong> CS each; each stack of flanking upgrade adds <strong>+${Math.round(config.upgradeBonusFlankingPerStack * 100)}%</strong> CS per contributing flanker (capped at ${config.maxFlankingUnits}). When defending, defense upgrade stacks add <strong>+${Math.round(config.upgradeBonusDefensePerStack * 100)}%</strong> CS each. The healing upgrade adds <strong>+${config.upgradeBonusHealPerStack}</strong> HP per stack to end-of-turn healing on own territory (not part of CS).</li>
       <li><strong>Tank spearhead</strong> mult (melee attacker only) = <strong>${100 + Math.round(config.tankSpearheadAttackBonus * 100)}%</strong> when the attacker is a <strong>tank</strong>, it had <strong>not</strong> spent movement earlier this phase, and the move into adjacent combat costs <strong>exactly</strong> that unit&rsquo;s <strong>movement</strong> stat in path steps (scales if tanks later have movement 3+).</li>
     </ul>
@@ -2572,15 +2557,15 @@ function buildRulesContent(): string {
       <div class="rules-group-title">Game modes</div>
       <p class="rules-prose">The match mode is chosen in <strong>Game settings</strong> before play.</p>
       <ul class="rules-list">
-      <li><strong>Domination:</strong> move a unit onto the <strong>opponent&rsquo;s home row</strong>, or <strong>eliminate all enemy units</strong>.</li>
-      <li><strong>Conquest:</strong> <strong>control point</strong> hexes are placed on the map in the editor (or embedded map JSON).
+      <li><strong>Domination:</strong> move a unit onto the <strong>opponent&rsquo;s home area</strong>, or <strong>eliminate all enemy units</strong>.</li>
+      <li><strong>Conquest:</strong> <strong>control points</strong> are placed on territories in the editor (or embedded map JSON).
         Each side starts with <strong>Conquer Points</strong> (south ${config.conquestPointsPlayer}, north ${config.conquestPointsAi} — configurable).
         After each side finishes its <strong>movement phase</strong>, for every control point you <strong>own</strong>, the opponent loses 1 Conquer Point (multiple points stack).
         Additionally, each time a unit is <strong>killed</strong>, its owner loses 1 Conquer Point.
         The first side reduced to <strong>0</strong> Conquer Points loses.
         You also lose immediately if you have <strong>no units</strong> and <strong>no owned territory</strong> (even if your Conquer Points are still above 0).
-        Reaching the opponent&rsquo;s home row alone does <strong>not</strong> end the match.
-        If both sides hit 0 Conquer Points in the same tick, the side with more <strong>owned hexes</strong> wins; if hex counts are also equal, the <strong>northern</strong> player wins the tie. Both sides totally eliminated from the map at once → northern player wins.</li>
+        Reaching the opponent&rsquo;s home area alone does <strong>not</strong> end the match.
+        If both sides hit 0 Conquer Points in the same tick, the side with more <strong>owned territories</strong> wins; if territory counts are also equal, the <strong>northern</strong> player wins the tie. Both sides totally eliminated from the map at once → northern player wins.</li>
       <li><strong>Breakthrough:</strong> the map is split into <strong>${config.breakthroughSectorCount}</strong> sectors (configurable, south to north). In <strong>Game settings</strong> you can set whether <strong>player 1</strong> (south / host) is <strong>attacker</strong> or <strong>defender</strong>, or enable <strong>random role</strong> to pick at match start. The <strong>attacker</strong> starts with <strong>${config.breakthroughAttackerStartingPP} PP</strong> and earns <strong>no further PP</strong>; the <strong>defender</strong> starts with <strong>${config.breakthroughDefenderStartingPP} PP</strong>, then earns the usual per-turn PP plus territory bonus each round.
         The attacker&rsquo;s <strong>home sector</strong> (south if player 1 is attacker, north if player 1 is defender) has no control point. Only the <strong>frontline defender sector on the attacker-facing border</strong> shows its control point(s) at a time. To capture that sector, the attacker must keep at least one unit on <strong>each</strong> of that sector&rsquo;s control points <strong>at the same time</strong> for <strong>two full rounds</strong> (checked after both sides move); the occupation counter only advances while every CP in the sector is held. When a sector is captured, those markers are removed, <strong>every hex in that sector</strong> becomes attacker territory, and the next defender-border sector&rsquo;s control point(s) appear. The attacker also gains <strong>+${config.breakthroughSectorCaptureBonusPP} PP</strong> (configurable; 0 to disable).
         After that, the defender <strong>cannot regain those hexes</strong> — they may still fight and move there, but hex ownership stays with the attacker. The sector itself also <strong>never</strong> flips back politically.
